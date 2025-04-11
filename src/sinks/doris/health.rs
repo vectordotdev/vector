@@ -2,14 +2,14 @@ use crate::{
     http::HttpError,
     sinks::{ util::service::HealthLogic},
 };
-use crate::sinks::util::http::HttpResponse;
+use crate::sinks::doris::service_bak::DorisResponse;
 
 #[derive(Clone)]
 pub struct DorisHealthLogic;
 
 impl HealthLogic for DorisHealthLogic {
     type Error = crate::Error;
-    type Response = HttpResponse;
+    type Response = DorisResponse;
 
     fn is_healthy(&self, response: &Result<Self::Response, Self::Error>) -> Option<bool> {
         match response {

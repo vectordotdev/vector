@@ -8,19 +8,21 @@ use crate::{
     sinks::{
         doris::health::DorisHealthLogic,
         prelude::*,
-        util::{http::HttpService, RealtimeSizeBasedDefaultBatchSettings, service::HealthConfig},
+        util::{RealtimeSizeBasedDefaultBatchSettings, service::HealthConfig},
     },
 };
 use http::{Request, Uri};
 use hyper::Body;
 use std::collections::HashMap;
-use std::fmt;
 use futures;
 use futures_util::TryFutureExt;
 use serde_json;
 use vector_lib::codecs::JsonSerializerConfig;
 use crate::sinks::doris::common::DorisCommon;
 use crate::sinks::doris::retry::DorisRetryLogic;
+use crate::sinks::doris::service_bak::{DorisService, HttpRequestBuilder};
+use crate::sinks::util::http::RequestConfig;
+use std::sync::Arc;
 
 // 定义用于 Doris 服务的 URI 处理函数
 fn get_http_scheme_host(host: &str) -> crate::Result<UriComponents> {
@@ -78,9 +80,6 @@ pub struct DorisConfig {
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: Template,
 
-    /// The format to parse input data.
-    #[serde(default)]
-    pub format: DorisFormat,
 
     /// The prefix for Stream Load label.
     /// The final label will be in format: `{label_prefix}_{database}_{table}_{timestamp}_{uuid}`.
@@ -114,6 +113,10 @@ pub struct DorisConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
+    /// Compression algorithm to use for HTTP requests.
+    #[serde(default)]
+    pub compression: Compression,
+
     /// Maximum size of a batch before it is flushed.
     #[serde(default = "default_bulk_max_size")]
     pub bulk_max_size: usize,
@@ -129,9 +132,9 @@ pub struct DorisConfig {
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    #[configurable(derived)]
+    pub request: RequestConfig,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -180,33 +183,33 @@ fn default_max_retries() -> isize {
     -1
 }
 
-/// The format used to parse input/output data.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-#[allow(clippy::enum_variant_names)]
-pub enum DorisFormat {
-    #[derivative(Default)]
-    /// JSONEachRow.
-    Json,
-
-    /// json array [{},{},{}].
-    JsonAsArray,
-
-    /// csv.
-    CSV,
-}
-
-impl fmt::Display for DorisFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DorisFormat::Json => write!(f, "Json"),
-            DorisFormat::JsonAsArray => write!(f, "JsonAsArray"),
-            DorisFormat::CSV => write!(f, "CSV"),
-        }
-    }
-}
+// /// The format used to parse input/output data.
+// #[configurable_component]
+// #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
+// #[serde(rename_all = "snake_case")]
+// #[derivative(Default)]
+// #[allow(clippy::enum_variant_names)]
+// pub enum DorisFormat {
+//     #[derivative(Default)]
+//     /// JSONEachRow.
+//     Json,
+//
+//     /// json array [{},{},{}].
+//     JsonAsArray,
+//
+//     /// csv.
+//     CSV,
+// }
+//
+// impl fmt::Display for DorisFormat {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             DorisFormat::Json => write!(f, "Json"),
+//             DorisFormat::JsonAsArray => write!(f, "JsonAsArray"),
+//             DorisFormat::CSV => write!(f, "CSV"),
+//         }
+//     }
+// }
 
 impl_generate_config_from_default!(DorisConfig);
 
@@ -222,58 +225,47 @@ impl SinkConfig for DorisConfig {
         let commons = DorisCommon::parse_many(self).await?;
         let common = commons[0].clone();
 
-        // let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        // Handle auth
-        // let auth = self.auth.clone();
-
         let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
-
-        
-
-        // Create headers with basic auth if credentials are provided
-        let headers = self.create_headers();
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
         // Create and start the progress reporter
         let reporter = ProgressReporter::new(self.log_progress_interval);
         let reporter_clone = reporter.clone();
-        // 创建一个新的 noop 关闭信号 - 它会在 Vector 进程关闭时自动关闭
+        // Create a new noop shutdown signal - it will be automatically closed when the Vector process shuts down
         let shutdown = vector_lib::shutdown::ShutdownSignal::noop();
         tokio::spawn(async move {
             reporter_clone.report(Some(shutdown)).await;
         });
 
         // Setup retry logic using the configured request settings
-        let request_settings = self.request.clone().into_settings();
+        let request_settings = self.request.tower.into_settings();
         
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
+        // 将reporter包装为Arc以便共享
+        let reporter_arc = Arc::new(reporter);
+
+        // Use our new DorisService implementation instead of HttpService
         let services = commons
             .iter()
             .cloned()
             .map(|common| {
-
                 let endpoint = common.base_url.clone();
-                let doris_service_request_builder = super::service::DorisServiceRequestBuilder {
-                    auth: common.auth.clone(),
-                    url: common.base_url.clone().to_string(),
-                    headers: headers.clone(),
-                    label_prefix: self.label_prefix.clone(),
-                    log_request: self.log_request,
-                };
-
-                let service: HttpService<
-                    super::service::DorisServiceRequestBuilder,
-                    super::sink::DorisPartitionKey,
-                > = HttpService::new(client.clone(), doris_service_request_builder);
-
+                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                
+                let service = DorisService::new(
+                    client.clone(), 
+                    http_request_builder, 
+                    self.log_request, 
+                    Arc::clone(&reporter_arc)
+                );
                 (endpoint, service)
             })
             .collect::<Vec<_>>();
 
         let service = request_settings.distributed_service(
-            DorisRetryLogic::new(reporter.clone(), self.log_request),
+            DorisRetryLogic::new(),
             services,
             health_config,
             DorisHealthLogic,
@@ -304,6 +296,11 @@ impl SinkConfig for DorisConfig {
 }
 
 impl DorisConfig {
+    /// Helper function to create HTTP headers for Doris Stream Load.
+    /// 
+    /// Note: This functionality is now directly implemented in HttpRequestBuilder::new in service_bak.rs,
+    /// but this function is kept for potential future uses or other implementations.
+    #[allow(dead_code)]
     fn create_headers(&self) -> HashMap<String, String> {
         let mut headers = HashMap::new();
         // 确保总是添加这些基本头部
