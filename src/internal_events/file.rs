@@ -575,6 +575,40 @@ mod source {
             emit!(FileOpen { count });
         }
 
+        fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to passive watching mode",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_passive_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_passive_total")
+            }
+            .increment(1);
+        }
+
+        fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to active watching mode",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_active_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_active_total")
+            }
+            .increment(1);
+        }
+
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
         }
