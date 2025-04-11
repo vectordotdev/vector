@@ -20,7 +20,7 @@ use serde_json;
 use vector_lib::codecs::JsonSerializerConfig;
 use crate::sinks::doris::common::DorisCommon;
 use crate::sinks::doris::retry::DorisRetryLogic;
-use crate::sinks::doris::service_bak::{DorisService, HttpRequestBuilder};
+use crate::sinks::doris::service::{DorisService, HttpRequestBuilder};
 use crate::sinks::util::http::RequestConfig;
 use std::sync::Arc;
 
@@ -298,7 +298,7 @@ impl SinkConfig for DorisConfig {
 impl DorisConfig {
     /// Helper function to create HTTP headers for Doris Stream Load.
     /// 
-    /// Note: This functionality is now directly implemented in HttpRequestBuilder::new in service_bak.rs,
+    /// Note: This functionality is now directly implemented in HttpRequestBuilder::new in service,
     /// but this function is kept for potential future uses or other implementations.
     #[allow(dead_code)]
     fn create_headers(&self) -> HashMap<String, String> {

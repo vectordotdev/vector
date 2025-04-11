@@ -16,6 +16,5 @@ mod request_builder;
 mod retry;
 mod health;
 mod common;
-mod service_bak;
 
 pub use self::config::DorisConfig;
