@@ -86,7 +86,7 @@ azure_storage,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
 azure_storage_blobs,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
 azure_svc_blobstorage,https://github.com/azure/azure-sdk-for-rust,MIT,The azure_svc_blobstorage Authors
 backoff,https://github.com/ihrwein/backoff,MIT OR Apache-2.0,Tibor Benke <ihrwein@gmail.com>
-backon,https://github.com/Xuanwo/backon,Apache-2.0,Xuanwo <github@xuanwo.io>
+backon,https://github.com/Xuanwo/backon,Apache-2.0,The backon Authors
 backtrace,https://github.com/rust-lang/backtrace-rs,MIT OR Apache-2.0,The Rust Project Developers
 base16,https://github.com/thomcc/rust-base16,CC0-1.0,Thom Chiovoloni <tchiovoloni@mozilla.com>
 base16ct,https://github.com/RustCrypto/formats/tree/master/base16ct,Apache-2.0 OR MIT,RustCrypto Developers
@@ -230,7 +230,6 @@ ff,https://github.com/zkcrypto/ff,MIT OR Apache-2.0,"Sean Bowe <ewillbefull@gmai
 fiat-crypto,https://github.com/mit-plv/fiat-crypto,MIT OR Apache-2.0 OR BSD-1-Clause,Fiat Crypto library authors <jgross@mit.edu>
 filetime,https://github.com/alexcrichton/filetime,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 finl_unicode,https://github.com/dahosek/finl_unicode,MIT OR Apache-2.0,The finl_unicode Authors
-flagset,https://github.com/enarx/flagset,Apache-2.0,Nathaniel McCallum <nathaniel@profian.com>
 flate2,https://github.com/rust-lang/flate2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>"
 float_eq,https://github.com/jtempest/float_eq-rs,MIT OR Apache-2.0,jtempest
 fluent-uri,https://github.com/yescallop/fluent-uri-rs,MIT,Scallop Ye <yescallop@gmail.com>
@@ -258,6 +257,7 @@ generic-array,https://github.com/fizyk20/generic-array,MIT,"Bartłomiej Kamińsk
 getrandom,https://github.com/rust-random/getrandom,MIT OR Apache-2.0,The Rand Project Developers
 gimli,https://github.com/gimli-rs/gimli,MIT OR Apache-2.0,The gimli Authors
 glob,https://github.com/rust-lang/glob,MIT OR Apache-2.0,The Rust Project Developers
+gloo-timers,https://github.com/rustwasm/gloo/tree/master/crates/timers,MIT OR Apache-2.0,Rust and WebAssembly Working Group
 goauth,https://github.com/durch/rust-goauth,MIT,Drazen Urch <github@drazenur.ch>
 governor,https://github.com/boinkor-net/governor,MIT,Andreas Fuchs <asf@boinkor.net>
 graphql-introspection-query,https://github.com/graphql-rust/graphql-client,Apache-2.0 OR MIT,Tom Houlé <tom@tomhoule.com>
