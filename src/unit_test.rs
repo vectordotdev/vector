@@ -76,7 +76,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         None => return exitcode::CONFIG,
     };
 
-    let create_junit_report = opts.path_junit_report.is_some();
+    let create_junit_report = opts.junit_report_paths.is_some();
     let mut report = Report::new("Vector Unit Tests");
     let mut test_suite = TestSuite::new("Test Suite");
 
@@ -156,7 +156,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
             }
         };
 
-        for path in &opts.path_junit_report.unwrap() { // safe to unwrap because `create_junit_report` is true
+        for path in opts.junit_report_paths.as_ref().unwrap() { // safe to unwrap because `create_junit_report` is true
             match File::create(path) {
                 Ok(mut file) => {
                     if let Err(error) = file.write_all(&report_bytes) {
