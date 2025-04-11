@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use std::fs::File;
-use std::path::PathBuf;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use clap::Parser;
@@ -169,7 +169,6 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                     return exitcode::CONFIG;
                 }
             }
-
         }
     }
 
