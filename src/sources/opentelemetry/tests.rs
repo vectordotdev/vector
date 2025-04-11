@@ -458,8 +458,127 @@ async fn receive_sum_metric() {
 
         let mut expected_event = Event::from(MetricEvent::new(
             "some.random.metric",
-            MetricKind::Incremental, // since monotonic = true
+            MetricKind::Absolute, // since monotonic = true
             MetricValue::Counter { value: 42.0 },
+        )
+            .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
+            .with_tags(Some(tags)));
+        expected_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("metrics".into()),
+        }));
+        assert_eq!(actual_event, expected_event);
+    })
+        .await;
+}
+
+#[tokio::test]
+async fn receive_sum_non_monotonic_metric() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let grpc_addr = next_addr();
+        let http_addr = next_addr();
+
+        let source = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: grpc_addr,
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: http_addr,
+                tls: Default::default(),
+                keepalive: Default::default(),
+                headers: Default::default(),
+            },
+            acknowledgements: Default::default(),
+            log_namespace: Default::default(),
+        };
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(grpc_addr).await;
+
+        // send request via grpc client
+        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+            .await
+            .unwrap();
+        let event_time = SystemTime::now();
+        // u64
+        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
+        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000 + u64::from(duration_since_epoch.subsec_nanos());
+
+        let req = Request::new(ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: Some(Resource {
+                    attributes: vec![KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("vector-collector".to_string())),
+                        }),
+                    }],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: Some(InstrumentationScope {
+                        name: "vector-collector-instrumentation".to_string(),
+                        version: "0.111.0".to_string(),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                    }),
+                    schema_url: "".to_string(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        data: Some(Data::Sum(Sum {
+                            data_points: vec![NumberDataPoint {
+                                attributes: vec![
+                                    KeyValue {
+                                        key: "host".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue("localhost".to_string())),
+                                        }),
+                                    }, KeyValue {
+                                        key: "service".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue("vector-collector".to_string())),
+                                        }),
+                                    },
+                                ],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: event_time_nanos,
+                                exemplars: vec![],
+                                flags: 0,
+                                value: Some(vector_lib::opentelemetry::proto::metrics::v1::number_data_point::Value::AsDouble(42.0)),
+                            }],
+                            aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                            // monotonic =  incremental
+                            is_monotonic: false,
+                        })),
+                    }],
+                }],
+            }],
+        });
+        _ = client.export(req).await;
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+
+        let mut tags = MetricTags::default();
+        tags.insert("resource.service.name".to_string(),"vector-collector".to_string());
+        tags.insert("scope.name".to_string(), "vector-collector-instrumentation".to_string());
+        tags.insert("scope.version".to_string(), "0.111.0".to_string());
+        tags.insert("host".to_string(), "localhost".to_string());
+        tags.insert("service".to_string(), "vector-collector".to_string());
+
+        let mut expected_event = Event::from(MetricEvent::new(
+            "some.random.metric",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 }, // since we have monotonic = false
         )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
             .with_tags(Some(tags)));
@@ -708,6 +827,161 @@ async fn receive_histogram_metric() {
             MetricEvent::new(
                 "some.random.metric",
                 MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![
+                        Bucket {
+                            count: 1,
+                            upper_limit: 50.0,
+                        },
+                        Bucket {
+                            count: 2,
+                            upper_limit: 100.0,
+                        },
+                        Bucket {
+                            count: 2,
+                            upper_limit: 150.0,
+                        },
+                        Bucket {
+                            count: 4,
+                            upper_limit: f64::INFINITY,
+                        },
+                    ],
+                    count: 9,
+                    sum: 123.45,
+                },
+            )
+            .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
+            .with_tags(Some(tags)),
+        );
+        expected_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("metrics".into()),
+        }));
+        assert_eq!(actual_event, expected_event);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn receive_histogram_delta_metric() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let grpc_addr = next_addr();
+        let http_addr = next_addr();
+
+        let source = OpentelemetryConfig {
+            grpc: GrpcConfig {
+                address: grpc_addr,
+                tls: Default::default(),
+            },
+            http: HttpConfig {
+                address: http_addr,
+                tls: Default::default(),
+                keepalive: Default::default(),
+                headers: Default::default(),
+            },
+            acknowledgements: Default::default(),
+            log_namespace: Default::default(),
+        };
+
+        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(grpc_addr).await;
+
+        // send request via grpc client
+        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+            .await
+            .unwrap();
+        let event_time = SystemTime::now();
+        // u64
+        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
+        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000
+            + u64::from(duration_since_epoch.subsec_nanos());
+
+        let req = Request::new(ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: Some(Resource {
+                    attributes: vec![KeyValue {
+                        key: "service.name".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("vector-collector".to_string())),
+                        }),
+                    }],
+                    dropped_attributes_count: 0,
+                }),
+                schema_url: "".to_string(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: Some(InstrumentationScope {
+                        name: "vector-collector-instrumentation".to_string(),
+                        version: "0.111.0".to_string(),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                    }),
+                    schema_url: "".to_string(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        data: Some(Data::Histogram(Histogram {
+                            aggregation_temporality: AggregationTemporality::Delta as i32,
+                            data_points: vec![HistogramDataPoint {
+                                attributes: vec![
+                                    KeyValue {
+                                        key: "host".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue("localhost".to_string())),
+                                        }),
+                                    },
+                                    KeyValue {
+                                        key: "service".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(StringValue(
+                                                "vector-collector".to_string(),
+                                            )),
+                                        }),
+                                    },
+                                ],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: event_time_nanos,
+                                count: 9,
+                                sum: Some(123.45),
+                                bucket_counts: vec![1, 2, 2, 4],
+                                explicit_bounds: vec![50.0, 100.0, 150.0],
+                                exemplars: vec![],
+                                flags: 0,
+                                min: Some(10.0),
+                                max: Some(60.0),
+                            }],
+                        })),
+                    }],
+                }],
+            }],
+        });
+        _ = client.export(req).await;
+        let mut output = test_util::collect_ready(metrics_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+
+        let mut tags = MetricTags::default();
+        tags.insert(
+            "resource.service.name".to_string(),
+            "vector-collector".to_string(),
+        );
+        tags.insert(
+            "scope.name".to_string(),
+            "vector-collector-instrumentation".to_string(),
+        );
+        tags.insert("scope.version".to_string(), "0.111.0".to_string());
+        tags.insert("host".to_string(), "localhost".to_string());
+        tags.insert("service".to_string(), "vector-collector".to_string());
+
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Incremental,
                 MetricValue::AggregatedHistogram {
                     buckets: vec![
                         Bucket {

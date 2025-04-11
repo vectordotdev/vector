@@ -261,10 +261,11 @@ components: sources: opentelemetry: {
 		metrics: {
 			title: "Ingest metrics"
 			body: """
-				Metrics support is experimental and subject to change due to the differences in metrics structure between internal Vector metric DataModel and OpenTelemetry.
-				The current mapping behavior is as follows:
-				Gauge is mapped to a Vector Gauge with `MetricKind::Absolute`;
-				Sum is mapped to a Vector Counter(if `is_monotonic` is true, it uses `MetricKind::Incremental`, otherwise, it uses `MetricKind::Absolute`);
+				Metrics support is experimental and subject to change due to structural differences between the internal Vector metric data model and OpenTelemetry.
+				If aggregation temporality is supported for an OpenTelemetry metric type, it influences the corresponding Vector metric kind as follows: If temporality is set to Delta, the metric kind is Incremental; otherwise, it is Absolute.
+				Metric type mappings:
+				Gauge is mapped to a Vector Gauge;
+				Sum is mapped to a Vector Counter if `is_monotonic` is true, to Vector Gauge if `is_monotonic` is false;
 				Histogram is mapped to a Vector AggregatedHistogram;
 				Exponential Histogram is also mapped to a Vector AggregatedHistogram, bucket boundaries are reconstructed from the exponential scale;
 				Summary is mapped to a Vector Aggregated Summary.

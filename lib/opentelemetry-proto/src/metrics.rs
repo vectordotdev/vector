@@ -1,9 +1,9 @@
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
     metrics::v1::{
-        metric::Data, number_data_point::Value as NumberDataPointValue, ExponentialHistogram,
-        ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, NumberDataPoint,
-        ResourceMetrics, Sum, Summary, SummaryDataPoint,
+        metric::Data, number_data_point::Value as NumberDataPointValue, AggregationTemporality,
+        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint,
+        NumberDataPoint, ResourceMetrics, Sum, Summary, SummaryDataPoint,
     },
     resource::v1::Resource,
 };
@@ -83,6 +83,7 @@ impl ResourceMetrics {
             .into_iter()
             .map(move |point| {
                 SumMetric {
+                    aggregation_temporality: sum.aggregation_temporality,
                     resource: resource.clone(),
                     scope: scope.clone(),
                     is_monotonic: sum.is_monotonic,
@@ -108,6 +109,7 @@ impl ResourceMetrics {
             .into_iter()
             .map(move |point| {
                 HistogramMetric {
+                    aggregation_temporality: histogram.aggregation_temporality,
                     resource: resource.clone(),
                     scope: scope.clone(),
                     point,
@@ -132,6 +134,7 @@ impl ResourceMetrics {
             .into_iter()
             .map(move |point| {
                 ExpHistogramMetric {
+                    aggregation_temporality: histogram.aggregation_temporality,
                     resource: resource.clone(),
                     scope: scope.clone(),
                     point,
@@ -173,6 +176,7 @@ struct GaugeMetric {
 }
 
 struct SumMetric {
+    aggregation_temporality: i32,
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     point: NumberDataPoint,
@@ -186,12 +190,14 @@ struct SummaryMetric {
 }
 
 struct HistogramMetric {
+    aggregation_temporality: i32,
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     point: HistogramDataPoint,
 }
 
 struct ExpHistogramMetric {
+    aggregation_temporality: i32,
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     point: ExponentialHistogramDataPoint,
@@ -252,13 +258,20 @@ impl SumMetric {
         let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
         let value = self.point.value.to_f64().unwrap_or(0.0);
         let attributes = build_metric_tags(self.resource, self.scope, &self.point.attributes);
-        let kind = if self.is_monotonic {
+        let kind = if self.aggregation_temporality == AggregationTemporality::Delta as i32 {
             MetricKind::Incremental
         } else {
             MetricKind::Absolute
         };
 
-        MetricEvent::new(metric_name, kind, MetricValue::Counter { value })
+        // as per otel doc non_monotonic sum would be better transformed to gauge in time-series
+        let metric_value = if self.is_monotonic {
+            MetricValue::Counter { value }
+        } else {
+            MetricValue::Gauge { value }
+        };
+
+        MetricEvent::new(metric_name, kind, metric_value)
             .with_tags(Some(attributes))
             .with_timestamp(timestamp)
             .into()
@@ -306,9 +319,15 @@ impl HistogramMetric {
             }
         };
 
+        let kind = if self.aggregation_temporality == AggregationTemporality::Delta as i32 {
+            MetricKind::Incremental
+        } else {
+            MetricKind::Absolute
+        };
+
         MetricEvent::new(
             metric_name,
-            MetricKind::Absolute,
+            kind,
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
@@ -356,9 +375,15 @@ impl ExpHistogramMetric {
             }
         }
 
+        let kind = if self.aggregation_temporality == AggregationTemporality::Delta as i32 {
+            MetricKind::Incremental
+        } else {
+            MetricKind::Absolute
+        };
+
         MetricEvent::new(
             metric_name,
-            MetricKind::Absolute,
+            kind,
             MetricValue::AggregatedHistogram {
                 buckets,
                 count: self.point.count,
