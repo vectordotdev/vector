@@ -1,7 +1,7 @@
 use crate::sinks::doris::DorisConfig;
 use crate::sinks::prelude::*;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use crate::sinks::doris::service_bak::{DorisRequest};
+use crate::sinks::doris::service::{DorisRequest};
 
 pub struct DorisSink<S> {
     batch_settings: BatcherSettings,

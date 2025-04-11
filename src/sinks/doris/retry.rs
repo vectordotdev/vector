@@ -12,7 +12,7 @@ use crate::{
         },
     },
 };
-use crate::sinks::doris::service_bak::DorisResponse;
+use crate::sinks::doris::service::DorisResponse;
 
 /// 用于解析 Doris Stream Load API 响应的内部结构体
 #[derive(Debug, Deserialize)]

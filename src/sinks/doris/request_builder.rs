@@ -5,7 +5,7 @@ use crate::sinks::prelude::*;
 use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::json_size::JsonSize;
-use crate::sinks::doris::service_bak::DorisRequest;
+use crate::sinks::doris::service::DorisRequest;
 use serde_json;
 
 
