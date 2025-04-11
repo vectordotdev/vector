@@ -2,7 +2,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 use clap::Parser;
 use colored::*;
@@ -67,6 +67,70 @@ impl Opts {
     }
 }
 
+#[derive(Debug)]
+pub struct JUnitReporter<'a> {
+    report: Report,
+    test_suite: TestSuite,
+    output_paths: Option<&'a Vec<PathBuf>>,
+}
+
+impl<'a> JUnitReporter<'a> {
+    fn new(paths: Option<&'a Vec<PathBuf>>) -> Self {
+        Self {
+            report: Report::new("Vector Unit Tests"),
+            test_suite: TestSuite::new("Test Suite"),
+            output_paths: paths,
+        }
+    }
+
+    fn add_test_result(&mut self, name: &String, errors: &Vec<String>, time: Duration) {
+        if self.output_paths.is_none() { return }; // early return in case no output paths were specified
+
+        if errors.is_empty() {
+            // successful test
+            let mut test_case = TestCase::new(name.clone(), TestCaseStatus::success());
+            test_case.set_time(time);
+            self.test_suite.add_test_case(test_case);
+        } else {
+            // failed test
+            let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+            status.set_description(errors.join("\n"));
+            let mut test_case = TestCase::new(name.clone(), status);
+            test_case.set_time(time);
+            self.test_suite.add_test_case(test_case);
+        }
+    }
+
+    fn write_reports(mut self, time: Duration) -> Result<(), String> {
+        if self.output_paths.is_none() { return Ok(()) }; // early return in case no output paths were specified
+
+        // create a report from the test cases
+        self.test_suite.set_time(time);
+        self.report.add_test_suite(self.test_suite);
+
+        let report_bytes = match self.report.to_string() {
+            Ok(report_string) => report_string.into_bytes(),
+            Err(error) => return Err(error.to_string())
+        };
+
+        for path in self.output_paths.unwrap() {
+            // safe to unwrap because of the check above
+            match File::create(path) {
+                Ok(mut file) => {
+                    match file.write_all(&report_bytes) {
+                        Ok(()) => {},
+                        Err(error) => return Err(error.to_string())
+                    }
+                }
+                Err(error) => return Err(error.to_string())
+            }
+        }
+
+        Ok(())
+    }
+
+}
+
 pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
@@ -76,9 +140,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         None => return exitcode::CONFIG,
     };
 
-    let create_junit_report = opts.junit_report_paths.is_some();
-    let mut report = Report::new("Vector Unit Tests");
-    let mut test_suite = TestSuite::new("Test Suite");
+    let mut junit_reporter = JUnitReporter::new(opts.junit_report_paths.as_ref());
 
     #[allow(clippy::print_stdout)]
     {
@@ -93,6 +155,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                 }
             } else {
                 let test_suite_start = Instant::now();
+
                 for test in tests {
                     let name = test.name.clone();
 
@@ -100,75 +163,35 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                     let UnitTestResult { errors } = test.run().await;
                     let test_case_elapsed = test_case_start.elapsed();
 
+                    junit_reporter.add_test_result(&name, &errors, test_case_elapsed);
+
                     if !errors.is_empty() {
                         #[allow(clippy::print_stdout)]
                         {
                             println!("test {} ... {}", name, "failed".red());
                         }
-
-                        if create_junit_report {
-                            // create a failed test case
-                            let errors_joined = errors.join("\n");
-                            let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                            status.set_description(errors_joined);
-                            let mut test_case = TestCase::new(name.clone(), status);
-                            test_case.set_time(test_case_elapsed);
-                            test_suite.add_test_case(test_case);
-                        }
-
                         aggregated_test_errors.push((name, errors));
                     } else {
                         #[allow(clippy::print_stdout)]
                         {
                             println!("test {} ... {}", name, "passed".green());
                         }
-
-                        if create_junit_report {
-                            // create a successful test case
-                            let mut test_case = TestCase::new(name, TestCaseStatus::success());
-                            test_case.set_time(test_case_elapsed);
-                            test_suite.add_test_case(test_case);
-                        }
                     }
                 }
 
-                if create_junit_report {
-                    // create a report from the test cases
-                    let test_suite_elapsed = test_suite_start.elapsed();
-                    test_suite.set_time(test_suite_elapsed);
-                    report.add_test_suite(test_suite);
+                let test_suite_elapsed = test_suite_start.elapsed();
+                match junit_reporter.write_reports(test_suite_elapsed) {
+                    Ok(()) => {},
+                    Err(error) => {
+                        error!("Failed to execute tests:\n{}.", error);
+                        return exitcode::CONFIG;
+                    }
                 }
             }
         }
         Err(errors) => {
             error!("Failed to execute tests:\n{}.", errors.join("\n"));
             return exitcode::CONFIG;
-        }
-    }
-
-    if create_junit_report {
-        // write junit report
-        let report_bytes = match report.to_string() {
-            Ok(report_string) => report_string.into_bytes(),
-            Err(error) => {
-                error!("Failed to execute tests:\n{}.", error);
-                return exitcode::CONFIG;
-            }
-        };
-
-        for path in opts.junit_report_paths.as_ref().unwrap() { // safe to unwrap because `create_junit_report` is true
-            match File::create(path) {
-                Ok(mut file) => {
-                    if let Err(error) = file.write_all(&report_bytes) {
-                        error!("Failed to execute tests:\n{}.", error);
-                        return exitcode::CONFIG;
-                    }
-                }
-                Err(error) => {
-                    error!("Failed to execute tests:\n{}.", error);
-                    return exitcode::CONFIG;
-                }
-            }
         }
     }
 
