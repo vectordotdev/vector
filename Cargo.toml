@@ -396,6 +396,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 sysinfo = "0.32.1"
 byteorder = "1.5.0"
+reqwest = { version = "0.11", features = ["blocking"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.7.0"

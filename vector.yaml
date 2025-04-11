@@ -1,18 +1,36 @@
 sources:
   in:
-    type: "stdin"
+    type: "file"
+    include:
+      - "/Users/bingquanzhao/Desktop/vector_data/*.json"
+    read_from: "beginning"
+    line_delimiter: "\n"
+    fingerprint:
+      strategy: "device_and_inode"
+      ignored_header_bytes: 0
+    ignore_older_secs: 0
+
+
+transforms:
+  parse_json:
+    type: "remap"
+    inputs: ["in"]
+    source: |
+      parsed = parse_json(.message) ?? {}
+      . = parsed
 
 sinks:
-  out:
+  # 添加控制台输出用于调试
+  console:
     inputs:
-      - "in"
+      - "parse_json"
     type: "console"
     encoding:
       codec: "json"
 
   doris:
     inputs:
-      - "in"
+      - "parse_json"  # 使用转换后的数据
     type: "doris"
     endpoints: ["http://10.16.10.6:8630"]
     auth:
@@ -22,8 +40,7 @@ sinks:
     database: "test"
     table: "test_table"
     label_prefix: "vector"
-    bulk_max_size: 1000
     log_request: true
     headers:
       format: "json"
-      strip_outer_array: "true"
+      strip_outer_array: "false"  

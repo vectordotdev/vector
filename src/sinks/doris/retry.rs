@@ -1,19 +1,18 @@
 use http::StatusCode;
 use serde::Deserialize;
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use crate::{
     http::HttpError,
     sinks::{
         prelude::*,
         util::{
-            http::{ HttpResponse, HttpRetryLogic},
+            http::{HttpRetryLogic},
             retries::RetryAction,
         },
     },
 };
-
-use super::progress::ProgressReporter;
+use crate::sinks::doris::service_bak::DorisResponse;
 
 /// 用于解析 Doris Stream Load API 响应的内部结构体
 #[derive(Debug, Deserialize)]
@@ -24,39 +23,45 @@ struct DorisStreamLoadResponse {
     
     #[serde(rename = "Message")]
     message: Option<String>,
-
-    #[serde(rename = "NumberLoadedRows")]
-    number_loaded_rows: Option<i64>,
-    
-    #[serde(rename = "NumberFilteredRows")]
-    number_filtered_rows: Option<i64>,
-
-    #[serde(rename = "LoadBytes")]
-    load_bytes: Option<i64>,
-
 }
 
 #[derive(Debug, Clone)]
 pub struct DorisRetryLogic {
     inner: HttpRetryLogic,
-    reporter: ProgressReporter,
-    log_request: bool,
 }
 
 impl DorisRetryLogic {
     /// Create a new DorisRetryLogic
-    pub fn new(reporter: ProgressReporter, log_request: bool) -> Self {
+    pub fn new() -> Self {
         Self {
             inner: HttpRetryLogic,
-            reporter,
-            log_request,
         }
+    }
+    
+    /// 检查错误消息，判断是否为临时错误
+    fn is_transient_error(&self, message: &str) -> bool {
+        message.contains("timeout") || 
+        message.contains("overload") || 
+        message.contains("too many requests") ||
+        message.contains("try again later") ||
+        message.contains("temporarily unavailable")
+    }
+    
+    /// 检查错误消息，判断是否为永久错误
+    fn is_permanent_error(&self, message: &str) -> bool {
+        message.contains("DATA_QUALITY_ERROR") || 
+        message.contains("too many filtered rows") ||
+        message.contains("schema change") ||
+        message.contains("column not exist") ||
+        message.contains("format error") ||
+        message.contains("parse error") ||
+        message.contains("duplicate key")
     }
 }
 
 impl RetryLogic for DorisRetryLogic {
     type Error = HttpError;
-    type Response = HttpResponse;
+    type Response = DorisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         // 所有 HTTP 错误都可以重试
@@ -71,18 +76,8 @@ impl RetryLogic for DorisRetryLogic {
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.http_response.status();
         let body = response.http_response.body();
-        
-        // 记录响应 (Filebeat 中的 logRequest)
         let body_str = String::from_utf8_lossy(body);
-        if self.log_request {
-            info!(
-                target: "doris_sink",
-                "Doris stream load response:\nStatus: {}\nBody: {}", 
-                status,
-                body_str
-            );
-        }
-
+        
         // 基于HTTP状态码和响应内容决定重试策略
         match status {
             // 特定的 HTTP 状态码处理
@@ -114,47 +109,49 @@ impl RetryLogic for DorisRetryLogic {
                 // 尝试解析 Doris 响应
                 match serde_json::from_str::<DorisStreamLoadResponse>(&body_str) {
                     Ok(doris_resp) => {
-                        // 更新进度报告
-                        if let Some(bytes) = doris_resp.load_bytes {
-                            self.reporter.incr_total_bytes(bytes);
-                        }
-                        
-                        if let Some(loaded_rows) = doris_resp.number_loaded_rows {
-                            self.reporter.incr_total_rows(loaded_rows);
-                        }
-                        
-                        if let Some(filtered_rows) = doris_resp.number_filtered_rows {
-                            if filtered_rows > 0 {
-                                self.reporter.incr_failed_rows(filtered_rows);
-                                debug!(
-                                    target: "doris_sink",
-                                    "Doris filtered {} rows during load", 
-                                    filtered_rows
-                                );
-                            }
-                        }
-                        
                         // 根据 Doris 响应状态决定重试
                         match doris_resp.status.as_str() {
                             "Success" => {
                                 debug!(
                                     target: "doris_sink",
-                                    "Doris stream load successful: loaded {} rows, {} bytes", 
-                                    doris_resp.number_loaded_rows.unwrap_or(0),
-                                    doris_resp.load_bytes.unwrap_or(0)
+                                    "Doris stream load successful"
                                 );
                                 RetryAction::Successful
                             },
                             _ => {
-                                // 任何非 "Success" 的状态都会触发重试
+                                // 获取错误消息
                                 let message = doris_resp.message.clone().unwrap_or_default();
-                                error!(
-                                    target: "doris_sink",
-                                    "Doris stream load failed (will retry): Status={}, Message={}", 
-                                    doris_resp.status,
-                                    message
-                                );
-                                RetryAction::Retry(format!("Doris error: {}", message).into())
+                                
+                                // 检查是否为临时性错误
+                                if self.is_transient_error(&message) {
+                                    error!(
+                                        target: "doris_sink",
+                                        "Doris stream load failed (transient error, will retry): Status={}, Message={}", 
+                                        doris_resp.status,
+                                        message
+                                    );
+                                    RetryAction::Retry(format!("Transient Doris error: {}", message).into())
+                                }
+                                // 检查是否为永久性错误
+                                else if self.is_permanent_error(&message) {
+                                    error!(
+                                        target: "doris_sink",
+                                        "Doris stream load failed (permanent error, won't retry): Status={}, Message={}", 
+                                        doris_resp.status,
+                                        message
+                                    );
+                                    RetryAction::DontRetry(format!("Permanent Doris error: {}", message).into())
+                                }
+                                // 默认行为
+                                else {
+                                    error!(
+                                        target: "doris_sink",
+                                        "Doris stream load failed (unknown error type, will retry): Status={}, Message={}", 
+                                        doris_resp.status,
+                                        message
+                                    );
+                                    RetryAction::Retry(format!("Unknown Doris error: {}", message).into())
+                                }
                             }
                         }
                     },
@@ -166,7 +163,7 @@ impl RetryLogic for DorisRetryLogic {
                             body_str,
                             err
                         );
-                        // 在 Filebeat 中，解析错误会被视为失败并重试
+                        // 解析错误视为临时错误，可以重试
                         RetryAction::Retry(format!("Failed to parse response: {}", err).into())
                     }
                 }

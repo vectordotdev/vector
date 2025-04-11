@@ -1,6 +1,7 @@
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::sinks::doris::DorisConfig;
+use crate::sinks::prelude::*;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use super::{config::DorisConfig, config::DorisFormat};
+use crate::sinks::doris::service_bak::{DorisRequest};
 
 pub struct DorisSink<S> {
     batch_settings: BatcherSettings,
@@ -11,7 +12,8 @@ pub struct DorisSink<S> {
 
 impl<S> DorisSink<S>
 where
-    S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
+    // S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
+    S: Service<DorisRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -34,8 +36,7 @@ where
         let batch_settings = self.batch_settings;
         let key_partitioner = DorisKeyPartitioner::new(
             self.config.database, 
-            self.config.table, 
-            self.config.format
+            self.config.table,
         );
         
         input
@@ -63,7 +64,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for DorisSink<S>
 where
-    S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
+    S: Service<DorisRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -78,25 +79,22 @@ where
 
 /// PartitionKey used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub(super) struct DorisPartitionKey {
+pub struct DorisPartitionKey {
     pub database: String,
     pub table: String,
-    pub format: DorisFormat,
 }
 
 /// KeyPartitioner that partitions events by (database, table) pair.
 struct DorisKeyPartitioner {
     database: Template,
     table: Template,
-    format: DorisFormat,
 }
 
 impl DorisKeyPartitioner {
-    const fn new(database: Template, table: Template, format: DorisFormat) -> Self {
+    const fn new(database: Template, table: Template,) -> Self {
         Self {
             database,
             table,
-            format,
         }
     }
     
@@ -124,7 +122,6 @@ impl Partitioner for DorisKeyPartitioner {
         Some(DorisPartitionKey {
             database,
             table,
-            format: self.format,
         })
     }
 }
