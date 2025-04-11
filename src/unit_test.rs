@@ -2,7 +2,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use clap::Parser;
 use colored::*;
@@ -83,26 +83,30 @@ impl<'a> JUnitReporter<'a> {
         }
     }
 
-    fn add_test_result(&mut self, name: &String, errors: &Vec<String>, time: Duration) {
-        if self.output_paths.is_none() { return }; // early return in case no output paths were specified
+    fn add_test_result(&mut self, name: &str, errors: &[String], time: Duration) {
+        if self.output_paths.is_none() {
+            return;
+        }; // early return in case no output paths were specified
 
         if errors.is_empty() {
             // successful test
-            let mut test_case = TestCase::new(name.clone(), TestCaseStatus::success());
+            let mut test_case = TestCase::new(name.to_owned(), TestCaseStatus::success());
             test_case.set_time(time);
             self.test_suite.add_test_case(test_case);
         } else {
             // failed test
             let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
             status.set_description(errors.join("\n"));
-            let mut test_case = TestCase::new(name.clone(), status);
+            let mut test_case = TestCase::new(name.to_owned(), status);
             test_case.set_time(time);
             self.test_suite.add_test_case(test_case);
         }
     }
 
     fn write_reports(mut self, time: Duration) -> Result<(), String> {
-        if self.output_paths.is_none() { return Ok(()) }; // early return in case no output paths were specified
+        if self.output_paths.is_none() {
+            return Ok(());
+        }; // early return in case no output paths were specified
 
         // create a report from the test cases
         self.test_suite.set_time(time);
@@ -110,25 +114,22 @@ impl<'a> JUnitReporter<'a> {
 
         let report_bytes = match self.report.to_string() {
             Ok(report_string) => report_string.into_bytes(),
-            Err(error) => return Err(error.to_string())
+            Err(error) => return Err(error.to_string()),
         };
 
         for path in self.output_paths.unwrap() {
             // safe to unwrap because of the check above
             match File::create(path) {
-                Ok(mut file) => {
-                    match file.write_all(&report_bytes) {
-                        Ok(()) => {},
-                        Err(error) => return Err(error.to_string())
-                    }
-                }
-                Err(error) => return Err(error.to_string())
+                Ok(mut file) => match file.write_all(&report_bytes) {
+                    Ok(()) => {}
+                    Err(error) => return Err(error.to_string()),
+                },
+                Err(error) => return Err(error.to_string()),
             }
         }
 
         Ok(())
     }
-
 }
 
 pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
@@ -181,7 +182,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
 
                 let test_suite_elapsed = test_suite_start.elapsed();
                 match junit_reporter.write_reports(test_suite_elapsed) {
-                    Ok(()) => {},
+                    Ok(()) => {}
                     Err(error) => {
                         error!("Failed to execute tests:\n{}.", error);
                         return exitcode::CONFIG;
