@@ -53,38 +53,15 @@ fn generate_config() {
 #[tokio::test]
 async fn receive_grpc_logs_vector_namespace() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Some(true),
-        };
-        let schema_definitions = source
+        let env = build_otlp_test_env(LOGS, Some(true)).await;
+        let schema_definitions = env
+            .config
             .outputs(LogNamespace::Vector)
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
-
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {
@@ -93,7 +70,7 @@ async fn receive_grpc_logs_vector_namespace() {
                     attributes: vec![KeyValue {
                         key: "res_key".into(),
                         value: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("res_val".into())),
+                            value: Some(StringValue("res_val".into())),
                         }),
                     }],
                     dropped_attributes_count: 0,
@@ -105,7 +82,7 @@ async fn receive_grpc_logs_vector_namespace() {
                         attributes: vec![KeyValue {
                             key: "scope_attr".into(),
                             value: Some(AnyValue {
-                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                                value: Some(StringValue("scope_val".into())),
                             }),
                         }],
                         dropped_attributes_count: 7,
@@ -116,12 +93,12 @@ async fn receive_grpc_logs_vector_namespace() {
                         severity_number: 9,
                         severity_text: "info".into(),
                         body: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("log body".into())),
+                            value: Some(StringValue("log body".into())),
                         }),
                         attributes: vec![KeyValue {
                             key: "attr_key".into(),
                             value: Some(AnyValue {
-                                value: Some(any_value::Value::StringValue("attr_val".into())),
+                                value: Some(StringValue("attr_val".into())),
                             }),
                         }],
                         dropped_attributes_count: 3,
@@ -136,7 +113,7 @@ async fn receive_grpc_logs_vector_namespace() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(logs_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let event = output.pop().unwrap();
@@ -221,38 +198,15 @@ async fn receive_grpc_logs_vector_namespace() {
 #[tokio::test]
 async fn receive_grpc_logs_legacy_namespace() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-        let schema_definitions = source
+        let env = build_otlp_test_env(LOGS, None).await;
+        let schema_definitions = env
+            .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
             .schema_definition(true);
 
-        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
-
         // send request via grpc client
-        let mut client = LogsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
         let req = Request::new(ExportLogsServiceRequest {
@@ -261,7 +215,7 @@ async fn receive_grpc_logs_legacy_namespace() {
                     attributes: vec![KeyValue {
                         key: "res_key".into(),
                         value: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("res_val".into())),
+                            value: Some(StringValue("res_val".into())),
                         }),
                     }],
                     dropped_attributes_count: 0,
@@ -273,7 +227,7 @@ async fn receive_grpc_logs_legacy_namespace() {
                         attributes: vec![KeyValue {
                             key: "scope_attr".into(),
                             value: Some(AnyValue {
-                                value: Some(any_value::Value::StringValue("scope_val".into())),
+                                value: Some(StringValue("scope_val".into())),
                             }),
                         }],
                         dropped_attributes_count: 7,
@@ -284,12 +238,12 @@ async fn receive_grpc_logs_legacy_namespace() {
                         severity_number: 9,
                         severity_text: "info".into(),
                         body: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("log body".into())),
+                            value: Some(StringValue("log body".into())),
                         }),
                         attributes: vec![KeyValue {
                             key: "attr_key".into(),
                             value: Some(AnyValue {
-                                value: Some(any_value::Value::StringValue("attr_val".into())),
+                                value: Some(StringValue("attr_val".into())),
                             }),
                         }],
                         dropped_attributes_count: 3,
@@ -304,7 +258,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(logs_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
@@ -356,41 +310,13 @@ async fn receive_grpc_logs_legacy_namespace() {
 #[tokio::test]
 async fn receive_sum_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000 + u64::from(duration_since_epoch.subsec_nanos());
-
+        let (event_time, event_time_nanos) = current_time_and_nanos();
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
                 resource: Some(Resource {
@@ -445,7 +371,7 @@ async fn receive_sum_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -475,40 +401,13 @@ async fn receive_sum_metric() {
 #[tokio::test]
 async fn receive_sum_non_monotonic_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000 + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -564,7 +463,7 @@ async fn receive_sum_non_monotonic_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -594,40 +493,13 @@ async fn receive_sum_non_monotonic_metric() {
 #[tokio::test]
 async fn receive_gauge_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000 + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -680,7 +552,7 @@ async fn receive_gauge_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -710,41 +582,13 @@ async fn receive_gauge_metric() {
 #[tokio::test]
 async fn receive_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000
-            + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -806,7 +650,7 @@ async fn receive_histogram_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -865,41 +709,13 @@ async fn receive_histogram_metric() {
 #[tokio::test]
 async fn receive_histogram_delta_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000
-            + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -961,7 +777,7 @@ async fn receive_histogram_delta_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1020,41 +836,13 @@ async fn receive_histogram_delta_metric() {
 #[tokio::test]
 async fn receive_expontential_histogram_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000
-            + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -1125,7 +913,7 @@ async fn receive_expontential_histogram_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1188,41 +976,13 @@ async fn receive_expontential_histogram_metric() {
 #[tokio::test]
 async fn receive_summary_metric() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: Default::default(),
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
-
-        let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
-        let server = source
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(grpc_addr).await;
+        let env = build_otlp_test_env(METRICS, None).await;
 
         // send request via grpc client
-        let mut client = MetricsServiceClient::connect(format!("http://{}", grpc_addr))
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let event_time = SystemTime::now();
-        // u64
-        let duration_since_epoch = event_time.duration_since(UNIX_EPOCH).unwrap();
-        let event_time_nanos: u64 = duration_since_epoch.as_secs() * 1_000_000_000
-            + u64::from(duration_since_epoch.subsec_nanos());
+        let (event_time, event_time_nanos) = current_time_and_nanos();
 
         let req = Request::new(ExportMetricsServiceRequest {
             resource_metrics: vec![ResourceMetrics {
@@ -1292,7 +1052,7 @@ async fn receive_summary_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(metrics_output).await;
+        let mut output = test_util::collect_ready(env.output).await;
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1451,6 +1211,51 @@ async fn http_headers() {
     .await;
 }
 
+pub struct OTelTestEnv {
+    pub grpc_addr: String,
+    pub config: OpentelemetryConfig,
+    pub output: Box<dyn Stream<Item = Event> + Unpin + Send>,
+}
+
+pub async fn build_otlp_test_env(
+    event_name: &'static str,
+    log_namespace: Option<bool>,
+) -> OTelTestEnv {
+    let grpc_addr = next_addr();
+    let http_addr = next_addr();
+
+    let config = OpentelemetryConfig {
+        grpc: GrpcConfig {
+            address: grpc_addr,
+            tls: Default::default(),
+        },
+        http: HttpConfig {
+            address: http_addr,
+            tls: Default::default(),
+            keepalive: Default::default(),
+            headers: Default::default(),
+        },
+        acknowledgements: Default::default(),
+        log_namespace,
+    };
+
+    let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
+
+    let server = config
+        .build(SourceContext::new_test(sender.clone(), None))
+        .await
+        .expect("Failed to build source");
+
+    tokio::spawn(server);
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    OTelTestEnv {
+        grpc_addr: grpc_addr.to_string(),
+        config,
+        output: Box::new(output),
+    }
+}
+
 pub(super) fn new_source(
     status: EventStatus,
     event_name: String,
@@ -1477,4 +1282,13 @@ fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> ObjectMap {
             .map(|(k, v)| (k.into(), v))
             .collect::<Vec<(_, _)>>(),
     )
+}
+
+fn current_time_and_nanos() -> (SystemTime, u64) {
+    let time = SystemTime::now();
+    let nanos = time
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() * 1_000_000_000 + u64::from(d.subsec_nanos()))
+        .unwrap();
+    (time, nanos)
 }
