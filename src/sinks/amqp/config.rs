@@ -24,7 +24,7 @@ pub struct AmqpPropertiesConfig {
     pub(crate) expiration_ms: Option<u64>,
 
     /// Priority for AMQP messages.
-    pub(crate) priority: Option<Template>,
+    pub(crate) priority: Option<UIntTemplate>,
 }
 
 impl AmqpPropertiesConfig {
@@ -40,33 +40,20 @@ impl AmqpPropertiesConfig {
             prop = prop.with_expiration(ShortString::from(expiration_ms.to_string()));
         }
         if let Some(priority_template) = &self.priority {
-            let priority_string = priority_template
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("properties.priority"),
-                        drop_event: true,
-                    })
-                })
-                .ok()?;
+            let priority = priority_template.render(event).unwrap_or_else(|error| {
+                warn!(
+                    message = "Failed to render numeric template for \"properties.priority\".",
+                    error = %error,
+                    error_type = error_type::TEMPLATE_FAILED,
+                    stage = error_stage::PROCESSING,
+                    internal_log_rate_limit = true,
+                );
+                Default::default()
+            });
 
-            // Valid template but invalid priorty type (not numeric) does not throw an error; instead warn.
-            // Fall back to no priority in those cases (equivalent to 0).
-            match priority_string.parse::<u8>() {
-                Ok(priority) => {
-                    prop = prop.with_priority(priority);
-                }
-                Err(error) => {
-                    warn!(
-                        message = "Failed to convert to numeric value for \"properties.priority\".",
-                        error = %error,
-                        error_type = error_type::CONVERSION_FAILED,
-                        stage = error_stage::PROCESSING,
-                        internal_log_rate_limit = true,
-                    );
-                }
-            }
+            // Clamp the value to the range of 0-255, as AMQP priority is a u8.
+            let priority = priority.clamp(0, u8::MAX.into()) as u8;
+            prop = prop.with_priority(priority);
         }
         Some(prop)
     }
@@ -179,9 +166,9 @@ mod tests {
                 .unwrap()
                 .priority
                 .unwrap()
-                .render_string(event)
+                .render(event)
                 .unwrap(),
-            priority.to_string()
+            priority as u64
         );
     }
 

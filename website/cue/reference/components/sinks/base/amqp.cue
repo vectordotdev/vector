@@ -416,7 +416,7 @@ base: components: sinks: amqp: configuration: {
 			priority: {
 				description: "Priority for AMQP messages. It can be templated to an integer between 0 and 255 inclusive."
 				required:    false
-				type: string: syntax: "template"
+				type: uint: syntax: "template"
 			}
 		}
 	}

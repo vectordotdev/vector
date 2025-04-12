@@ -655,6 +655,8 @@ _values: {
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
 	unit?: #Unit | null
+
+	syntax: *"literal" | "template"
 }
 
 #Unit: "bytes" | "events" | "milliseconds" | "nanoseconds" | "requests" | "seconds" | "lines" | "concurrency" | "connections" | "tasks" | "retries"

@@ -3,7 +3,7 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
-    template::Template,
+    template::{Template, UIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string,
@@ -234,7 +234,7 @@ async fn amqp_priority_with_template(
     let exchange = format!("test-{}-exchange", random_string(10));
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     config.properties = Some(AmqpPropertiesConfig {
-        priority: Some(Template::try_from(template).unwrap()),
+        priority: Some(UIntTemplate::try_from(template).unwrap()),
         ..Default::default()
     });
 
@@ -343,7 +343,5 @@ async fn amqp_priority_template_constant() {
 async fn amqp_priority_template_out_of_bounds() {
     crate::test_util::trace_init();
 
-    amqp_priority_with_template("-1", None, None).await;
-    amqp_priority_with_template("100000", None, None).await;
-    amqp_priority_with_template("not a number", None, None).await;
+    amqp_priority_with_template("100000", None, Some(u8::MAX)).await;
 }
