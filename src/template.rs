@@ -8,7 +8,9 @@ use chrono::{
 };
 use regex::Regex;
 use snafu::Snafu;
-use vector_lib::configurable::{configurable_component, ConfigurableString};
+use vector_lib::configurable::{
+    configurable_component, ConfigurableNumber, ConfigurableString, NumberClass,
+};
 use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
@@ -40,32 +42,6 @@ pub enum TemplateRenderingError {
     NotNumeric { input: String },
     #[snafu(display("Unsupported part for numeric value"))]
     UnsupportedNumeric,
-}
-
-/// The source of a template. May be a constant (such as numeric values) or a template string.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[configurable_component]
-#[serde(untagged)]
-enum UIntTemplateSource {
-    /// A static unsigned number.
-    Number(u64),
-    /// A string, which may be a template.
-    String(String),
-}
-
-impl Default for UIntTemplateSource {
-    fn default() -> Self {
-        Self::Number(Default::default())
-    }
-}
-
-impl fmt::Display for UIntTemplateSource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Number(i) => write!(f, "{}", i),
-            Self::String(s) => write!(f, "{}", s),
-        }
-    }
 }
 
 /// A templated field.
@@ -268,6 +244,32 @@ impl Template {
     }
 }
 
+/// The source of a `uint` template. May be a constant numeric value or a template string.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[configurable_component]
+#[serde(untagged)]
+enum UIntTemplateSource {
+    /// A static unsigned number.
+    Number(u64),
+    /// A string, which may be a template.
+    String(String),
+}
+
+impl Default for UIntTemplateSource {
+    fn default() -> Self {
+        Self::Number(Default::default())
+    }
+}
+
+impl fmt::Display for UIntTemplateSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Number(i) => write!(f, "{}", i),
+            Self::String(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 /// Unsigned integer template.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
@@ -316,6 +318,15 @@ impl TryFrom<String> for UIntTemplate {
     }
 }
 
+impl From<u64> for UIntTemplate {
+    fn from(num: u64) -> UIntTemplate {
+        UIntTemplate {
+            src: UIntTemplateSource::Number(num),
+            parts: Vec::new(),
+        }
+    }
+}
+
 impl TryFrom<Cow<'_, str>> for UIntTemplate {
     type Error = TemplateParseError;
 
@@ -326,24 +337,20 @@ impl TryFrom<Cow<'_, str>> for UIntTemplate {
 
             if is_static {
                 match src.parse::<u64>() {
-                    Ok(num) => {
-                        return Ok(UIntTemplate {
-                            src: UIntTemplateSource::Number(num),
-                            parts,
-                        });
-                    }
-                    Err(_) => {
-                        return Err(TemplateParseError::InvalidNumericTemplate {
-                            template: src.to_string(),
-                        });
-                    }
+                    Ok(num) => Ok(UIntTemplate {
+                        src: UIntTemplateSource::Number(num),
+                        parts,
+                    }),
+                    Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
+                        template: src.into_owned(),
+                    }),
                 }
+            } else {
+                Ok(UIntTemplate {
+                    parts,
+                    src: UIntTemplateSource::String(src.into_owned()),
+                })
             }
-
-            Ok(UIntTemplate {
-                parts,
-                src: UIntTemplateSource::String(src.into_owned()),
-            })
         })
     }
 }
@@ -360,8 +367,14 @@ impl fmt::Display for UIntTemplate {
     }
 }
 
-// This is safe because we literally defer to `String` for the schema of `Template`.
 impl ConfigurableString for UIntTemplate {}
+impl ConfigurableNumber for UIntTemplate {
+    type Numeric = u64;
+
+    fn class() -> NumberClass {
+        NumberClass::Unsigned
+    }
+}
 
 impl UIntTemplate {
     /// Renders the given template with data from the event.
@@ -604,28 +617,18 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
-        // let f5 = Template::try_from(TemplateSource::String("{{ foo }}".to_string()))
-        //     .unwrap()
-        //     .get_fields()
-        //     .unwrap();
-        // let f6 = Template::try_from(TemplateSource::SignedNumber(123))
-        //     .unwrap()
-        //     .get_fields();
-        // let f7 = Template::try_from(TemplateSource::UnsignedNumber(123))
-        //     .unwrap()
-        //     .get_fields();
-        // let f8 = Template::try_from(TemplateSource::FloatingPointNumber(123.123))
-        //     .unwrap()
-        //     .get_fields();
+        let f5 = UIntTemplate::try_from("{{ foo }}-{{ bar }}")
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f6 = UIntTemplate::from(123u64).get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
-        // assert_eq!(f5, vec!["foo"]);
-        // assert_eq!(f6, None);
-        // assert_eq!(f7, None);
-        // assert_eq!(f8, None);
+        assert_eq!(f5, vec!["foo", "bar"]);
+        assert_eq!(f6, None);
     }
 
     #[test]
@@ -638,17 +641,6 @@ mod tests {
         assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
             .unwrap()
             .is_dynamic());
-        // assert!(!Template::try_from(TemplateSource::SignedNumber(123))
-        //     .unwrap()
-        //     .is_dynamic());
-        // assert!(!Template::try_from(TemplateSource::UnsignedNumber(123))
-        //     .unwrap()
-        //     .is_dynamic());
-        // assert!(
-        //     !Template::try_from(TemplateSource::FloatingPointNumber(123.123))
-        //         .unwrap()
-        //         .is_dynamic()
-        // );
     }
 
     #[test]
@@ -659,29 +651,22 @@ mod tests {
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
     }
 
-    // #[test]
-    // fn render_log_signed_number() {
-    //     let event = Event::Log(LogEvent::from("hello world"));
-    //     let template = Template::try_from(TemplateSource::SignedNumber(123)).unwrap();
+    #[test]
+    fn render_log_unsigned_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = UIntTemplate::from(123);
 
-    //     assert_eq!(Ok(Bytes::from("123")), template.render(&event))
-    // }
+        assert_eq!(Ok(123), template.render(&event))
+    }
 
-    // #[test]
-    // fn render_log_unsigned_number() {
-    //     let event = Event::Log(LogEvent::from("hello world"));
-    //     let template = Template::try_from(TemplateSource::UnsignedNumber(123)).unwrap();
+    #[test]
+    fn render_log_unsigned_number_dynamic() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("foo", 123);
 
-    //     assert_eq!(Ok(Bytes::from("123")), template.render(&event))
-    // }
-
-    // #[test]
-    // fn render_log_float_number() {
-    //     let event = Event::Log(LogEvent::from("hello world"));
-    //     let template = Template::try_from(TemplateSource::FloatingPointNumber(123.123)).unwrap();
-
-    //     assert_eq!(Ok(Bytes::from("123.123")), template.render(&event))
-    // }
+        let template = UIntTemplate::try_from("{{ foo }}").unwrap();
+        assert_eq!(Ok(123), template.render(&event))
+    }
 
     #[test]
     fn render_log_dynamic() {
