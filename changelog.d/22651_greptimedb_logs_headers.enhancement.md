@@ -1,6 +1,6 @@
-add `extra_headers` option to `greptimedb_logs` sink to set additional headers for the request
+Added a new `extra_headers` option to `greptimedb_logs` sink configuration to set additional headers for outgoing requests.
 
-example:
+Example:
 
 ```yaml
 sinks:
