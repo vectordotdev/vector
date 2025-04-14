@@ -8,7 +8,7 @@ use url::Url;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{self, provider::ProviderConfig, ProxyConfig, Format as ConfigFormat},
+    config::{self, provider::ProviderConfig, ProxyConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -54,8 +54,8 @@ pub struct HttpConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
-
-    config_format: ConfigFormat,
+    /// Which config format expected to be loaded
+    config_format: String,
 }
 
 impl Default for HttpConfig {
@@ -66,7 +66,7 @@ impl Default for HttpConfig {
             poll_interval_secs: 30,
             tls_options: None,
             proxy: Default::default(),
-            config_format: ConfigFormat::Toml,
+            config_format: "toml".parse().unwrap(),
         }
     }
 }
@@ -130,12 +130,18 @@ async fn http_request_to_config_builder(
     tls_options: Option<&TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
-    config_format: &ConfigFormat
+    config_format: &String
 ) -> BuildResult {
     let config_str = http_request(url, tls_options, headers, proxy)
         .await
         .map_err(|e| vec![e.to_owned()])?;
-    config::load(config_str.chunk(), *config_format)
+
+    match config_format.as_ref() {
+        "toml" => config::load(config_str.chunk(), crate::config::format::Format::Toml),
+        "yaml" | "yml" => config::load(config_str.chunk(), crate::config::format::Format::Yaml),
+        "json" => config::load(config_str.chunk(), crate::config::format::Format::Json),
+        _ => config::load(config_str.chunk(), crate::config::format::Format::Toml),
+    }
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -145,7 +151,7 @@ fn poll_http(
     tls_options: Option<TlsConfig>,
     headers: IndexMap<String, String>,
     proxy: ProxyConfig,
-    config_format: ConfigFormat
+    config_format: String
 ) -> impl Stream<Item = signal::SignalTo> {
     let duration = time::Duration::from_secs(poll_interval_secs);
     let mut interval = time::interval_at(time::Instant::now() + duration, duration);
