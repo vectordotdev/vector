@@ -1,9 +1,9 @@
 //! `RequestBuilder` implementation for the `Doris` sink.
 
 use super::sink::DorisPartitionKey;
+use crate::sinks::doris::service::DorisRequest;
 use crate::sinks::prelude::*;
 use bytes::Bytes;
-use crate::sinks::doris::service::DorisRequest;
 use vector_lib::codecs::encoding::Framer;
 
 #[derive(Debug, Clone)]
@@ -38,7 +38,7 @@ impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
         input: (DorisPartitionKey, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
-        
+
         let builder = RequestMetadataBuilder::from_events(&events);
         let doris_metadata = DorisMetadata {
             finalizers: events.take_finalizers(),
@@ -47,7 +47,6 @@ impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
 
         (doris_metadata, builder, events)
     }
-
 
     fn build_request(
         &self,
@@ -67,5 +66,3 @@ impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
         }
     }
 }
-
-

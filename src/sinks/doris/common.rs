@@ -1,15 +1,14 @@
-use http::Uri;
-use snafu::ResultExt;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use crate::codecs::Encoder;
 use crate::http::{Auth, MaybeAuth};
-use crate::sinks::doris::DorisConfig;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
+use crate::sinks::doris::DorisConfig;
 use crate::sinks::elasticsearch::{InvalidHostSnafu, ParseError};
 use crate::sinks::prelude::Compression;
 use crate::sinks::util::UriSerde;
 use crate::tls::TlsSettings;
-
+use http::Uri;
+use snafu::ResultExt;
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 #[derive(Debug, Clone)]
 pub struct DorisCommon {
@@ -19,12 +18,8 @@ pub struct DorisCommon {
     pub tls_settings: TlsSettings,
 }
 
-
 impl DorisCommon {
-    pub async fn parse_config(
-        config: &DorisConfig,
-        endpoint: &str,
-    ) -> crate::Result<Self>  {
+    pub async fn parse_config(config: &DorisConfig, endpoint: &str) -> crate::Result<Self> {
         let uri = format!("{}/_test", endpoint);
         let uri = uri
             .parse::<Uri>()
@@ -33,7 +28,7 @@ impl DorisCommon {
             return Err(ParseError::HostMustIncludeHostname {
                 host: endpoint.to_string(),
             }
-                .into());
+            .into());
         }
         let uri = endpoint.parse::<UriSerde>()?;
 
@@ -62,10 +57,8 @@ impl DorisCommon {
     pub async fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
         for endpoint in config.endpoints.iter() {
-            commons
-                .push(Self::parse_config(config, endpoint).await?);
+            commons.push(Self::parse_config(config, endpoint).await?);
         }
         Ok(commons)
     }
 }
-
