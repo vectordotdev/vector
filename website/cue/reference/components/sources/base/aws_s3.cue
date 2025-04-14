@@ -714,9 +714,9 @@ base: components: sources: aws_s3: configuration: {
 				type: object: options: {
 					max_age_secs: {
 						description: """
-																Event must have been emitted within the last max_age_secs seconds to be processed.
-																If the event is older, it is forwarded to the queue_url for later processing.
-																This is useful for preferring to process more recent files.
+																Event must have been emitted within the last `max_age_secs` seconds to be processed.
+
+																If the event is older, it is forwarded to the `queue_url` for later processing.
 																"""
 						required: true
 						type: uint: {
@@ -725,7 +725,7 @@ base: components: sources: aws_s3: configuration: {
 						}
 					}
 					queue_url: {
-						description: "The URL of the queue to forward events to when they are older than max_age_secs."
+						description: "The URL of the queue to forward events to when they are older than `max_age_secs`."
 						required:    true
 						type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 					}

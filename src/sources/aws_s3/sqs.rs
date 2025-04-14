@@ -63,16 +63,16 @@ static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DeferredConfig {
-    /// The URL of the queue to forward events to when they are older than max_age_secs.
+    /// The URL of the queue to forward events to when they are older than `max_age_secs`.
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
     ))]
     #[configurable(validation(format = "uri"))]
     pub(super) queue_url: String,
 
-    /// Event must have been emitted within the last max_age_secs seconds to be processed.
-    /// If the event is older, it is forwarded to the queue_url for later processing.
-    /// This is useful for preferring to process more recent files.
+    /// Event must have been emitted within the last `max_age_secs` seconds to be processed.
+    ///
+    /// If the event is older, it is forwarded to the `queue_url` for later processing.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     pub(super) max_age_secs: u64,
