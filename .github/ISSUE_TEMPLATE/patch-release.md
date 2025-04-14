@@ -8,7 +8,7 @@ labels: "domain: releasing"
 Before the release:
 
 - [ ] Create a new release preparation branch from the current release branch
-  - `git fetch && git checkout v0.<current minor version> && git checkout -b website-prepare-v0.<new version number>`
+  - `git fetch --all && git checkout v0.<current minor version> && git checkout -b website-prepare-v0-<current minor version>-<new patch>
 - [ ] Cherry-pick in all commits to be released from the associated release milestone
   - If any merge conflicts occur, attempt to solve them and if needed enlist the aid of those familiar with the conflicting commits.
 - [ ] Bump the release number in the `Cargo.toml` to the current version number
@@ -17,11 +17,11 @@ Before the release:
         previous releases for examples).
 - [ ] Update version number in `distribution/install.sh`
 - [ ] Add new version to `website/cue/reference/versions.cue`
-- [ ] Create new release md file by copying an existing one in `./website/content/en/releases/` and
-      updating version number
+- [ ] Create new release md file by copying an existing one in `./website/content/en/releases/`.
+  - Update the version number to `v0.<current minor version>.<patch>` and increase the `weight` by 1.
 - [ ] Run `cargo check` to regenerate `Cargo.lock` file
 - [ ] Commit these changes
-- [ ] Open PR against the release branch (`v0.<new version number>`) for review
+- [ ] Open PR against the release branch (`v0.<current minor version>`) for review
 - [ ] PR approval
 
 On the day of release:
@@ -30,9 +30,9 @@ On the day of release:
 - [ ] Rebase the release preparation branch on the release branch
   - Squash the release preparation commits (but not the cherry-picked commits!) to a single
     commit. This makes it easier to cherry-pick to master after the release.
-  - `git checkout prepare-v0.<new version number> && git rebase -i v0.<current minor version>`
+  - `git checkout website-prepare-v0-<current minor version>-<new patch> && git rebase -i v0.<current minor version>`
 - [ ] Merge release preparation branch into the release branch
-  - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
+  - `git co v0.<current minor version> && git merge --ff-only website-prepare-v0-<current minor version>-<new patch>`
 - [ ] Tag new release
   - [ ] `git tag v0.<minor>.<patch> -a -m v0.<minor>.<patch>`
   - [ ] `git push origin v0.<minor>.<patch>`
