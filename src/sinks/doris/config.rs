@@ -3,30 +3,32 @@
 use super::progress::ProgressReporter;
 use super::sink::DorisSink;
 
+use crate::sinks::doris::common::DorisCommon;
+use crate::sinks::doris::retry::DorisRetryLogic;
+use crate::sinks::doris::service::{DorisService, HttpRequestBuilder};
+use crate::sinks::util::http::RequestConfig;
 use crate::{
     http::{Auth, HttpClient},
     sinks::{
         doris::health::DorisHealthLogic,
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, service::HealthConfig},
+        util::{service::HealthConfig, RealtimeSizeBasedDefaultBatchSettings},
     },
 };
-use http::{Request, Uri};
-use hyper::Body;
-use std::collections::HashMap;
 use futures;
 use futures_util::TryFutureExt;
+use http::{Request, Uri};
+use hyper::Body;
 use serde_json;
-use vector_lib::codecs::JsonSerializerConfig;
-use crate::sinks::doris::common::DorisCommon;
-use crate::sinks::doris::retry::DorisRetryLogic;
-use crate::sinks::doris::service::{DorisService, HttpRequestBuilder};
-use crate::sinks::util::http::RequestConfig;
+use std::collections::HashMap;
 use std::sync::Arc;
+use vector_lib::codecs::JsonSerializerConfig;
 
 // 定义用于 Doris 服务的 URI 处理函数
 fn get_http_scheme_host(host: &str) -> crate::Result<UriComponents> {
-    let uri = host.parse::<Uri>().map_err(|e| format!("Failed to parse URI: {}", e))?;
+    let uri = host
+        .parse::<Uri>()
+        .map_err(|e| format!("Failed to parse URI: {}", e))?;
 
     // 获取 scheme, 默认为 http
     let scheme = uri.scheme_str().unwrap_or("http").to_string();
@@ -37,17 +39,15 @@ fn get_http_scheme_host(host: &str) -> crate::Result<UriComponents> {
     // 获取 port
     let port = uri.port_u16();
 
-    Ok(UriComponents {
-        scheme,
-        host,
-        port,
-    })
+    Ok(UriComponents { scheme, host, port })
 }
 
 // 构建完整的 URI
 fn build_uri(scheme: &str, path: &str, host: &str, port: u16) -> crate::Result<Uri> {
     let uri_str = format!("{}://{}:{}{}", scheme, host, port, path);
-    uri_str.parse::<Uri>().map_err(|e| format!("Failed to build URI: {}", e).into())
+    uri_str
+        .parse::<Uri>()
+        .map_err(|e| format!("Failed to build URI: {}", e).into())
 }
 
 // URI 组件结构体
@@ -63,7 +63,6 @@ struct UriComponents {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DorisConfig {
-
     /// A list of Doris endpoints to send logs to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a
@@ -79,7 +78,6 @@ pub struct DorisConfig {
     /// The table data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: Template,
-
 
     /// The prefix for Stream Load label.
     /// The final label will be in format: `{label_prefix}_{database}_{table}_{timestamp}_{uuid}`.
@@ -117,7 +115,6 @@ pub struct DorisConfig {
     #[serde(default)]
     pub compression: Compression,
 
-
     /// Number of retries that will be attempted before give up.
     #[serde(default = "default_max_retries")]
     pub max_retries: isize,
@@ -141,7 +138,6 @@ pub struct DorisConfig {
     #[configurable(derived)]
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
-
 
     #[configurable(derived)]
     #[serde(
@@ -172,7 +168,6 @@ fn default_max_retries() -> isize {
     -1
 }
 
-
 impl_generate_config_from_default!(DorisConfig);
 
 #[async_trait::async_trait]
@@ -202,7 +197,7 @@ impl SinkConfig for DorisConfig {
 
         // Setup retry logic using the configured request settings
         let request_settings = self.request.tower.into_settings();
-        
+
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         // 将reporter包装为Arc以便共享
@@ -215,12 +210,12 @@ impl SinkConfig for DorisConfig {
             .map(|common| {
                 let endpoint = common.base_url.clone();
                 let http_request_builder = HttpRequestBuilder::new(&common, self);
-                
+
                 let service = DorisService::new(
-                    client.clone(), 
-                    http_request_builder, 
-                    self.log_request, 
-                    Arc::clone(&reporter_arc)
+                    client.clone(),
+                    http_request_builder,
+                    self.log_request,
+                    Arc::clone(&reporter_arc),
                 );
                 (endpoint, service)
             })
@@ -259,7 +254,7 @@ impl SinkConfig for DorisConfig {
 
 impl DorisConfig {
     /// Helper function to create HTTP headers for Doris Stream Load.
-    /// 
+    ///
     /// Note: This functionality is now directly implemented in HttpRequestBuilder::new in service,
     /// but this function is kept for potential future uses or other implementations.
     #[allow(dead_code)]
@@ -294,85 +289,98 @@ impl DorisConfig {
         client: HttpClient,
         hosts: Vec<String>,
     ) -> crate::Result<Healthcheck> {
-
         // 为每个节点创建一个健康检查
-        let healthchecks = hosts.into_iter().map(move |host| {
-            let client = client.clone();
-            
-            async move {
-                let parsed_url = get_http_scheme_host(&host)?;
+        let healthchecks = hosts
+            .into_iter()
+            .map(move |host| {
+                let client = client.clone();
 
-                // 使用 Doris 的 bootstrap API 端点进行健康检查
-                let query_path = "/api/bootstrap";
-                let uri = build_uri(
-                    &parsed_url.scheme,
-                    query_path,
-                    &parsed_url.host,
-                    parsed_url.port.unwrap_or(8030),
-                )?;
+                async move {
+                    let parsed_url = get_http_scheme_host(&host)?;
 
-                debug!(
-                    target: "doris_sink",
-                    "Checking health of Doris node: {}", 
-                    uri
-                );
+                    // 使用 Doris 的 bootstrap API 端点进行健康检查
+                    let query_path = "/api/bootstrap";
+                    let uri = build_uri(
+                        &parsed_url.scheme,
+                        query_path,
+                        &parsed_url.host,
+                        parsed_url.port.unwrap_or(8030),
+                    )?;
 
-                let request = Request::get(uri.to_string())
-                    .body(Body::empty())
-                    .map_err(|_| "Failed to build request".to_string())?;
+                    debug!(
+                        target: "doris_sink",
+                        "Checking health of Doris node: {}",
+                        uri
+                    );
 
-                let request = request;
+                    let request = Request::get(uri.to_string())
+                        .body(Body::empty())
+                        .map_err(|_| "Failed to build request".to_string())?;
 
-                let response = client.send(request).await?;
-                let (parts, body) = response.into_parts();
-                let body_bytes = hyper::body::to_bytes(body).await
-                    .map_err(|e| format!("Failed to read response body: {}", e))?;
+                    let request = request;
 
-                if parts.status.is_success() {
-                    // 尝试解析JSON响应
-                    match serde_json::from_slice::<serde_json::Value>(&body_bytes) {
-                        Ok(json) => {
-                            // 检查响应中的code字段是否为0
-                            if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
-                                if code == 0 {
-                                    info!(
-                                        target: "doris_sink",
-                                        "Doris node {} is healthy", 
-                                        host
-                                    );
-                                    return Ok(());
-                                } else {
-                                    let msg = json.get("msg").and_then(|m| m.as_str()).unwrap_or("unknown error");
-                                    warn!(
-                                        target: "doris_sink",
-                                        "Doris node {} is unhealthy: code={}, msg={}", 
-                                        host, code, msg
-                                    );
-                                    return Err(format!("Healthcheck failed for host {}: code={}, msg={}", 
-                                                    host, code, msg).into());
+                    let response = client.send(request).await?;
+                    let (parts, body) = response.into_parts();
+                    let body_bytes = hyper::body::to_bytes(body)
+                        .await
+                        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+                    if parts.status.is_success() {
+                        // 尝试解析JSON响应
+                        match serde_json::from_slice::<serde_json::Value>(&body_bytes) {
+                            Ok(json) => {
+                                // 检查响应中的code字段是否为0
+                                if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
+                                    if code == 0 {
+                                        info!(
+                                            target: "doris_sink",
+                                            "Doris node {} is healthy",
+                                            host
+                                        );
+                                        return Ok(());
+                                    } else {
+                                        let msg = json
+                                            .get("msg")
+                                            .and_then(|m| m.as_str())
+                                            .unwrap_or("unknown error");
+                                        warn!(
+                                            target: "doris_sink",
+                                            "Doris node {} is unhealthy: code={}, msg={}",
+                                            host, code, msg
+                                        );
+                                        return Err(format!(
+                                            "Healthcheck failed for host {}: code={}, msg={}",
+                                            host, code, msg
+                                        )
+                                        .into());
+                                    }
                                 }
                             }
-                        }
-                        Err(e) => {
-                            warn!(
-                                target: "doris_sink",
-                                "Failed to parse JSON response from {}: {}", 
-                                host, e
-                            );
+                            Err(e) => {
+                                warn!(
+                                    target: "doris_sink",
+                                    "Failed to parse JSON response from {}: {}",
+                                    host, e
+                                );
+                            }
                         }
                     }
-                }
 
-                // 如果代码执行到这里，说明响应不成功或者JSON解析失败
-                warn!(
-                    target: "doris_sink",
-                    "Doris node {} is unhealthy: status={}", 
-                    host, parts.status
-                );
-                Err(format!("Healthcheck failed for host {} with status: {}", 
-                           host, parts.status).into())
-            }.boxed()
-        }).collect::<Vec<_>>();
+                    // 如果代码执行到这里，说明响应不成功或者JSON解析失败
+                    warn!(
+                        target: "doris_sink",
+                        "Doris node {} is unhealthy: status={}",
+                        host, parts.status
+                    );
+                    Err(format!(
+                        "Healthcheck failed for host {} with status: {}",
+                        host, parts.status
+                    )
+                    .into())
+                }
+                .boxed()
+            })
+            .collect::<Vec<_>>();
 
         // 使用 select_ok 来选择第一个成功的健康检查
         let healthcheck = futures::future::select_ok(healthchecks)

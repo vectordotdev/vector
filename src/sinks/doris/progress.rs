@@ -2,7 +2,7 @@
 
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time;
 use tracing::info;
 use vector_lib::shutdown::ShutdownSignal;
@@ -50,7 +50,10 @@ impl ProgressReporter {
             return;
         }
 
-        let init_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+        let init_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
         let mut last_time = init_time;
         let mut last_bytes = self.total_bytes.load(Ordering::Relaxed);
         let mut last_rows = self.total_rows.load(Ordering::Relaxed);
@@ -63,7 +66,7 @@ impl ProgressReporter {
 
         loop {
             let sleep_fut = time::sleep(Duration::from_secs(self.interval));
-            
+
             tokio::select! {
                 _ = sleep_fut => {},
                 // 如果有关闭信号，则退出循环
@@ -76,10 +79,13 @@ impl ProgressReporter {
                 }
             }
 
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
             let cur_bytes = self.total_bytes.load(Ordering::Relaxed);
             let cur_rows = self.total_rows.load(Ordering::Relaxed);
-            
+
             let total_time = now.saturating_sub(init_time);
             let total_speed_mbps = if total_time > 0 {
                 cur_bytes / 1024 / 1024 / total_time as i64
@@ -135,4 +141,4 @@ impl Clone for ProgressReporter {
             interval: self.interval,
         }
     }
-} 
+}

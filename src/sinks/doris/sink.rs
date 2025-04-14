@@ -1,13 +1,13 @@
+use crate::sinks::doris::request_builder::DorisRequestBuilder;
+use crate::sinks::doris::service::DorisRequest;
 use crate::sinks::doris::DorisConfig;
 use crate::sinks::prelude::*;
-use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use crate::sinks::doris::service::{DorisRequest};
 
 pub struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
     config: DorisConfig,
-    request_builder: DorisRequestBuilder
+    request_builder: DorisRequestBuilder,
 }
 
 impl<S> DorisSink<S>
@@ -22,7 +22,7 @@ where
         batch_settings: BatcherSettings,
         service: S,
         config: DorisConfig,
-        request_builder: DorisRequestBuilder
+        request_builder: DorisRequestBuilder,
     ) -> Self {
         DorisSink {
             batch_settings,
@@ -31,14 +31,11 @@ where
             request_builder,
         }
     }
-    
+
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
-        let key_partitioner = DorisKeyPartitioner::new(
-            self.config.database, 
-            self.config.table,
-        );
-        
+        let key_partitioner = DorisKeyPartitioner::new(self.config.database, self.config.table);
+
         input
             .batched_partitioned(key_partitioner, || batch_settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
@@ -91,13 +88,10 @@ struct DorisKeyPartitioner {
 }
 
 impl DorisKeyPartitioner {
-    const fn new(database: Template, table: Template,) -> Self {
-        Self {
-            database,
-            table,
-        }
+    const fn new(database: Template, table: Template) -> Self {
+        Self { database, table }
     }
-    
+
     fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
@@ -115,13 +109,10 @@ impl DorisKeyPartitioner {
 impl Partitioner for DorisKeyPartitioner {
     type Item = Event;
     type Key = Option<DorisPartitionKey>;
-    
+
     fn partition(&self, item: &Self::Item) -> Self::Key {
         let database = Self::render(&self.database, item, "database_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
-        Some(DorisPartitionKey {
-            database,
-            table,
-        })
+        Some(DorisPartitionKey { database, table })
     }
 }

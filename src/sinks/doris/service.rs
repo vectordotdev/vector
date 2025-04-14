@@ -1,22 +1,24 @@
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-    collections::{HashMap, HashSet},
-};
-use std::time::SystemTime;
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use http::{Method, Response, StatusCode, Uri};
 use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use http::{Method, Response, StatusCode, Uri};
 use hyper::{service::Service, Body, Request};
+use std::time::SystemTime;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tower::ServiceExt;
+use tracing::{debug, info};
 use uuid::Uuid;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
 use vector_lib::ByteSizeOf;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use tracing::{debug, info};
 
 use super::DorisConfig;
+use crate::sinks::doris::common::DorisCommon;
+use crate::sinks::doris::sink::DorisPartitionKey;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     http::HttpClient,
@@ -26,8 +28,6 @@ use crate::{
         Compression, ElementCount,
     },
 };
-use crate::sinks::doris::common::DorisCommon;
-use crate::sinks::doris::sink::DorisPartitionKey;
 
 #[derive(Clone, Debug)]
 pub struct DorisRequest {
@@ -79,23 +79,26 @@ pub struct HttpRequestBuilder {
 impl HttpRequestBuilder {
     pub fn new(common: &DorisCommon, config: &DorisConfig) -> HttpRequestBuilder {
         let auth = common.auth.clone().map(|http_auth| Auth::Basic(http_auth));
-        
+
         // 创建并设置 headers
         let mut headers = HashMap::new();
         // 基本头部
         headers.insert("Expect".to_string(), "100-continue".to_string());
-        headers.insert("Content-Type".to_string(), "text/plain;charset=utf-8".to_string());
-        
+        headers.insert(
+            "Content-Type".to_string(),
+            "text/plain;charset=utf-8".to_string(),
+        );
+
         // 添加行分隔符头部（如果非默认）
         if !config.line_delimiter.is_empty() && config.line_delimiter != "\n" {
             headers.insert("line_delimiter".to_string(), config.line_delimiter.clone());
         }
-        
+
         // 添加自定义头部
         for (k, v) in &config.headers {
             headers.insert(k.clone(), v.clone());
         }
-        
+
         HttpRequestBuilder {
             auth,
             compression: config.compression.clone(),
@@ -113,14 +116,14 @@ impl HttpRequestBuilder {
     ) -> Result<Request<Bytes>, crate::Error> {
         let database = &doris_req.partition_key.database;
         let table = &doris_req.partition_key.table;
-        
+
         debug!(
             message = "Building Doris Stream Load request",
             database = %database,
             table = %table,
             payload_size = doris_req.payload.len()
         );
-        
+
         // Generate a unique label
         let label = format!(
             "{}_{}_{}_{}_{}",
@@ -141,19 +144,19 @@ impl HttpRequestBuilder {
                 message = "Using redirect URL",
                 redirect_url = %redirect_url
             );
-            redirect_url.parse::<Uri>()
+            redirect_url
+                .parse::<Uri>()
                 .map_err(|e| crate::Error::from(format!("Invalid redirect URI: {}", e)))?
         } else {
             // 构建原始URL
-            let stream_load_url = format!(
-                "{}/api/{}/{}/_stream_load",
-                self.base_url, database, table
-            );
-            
-            stream_load_url.parse::<Uri>()
+            let stream_load_url =
+                format!("{}/api/{}/{}/_stream_load", self.base_url, database, table);
+
+            stream_load_url
+                .parse::<Uri>()
                 .map_err(|e| crate::Error::from(format!("Invalid URI: {}", e)))?
         };
-        
+
         debug!(
             message = "Building request",
             uri = %uri,
@@ -181,7 +184,7 @@ impl HttpRequestBuilder {
         for (header, value) in &self.headers {
             builder = builder.header(&header[..], &value[..]);
         }
-        
+
         // 添加 http_request_config 中的自定义 headers (保留兼容性)
         for (header, value) in &self.http_request_config.headers {
             builder = builder.header(&header[..], &value[..]);
@@ -198,7 +201,7 @@ impl HttpRequestBuilder {
                 debug!(message = "Applied Basic authentication to request");
             }
         }
-        
+
         debug!(
             message = "Request built successfully",
             method = %request.method(),
@@ -275,38 +278,38 @@ impl Service<DorisRequest> for DorisService {
         let mut http_service = self.batch_service.clone();
         let log_request = self.log_request;
         let reporter = Arc::clone(&self.reporter);
-        
+
         Box::pin(async move {
             // 确保服务已准备好
             http_service.ready().await?;
-            
+
             // 处理元数据和字节大小计算
-            let events_byte_size = std::mem::take(req.metadata_mut())
-                .into_events_estimated_json_encoded_byte_size();
-            
+            let events_byte_size =
+                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
+
             // 创建当前请求，并追踪已访问URL，防止重定向循环
             let mut current_req = req;
             let mut redirect_count = 0;
             let mut visited_urls = HashSet::new();
             const MAX_REDIRECTS: u8 = 3;
-            
+
             // 记录初始URL
             if let Some(url) = &current_req.redirect_url {
                 visited_urls.insert(url.clone());
             }
-            
+
             // 发送初始请求
             let mut http_response = http_service.call(current_req.clone()).await?;
-            
+
             // 检查是否收到重定向响应
             let mut status = http_response.status();
-            
+
             // 处理重定向
-            while (status == StatusCode::TEMPORARY_REDIRECT || 
-                   status == StatusCode::PERMANENT_REDIRECT || 
-                   status == StatusCode::FOUND) && 
-                  redirect_count < MAX_REDIRECTS {
-                
+            while (status == StatusCode::TEMPORARY_REDIRECT
+                || status == StatusCode::PERMANENT_REDIRECT
+                || status == StatusCode::FOUND)
+                && redirect_count < MAX_REDIRECTS
+            {
                 // 尝试获取重定向位置
                 if let Some(location) = http_response.headers().get(http::header::LOCATION) {
                     if let Ok(location_str) = location.to_str() {
@@ -316,12 +319,12 @@ impl Service<DorisRequest> for DorisService {
                             to = %location_str,
                             redirect_count = redirect_count + 1
                         );
-                        
+
                         // 检查重定向循环
                         if !visited_urls.insert(location_str.to_string()) {
                             return Err(crate::Error::from("Detected redirect loop"));
                         }
-                        
+
                         // 创建一个新的 DorisRequest，使用重定向 URL
                         let redirect_req = DorisRequest {
                             redirect_url: Some(location_str.to_string()),
@@ -335,33 +338,38 @@ impl Service<DorisRequest> for DorisService {
 
                         // 更新当前请求为重定向请求
                         current_req = redirect_req;
-                        
+
                         // 增加重定向计数
                         redirect_count += 1;
-                        
+
                         debug!(
                             message = "Received response after redirect",
                             new_status = %status,
                             redirect_count = redirect_count
                         );
                     } else {
-                        return Err(crate::Error::from("Invalid Location header in redirect response"));
+                        return Err(crate::Error::from(
+                            "Invalid Location header in redirect response",
+                        ));
                     }
                 } else {
-                    return Err(crate::Error::from("Missing Location header in redirect response"));
+                    return Err(crate::Error::from(
+                        "Missing Location header in redirect response",
+                    ));
                 }
             }
-            
+
             // 检查是否超过最大重定向次数
             if redirect_count >= MAX_REDIRECTS {
                 return Err(crate::Error::from(format!(
-                    "Exceeded maximum number of redirects ({})", MAX_REDIRECTS
+                    "Exceeded maximum number of redirects ({})",
+                    MAX_REDIRECTS
                 )));
             }
-            
+
             // 处理最终响应
             let event_status = get_event_status(&http_response);
-            
+
             // 记录最终响应体 - 无论成功与否都记录
             if log_request {
                 let body = http_response.body();
@@ -379,32 +387,38 @@ impl Service<DorisRequest> for DorisService {
                             if let Some(status_str) = status_value.as_str() {
                                 if status_str == "Success" {
                                     // 更新字节数统计
-                                    if let Some(load_bytes) = json.get("LoadBytes").and_then(|b| b.as_i64()) {
+                                    if let Some(load_bytes) =
+                                        json.get("LoadBytes").and_then(|b| b.as_i64())
+                                    {
                                         reporter.incr_total_bytes(load_bytes);
                                         debug!(
                                             target: "doris_sink",
-                                            "Updated bytes stats: +{} bytes", 
+                                            "Updated bytes stats: +{} bytes",
                                             load_bytes
                                         );
                                     }
 
                                     // 更新行数统计
-                                    if let Some(loaded_rows) = json.get("NumberLoadedRows").and_then(|r| r.as_i64()) {
+                                    if let Some(loaded_rows) =
+                                        json.get("NumberLoadedRows").and_then(|r| r.as_i64())
+                                    {
                                         reporter.incr_total_rows(loaded_rows);
                                         debug!(
                                             target: "doris_sink",
-                                            "Updated rows stats: +{} rows", 
+                                            "Updated rows stats: +{} rows",
                                             loaded_rows
                                         );
                                     }
 
                                     // 更新过滤行数统计
-                                    if let Some(filtered_rows) = json.get("NumberFilteredRows").and_then(|r| r.as_i64()) {
+                                    if let Some(filtered_rows) =
+                                        json.get("NumberFilteredRows").and_then(|r| r.as_i64())
+                                    {
                                         if filtered_rows > 0 {
                                             reporter.incr_failed_rows(filtered_rows);
                                             debug!(
                                                 target: "doris_sink",
-                                                "Updated filtered rows stats: +{} filtered rows", 
+                                                "Updated filtered rows stats: +{} filtered rows",
                                                 filtered_rows
                                             );
                                         }
@@ -415,7 +429,7 @@ impl Service<DorisRequest> for DorisService {
                     }
                 }
             }
-            
+
             Ok(DorisResponse {
                 event_status,
                 http_response,
@@ -427,7 +441,7 @@ impl Service<DorisRequest> for DorisService {
 
 fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     let status = response.status();
-    
+
     // 处理HTTP层面的基本状态
     if !status.is_success() {
         if status.is_server_error() {
@@ -438,10 +452,10 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
             return EventStatus::Rejected;
         }
     }
-    
+
     // HTTP状态码是2xx，需要进一步解析响应体
     let body = String::from_utf8_lossy(response.body());
-    
+
     // 尝试解析响应体为JSON
     match serde_json::from_str::<serde_json::Value>(&body) {
         Ok(json) => {
@@ -457,15 +471,15 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
                     }
                 }
             }
-            
+
             // 兜底 - 如果找不到Status字段但格式是JSON
             if body.contains("\"errors\":true") || body.contains("\"status\":\"Fail\"") {
                 return EventStatus::Rejected;
             }
-            
+
             // 没有明确错误指示，假设成功
             return EventStatus::Delivered;
-        },
+        }
         Err(_) => {
             // 无法解析JSON，尝试基于文本内容判断
             if body.contains("Success") {
