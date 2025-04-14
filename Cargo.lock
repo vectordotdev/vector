@@ -6449,6 +6449,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
+name = "newtype-uuid"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee3224f0e8be7c2a1ebc77ef9c3eecb90f55c6594399ee825de964526b3c9056"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "nibble_vec"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8023,6 +8032,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
+name = "quick-junit"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed1a693391a16317257103ad06a88c6529ac640846021da7c435a06fffdacd7"
+dependencies = [
+ "chrono",
+ "indexmap 2.9.0",
+ "newtype-uuid",
+ "quick-xml 0.37.4",
+ "strip-ansi-escapes",
+ "thiserror 2.0.3",
+ "uuid",
+]
+
+[[package]]
 name = "quick-xml"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8040,6 +8064,15 @@ checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.37.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4ce8c88de324ff838700f36fb6ab86c96df0e3c4ab6ef3a9b2044465cce1369"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -11489,6 +11522,7 @@ dependencies = [
  "prost-reflect",
  "prost-types 0.12.6",
  "pulsar",
+ "quick-junit",
  "quickcheck",
  "rand 0.9.0",
  "rand_distr",
