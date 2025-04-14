@@ -169,7 +169,7 @@ pub fn normalize_as_agent_event(event: &mut Event) {
             // possible payload is stringified JSON
             outer_msg
                 .as_bytes()
-                .and_then(|b| serde_json::from_slice::<ObjectMap>(&b).ok())
+                .and_then(|b| serde_json::from_slice::<ObjectMap>(b).ok())
                 .unwrap_or_else(|| {
                     [(KeyString::from(MESSAGE), outer_msg)]
                         .into_iter()
