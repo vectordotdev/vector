@@ -28,6 +28,13 @@ sinks:
     encoding:
       codec: "json"
 
+  console2:
+    inputs:
+      - "in"
+    type: "console"
+    encoding:
+      codec: "json"
+
   doris:
     inputs:
       - "parse_json"  # 使用转换后的数据
@@ -43,4 +50,5 @@ sinks:
     log_request: true
     headers:
       format: "json"
-      strip_outer_array: "false"  
+      strip_outer_array: "false"
+      read_json_by_line: "true"
