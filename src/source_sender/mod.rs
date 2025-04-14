@@ -99,16 +99,21 @@ pub struct Builder {
     lag_time: Option<Histogram>,
 }
 
-impl Builder {
-    // https://github.com/rust-lang/rust/issues/73255
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn with_buffer(self, n: usize) -> Self {
+impl Default for Builder {
+    fn default() -> Self {
         Self {
-            buf_size: n,
-            inner: self.inner,
-            named_inners: self.named_inners,
-            lag_time: self.lag_time,
+            buf_size: CHUNK_SIZE,
+            inner: None,
+            named_inners: Default::default(),
+            lag_time: Some(histogram!(LAG_TIME_NAME)),
         }
+    }
+}
+
+impl Builder {
+    pub const fn with_buffer(mut self, n: usize) -> Self {
+        self.buf_size = n;
+        self
     }
 
     pub fn add_source_output(
@@ -148,11 +153,9 @@ impl Builder {
         }
     }
 
-    // https://github.com/rust-lang/rust/issues/73255
-    #[allow(clippy::missing_const_for_fn)]
     pub fn build(self) -> SourceSender {
         SourceSender {
-            inner: self.inner,
+            inner: self.inner.expect("no default output"),
             named_inners: self.named_inners,
         }
     }
@@ -160,18 +163,13 @@ impl Builder {
 
 #[derive(Debug, Clone)]
 pub struct SourceSender {
-    inner: Option<Inner>,
+    inner: Inner,
     named_inners: HashMap<String, Inner>,
 }
 
 impl SourceSender {
     pub fn builder() -> Builder {
-        Builder {
-            buf_size: CHUNK_SIZE,
-            inner: None,
-            named_inners: Default::default(),
-            lag_time: Some(histogram!(LAG_TIME_NAME)),
-        }
+        Builder::default()
     }
 
     #[cfg(any(test, feature = "test-utils"))]
@@ -185,7 +183,7 @@ impl SourceSender {
             Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
-                inner: Some(inner),
+                inner,
                 named_inners: Default::default(),
             },
             rx,
@@ -271,11 +269,7 @@ impl SourceSender {
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
-        self.inner
-            .as_mut()
-            .expect("no default output")
-            .send_event(event)
-            .await
+        self.inner.send_event(event).await
     }
 
     /// Send a stream of events to the default output.
@@ -286,11 +280,7 @@ impl SourceSender {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        self.inner
-            .as_mut()
-            .expect("no default output")
-            .send_event_stream(events)
-            .await
+        self.inner.send_event_stream(events).await
     }
 
     /// Send a batch of events to the default output.
@@ -302,11 +292,7 @@ impl SourceSender {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
-        self.inner
-            .as_mut()
-            .expect("no default output")
-            .send_batch(events)
-            .await
+        self.inner.send_batch(events).await
     }
 
     /// Send a batch of events event to a named output.
@@ -482,7 +468,7 @@ impl Inner {
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             let count = events.len();
             self.send(events).await.inspect_err(|_| {
-                // The unsent event count is discarded here because the caller emits the
+                // The unsent event count is discarded here because the callee emits the
                 // `StreamClosedError`.
                 unsent_event_count.discard();
             })?;
