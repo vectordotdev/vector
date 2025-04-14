@@ -30,9 +30,9 @@ On the day of release:
 - [ ] Rebase the release preparation branch on the release branch
   - Squash the release preparation commits (but not the cherry-picked commits!) to a single
     commit. This makes it easier to cherry-pick to master after the release.
-  - `git checkout prepare-v0.<new version number> && git rebase -i v0.<current minor version>`
+  - `git fetch --all && git checkout prepare-v0.<new version number> && git rebase -i v0.<current minor version>`
 - [ ] Merge release preparation branch into the release branch
-  - `git co v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
+  - `git checkout v0.<current minor version> && git merge --ff-only prepare-v0.<current minor version>.<patch>`
 - [ ] Tag new release
   - [ ] `git tag v0.<minor>.<patch> -a -m v0.<minor>.<patch>`
   - [ ] `git push origin v0.<minor>.<patch>`
