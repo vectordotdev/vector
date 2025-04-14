@@ -51,3 +51,45 @@ pub mod resource {
         tonic::include_proto!("opentelemetry.proto.resource.v1");
     }
 }
+
+#[cfg(all(feature = "with-serde"))]
+pub(crate) mod serializers {
+    use serde::de::{self, MapAccess, Visitor};
+    use serde::ser::{SerializeMap, SerializeStruct};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::fmt;
+
+    // hex string <-> bytes conversion
+
+    pub fn serialize_to_hex_string<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex_string = hex::encode(bytes);
+        serializer.serialize_str(&hex_string)
+    }
+
+    pub fn deserialize_from_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct BytesVisitor;
+
+        impl<'de> Visitor<'de> for BytesVisitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string representing hex-encoded bytes")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Vec<u8>, E>
+            where
+                E: de::Error,
+            {
+                hex::decode(value).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_str(BytesVisitor)
+    }
+}
