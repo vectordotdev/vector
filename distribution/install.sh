@@ -13,7 +13,7 @@ set -u
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.46.0"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.46.1"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
