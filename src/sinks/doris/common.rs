@@ -1,9 +1,7 @@
 use http::Uri;
 use snafu::ResultExt;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use crate::codecs::Encoder;
-
 use crate::http::{Auth, MaybeAuth};
 use crate::sinks::doris::DorisConfig;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
@@ -43,11 +41,9 @@ impl DorisCommon {
         let auth = config.auth.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
-        let config = config.clone();
-
         let request_builder = DorisRequestBuilder {
             compression: Compression::None, // TODO: Support compression
-            encoding: (
+            encoder: (
                 config.encoding.clone(),
                 Encoder::<Framer>::new(
                     NewlineDelimitedEncoderConfig.build().into(),

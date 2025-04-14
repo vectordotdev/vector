@@ -117,9 +117,6 @@ pub struct DorisConfig {
     #[serde(default)]
     pub compression: Compression,
 
-    /// Maximum size of a batch before it is flushed.
-    #[serde(default = "default_bulk_max_size")]
-    pub bulk_max_size: usize,
 
     /// Number of retries that will be attempted before give up.
     #[serde(default = "default_max_retries")]
@@ -171,45 +168,10 @@ fn default_log_progress_interval() -> u64 {
     10
 }
 
-// fn default_timeout() -> Duration {
-//     Duration::from_secs(30)
-// }
-
-fn default_bulk_max_size() -> usize {
-    100000
-}
-
 fn default_max_retries() -> isize {
     -1
 }
 
-// /// The format used to parse input/output data.
-// #[configurable_component]
-// #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Hash)]
-// #[serde(rename_all = "snake_case")]
-// #[derivative(Default)]
-// #[allow(clippy::enum_variant_names)]
-// pub enum DorisFormat {
-//     #[derivative(Default)]
-//     /// JSONEachRow.
-//     Json,
-//
-//     /// json array [{},{},{}].
-//     JsonAsArray,
-//
-//     /// csv.
-//     CSV,
-// }
-//
-// impl fmt::Display for DorisFormat {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             DorisFormat::Json => write!(f, "Json"),
-//             DorisFormat::JsonAsArray => write!(f, "JsonAsArray"),
-//             DorisFormat::CSV => write!(f, "CSV"),
-//         }
-//     }
-// }
 
 impl_generate_config_from_default!(DorisConfig);
 
@@ -276,7 +238,7 @@ impl SinkConfig for DorisConfig {
         let sink = DorisSink::new(
             batch_settings,
             service,
-            self.clone(), // Pass the entire config
+            self.clone(),
             common.request_builder.clone(),
         );
 

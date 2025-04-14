@@ -1,6 +1,7 @@
 use std::{
     sync::Arc,
     task::{Context, Poll},
+    collections::{HashMap, HashSet},
 };
 use std::time::SystemTime;
 use bytes::Bytes;
@@ -12,11 +13,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 use vector_lib::stream::DriverResponse;
 use vector_lib::ByteSizeOf;
-use vector_lib::{
-    json_size::JsonSize,
-    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
-};
-use std::collections::HashMap;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use tracing::{debug, info};
 
 use super::DorisConfig;
@@ -36,9 +33,6 @@ use crate::sinks::doris::sink::DorisPartitionKey;
 pub struct DorisRequest {
     pub payload: Bytes,
     pub finalizers: EventFinalizers,
-    pub batch_size: usize,
-    #[allow(dead_code)]
-    pub events_byte_size: JsonSize,
     pub metadata: RequestMetadata,
     pub partition_key: DorisPartitionKey,
     pub redirect_url: Option<String>,
@@ -52,7 +46,7 @@ impl ByteSizeOf for DorisRequest {
 
 impl ElementCount for DorisRequest {
     fn element_count(&self) -> usize {
-        self.batch_size
+        self.metadata.event_count()
     }
 }
 
@@ -120,7 +114,7 @@ impl HttpRequestBuilder {
         let database = &doris_req.partition_key.database;
         let table = &doris_req.partition_key.table;
         
-        info!(
+        debug!(
             message = "Building Doris Stream Load request",
             database = %database,
             table = %table,
@@ -143,7 +137,7 @@ impl HttpRequestBuilder {
         // 检查是否有重定向URL
         let uri = if let Some(redirect_url) = &doris_req.redirect_url {
             // 使用重定向URL
-            info!(
+            debug!(
                 message = "Using redirect URL",
                 redirect_url = %redirect_url
             );
@@ -160,7 +154,7 @@ impl HttpRequestBuilder {
                 .map_err(|e| crate::Error::from(format!("Invalid URI: {}", e)))?
         };
         
-        info!(
+        debug!(
             message = "Building request",
             uri = %uri,
             label = %label
@@ -205,7 +199,7 @@ impl HttpRequestBuilder {
             }
         }
         
-        info!(
+        debug!(
             message = "Request built successfully",
             method = %request.method(),
             uri = %request.uri(),
@@ -282,34 +276,27 @@ impl Service<DorisRequest> for DorisService {
         let log_request = self.log_request;
         let reporter = Arc::clone(&self.reporter);
         
-        // 为了调试，输出DorisRequest的payload内容
-        info!(
-            target: "doris_sink",
-            "DorisRequest payload (batch_size={}): {}",
-            req.batch_size,
-            String::from_utf8_lossy(&req.payload)
-        );
-        
         Box::pin(async move {
             // 确保服务已准备好
             http_service.ready().await?;
             
-            // 提取元数据中的事件字节大小
-            let events_byte_size =
-                std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
+            // 处理元数据和字节大小计算
+            let events_byte_size = std::mem::take(req.metadata_mut())
+                .into_events_estimated_json_encoded_byte_size();
             
-            // 保存原始请求的副本，用于处理重定向
-            let original_payload = req.payload.clone();
-            let original_finalizers = req.finalizers.clone();
-            let original_batch_size = req.batch_size;
-            let original_partition_key = req.partition_key.clone();
-            let original_event_byte_size= req.events_byte_size.clone();
-            let original_metadata = req.metadata.clone();
+            // 创建当前请求，并追踪已访问URL，防止重定向循环
+            let mut current_req = req;
             let mut redirect_count = 0;
+            let mut visited_urls = HashSet::new();
             const MAX_REDIRECTS: u8 = 3;
             
+            // 记录初始URL
+            if let Some(url) = &current_req.redirect_url {
+                visited_urls.insert(url.clone());
+            }
+            
             // 发送初始请求
-            let mut http_response = http_service.call(req).await?;
+            let mut http_response = http_service.call(current_req.clone()).await?;
             
             // 检查是否收到重定向响应
             let mut status = http_response.status();
@@ -323,36 +310,36 @@ impl Service<DorisRequest> for DorisService {
                 // 尝试获取重定向位置
                 if let Some(location) = http_response.headers().get(http::header::LOCATION) {
                     if let Ok(location_str) = location.to_str() {
-                        info!(
+                        debug!(
                             message = "Following redirect",
                             status = %status,
                             to = %location_str,
                             redirect_count = redirect_count + 1
                         );
                         
+                        // 检查重定向循环
+                        if !visited_urls.insert(location_str.to_string()) {
+                            return Err(crate::Error::from("Detected redirect loop"));
+                        }
+                        
                         // 创建一个新的 DorisRequest，使用重定向 URL
                         let redirect_req = DorisRequest {
-                            payload: original_payload.clone(),
-                            finalizers: original_finalizers.clone(),
-                            batch_size: original_batch_size,
-                            events_byte_size: original_event_byte_size,
-                            metadata: original_metadata.clone(),
-                            partition_key: DorisPartitionKey {
-                                database: original_partition_key.database.clone(),
-                                table: original_partition_key.table.clone(),
-                            },
                             redirect_url: Some(location_str.to_string()),
+                            ..current_req.clone()
                         };
-                        
+
                         // 发送重定向请求
                         http_service.ready().await?;
-                        http_response = http_service.call(redirect_req).await?;
+                        http_response = http_service.call(redirect_req.clone()).await?;
                         status = http_response.status();
+
+                        // 更新当前请求为重定向请求
+                        current_req = redirect_req;
                         
                         // 增加重定向计数
                         redirect_count += 1;
                         
-                        info!(
+                        debug!(
                             message = "Received response after redirect",
                             new_status = %status,
                             redirect_count = redirect_count
@@ -381,8 +368,7 @@ impl Service<DorisRequest> for DorisService {
                 let body_str = String::from_utf8_lossy(body);
                 info!(
                     target: "doris_sink",
-                    "Doris stream load response:\nStatus: {}\nBody: {}", 
-                    status,
+                    "Doris stream load response:\n {}",
                     body_str
                 );
 
