@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use http::StatusCode;
 use serde::Deserialize;
 
@@ -154,7 +153,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                         status == StatusCode::TOO_MANY_REQUESTS
                                             || status.is_server_error()
                                     })
-                                    .collect::<Vec<_>>();
+                                    .collect();
                                 if let Some((_status, _error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
@@ -163,40 +162,33 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                 {
                                     return RetryAction::RetryPartial(Box::new(EsRetryClosure {
                                         closure: Box::new(move |req: ElasticsearchRequest| {
-                                            let byte_slice: &[u8] = req.payload.as_ref();
                                             let string_data: &str =
                                                 match std::str::from_utf8(req.payload.as_ref()) {
                                                     Ok(s) => s,
                                                     Err(_) => return req,
                                                 };
                                             let lines: Vec<&str> = string_data.lines().collect();
-                                            let mut grouped_lines = Vec::new();
-                                            for chunk in lines.chunks(2) {
-                                                let group = chunk.join("\n");
-                                                grouped_lines.push(group);
-                                            }
+                                            let grouped_lines: Vec<String> = lines
+                                                .chunks_exact(2)
+                                                .map(|chunk| chunk.join("\n"))
+                                                .collect();
                                             if grouped_lines.len() != status_codes.len() {
-                                                req
-                                            } else {
-                                                let payload = grouped_lines
-                                                    .into_iter()
-                                                    .zip(<std::vec::Vec<bool> as Clone>::clone(
-                                                        &status_codes,
-                                                    ))
-                                                    .filter(|&(_, flag)| flag)
-                                                    .map(|(item, _)| item)
-                                                    .collect::<Vec<_>>();
-                                                let mut req = req.clone();
-                                                // change batch_size
-                                                req.batch_size = payload.len();
-                                                // change payload
-                                                req.payload = Bytes::from(
-                                                    (payload.join("\n") + "\n").into_bytes(),
-                                                );
-                                                // println!("NEW REQ <DEBUG> {:?}", req);
-                                                // TODO: need to fix some metadata here
-                                                req
+                                                return req;
                                             }
+                                            let filtered_payload: Vec<String> = grouped_lines
+                                                .into_iter()
+                                                .zip(status_codes.iter())
+                                                .filter(|(_, &flag)| flag)
+                                                .map(|(item, _)| item)
+                                                .collect();
+                                            let mut req = req.clone();
+                                            // change batch_size
+                                            req.batch_size = filtered_payload.len();
+                                            // change payload
+                                            req.payload =
+                                                (filtered_payload.join("\n") + "\n").into();
+                                            // TODO: need to fix some metadata here
+                                            req
                                         }),
                                     }));
                                 }
