@@ -187,17 +187,6 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
 
-    // Note: The `.graph.node_attributes` config is ignored for Mermaid rendering
-    // since it's explicitly set to be in DOT format. It should be possible to
-    // adapt but it's likely to lead to conflicts between the two formats.
-    //
-    // It could look like:
-    // node_id@{shape: shapename}
-    // style node_id key:value,key2:value2
-    //
-    // (shapename would replace the shorthand in the current version)
-    //
-    // https://mermaid.js.org/syntax/flowchart.html#styling-and-classes
     writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
         writeln!(mermaid, "  {id}[/{id}/]").unwrap();
