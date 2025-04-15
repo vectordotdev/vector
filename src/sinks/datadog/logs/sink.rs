@@ -764,8 +764,9 @@ mod tests {
         // and performs standard assertions, returning the resultant log if no assertions have triggered.
         macro_rules! normalize_case {
             ($log:expr, $val:expr) => {{
-                $log.insert(event_path!("message"), $val);
-                let mut event = Event::Log($log);
+                let mut log_copy = $log.clone();
+                log_copy.insert(event_path!("message"), $val);
+                let mut event = Event::Log(log_copy);
                 normalize_event(&mut event);
                 normalize_as_agent_event(&mut event);
                 let log = event.into_log();
@@ -776,7 +777,7 @@ mod tests {
         }
         // Message as String
         {
-            let log = normalize_case!(log.clone(), "message_value");
+            let log = normalize_case!(&log, "message_value");
             assert_eq!(
                 log.get(event_path!("message")),
                 Some(&value!({
@@ -788,7 +789,7 @@ mod tests {
         }
         // Message as stringified JSON
         {
-            let log = normalize_case!(log.clone(), r#"{ "field_d": "field_d_value" }"#);
+            let log = normalize_case!(&log, r#"{ "field_d": "field_d_value" }"#);
             assert_eq!(
                 log.get(event_path!("message")),
                 Some(&value!({
@@ -800,7 +801,7 @@ mod tests {
         }
         // Message as JSON
         {
-            let log = normalize_case!(log.clone(), value!({ "field_d": "field_d_value" }));
+            let log = normalize_case!(&log, value!({ "field_d": "field_d_value" }));
             assert_eq!(
                 log.get(event_path!("message")),
                 Some(&value!({
@@ -812,7 +813,7 @@ mod tests {
         }
         // Message as number
         {
-            let log = normalize_case!(log.clone(), 5);
+            let log = normalize_case!(&log, 5);
             assert_eq!(
                 log.get(event_path!("message")),
                 Some(&value!({
@@ -824,7 +825,7 @@ mod tests {
         }
         // Message as stringified array
         {
-            let log = normalize_case!(log.clone(), "[1,2,3,4,5]");
+            let log = normalize_case!(&log, "[1,2,3,4,5]");
             assert_eq!(
                 log.get(event_path!("message")),
                 Some(&value!({
