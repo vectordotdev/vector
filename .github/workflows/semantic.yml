@@ -246,3 +246,4 @@ jobs:
             search website
             template website
             website
+            website deps

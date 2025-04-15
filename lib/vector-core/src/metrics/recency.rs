@@ -216,6 +216,39 @@ impl<K, S: Storage<K>> Storage<K> for GenerationalStorage<S> {
     }
 }
 
+pub(super) trait KeyMatcher<K> {
+    fn matches(&self, key: &K) -> bool;
+}
+
+struct PerSetTimeout<K, M: KeyMatcher<K>> {
+    configuration: Vec<(M, Duration)>,
+    per_key_timeouts: HashMap<K, Option<Duration>>,
+}
+
+impl<K, M> PerSetTimeout<K, M>
+where
+    K: Clone + Eq + Hashable,
+    M: KeyMatcher<K>,
+{
+    fn new(configuration: Vec<(M, Duration)>) -> Self {
+        Self {
+            configuration,
+            per_key_timeouts: HashMap::new(),
+        }
+    }
+
+    fn get_timeout_for_key(&mut self, key: &K, default: Option<Duration>) -> Option<Duration> {
+        *self.per_key_timeouts.entry(key.clone()).or_insert_with(|| {
+            for (matcher, duration) in &self.configuration {
+                if matcher.matches(key) {
+                    return Some(*duration);
+                }
+            }
+            default
+        })
+    }
+}
+
 /// Tracks recency of metric updates by their registry generation and time.
 ///
 /// In many cases, a user may have a long-running process where metrics are stored over time using
@@ -229,20 +262,22 @@ impl<K, S: Storage<K>> Storage<K> for GenerationalStorage<S> {
 ///
 /// [`Recency`] is separate from [`Registry`] specifically to avoid imposing any slowdowns when
 /// tracking recency does not matter, despite their otherwise tight coupling.
-pub(super) struct Recency<K> {
+pub(super) struct Recency<K, M: KeyMatcher<K>> {
     mask: MetricKindMask,
     inner: Mutex<(Clock, HashMap<K, (Generation, Instant)>)>,
-    idle_timeout: Option<Duration>,
+    global_idle_timeout: Option<Duration>,
+    per_set_timeouts: Mutex<PerSetTimeout<K, M>>,
 }
 
-impl<K> Recency<K>
+impl<K, M> Recency<K, M>
 where
-    K: Clone + Eq + Hashable,
+    K: Clone + Eq + Hashable + std::fmt::Debug,
+    M: KeyMatcher<K>,
 {
     /// Creates a new [`Recency`].
     ///
-    /// If `idle_timeout` is `None`, no recency checking will occur.  Otherwise, any metric that has
-    /// not been updated for longer than `idle_timeout` will be subject for deletion the next time
+    /// If `global_idle_timeout` is `None`, no recency checking will occur.  Otherwise, any metric that has
+    /// not been updated for longer than `global_idle_timeout` will be subject for deletion the next time
     /// the metric is checked.
     ///
     /// The provided `clock` is used for tracking time, while `mask` controls which metrics
@@ -251,11 +286,17 @@ where
     ///
     /// Refer to the documentation for [`MetricKindMask`](crate::MetricKindMask) for more
     /// information on defining a metric kind mask.
-    pub(super) fn new(clock: Clock, mask: MetricKindMask, idle_timeout: Option<Duration>) -> Self {
+    pub(super) fn new(
+        clock: Clock,
+        mask: MetricKindMask,
+        global_idle_timeout: Option<Duration>,
+        per_set_timeouts: Vec<(M, Duration)>,
+    ) -> Self {
         Recency {
             mask,
             inner: Mutex::new((clock, HashMap::new())),
-            idle_timeout,
+            global_idle_timeout,
+            per_set_timeouts: Mutex::new(PerSetTimeout::new(per_set_timeouts)),
         }
     }
 
@@ -343,8 +384,13 @@ where
         F: Fn(&Registry<K, S>, &K) -> bool,
         S: Storage<K>,
     {
+        let key_timeout = self
+            .per_set_timeouts
+            .lock()
+            .get_timeout_for_key(key, self.global_idle_timeout);
+
         let gen = value.get_generation();
-        if let Some(idle_timeout) = self.idle_timeout {
+        if let Some(timeout) = key_timeout {
             if self.mask.matches(kind) {
                 let mut guard = self.inner.lock();
                 let (clock, entries) = &mut *guard;
@@ -366,9 +412,7 @@ where
                         // If the delete returns false, that means that our generation counter is
                         // out-of-date, and that the metric has been updated since, so we don't
                         // actually want to delete it yet.
-                        !referenced
-                            && (now - *last_update) > idle_timeout
-                            && delete_op(registry, key)
+                        !referenced && (now - *last_update) > timeout && delete_op(registry, key)
                     } else {
                         // Value has changed, so mark it such.
                         *last_update = now;
