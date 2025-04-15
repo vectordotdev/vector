@@ -522,6 +522,12 @@ jobs:
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.6.0
         with:
@@ -575,6 +581,7 @@ jobs:
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+          REPOS: "timberio/vector,ghcr.io/vectordotdev/vector"
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15

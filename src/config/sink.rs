@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
+use std::path::PathBuf;
 use vector_lib::buffers::{BufferConfig, BufferType};
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
@@ -219,6 +220,11 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
+
+    /// Gets the files to watch to trigger reload
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        Vec::new()
+    }
 
     /// Gets the list of resources, if any, used by this sink.
     ///
