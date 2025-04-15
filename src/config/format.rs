@@ -13,7 +13,20 @@ use vector_config_macros::Configurable;
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Configurable)]
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Serialize,
+    Deserialize,
+    Configurable,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Format {
     /// TOML format is used.

@@ -8,7 +8,7 @@ use url::Url;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{self, provider::ProviderConfig, ProxyConfig, Format},
+    config::{self, provider::ProviderConfig, Format, ProxyConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -131,7 +131,7 @@ async fn http_request_to_config_builder(
     tls_options: Option<&TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
-    config_format: &Format
+    config_format: &Format,
 ) -> BuildResult {
     let config_str = http_request(url, tls_options, headers, proxy)
         .await
@@ -147,7 +147,7 @@ fn poll_http(
     tls_options: Option<TlsConfig>,
     headers: IndexMap<String, String>,
     proxy: ProxyConfig,
-    config_format: Format
+    config_format: Format,
 ) -> impl Stream<Item = signal::SignalTo> {
     let duration = time::Duration::from_secs(poll_interval_secs);
     let mut interval = time::interval_at(time::Instant::now() + duration, duration);
@@ -182,9 +182,14 @@ impl ProviderConfig for HttpConfig {
         let config_format = self.config_format.clone();
 
         let proxy = ProxyConfig::from_env().merge(&self.proxy);
-        let config_builder =
-            http_request_to_config_builder(&url, tls_options.as_ref(), &request.headers, &proxy, &config_format)
-                .await?;
+        let config_builder = http_request_to_config_builder(
+            &url,
+            tls_options.as_ref(),
+            &request.headers,
+            &proxy,
+            &config_format,
+        )
+        .await?;
 
         // Poll for changes to remote configuration.
         signal_handler.add(poll_http(
