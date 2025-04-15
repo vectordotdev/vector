@@ -612,12 +612,10 @@ mod tests {
         assert_normalized_log_has_expected_attrs(event.as_log());
     }
 
-    #[test]
-    fn normalize_event_normalizes_vector_namespace() {
+    fn prepare_event_vector_namespace(log_generator: fn(Definition) -> LogEvent) -> Event {
         let definition =
             Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector]);
-        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
-        log.insert(event_path!("message"), "the_message");
+        let mut log = log_generator(definition);
 
         // insert an arbitrary metadata field such that the log becomes Vector namespaced
         log.insert(metadata_path!("vector", "foo"), "bar");
@@ -638,8 +636,17 @@ mod tests {
         log.insert(metadata_path!("datadog_agent", "severity"), "the_severity");
 
         assert!(log.namespace() == LogNamespace::Vector);
+        Event::Log(log)
+    }
 
-        let mut event = Event::Log(log);
+    #[test]
+    fn normalize_event_normalizes_vector_namespace() {
+        let mut event = prepare_event_vector_namespace(|definition| {
+            let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
+            log.insert(event_path!("message"), "the_message");
+            log
+        });
+
         normalize_event(&mut event);
         normalize_as_agent_event(&mut event);
 
