@@ -641,8 +641,10 @@ mod tests {
 
         let mut event = Event::Log(log);
         normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
 
         assert_normalized_log_has_expected_attrs(event.as_log());
+        assert_only_reserved_fields_at_root(event.as_log());
     }
 
     fn prepare_agent_event() -> LogEvent {
