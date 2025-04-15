@@ -39,8 +39,8 @@ impl ProgressReporter {
 
     /// Increment the failed rows counter.
     pub fn incr_failed_rows(&self, rows: i64) {
-        // 为了与 Filebeat 保持一致，我们也更新总行数
-        // 虽然这看起来不符合逻辑，但这是为了保持兼容性
+        // For consistency with Filebeat, we also update the total rows count
+        // Though it seems counterintuitive, this is to maintain compatibility
         self.total_rows.fetch_add(rows, Ordering::Relaxed);
     }
 
@@ -59,9 +59,9 @@ impl ProgressReporter {
         let mut last_rows = self.total_rows.load(Ordering::Relaxed);
 
         info!(
-            target: "doris_sink",
-            "start progress reporter with interval {:?}",
-            Duration::from_secs(self.interval)
+            message = "Starting progress reporter.",
+            interval_seconds = self.interval,
+            interval = ?Duration::from_secs(self.interval)
         );
 
         loop {
@@ -69,11 +69,10 @@ impl ProgressReporter {
 
             tokio::select! {
                 _ = sleep_fut => {},
-                // 如果有关闭信号，则退出循环
+                // Exit the loop if shutdown signal is received
                 _ = async { if let Some(ref mut signal) = shutdown { signal.await } else { std::future::pending().await } } => {
                     info!(
-                        target: "doris_sink",
-                        "Shutting down progress reporter"
+                        message = "Shutting down progress reporter."
                     );
                     break;
                 }
@@ -112,17 +111,16 @@ impl ProgressReporter {
                 0
             };
 
-            // 完全按照 Filebeat 格式输出进度
+            // Output progress information using Vector's key-value format
             info!(
-                target: "doris_sink",
-                "total {} MB {} ROWS, total speed {} MB/s {} R/s, last {} seconds speed {} MB/s {} R/s",
-                cur_bytes / 1024 / 1024,
-                cur_rows,
-                total_speed_mbps,
-                total_speed_rps,
-                inc_time,
-                inc_speed_mbps,
-                inc_speed_rps
+                message = "Progress statistics for Doris sink.",
+                total_mb = cur_bytes / 1024 / 1024,
+                total_rows = cur_rows,
+                total_speed_mbps = total_speed_mbps,
+                total_speed_rps = total_speed_rps,
+                last_seconds = inc_time,
+                last_speed_mbps = inc_speed_mbps,
+                last_speed_rps = inc_speed_rps
             );
 
             last_time = now;
