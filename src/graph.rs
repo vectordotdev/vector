@@ -198,40 +198,33 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     // (shapename would replace the shorthand in the current version)
     //
     // https://mermaid.js.org/syntax/flowchart.html#styling-and-classes
-    writeln!(mermaid, "\n  %% Sources").expect("write to String never fails");
+    writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
-        writeln!(mermaid, "  {}[/{}/]", id, id)
-            .expect("write to String never fails");
+        writeln!(mermaid, "  {}[/{}/]", id, id).unwrap();
     }
 
-    writeln!(mermaid, "\n  %% Transforms").expect("write to String never fails");
+    writeln!(mermaid, "\n  %% Transforms").unwrap();
     for (id, transform) in config.transforms() {
-        writeln!(mermaid, "  {}{{{}}}", id, id)
-            .expect("write to String never fails");
+        writeln!(mermaid, "  {}{{{}}}", id, id).unwrap();
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
-                    .expect("write to String never fails");
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id).unwrap();
             } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id)
-                    .expect("write to String never fails");
+                writeln!(mermaid, "  {} --> {}", input.component, id).unwrap();
             }
         }
     }
 
-    writeln!(mermaid, "\n  %% Sinks").expect("write to String never fails");
+    writeln!(mermaid, "\n  %% Sinks").unwrap();
     for (id, sink) in config.sinks() {
-        writeln!(mermaid, "  {}[\\{}\\]", id, id)
-            .expect("write to String never fails");
+        writeln!(mermaid, "  {}[\\{}\\]", id, id).unwrap();
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id)
-                    .expect("write to String never fails");
+                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id).unwrap();
             } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id)
-                    .expect("write to String never fails");
+                writeln!(mermaid, "  {} --> {}", input.component, id).unwrap();
             }
         }
     }
