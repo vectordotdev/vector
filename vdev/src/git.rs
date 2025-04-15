@@ -111,6 +111,10 @@ pub fn check_git_repository_clean() -> Result<bool> {
         .map(|status| status.success())?)
 }
 
+pub fn add_files_in_current_dir() -> Result<String> {
+    Command::new("git").args(["add", "."]).check_output()
+}
+
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
@@ -145,7 +149,7 @@ pub fn checkout_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn checkout_main_branch() -> Result<()> {
-    let _output = run_and_check_output(&["checkout", "origin/master"])?;
+    let _output = run_and_check_output(&["switch", "master"])?;
     Ok(())
 }
 

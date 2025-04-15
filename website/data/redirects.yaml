@@ -35,6 +35,7 @@ sinks:
 - new_relic_logs
 - new_relic
 - papertrail
+- postgres
 - prometheus_exporter
 - prometheus_remote_write
 - pulsar

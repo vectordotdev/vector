@@ -26,6 +26,10 @@
   {{ if eq $classes.delivery "at_least_once" }}
   {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
   {{ end }}
+  
+  {{ if eq $classes.delivery "exactly_once" }}
+  {{ partial "badge.html" (dict "prefix" "delivery" "word" "exactly-once" "color" "blue" "inline" true) }}
+  {{ end }}
 
   {{ if eq $features.acknowledgements true }}
   {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}

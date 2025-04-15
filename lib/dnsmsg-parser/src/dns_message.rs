@@ -16,7 +16,6 @@ pub(super) const RTYPE_NSAP: u16 = 22;
 pub(super) const RTYPE_PX: u16 = 26;
 pub(super) const RTYPE_LOC: u16 = 29;
 pub(super) const RTYPE_KX: u16 = 36;
-pub(super) const RTYPE_CERT: u16 = 37;
 pub(super) const RTYPE_A6: u16 = 38;
 pub(super) const RTYPE_SINK: u16 = 40;
 pub(super) const RTYPE_APL: u16 = 42;

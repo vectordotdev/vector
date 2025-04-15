@@ -42,7 +42,7 @@ releases: "0.42.0": {
 			description: """
 				Adds more aggregations to `aggregate` transform: count, diff, max, min, mean, sum, latest and stdev. The current aggregation is named `auto` and is made the default (acts like a combination of `sum` and `latest`).
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"
@@ -63,7 +63,7 @@ releases: "0.42.0": {
 			description: """
 				Adds support for additional `graph` configuration on each component so that users can add arbitrary graphviz node attributes when generating a graph through `vector graph`.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"

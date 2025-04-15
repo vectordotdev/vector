@@ -5,6 +5,7 @@ use vector_common::TimeZone;
 use vector_config::{configurable_component, impl_generate_config_from_default};
 
 use super::super::default_data_dir;
+use super::metrics_expiration::PerMetricSetExpiration;
 use super::Telemetry;
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
 use crate::serde::bool_or_struct;
@@ -111,6 +112,12 @@ pub struct GlobalOptions {
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
+
+    /// This allows configuring different expiration intervals for different metric sets.
+    /// By default this is empty and any metric not matched by one of these sets will use
+    /// the global default value, defined using `expire_metrics_secs`.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 }
 
 impl_generate_config_from_default!(GlobalOptions);
@@ -230,6 +237,16 @@ impl GlobalOptions {
         let mut telemetry = self.telemetry.clone();
         telemetry.merge(&with.telemetry);
 
+        let merged_expire_metrics_per_metric_set = match (
+            &self.expire_metrics_per_metric_set,
+            &with.expire_metrics_per_metric_set,
+        ) {
+            (Some(a), Some(b)) => Some(a.iter().chain(b).cloned().collect()),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
+
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
@@ -240,6 +257,7 @@ impl GlobalOptions {
                 proxy: self.proxy.merge(&with.proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
+                expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
             })
         } else {
             Err(errors)

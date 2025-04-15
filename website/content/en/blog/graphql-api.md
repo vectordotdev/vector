@@ -18,9 +18,9 @@ GraphQL API](https://vector.dev/docs/reference/api/), available in
 The API enables ad-hoc querying of:
 
 - Your Vector topology, including
-  [`sources`](https://vector.dev/docs/reference/sources/),
-  [`transforms`](https://vector.dev/docs/reference/transforms/) and
-  [`sinks`](https://vector.dev/docs/reference/sinks/).
+  [`sources`](https://vector.dev/docs/reference/configuration/sources/),
+  [`transforms`](https://vector.dev/docs/reference/configuration/transforms/) and
+  [`sinks`](https://vector.dev/docs/reference/configuration/sinks/).
 - Uptime and health information.
 - Event processing, byte processing, and error metrics, both per component and
   in aggregate across the Vector instance.

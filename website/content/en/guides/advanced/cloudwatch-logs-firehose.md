@@ -35,7 +35,7 @@ You will learn how to:
 
 Once completed, you'll have a setup that will receive events written to
 CloudWatch Logs and writes them to standard out, but the configuration can be
-adapted to send them to any other [destination of your choice](https://vector.dev/docs/reference/sinks/).
+adapted to send them to any other [destination of your choice](https://vector.dev/docs/reference/configuration/sinks/).
 
 The goal of this guide is to serve as a reference that you can customize for
 your specific needs.

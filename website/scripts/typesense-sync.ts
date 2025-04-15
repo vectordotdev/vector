@@ -1,21 +1,19 @@
-import { typesenseSync } from 'typesense-sync';
-import * as dotenv from 'dotenv';
-const documentsFile = './public/search.json';
+const { typesenseSync } = require('typesense-sync');
+const { saveSettings } = require('typesense-sync/settings');
+const tsConfig = require('../typesense.config.json');
 
-dotenv.config();
-/*
- * @param {string} documentsFile - Path to the documents file. (required)
- * @param {Object} gitDiff - Object containing updated and deleted files (optional).
- * @param {string} aliasCollectionName - Name of the alias collection (optional).
- */
+const syncCollection = async () => {
+  const promises: Promise<any>[] = []
 
-const collectionName = 'vector_docs'
+  for (const collection of tsConfig.collections) {
+    console.log(`Updating collection ${collection.name}`)
+    promises.push(typesenseSync(collection.name, collection.file_path))
+  }
 
+  return await Promise.all(promises)
+}
 
-typesenseSync(collectionName, documentsFile)
-  .then(() => {
-    console.log('Typesense update completed.');
-  })
-  .catch((error) => {
-    console.error('An error occurred:', error);
-  });
+saveSettings()
+  .then(() => syncCollection())
+  .then(() => console.log('Typesense sync completed'))
+  .catch(error => console.log('An error occurred', error))

@@ -255,6 +255,12 @@ async function buildIndex() {
       path: `${publicPath}/guides/level-up/**/**.html`,
       displayPath: "guides/level-up",
       ranking: 40,
+    },
+    {
+      name: "Developer guides",
+      path: `${publicPath}/guides/developer/**/**.html`,
+      displayPath: "guides/developer",
+      ranking: 40,
     }
   ];
 

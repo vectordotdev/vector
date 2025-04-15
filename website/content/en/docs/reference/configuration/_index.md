@@ -509,6 +509,87 @@ sinks:
       codec: "json"
 ```
 
+#### Using memory enrichment table as a source
+
+The memory enrichment table can serve as a source by periodically exporting its stored data and making it available to downstream components.
+
+```yaml
+enrichment_tables:
+  memory_table:
+    type: memory
+    ttl: 60
+    flush_interval: 5
+    inputs: ["cache_generator"]
+    source_config:
+       # Export the cache every 3 minutes (100 seconds).
+       export_interval: 180
+       # If set to false (which is the default) it will not remove data from cache after exporting.
+       remove_after_export: false
+       # Source key has to be defined and be different from the main key ("memory_table").
+       # This key is then used to define this component as an input to other components
+       source_key: "memory_table_source"
+       # export_batch_size can be used to reduce memory usage when handling larger tables.
+       # When set, data will be exported from the table in batches, waiting for downstream components
+       # to process the data
+       # export_batch_size: 10000
+
+
+sources:
+  demo_logs_test:
+    type: "demo_logs"
+    format: "json"
+
+transforms:
+  demo_logs_processor:
+    type: "remap"
+    inputs: ["demo_logs_test"]
+    source: |
+      . = parse_json!(.message)
+      user_id = get!(., path: ["user-identifier"])
+
+      # Look for existing value in the table, using "user-identifier" as key
+      existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
+
+      if err == null {
+        # Value found, just use the cached value
+        # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
+        # Where value is the value we cached, ttl is the time left before this value is removed from
+        # the cache and key is the key we queried the table with
+        . = existing.value
+        .source = "cache"
+      } else {
+        # Do some processing, because we don't have this value in the table
+        .referer = parse_url!(.referer)
+        .referer.host = encode_punycode!(.referer.host)
+        .source = "transform"
+      }
+
+  cache_generator:
+    type: "remap"
+    inputs: ["demo_logs_processor"]
+    source: |
+      existing, err = get_enrichment_table_record("memory_table", { "key": get!(., path: ["user-identifier"]) })
+      if err != null {
+        # We don't have this key cached, so we need to prepare it for the table
+        data = .
+        # Since the memory enrichment table takes in all key value pairs it receives and stores them
+        # We want to produce an object that has the value of "user-identifier" as its key and
+        # rest of the object as its value
+        . = set!(value: {}, path: [get!(data, path: ["user-identifier"])], data: data)
+      } else {
+        . = {}
+      }
+
+# We can observe that after some time data will be exported to console from the cache
+sinks:
+  console:
+    inputs: ["memory_table_source"]
+    target: "stdout"
+    type: "console"
+    encoding:
+      codec: "json"
+```
+
 ## Sections
 
 {{< sections >}}

@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # Only run for PRs with 'website' in the branch name
-    if: ${{ contains(github.head_ref, 'website') }}
+    if: ${{ contains(github.head_ref, 'website') && contains(github.head_ref, '-') }}
     steps:
       - name: Echo approval
         run: |

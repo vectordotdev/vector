@@ -4,7 +4,7 @@ short: Homebrew
 weight: 4
 ---
 
-[Homebrew] is a free and open source package management system for Apple's macOS operating system and some supported Linux systems. This page covers installing and managing Vector using the Homebrew package repository.
+[Homebrew] is a free and open source package management system for Apple's macOS operating system and some supported Linux systems. This page covers installing and managing Vector using the Homebrew package repository on macOS (Linux is not supported).
 
 ## Installation
 

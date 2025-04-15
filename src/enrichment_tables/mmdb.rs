@@ -4,7 +4,7 @@
 //! [maxmind]: https://maxmind.com
 use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
 
-use maxminddb::{MaxMindDBError, Reader};
+use maxminddb::Reader;
 use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
 use vrl::value::{ObjectMap, Value};
@@ -57,7 +57,7 @@ impl Mmdb {
         let result = dbreader.lookup::<ObjectMap>(ip).map(|_| ());
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Mmdb {
+            Ok(_) => Ok(Mmdb {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 config,
@@ -67,7 +67,7 @@ impl Mmdb {
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
-        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()?;
+        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()??;
 
         if let Some(fields) = select {
             let mut filtered = Value::from(ObjectMap::new());

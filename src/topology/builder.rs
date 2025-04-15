@@ -209,10 +209,22 @@ impl<'a> Builder<'a> {
     ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
+        let table_sources = self
+            .config
+            .enrichment_tables
+            .iter()
+            .filter_map(|(key, table)| table.as_source(key))
+            .collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
             .filter(|(key, _)| self.diff.sources.contains_new(key))
+            .chain(
+                table_sources
+                    .iter()
+                    .map(|(key, sink)| (key, sink))
+                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+            )
         {
             debug!(component = %key, "Building new source.");
 
@@ -514,7 +526,7 @@ impl<'a> Builder<'a> {
             .config
             .enrichment_tables
             .iter()
-            .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+            .filter_map(|(key, table)| table.as_sink(key))
             .collect::<Vec<_>>();
         for (key, sink) in self
             .config
@@ -523,7 +535,7 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sinks
                     .iter()
-                    .map(|(key, sink)| (*key, sink))
+                    .map(|(key, sink)| (key, sink))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
