@@ -97,9 +97,16 @@ struct EsRetryClosure {
 
 impl RetryPartialFunction for EsRetryClosure {
     fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any> {
-        let request = request.downcast::<ElasticsearchRequest>().unwrap();
-        let new_request = (self.closure)(*request);
-        Box::new(new_request)
+        match request.downcast::<ElasticsearchRequest>() {
+            Ok(request) => {
+                let new_request = (self.closure)(*request);
+                Box::new(new_request)
+            }
+            Err(request) => {
+                //leave it unmodified
+                Box::new(request)
+            }
+        }
     }
 }
 
@@ -158,7 +165,10 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                         closure: Box::new(move |req: ElasticsearchRequest| {
                                             let byte_slice: &[u8] = req.payload.as_ref();
                                             let string_data: &str =
-                                                std::str::from_utf8(byte_slice).unwrap();
+                                                match std::str::from_utf8(req.payload.as_ref()) {
+                                                    Ok(s) => s,
+                                                    Err(_) => return req,
+                                                };
                                             let lines: Vec<&str> = string_data.lines().collect();
                                             let mut grouped_lines = Vec::new();
                                             for chunk in lines.chunks(2) {

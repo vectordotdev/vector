@@ -171,12 +171,22 @@ where
                     }
                     // here to modify the request Req, delete those successful requests from it.
                     let output = rebuild_request_fn.modify_request(Box::new(req.clone()));
-                    *req = *output.downcast::<Req>().unwrap();
-                    error!(
-                        message = "OK/retrying partial after response.",
-                        internal_log_rate_limit = true
-                    );
-                    Some(self.build_retry())
+                    if let Ok(output) = output.downcast::<Req>() {
+                        *req = *output;
+                        error!(
+                            message = "OK/retrying partial after response.",
+                            internal_log_rate_limit = true
+                        );
+                        Some(self.build_retry())
+                    } else {
+                        // unlikely to go here.
+                        error!(
+                            message =
+                                "OK/retry response but invalid request; dropping the request.",
+                            internal_log_rate_limit = true,
+                        );
+                        None
+                    }
                 }
 
                 RetryAction::DontRetry(reason) => {

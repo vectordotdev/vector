@@ -10654,7 +10654,7 @@ checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
 dependencies = [
  "futures-core",
  "futures-util",
- "indexmap 2.7.1",
+ "indexmap 2.8.0",
  "pin-project-lite",
  "slab",
  "sync_wrapper 1.0.1",
