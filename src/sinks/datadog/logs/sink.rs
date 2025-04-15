@@ -211,12 +211,12 @@ pub fn normalize_as_agent_event(event: &mut Event) {
                 .is_none()
             {
                 warn!(
-                message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'",
+                message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'.",
                 internal_log_rate_limit = true,
             );
             } else {
                 error!(
-                message = "Could not create field named _collisions at .message, a field with that name already exists",
+                message = "Could not create field named _collisions at .message, a field with that name already exists.",
                 internal_log_rate_limit = true,
             );
             }
