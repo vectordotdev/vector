@@ -200,31 +200,31 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     // https://mermaid.js.org/syntax/flowchart.html#styling-and-classes
     writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
-        writeln!(mermaid, "  {}[/{}/]", id, id).unwrap();
+        writeln!(mermaid, "  {id}[/{id}/]").unwrap();
     }
 
     writeln!(mermaid, "\n  %% Transforms").unwrap();
     for (id, transform) in config.transforms() {
-        writeln!(mermaid, "  {}{{{}}}", id, id).unwrap();
+        writeln!(mermaid, "  {id}{{{id}}}").unwrap();
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id).unwrap();
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id).unwrap();
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
             }
         }
     }
 
     writeln!(mermaid, "\n  %% Sinks").unwrap();
     for (id, sink) in config.sinks() {
-        writeln!(mermaid, "  {}[\\{}\\]", id, id).unwrap();
+        writeln!(mermaid, "  {id}[\\{id}\\]").unwrap();
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {} -->|{}| {}", input.component, port, id).unwrap();
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {} --> {}", input.component, id).unwrap();
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
             }
         }
     }
