@@ -145,7 +145,7 @@ jobs:
             gcp_pubsub source
             heroku_logs source
             host_metrics source
-            http source
+            http_client source
             http_scrape source
             internal_logs source
             internal_metrics source
