@@ -49,6 +49,9 @@ pub struct Opts {
     pub config_dirs: Vec<PathBuf>,
 
     /// Set the output format
+    ///
+    /// See https://mermaid.js.org/syntax/flowchart.html#styling-and-classes for
+    /// information on the `mermaid` format.
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
 }
