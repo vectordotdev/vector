@@ -113,6 +113,11 @@ pub struct LogSink<S> {
 pub fn normalize_event(event: &mut Event) {
     let log = event.as_mut_log();
 
+    // Will cast the internal value to an object if it already isn't
+    if !log.value().is_object() {
+        log.insert(MESSAGE, log.value().clone());
+    }
+
     // Upstream Sources may have semantically defined Datadog reserved attributes outside of their
     // expected location by DD logs intake (root of the event). Move them if needed.
     for (meaning, expected_field_name) in DD_RESERVED_SEMANTIC_ATTRS {
@@ -610,6 +615,23 @@ mod tests {
         normalize_event(&mut event);
 
         assert_normalized_log_has_expected_attrs(event.as_log());
+    }
+
+    #[test]
+    fn normalize_event_normalizes_vector_namespace_raw_field() {
+        let mut event = prepare_event_vector_namespace(|definition| {
+            LogEvent::from_parts(value!("the_message"), agent_event_metadata(definition))
+        });
+
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        assert_normalized_log_has_expected_attrs(event.as_log());
+        assert_only_reserved_fields_at_root(event.as_log());
+        assert_eq!(
+            event.as_log().get("message"),
+            Some(&value!({"message": "the_message"}))
+        );
     }
 
     fn prepare_event_vector_namespace(log_generator: fn(Definition) -> LogEvent) -> Event {
