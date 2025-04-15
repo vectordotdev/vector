@@ -24,25 +24,25 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use vector_lib::codecs::JsonSerializerConfig;
 
-// 定义用于 Doris 服务的 URI 处理函数
+// Define URI handling function for Doris service
 fn get_http_scheme_host(host: &str) -> crate::Result<UriComponents> {
     let uri = host
         .parse::<Uri>()
         .map_err(|e| format!("Failed to parse URI: {}", e))?;
 
-    // 获取 scheme, 默认为 http
+    // Get scheme, default to http
     let scheme = uri.scheme_str().unwrap_or("http").to_string();
 
-    // 获取 host
+    // Get host
     let host = uri.host().unwrap_or("localhost").to_string();
 
-    // 获取 port
+    // Get port
     let port = uri.port_u16();
 
     Ok(UriComponents { scheme, host, port })
 }
 
-// 构建完整的 URI
+// Build complete URI
 fn build_uri(scheme: &str, path: &str, host: &str, port: u16) -> crate::Result<Uri> {
     let uri_str = format!("{}://{}:{}{}", scheme, host, port, path);
     uri_str
@@ -50,7 +50,7 @@ fn build_uri(scheme: &str, path: &str, host: &str, port: u16) -> crate::Result<U
         .map_err(|e| format!("Failed to build URI: {}", e).into())
 }
 
-// URI 组件结构体
+// URI components struct
 #[derive(Debug)]
 struct UriComponents {
     scheme: String,
@@ -200,7 +200,7 @@ impl SinkConfig for DorisConfig {
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
-        // 将reporter包装为Arc以便共享
+        // Wrap reporter in Arc for sharing
         let reporter_arc = Arc::new(reporter);
 
         // Use our new DorisService implementation instead of HttpService
@@ -260,7 +260,7 @@ impl DorisConfig {
     #[allow(dead_code)]
     fn create_headers(&self) -> HashMap<String, String> {
         let mut headers = HashMap::new();
-        // 确保总是添加这些基本头部
+        // Always add these basic headers
         headers.insert("Expect".to_string(), "100-continue".to_string());
         headers.insert(
             "Content-Type".to_string(),
@@ -289,7 +289,7 @@ impl DorisConfig {
         client: HttpClient,
         hosts: Vec<String>,
     ) -> crate::Result<Healthcheck> {
-        // 为每个节点创建一个健康检查
+        // Create a health check for each node
         let healthchecks = hosts
             .into_iter()
             .map(move |host| {
@@ -298,7 +298,7 @@ impl DorisConfig {
                 async move {
                     let parsed_url = get_http_scheme_host(&host)?;
 
-                    // 使用 Doris 的 bootstrap API 端点进行健康检查
+                    // Use Doris bootstrap API endpoint for health check
                     let query_path = "/api/bootstrap";
                     let uri = build_uri(
                         &parsed_url.scheme,
@@ -308,9 +308,8 @@ impl DorisConfig {
                     )?;
 
                     debug!(
-                        target: "doris_sink",
-                        "Checking health of Doris node: {}",
-                        uri
+                        message = "Checking health of Doris node.",
+                        node = %uri
                     );
 
                     let request = Request::get(uri.to_string())
@@ -326,16 +325,15 @@ impl DorisConfig {
                         .map_err(|e| format!("Failed to read response body: {}", e))?;
 
                     if parts.status.is_success() {
-                        // 尝试解析JSON响应
+                        // Try to parse JSON response
                         match serde_json::from_slice::<serde_json::Value>(&body_bytes) {
                             Ok(json) => {
-                                // 检查响应中的code字段是否为0
+                                // Check if code field in response is 0
                                 if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
                                     if code == 0 {
                                         info!(
-                                            target: "doris_sink",
-                                            "Doris node {} is healthy",
-                                            host
+                                            message = "Doris node is healthy.",
+                                            node = %host
                                         );
                                         return Ok(());
                                     } else {
@@ -344,9 +342,10 @@ impl DorisConfig {
                                             .and_then(|m| m.as_str())
                                             .unwrap_or("unknown error");
                                         warn!(
-                                            target: "doris_sink",
-                                            "Doris node {} is unhealthy: code={}, msg={}",
-                                            host, code, msg
+                                            message = "Doris node is unhealthy.",
+                                            node = %host,
+                                            code = %code,
+                                            error_msg = %msg
                                         );
                                         return Err(format!(
                                             "Healthcheck failed for host {}: code={}, msg={}",
@@ -358,19 +357,19 @@ impl DorisConfig {
                             }
                             Err(e) => {
                                 warn!(
-                                    target: "doris_sink",
-                                    "Failed to parse JSON response from {}: {}",
-                                    host, e
+                                    message = "Failed to parse JSON response from node.",
+                                    node = %host,
+                                    error = %e
                                 );
                             }
                         }
                     }
 
-                    // 如果代码执行到这里，说明响应不成功或者JSON解析失败
+                    // If we reach here, response was not successful or JSON parsing failed
                     warn!(
-                        target: "doris_sink",
-                        "Doris node {} is unhealthy: status={}",
-                        host, parts.status
+                        message = "Doris node is unhealthy.",
+                        node = %host,
+                        status = %parts.status
                     );
                     Err(format!(
                         "Healthcheck failed for host {} with status: {}",
@@ -382,7 +381,7 @@ impl DorisConfig {
             })
             .collect::<Vec<_>>();
 
-        // 使用 select_ok 来选择第一个成功的健康检查
+        // Use select_ok to select the first successful health check
         let healthcheck = futures::future::select_ok(healthchecks)
             .map_ok(|((), _)| ())
             .boxed();

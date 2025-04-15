@@ -37,7 +37,7 @@ impl DorisCommon {
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
         let request_builder = DorisRequestBuilder {
-            compression: Compression::None, // TODO: Support compression
+            compression: Compression::None,
             encoder: (
                 config.encoding.clone(),
                 Encoder::<Framer>::new(

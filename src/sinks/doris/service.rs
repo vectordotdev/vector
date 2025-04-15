@@ -72,7 +72,6 @@ pub struct HttpRequestBuilder {
     pub http_request_config: RequestConfig,
     pub base_url: String,
     pub label_prefix: String,
-    // pub http_client: Option<HttpClient<Body>>,
     pub headers: HashMap<String, String>,
 }
 
@@ -80,21 +79,21 @@ impl HttpRequestBuilder {
     pub fn new(common: &DorisCommon, config: &DorisConfig) -> HttpRequestBuilder {
         let auth = common.auth.clone().map(|http_auth| Auth::Basic(http_auth));
 
-        // 创建并设置 headers
+        // Create and set headers
         let mut headers = HashMap::new();
-        // 基本头部
+        // Basic headers
         headers.insert("Expect".to_string(), "100-continue".to_string());
         headers.insert(
             "Content-Type".to_string(),
             "text/plain;charset=utf-8".to_string(),
         );
 
-        // 添加行分隔符头部（如果非默认）
+        // Add line delimiter header (if non-default)
         if !config.line_delimiter.is_empty() && config.line_delimiter != "\n" {
             headers.insert("line_delimiter".to_string(), config.line_delimiter.clone());
         }
 
-        // 添加自定义头部
+        // Add custom headers
         for (k, v) in &config.headers {
             headers.insert(k.clone(), v.clone());
         }
@@ -137,24 +136,34 @@ impl HttpRequestBuilder {
             Uuid::new_v4()
         );
 
-        // 检查是否有重定向URL
+        // Check if there is a redirect URL
         let uri = if let Some(redirect_url) = &doris_req.redirect_url {
-            // 使用重定向URL
+            // Use redirect URL
             debug!(
                 message = "Using redirect URL",
                 redirect_url = %redirect_url
             );
-            redirect_url
-                .parse::<Uri>()
-                .map_err(|e| crate::Error::from(format!("Invalid redirect URI: {}", e)))?
+            redirect_url.parse::<Uri>().map_err(|error| {
+                debug!(
+                    message = "Failed to parse redirect URI.",
+                    %error,
+                    redirect_url = %redirect_url
+                );
+                crate::Error::from(format!("Invalid redirect URI: {}", error))
+            })?
         } else {
-            // 构建原始URL
+            // Build original URL
             let stream_load_url =
                 format!("{}/api/{}/{}/_stream_load", self.base_url, database, table);
 
-            stream_load_url
-                .parse::<Uri>()
-                .map_err(|e| crate::Error::from(format!("Invalid URI: {}", e)))?
+            stream_load_url.parse::<Uri>().map_err(|error| {
+                debug!(
+                    message = "Failed to parse URI.",
+                    %error,
+                    url = %stream_load_url
+                );
+                crate::Error::from(format!("Invalid URI: {}", error))
+            })?
         };
 
         debug!(
@@ -165,7 +174,7 @@ impl HttpRequestBuilder {
 
         let mut builder = Request::builder()
             .method(Method::PUT)
-            .uri(uri)
+            .uri(uri.clone())
             .header(CONTENT_LENGTH, doris_req.payload.len())
             .header(CONTENT_TYPE, "text/plain;charset=utf-8")
             .header("Expect", "100-continue")
@@ -180,25 +189,33 @@ impl HttpRequestBuilder {
             builder = builder.header("Accept-Encoding", ae);
         }
 
-        // 先添加我们在构造函数中创建的 headers
+        // First add headers we created in the constructor
         for (header, value) in &self.headers {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        // 添加 http_request_config 中的自定义 headers (保留兼容性)
+        // Add custom headers from http_request_config (for compatibility)
         for (header, value) in &self.http_request_config.headers {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        let mut request = builder
-            .body(doris_req.payload)
-            .map_err(|e| crate::Error::from(format!("Failed to build request: {}", e)))?;
+        let mut request = builder.body(doris_req.payload).map_err(|error| {
+            debug!(
+                message = "Failed to build HTTP request.",
+                %error,
+                uri = %uri
+            );
+            crate::Error::from(format!("Failed to build request: {}", error))
+        })?;
 
         // Apply authentication if configured
         if let Some(auth) = &self.auth {
             if let Auth::Basic(http_auth) = auth {
                 http_auth.apply(&mut request);
-                debug!(message = "Applied Basic authentication to request");
+                debug!(
+                    message = "Applied Basic authentication to request.",
+                    uri = %request.uri()
+                );
             }
         }
 
@@ -274,43 +291,43 @@ impl Service<DorisRequest> for DorisService {
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: DorisRequest) -> Self::Future {
-        // 克隆必要的数据，以便在 async 闭包中使用
+        // Clone necessary data for use in async closure
         let mut http_service = self.batch_service.clone();
         let log_request = self.log_request;
         let reporter = Arc::clone(&self.reporter);
 
         Box::pin(async move {
-            // 确保服务已准备好
+            // Ensure service is ready
             http_service.ready().await?;
 
-            // 处理元数据和字节大小计算
+            // Process metadata and byte size calculation
             let events_byte_size =
                 std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
 
-            // 创建当前请求，并追踪已访问URL，防止重定向循环
+            // Create the current request and track visited URLs to prevent redirect loops
             let mut current_req = req;
             let mut redirect_count = 0;
             let mut visited_urls = HashSet::new();
             const MAX_REDIRECTS: u8 = 3;
 
-            // 记录初始URL
+            // Record initial URL
             if let Some(url) = &current_req.redirect_url {
                 visited_urls.insert(url.clone());
             }
 
-            // 发送初始请求
+            // Send initial request
             let mut http_response = http_service.call(current_req.clone()).await?;
 
-            // 检查是否收到重定向响应
+            // Check if received a redirect response
             let mut status = http_response.status();
 
-            // 处理重定向
+            // Handle redirects
             while (status == StatusCode::TEMPORARY_REDIRECT
                 || status == StatusCode::PERMANENT_REDIRECT
                 || status == StatusCode::FOUND)
                 && redirect_count < MAX_REDIRECTS
             {
-                // 尝试获取重定向位置
+                // Try to get redirect location
                 if let Some(location) = http_response.headers().get(http::header::LOCATION) {
                     if let Ok(location_str) = location.to_str() {
                         debug!(
@@ -320,26 +337,26 @@ impl Service<DorisRequest> for DorisService {
                             redirect_count = redirect_count + 1
                         );
 
-                        // 检查重定向循环
+                        // Check for redirect loops
                         if !visited_urls.insert(location_str.to_string()) {
                             return Err(crate::Error::from("Detected redirect loop"));
                         }
 
-                        // 创建一个新的 DorisRequest，使用重定向 URL
+                        // Create a new DorisRequest using the redirect URL
                         let redirect_req = DorisRequest {
                             redirect_url: Some(location_str.to_string()),
                             ..current_req.clone()
                         };
 
-                        // 发送重定向请求
+                        // Send redirect request
                         http_service.ready().await?;
                         http_response = http_service.call(redirect_req.clone()).await?;
                         status = http_response.status();
 
-                        // 更新当前请求为重定向请求
+                        // Update current request to redirect request
                         current_req = redirect_req;
 
-                        // 增加重定向计数
+                        // Increment redirect count
                         redirect_count += 1;
 
                         debug!(
@@ -359,7 +376,7 @@ impl Service<DorisRequest> for DorisService {
                 }
             }
 
-            // 检查是否超过最大重定向次数
+            // Check if exceeded maximum redirects
             if redirect_count >= MAX_REDIRECTS {
                 return Err(crate::Error::from(format!(
                     "Exceeded maximum number of redirects ({})",
@@ -367,59 +384,56 @@ impl Service<DorisRequest> for DorisService {
                 )));
             }
 
-            // 处理最终响应
+            // Process final response
             let event_status = get_event_status(&http_response);
 
-            // 记录最终响应体 - 无论成功与否都记录
+            // Log final response body - regardless of success or failure
             if log_request {
                 let body = http_response.body();
                 let body_str = String::from_utf8_lossy(body);
                 info!(
-                    target: "doris_sink",
-                    "Doris stream load response:\n {}",
-                    body_str
+                    message = "Doris stream load response received.",
+                    status_code = %status,
+                    response = %body_str
                 );
 
-                // 如果响应成功，尝试解析响应体并更新进度统计
+                // If response is successful, try to parse response body and update progress statistics
                 if status.is_success() {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
                         if let Some(status_value) = json.get("Status") {
                             if let Some(status_str) = status_value.as_str() {
                                 if status_str == "Success" {
-                                    // 更新字节数统计
+                                    // Update byte count statistics
                                     if let Some(load_bytes) =
                                         json.get("LoadBytes").and_then(|b| b.as_i64())
                                     {
                                         reporter.incr_total_bytes(load_bytes);
                                         debug!(
-                                            target: "doris_sink",
-                                            "Updated bytes stats: +{} bytes",
-                                            load_bytes
+                                            message = "Updated bytes statistics.",
+                                            added_bytes = load_bytes
                                         );
                                     }
 
-                                    // 更新行数统计
+                                    // Update row count statistics
                                     if let Some(loaded_rows) =
                                         json.get("NumberLoadedRows").and_then(|r| r.as_i64())
                                     {
                                         reporter.incr_total_rows(loaded_rows);
                                         debug!(
-                                            target: "doris_sink",
-                                            "Updated rows stats: +{} rows",
-                                            loaded_rows
+                                            message = "Updated rows statistics.",
+                                            added_rows = loaded_rows
                                         );
                                     }
 
-                                    // 更新过滤行数统计
+                                    // Update filtered rows count statistics
                                     if let Some(filtered_rows) =
                                         json.get("NumberFilteredRows").and_then(|r| r.as_i64())
                                     {
                                         if filtered_rows > 0 {
                                             reporter.incr_failed_rows(filtered_rows);
                                             debug!(
-                                                target: "doris_sink",
-                                                "Updated filtered rows stats: +{} filtered rows",
-                                                filtered_rows
+                                                message = "Updated filtered rows statistics.",
+                                                filtered_rows = %filtered_rows
                                             );
                                         }
                                     }
@@ -442,49 +456,77 @@ impl Service<DorisRequest> for DorisService {
 fn get_event_status(response: &Response<Bytes>) -> EventStatus {
     let status = response.status();
 
-    // 处理HTTP层面的基本状态
+    // Handle basic HTTP status level
     if !status.is_success() {
         if status.is_server_error() {
-            // 服务器错误通常是临时性的
+            // Server errors are typically temporary
+            debug!(
+                message = "Detected server error status code.",
+                status_code = %status
+            );
             return EventStatus::Errored;
         } else {
-            // 客户端错误和其他非成功状态视为永久性失败
+            // Client errors and other non-success statuses are considered permanent failures
+            debug!(
+                message = "Detected client error or other non-success status code.",
+                status_code = %status
+            );
             return EventStatus::Rejected;
         }
     }
 
-    // HTTP状态码是2xx，需要进一步解析响应体
+    // HTTP status code is 2xx, need to further parse the response body
     let body = String::from_utf8_lossy(response.body());
 
-    // 尝试解析响应体为JSON
+    // Try to parse response body as JSON
     match serde_json::from_str::<serde_json::Value>(&body) {
         Ok(json) => {
-            // 检查Doris特定的Status字段
+            // Check Doris-specific Status field
             if let Some(status_value) = json.get("Status") {
                 if let Some(status_str) = status_value.as_str() {
                     if status_str == "Success" {
-                        // 明确成功的情况
+                        // Clearly successful case
+                        debug!(
+                            message = "Received successful status from Doris.",
+                            doris_status = %status_str
+                        );
                         return EventStatus::Delivered;
                     } else {
-                        // 非成功状态视为拒绝
+                        // Non-success status is considered rejected
+                        debug!(
+                            message = "Received non-success status from Doris.",
+                            doris_status = %status_str
+                        );
                         return EventStatus::Rejected;
                     }
                 }
             }
 
-            // 兜底 - 如果找不到Status字段但格式是JSON
+            // Fallback - if Status field not found but format is JSON
             if body.contains("\"errors\":true") || body.contains("\"status\":\"Fail\"") {
+                debug!(
+                    message = "Detected error indicators in JSON response body.",
+                    contains_errors = body.contains("\"errors\":true"),
+                    contains_fail = body.contains("\"status\":\"Fail\"")
+                );
                 return EventStatus::Rejected;
             }
 
-            // 没有明确错误指示，假设成功
+            // No clear error indicators, assume success
+            debug!(message = "No error indicators found in JSON response, assuming success.");
             return EventStatus::Delivered;
         }
-        Err(_) => {
-            // 无法解析JSON，尝试基于文本内容判断
+        Err(error) => {
+            // Cannot parse JSON, try to determine based on text content
+            debug!(
+                message = "Failed to parse response as JSON, falling back to text analysis.",
+                %error
+            );
             if body.contains("Success") {
+                debug!(message = "Detected 'Success' in plain text response.");
                 return EventStatus::Delivered;
             } else {
+                debug!(message = "No success indicators found in plain text response.");
                 return EventStatus::Rejected;
             }
         }
