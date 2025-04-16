@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: deps"
@@ -73,7 +73,7 @@ updates:
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: releasing"
@@ -84,7 +84,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "domain: ci"
       - "no-changelog"
@@ -98,7 +98,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "website/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       time: "05:00" # UTC
     labels:
       - "dependencies"
