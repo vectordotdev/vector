@@ -1,13 +1,19 @@
-use http::StatusCode;
-use serde::Deserialize;
-
+use crate::sinks::{
+    elasticsearch::encoder::ProcessedEvent,
+    util::{metadata::RequestMetadataBuilder, request_builder::RequestBuilder},
+};
 use crate::{
+    event::Finalizable,
     http::HttpError,
     sinks::{
         elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
         util::retries::{RetryAction, RetryLogic, RetryPartialFunction},
     },
 };
+use http::StatusCode;
+use serde::Deserialize;
+use vector_lib::json_size::JsonSize;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -162,33 +168,41 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                 {
                                     return RetryAction::RetryPartial(Box::new(EsRetryClosure {
                                         closure: Box::new(move |req: ElasticsearchRequest| {
-                                            let string_data: &str =
-                                                match std::str::from_utf8(req.payload.as_ref()) {
-                                                    Ok(s) => s,
-                                                    Err(_) => return req,
-                                                };
-                                            let lines: Vec<&str> = string_data.lines().collect();
-                                            let grouped_lines: Vec<String> = lines
-                                                .chunks_exact(2)
-                                                .map(|chunk| chunk.join("\n"))
-                                                .collect();
-                                            if grouped_lines.len() != status_codes.len() {
-                                                return req;
-                                            }
-                                            let filtered_payload: Vec<String> = grouped_lines
+                                            let mut failed_events: Vec<ProcessedEvent> = req
+                                                .original_events
+                                                .clone()
                                                 .into_iter()
                                                 .zip(status_codes.iter())
                                                 .filter(|(_, &flag)| flag)
                                                 .map(|(item, _)| item)
                                                 .collect();
-                                            let mut req = req.clone();
-                                            // change batch_size
-                                            req.batch_size = filtered_payload.len();
-                                            // change payload
-                                            req.payload =
-                                                (filtered_payload.join("\n") + "\n").into();
-                                            // TODO: need to fix some metadata here
-                                            req
+                                            let finalizers = failed_events.take_finalizers();
+                                            let batch_size = failed_events.len();
+                                            let events_byte_size = failed_events
+                                                .iter()
+                                                .map(|x| x.log.estimated_json_encoded_size_of())
+                                                .reduce(|a, b| a + b)
+                                                .unwrap_or(JsonSize::zero());
+                                            let encode_result = match req
+                                                .elasticsearch_request_builder
+                                                .encode_events(failed_events.clone())
+                                            {
+                                                Ok(s) => s,
+                                                Err(_) => return req,
+                                            };
+                                            let metadata_builder =
+                                                RequestMetadataBuilder::from_events(&failed_events);
+                                            let metadata = metadata_builder.build(&encode_result);
+                                            ElasticsearchRequest {
+                                                payload: encode_result.into_payload(),
+                                                finalizers,
+                                                batch_size,
+                                                events_byte_size,
+                                                metadata,
+                                                original_events: failed_events,
+                                                elasticsearch_request_builder: req
+                                                    .elasticsearch_request_builder,
+                                            }
                                         }),
                                     }));
                                 }
