@@ -100,10 +100,7 @@ pub struct LogSink<S> {
     batch_settings: BatcherSettings,
     /// The protocol name
     protocol: String,
-    /// When enabled this sink will normalize events to conform to the Datadog Agent standard. This
-    /// also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
-    /// will be overidden as `true` if this header has already been set in the request.headers
-    /// configuration setting.
+    /// Normalize events to agent standard and attach associated HTTP header to request
     conforms_as_agent: bool,
 }
 
