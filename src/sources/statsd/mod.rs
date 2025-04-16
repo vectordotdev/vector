@@ -93,6 +93,13 @@ impl Configurable for ConversionUnit {
         };
         Ok(schema)
     }
+
+    fn metadata() -> vector_config::Metadata {
+        let mut md = vector_config::Metadata::default();
+        md.set_description("Specifies the target unit for converting incoming StatsD timing values. When set to \"seconds\" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to \"milliseconds\", the original timing values are preserved.");
+        md.set_default_value(ConversionUnit::Seconds);
+        md
+    }
 }
 
 /// UDP configuration for the `statsd` source.

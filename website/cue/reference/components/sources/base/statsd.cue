@@ -18,6 +18,11 @@ base: components: sources: statsd: configuration: {
 		required:      false
 		type: uint: unit: "connections"
 	}
+	convert_to: {
+		description: "Specifies the target unit for converting incoming StatsD timing values. When set to \"seconds\" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to \"milliseconds\", the original timing values are preserved."
+		required:    false
+		type: string: default: "seconds"
+	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."
 		relevant_when: "mode = \"tcp\""
@@ -68,16 +73,6 @@ base: components: sources: statsd: configuration: {
 			"""
 		required: false
 		type: bool: default: true
-	}
-	convert_to: {
-		description: """
-			Specifies the target unit for converting incoming StatsD timing values.
-			When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`).
-			When set to "milliseconds", the original timing values are preserved.
-			"""
-		relevant_when: "mode = \"tcp\" or mode = \"udp\" or mode = \"unix\""
-		required:      false
-		type: string: default: "seconds"
 	}
 	shutdown_timeout_secs: {
 		description:   "The timeout before a connection is forcefully closed during shutdown."
