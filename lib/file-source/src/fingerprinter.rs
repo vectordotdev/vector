@@ -212,21 +212,30 @@ impl Fingerprinter {
                     self.get_fingerprint_of_file(path, buffer).map(Some)
                 }
             })
-            .map_err(|error| match error.kind() {
-                io::ErrorKind::UnexpectedEof => {
-                    if !known_small_files.contains_key(path) {
-                        emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.to_path_buf(), time::Instant::now());
+            .inspect(|_| {
+                // Drop the path from the small files map if we've got enough data to fingerprint it.
+                known_small_files.remove(&path.to_path_buf());
+            })
+            .map_err(|error| {
+                match error.kind() {
+                    io::ErrorKind::UnexpectedEof => {
+                        if !known_small_files.contains_key(path) {
+                            emitter.emit_file_checksum_failed(path);
+                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
+                        }
+                        return;
                     }
-                }
-                io::ErrorKind::NotFound => {
-                    if !self.ignore_not_found {
+                    io::ErrorKind::NotFound => {
+                        if !self.ignore_not_found {
+                            emitter.emit_file_fingerprint_read_error(path, error);
+                        }
+                    }
+                    _ => {
                         emitter.emit_file_fingerprint_read_error(path, error);
                     }
-                }
-                _ => {
-                    emitter.emit_file_fingerprint_read_error(path, error);
-                }
+                };
+                // For scenarios other than UnexpectedEOF, remove the path from the small files map.
+                known_small_files.remove(&path.to_path_buf());
             })
             .ok()
             .flatten()
