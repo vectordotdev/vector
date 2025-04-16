@@ -32,6 +32,13 @@ pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
     (meaning::TAGS, DDTAGS),
 ];
 
+/// Returns true if the parameter `attr` is one of the reserved Datadog log attributes
+pub fn is_reserved_attribute(attr: &str) -> bool {
+    DD_RESERVED_SEMANTIC_ATTRS
+        .iter()
+        .any(|(_, attr_str)| &attr == attr_str)
+}
+
 /// DatadogSeriesMetric
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct DatadogSeriesMetric {

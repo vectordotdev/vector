@@ -15,7 +15,7 @@ use vrl::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    common::datadog::{DDTAGS, DD_RESERVED_SEMANTIC_ATTRS, MESSAGE},
+    common::datadog::{is_reserved_attribute, DDTAGS, DD_RESERVED_SEMANTIC_ATTRS, MESSAGE},
     sinks::{
         prelude::*,
         util::{http::HttpJsonBatchSizer, Compressor},
@@ -161,10 +161,14 @@ pub fn normalize_event(event: &mut Event) {
 // request with slight differences when this header and format are observed.
 pub fn normalize_as_agent_event(event: &mut Event) {
     let log = event.as_mut_log();
+    // Should never occur since normalize_event forces a conversion of the log value to an Object type
+    let Some(object_map) = log.as_map_mut() else {
+        return;
+    };
 
     // Extract the `message` object from the log if it already exists. Then JSON deserialize its
     // value field. All non reserved fields placed at the root will be moved there.
-    let mut message = if let Some(outer_msg) = log.remove(event_path!(MESSAGE)) {
+    let mut message = if let Some(outer_msg) = object_map.remove(MESSAGE) {
         if let Value::Object(current_message) = outer_msg {
             current_message // already JSON
         } else {
@@ -183,40 +187,33 @@ pub fn normalize_as_agent_event(event: &mut Event) {
     };
 
     // Move all non reserved fields into a new object
-    if let Some(object_map) = log.as_map_mut() {
-        let mut collisions = ObjectMap::default();
-
-        let keys_to_move = object_map
-            .keys()
-            .filter(|key| {
-                DD_RESERVED_SEMANTIC_ATTRS
-                    .iter()
-                    .all(|(_, attr)| *attr != key.as_str())
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        for key in keys_to_move {
-            if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
-                if let Some(returned_entry_v) = message.insert(entry_k, entry_v) {
-                    collisions.insert(key, returned_entry_v);
-                }
+    let mut collisions = ObjectMap::default();
+    let keys_to_move = object_map
+        .keys()
+        .filter(|ks| !is_reserved_attribute(ks.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    for key in keys_to_move {
+        if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
+            if let Some(returned_entry_v) = message.insert(entry_k, entry_v) {
+                collisions.insert(key, returned_entry_v);
             }
         }
-        if !collisions.is_empty() {
-            if message
-                .insert(KeyString::from("_collisions"), Value::Object(collisions))
-                .is_none()
-            {
-                warn!(
+    }
+    if !collisions.is_empty() {
+        if message
+            .insert(KeyString::from("_collisions"), Value::Object(collisions))
+            .is_none()
+        {
+            warn!(
                 message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'.",
                 internal_log_rate_limit = true,
             );
-            } else {
-                error!(
+        } else {
+            error!(
                 message = "Could not create field named _collisions at .message, a field with that name already exists.",
                 internal_log_rate_limit = true,
             );
-            }
         }
     }
     // .. finally nest this object at the root under the reserved key named 'message'
