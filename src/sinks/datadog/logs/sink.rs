@@ -153,7 +153,7 @@ pub fn normalize_event(event: &mut Event) {
     }
 }
 
-// Optionally for all other non-reserved fields, nest these under the 'message' key. This is the
+// Optionally for all other non-reserved fields, nest these under the `message` key. This is the
 // final step in having the event conform to the standard that the logs intake expects when an
 // event originates from an agent. Normalizing the events to the format prepared by the datadog
 // agent resolves any inconsistencies that would be observed when data flows through vector
