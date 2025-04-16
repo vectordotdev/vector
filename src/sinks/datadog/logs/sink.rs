@@ -211,7 +211,7 @@ pub fn normalize_as_agent_event(event: &mut Event) {
             );
         } else {
             error!(
-                message = "Could not create field named _collisions at .message, a field with that name already exists.",
+                message = "A field with the name 'message._collisions' already exists, replacing its value with an object containing key collisions.",
                 internal_log_rate_limit = true,
             );
         }
