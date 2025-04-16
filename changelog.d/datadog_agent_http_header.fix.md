@@ -6,7 +6,7 @@ The log will be mutated so that any data that is a reserved keyword that exists 
 moved under a new object keyed at the field 'message'. One will be created if it already does not
 exist. As an example:
 
-```
+```json
 {
   "key1": "value1",
   "key2": { "key2-1" : "value2" },
@@ -17,7 +17,7 @@ exist. As an example:
 
 will be modified to:
 
-```
+```json
 {
   "message" : {
     "message" : "Hello world",
