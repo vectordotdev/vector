@@ -22,7 +22,7 @@ use vector_common::{
     request_metadata::GetEventCountTags,
     EventDataEq,
 };
-use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
+use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError, ValuePath};
 use vrl::{event_path, owned_value_path};
 
 use super::{
@@ -404,9 +404,47 @@ impl LogEvent {
     /// Rename a key
     ///
     /// If `to_key` already exists in the structure its value will be overwritten.
+    /// TODO: Rename to unsafe.
     pub fn rename_key<'a>(&mut self, from: impl TargetPath<'a>, to: impl TargetPath<'a>) {
         if let Some(val) = self.remove(from) {
             self.insert(to, val);
+        }
+    }
+
+    /// Renames a key in a safe way.
+    ///
+    /// This method removes the value associated with the `from` key path and inserts it at the `to` key path.
+    /// If the `to` key already exists, its value will be overwritten.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The path to the existing key to be renamed.
+    /// * `to` - The new path for the key.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some(Value)` if the `from` key mapped to an existing value and `None` if the `from`
+    /// key did not exist.
+    /// TODO: Rename the existing [`rename_key`] to `rename_key_unchecked` and then drop the `_checked` suffix.
+    #[must_use]
+    fn rename_key_checked<'a>(&mut self, from: impl TargetPath<'a>, to: impl TargetPath<'a>) -> Option<Value> {
+        // TODO think how to handle arrays
+
+        if self.get(from.clone()).is_none() {
+            return None;
+        }
+        
+        // TODO Implement this in VRL for TargetPath
+        if from.prefix() == to.prefix() && from.value_path().eq(to.value_path()) {
+            return None;
+        }
+
+        if let Some(val) = self.remove(from) {
+            let overwritten = self.remove(to.clone());
+            self.insert(to, val);
+            overwritten
+        } else {
+            None
         }
     }
 
@@ -1212,5 +1250,29 @@ mod test {
             log1.metadata().source_event_id(),
             log2.metadata().source_event_id()
         );
+    }
+
+    #[test]
+    fn rename_key_checked() {
+        let value = value!({
+            one: 1,
+            two: 2
+        });
+
+        let log = LogEvent::from(Value::from(btreemap! {
+            "arr" => vec![1, 2, 3],
+        }));
+        assert_eq!(log.get("arr[0]"), Some(&1.into()));
+
+        let mut log = LogEvent::from(Value::from("str"));
+        log.rename_key("does_not_exist", "blah 2");
+        assert_eq!(log.get("does_not_exist"), None);
+
+
+        let mut base = LogEvent::from_parts(value.clone(), EventMetadata::default());
+        let _ = base.rename_key_checked(event_path!("one"), event_path!("one"));
+        let (actual_fields, _) = base.into_parts();
+
+        assert_eq!(value, actual_fields);
     }
 }
