@@ -247,3 +247,5 @@ jobs:
             template website
             website
             website deps
+
+            config provider
