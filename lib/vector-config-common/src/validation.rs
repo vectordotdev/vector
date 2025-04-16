@@ -187,9 +187,9 @@ pub enum Validation {
     ///
     /// Can only be used for numbers.
     Range {
-        #[darling(default, rename = "min", with = "maybe_float_or_int")]
+        #[darling(default, rename = "min", with = maybe_float_or_int)]
         minimum: Option<f64>,
-        #[darling(default, rename = "max", with = "maybe_float_or_int")]
+        #[darling(default, rename = "max", with = maybe_float_or_int)]
         maximum: Option<f64>,
     },
 

@@ -139,6 +139,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 chrono = { version = "0.4.40", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
 clap = { version = "4.5.34", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 flate2 = { version = "1.1.1", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
