@@ -411,18 +411,22 @@ async fn handle_request<T: prost::Message + serde::Serialize + std::default::Def
                     BatchStatus::Delivered => {
                         serialize_response(content_type, hyper::StatusCode::OK, T::default())
                     }
+                    // # TODO: Is Errored retryable? If not, we need to change the status code
+                    // https://opentelemetry.io/docs/specs/otlp/#failures-1
                     BatchStatus::Errored => serialize_response(
                         content_type,
-                        hyper::StatusCode::OK,
+                        hyper::StatusCode::BAD_GATEWAY,
                         Status {
                             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                             message: "Error delivering contents to sink".into(),
                             ..Default::default()
                         },
                     ),
+                    // # TODO: Is Rejected retryable? If not, we need to change the status code
+                    // https://opentelemetry.io/docs/specs/otlp/#failures-1
                     BatchStatus::Rejected => serialize_response(
                         content_type,
-                        hyper::StatusCode::OK,
+                        hyper::StatusCode::BAD_REQUEST,
                         Status {
                             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
                             message: "Contents failed to deliver to sink".into(),
@@ -451,15 +455,21 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
                 format!("Invalid Content-Type header value: {content_type}"),
                 hyper::StatusCode::BAD_REQUEST,
             )),
-            ApiError::ServerShutdown => Ok(warp::reply::with_status(
-                "server down".to_string(),
-                hyper::StatusCode::BAD_REQUEST,
-            )),
         }
+    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
+        Ok(warp::reply::with_status(
+            "Method not allowed".to_string(),
+            hyper::StatusCode::METHOD_NOT_ALLOWED,
+        ))
+    } else if err.is_not_found() {
+        Ok(warp::reply::with_status(
+            "Not found".to_string(),
+            hyper::StatusCode::NOT_FOUND,
+        ))
     } else {
         Ok(warp::reply::with_status(
-            "Unknown route".to_string(),
-            hyper::StatusCode::NOT_FOUND,
+            "Internal server error".to_string(),
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
         ))
     }
 }
