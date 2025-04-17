@@ -129,7 +129,7 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let limit_exists = limit_visitor.limit.unwrap_or(false);
+        let limit_exists = limit_visitor.limit.unwrap_or(true);
         if !limit_exists {
             return self.inner.on_event(event, ctx);
         }
