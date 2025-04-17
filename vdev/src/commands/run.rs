@@ -3,6 +3,7 @@ use std::{path::PathBuf, process::Command};
 use anyhow::{bail, Result};
 use clap::Args;
 
+use crate::util;
 use crate::{app::CommandExt as _, features};
 
 /// Run `vector` with the minimum set of features required by the config file
@@ -48,6 +49,7 @@ impl Cli {
             self.config.to_str().expect("Invalid config file name"),
         ]);
         command.args(self.args);
+        util::catch_sigs();
         command.check_run()
     }
 }
