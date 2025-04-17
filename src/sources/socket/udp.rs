@@ -183,7 +183,6 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
@@ -211,7 +210,6 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_limit = true
                                     );
                                 }
 
