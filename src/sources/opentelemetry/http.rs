@@ -46,7 +46,6 @@ use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Debug, Snafu)]
 pub(crate) enum ApiError {
-    ServerShutdown,
     ContentType { content_type: String },
 }
 
@@ -382,10 +381,18 @@ async fn handle_request<T: prost::Message + std::default::Default + serde::Seria
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
-            out.send_batch_named(output, events).await.map_err(|_| {
+            if let Err(_) = out.send_batch_named(output, events).await {
                 emit!(StreamClosedError { count });
-                warp::reject::custom(ApiError::ServerShutdown)
-            })?;
+                return serialize_response(
+                    content_type,
+                    hyper::StatusCode::SERVICE_UNAVAILABLE,
+                    Status {
+                        code: 14,
+                        message: "Vector is shutting down".into(),
+                        ..Default::default()
+                    },
+                );
+            }
 
             match receiver {
                 None => serialize_response(content_type, hyper::StatusCode::OK, resp),
