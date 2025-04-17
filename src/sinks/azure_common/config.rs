@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use azure_core::{error::HttpError, RetryOptions};
 use azure_storage::{prelude::*, CloudLocation, ConnectionString};
-use azure_storage_blob: {blob::operations::PutBlockBlobResponse, prelude::*};
+use azure_storage_blob::{operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;

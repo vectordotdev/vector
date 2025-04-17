@@ -4,7 +4,7 @@ use std::{
 };
 
 use azure_core::{error::HttpError, prelude::Range};
-use azure_storage_blob: prelude::*;
+use azure_storage_blob::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
 use futures::{stream, Stream, StreamExt};
