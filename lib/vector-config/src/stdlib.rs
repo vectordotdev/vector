@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
-    net::SocketAddr,
+    net::{Ipv4Addr, SocketAddr},
     num::{
         NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
         NonZeroU8, NonZeroUsize,
@@ -397,6 +397,31 @@ impl Configurable for SocketAddr {
 }
 
 impl ToValue for SocketAddr {
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string())
+    }
+}
+
+impl Configurable for Ipv4Addr {
+    fn referenceable_name() -> Option<&'static str> {
+        Some("stdlib::Ipv4Addr")
+    }
+
+    fn metadata() -> Metadata {
+        let mut metadata = Metadata::default();
+        metadata.set_description("An IPv4 address.");
+        metadata
+    }
+
+    fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        // TODO: We don't need anything other than a string schema to (de)serialize a `Ipv4Addr`,
+        // but we eventually should have validation since the format for the possible permutations
+        // is well-known and can be easily codified.
+        Ok(generate_string_schema())
+    }
+}
+
+impl ToValue for Ipv4Addr {
     fn to_value(&self) -> Value {
         Value::String(self.to_string())
     }
