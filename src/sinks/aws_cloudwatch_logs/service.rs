@@ -190,9 +190,9 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
             })
             .collect();
 
-        let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
+        let svc = match &mut self.clients.get_mut(&key) { Some(svc) => {
             svc.clone()
-        } else {
+        } _ => {
             // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
                 .buffer(1)
@@ -216,7 +216,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
             self.clients.insert(key, svc.clone());
             svc
-        };
+        }};
 
         svc.oneshot(events)
             .map_ok(move |_x| CloudwatchResponse { events_byte_size })

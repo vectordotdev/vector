@@ -143,7 +143,7 @@ pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<H
 
 #[macro_export]
 macro_rules! series {
-	($name:expr) => {
+	($name:expr_2021) => {
 		vector_lib::event::metric::MetricSeries {
 			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
@@ -152,7 +152,7 @@ macro_rules! series {
 			tags: None,
 		}
 	};
-	($name:expr, $($tk:expr => $tv:expr),*) => {
+	($name:expr_2021, $($tk:expr_2021 => $tv:expr_2021),*) => {
 		vector_lib::event::metric::MetricSeries {
 			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
