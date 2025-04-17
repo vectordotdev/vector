@@ -208,12 +208,11 @@ fn build_warp_log_filter(
                         events
                     });
 
-                handle_request(
+                handle_request::<ExportLogsServiceResponse>(
                     events,
                     acknowledgements,
                     out.clone(),
                     super::LOGS,
-                    ExportLogsServiceResponse::default(),
                     content_type,
                 )
             },
@@ -239,12 +238,11 @@ fn build_warp_metrics_filter(
                     decode_metrics_body(body, &events_received, content_type)
                 });
 
-                handle_request(
+                handle_request::<ExportMetricsServiceResponse>(
                     events,
                     acknowledgements,
                     out.clone(),
                     super::METRICS,
-                    ExportMetricsServiceResponse::default(),
                     content_type,
                 )
             },
@@ -270,12 +268,11 @@ fn build_warp_trace_filter(
                     decode_trace_body(body, &events_received, content_type)
                 });
 
-                handle_request(
+                handle_request::<ExportTraceServiceResponse>(
                     events,
                     acknowledgements,
                     out.clone(),
                     super::TRACES,
-                    ExportTraceServiceResponse::default(),
                     content_type,
                 )
             },
@@ -383,12 +380,11 @@ fn serialize_response<T: serde::Serialize + prost::Message>(
     }
 }
 
-async fn handle_request<T: prost::Message + std::default::Default + serde::Serialize>(
+async fn handle_request<T: prost::Message + serde::Serialize + std::default::Default>(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
     mut out: SourceSender,
     output: &str,
-    resp: T,
     content_type: ContentType,
 ) -> Result<Response, Rejection> {
     match events {
@@ -410,10 +406,10 @@ async fn handle_request<T: prost::Message + std::default::Default + serde::Seria
             }
 
             match receiver {
-                None => serialize_response(content_type, hyper::StatusCode::OK, resp),
+                None => serialize_response(content_type, hyper::StatusCode::OK, T::default()),
                 Some(receiver) => match receiver.await {
                     BatchStatus::Delivered => {
-                        serialize_response(content_type, hyper::StatusCode::OK, resp)
+                        serialize_response(content_type, hyper::StatusCode::OK, T::default())
                     }
                     BatchStatus::Errored => serialize_response(
                         content_type,
