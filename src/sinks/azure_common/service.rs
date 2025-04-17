@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use azure_storage_blobs::prelude::*;
+use azure_storage_blob: prelude::*;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;

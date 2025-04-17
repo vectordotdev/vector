@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use azure_storage_blobs::prelude::*;
+use azure_storage_blob:prelude::*;
 use tower::ServiceBuilder;
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use vector_lib::configurable::configurable_component;

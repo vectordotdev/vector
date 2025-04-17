@@ -177,7 +177,7 @@ build with just the components required. We need to add this feature to the
 `Cargo.toml`.
 
 ```diff
-  sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
+  sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blob"]
   sinks-azure_monitor_logs = []
 + sinks-basic = []
   sinks-blackhole = []

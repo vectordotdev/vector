@@ -408,18 +408,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-channel"
-version = "2.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89b47800b0be77592da0afd425cc03468052844aff33b84e33cc696f64e77b6a"
-dependencies = [
- "concurrent-queue",
- "event-listener-strategy",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
 name = "async-compression"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -467,7 +455,7 @@ version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1b6f5d7df27bd294849f8eec66ecfc63d11814df7a4f5d74168a2394467b776"
 dependencies = [
- "async-channel 1.9.0",
+ "async-channel",
  "async-executor",
  "async-io 1.13.0",
  "async-lock 2.8.0",
@@ -690,25 +678,6 @@ dependencies = [
  "futures-lite 1.13.0",
  "rustix 0.38.40",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "async-process"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63255f1dc2381611000436537bbedfe83183faa303a5a0edaf191edef06526bb"
-dependencies = [
- "async-channel 2.3.1",
- "async-io 2.4.0",
- "async-lock 3.4.0",
- "async-signal",
- "async-task",
- "blocking",
- "cfg-if",
- "event-listener 5.3.1",
- "futures-lite 2.6.0",
- "rustix 0.38.40",
- "tracing 0.1.41",
 ]
 
 [[package]]
@@ -1551,18 +1520,15 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.31",
  "getrandom 0.2.15",
- "hmac",
  "http-types",
  "once_cell",
  "paste",
  "pin-project",
  "quick-xml 0.31.0",
  "rand 0.8.5",
- "reqwest 0.12.4",
  "rustc_version 0.4.1",
  "serde",
  "serde_json",
- "sha2",
  "time",
  "tracing 0.1.41",
  "url",
@@ -1570,23 +1536,43 @@ dependencies = [
 ]
 
 [[package]]
-name = "azure_identity"
-version = "0.21.0"
+name = "azure_core"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88ddd80344317c40c04b603807b63a5cefa532f1b43522e72f480a988141f744"
+checksum = "b0435fd24f90b870a2b5010a0431ba69b316b6cdf880ae1cf7701671b465ddca"
 dependencies = [
  "async-lock 3.4.0",
- "async-process 2.3.0",
  "async-trait",
- "azure_core",
+ "bytes 1.10.1",
  "futures 0.3.31",
- "oauth2",
+ "hmac",
+ "pin-project",
+ "rustc_version 0.4.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tracing 0.1.41",
+ "typespec",
+ "typespec_client_core",
+]
+
+[[package]]
+name = "azure_identity"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "236e688ca5a4a5cb44b39292776d780694c977d563cd8e6c0f4dde6dee596197"
+dependencies = [
+ "async-lock 3.4.0",
+ "async-trait",
+ "azure_core 0.23.0",
+ "futures 0.3.31",
+ "oauth2 5.0.0",
  "pin-project",
  "serde",
  "time",
  "tracing 0.1.41",
+ "typespec_client_core",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -1598,7 +1584,7 @@ dependencies = [
  "RustyXML",
  "async-lock 3.4.0",
  "async-trait",
- "azure_core",
+ "azure_core 0.21.0",
  "bytes 1.10.1",
  "serde",
  "serde_derive",
@@ -1609,40 +1595,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "azure_storage_blobs"
-version = "0.21.0"
+name = "azure_storage_blob"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97e83c3636ae86d9a6a7962b2112e3b19eb3903915c50ce06ff54ff0a2e6a7e4"
+checksum = "259c0f3c7e3d0703c7d7f0f82ebee1967d9f62f240bed0e9192e769accf384ff"
 dependencies = [
- "RustyXML",
- "azure_core",
- "azure_storage",
- "azure_svc_blobstorage",
- "bytes 1.10.1",
- "futures 0.3.31",
+ "async-trait",
+ "azure_core 0.23.0",
  "serde",
- "serde_derive",
- "serde_json",
  "time",
- "tracing 0.1.41",
+ "typespec_client_core",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "azure_svc_blobstorage"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e6c6f20c5611b885ba94c7bae5e02849a267381aecb8aee577e8c35ff4064c6"
-dependencies = [
- "azure_core",
- "bytes 1.10.1",
- "futures 0.3.31",
- "log",
- "once_cell",
- "serde",
- "serde_json",
- "time",
 ]
 
 [[package]]
@@ -1819,7 +1783,7 @@ version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c36a4d0d48574b3dd360b4b7d95cc651d2b6557b6402848a27d4b228a473e2a"
 dependencies = [
- "async-channel 1.9.0",
+ "async-channel",
  "async-lock 2.8.0",
  "async-task",
  "fastrand 2.3.0",
@@ -3974,10 +3938,7 @@ version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5edaec856126859abb19ed65f39e90fea3a9574b9707f13539acf4abf7eb532"
 dependencies = [
- "fastrand 2.3.0",
  "futures-core",
- "futures-io",
- "parking",
  "pin-project-lite",
 ]
 
@@ -4725,7 +4686,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e9b187a72d63adbfba487f48095306ac823049cb504ee195541e91c7775f5ad"
 dependencies = [
  "anyhow",
- "async-channel 1.9.0",
+ "async-channel",
  "base64 0.13.1",
  "futures-lite 1.13.0",
  "infer",
@@ -6826,6 +6787,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "oauth2"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "getrandom 0.2.15",
+ "http 1.1.0",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "sha2",
+ "thiserror 1.0.68",
+ "url",
+]
+
+[[package]]
 name = "objc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6956,7 +6936,7 @@ dependencies = [
  "http 0.2.9",
  "itertools 0.10.5",
  "log",
- "oauth2",
+ "oauth2 4.4.2",
  "p256",
  "p384",
  "rand 0.8.5",
@@ -7985,7 +7965,7 @@ dependencies = [
  "lz4",
  "native-tls",
  "nom",
- "oauth2",
+ "oauth2 4.4.2",
  "openidconnect",
  "pem",
  "prost 0.11.9",
@@ -8568,6 +8548,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "566cafdd92868e0939d3fb961bd0dc25fcfaaed179291093b3d43e6b3150ea10"
 dependencies = [
+ "async-compression",
  "base64 0.22.1",
  "bytes 1.10.1",
  "futures-core",
@@ -9570,13 +9551,13 @@ version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13f2b548cd8447f8de0fdf1c592929f70f4fc7039a05e47404b0d096ec6987a1"
 dependencies = [
- "async-channel 1.9.0",
+ "async-channel",
  "async-executor",
  "async-fs",
  "async-io 1.13.0",
  "async-lock 2.8.0",
  "async-net",
- "async-process 1.8.1",
+ "async-process",
  "blocking",
  "futures-lite 1.13.0",
 ]
@@ -11124,6 +11105,56 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
+name = "typespec"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859b9d83198115b1db96c1bad5c53b684bdaae7cc8bb00a03f2e03549fe59ad5"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "typespec_client_core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2da9e6e81b951c2b53f0ea513b441f39a43d740190f05a80f4a3fcc5ed7596e"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes 1.10.1",
+ "dyn-clone",
+ "futures 0.3.31",
+ "getrandom 0.2.15",
+ "pin-project",
+ "quick-xml 0.31.0",
+ "rand 0.8.5",
+ "reqwest 0.12.4",
+ "serde",
+ "serde_json",
+ "time",
+ "tokio",
+ "tracing 0.1.41",
+ "typespec",
+ "typespec_macros",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "typespec_macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6a0ba07066b3e2226f04261d2fba4976959ebe373ec1d34ed85d2e391f51d3e"
+dependencies = [
+ "proc-macro2 1.0.94",
+ "quote 1.0.40",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "typetag"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11424,10 +11455,10 @@ dependencies = [
  "aws-smithy-types",
  "aws-types",
  "axum 0.6.20",
- "azure_core",
+ "azure_core 0.23.0",
  "azure_identity",
  "azure_storage",
- "azure_storage_blobs",
+ "azure_storage_blob",
  "base64 0.22.1",
  "bloomy",
  "bollard",
