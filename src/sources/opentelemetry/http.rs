@@ -53,7 +53,7 @@ impl warp::reject::Reject for ApiError {}
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
-enum ContentType {
+pub(crate) enum ContentType {
     Protobuf,
     Json,
 }
@@ -66,6 +66,21 @@ impl TryFrom<String> for ContentType {
             "application/json" => Ok(ContentType::Json),
             _ => Err(()),
         }
+    }
+}
+
+impl From<ContentType> for String {
+    fn from(content_type: ContentType) -> Self {
+        match content_type {
+            ContentType::Protobuf => "application/x-protobuf".to_string(),
+            ContentType::Json => "application/json".to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for ContentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Into::<String>::into(*self))
     }
 }
 
