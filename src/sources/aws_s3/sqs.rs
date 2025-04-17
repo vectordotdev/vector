@@ -512,8 +512,12 @@ impl IngestorProcess {
 
         // Should consider removing failed deferrals from the delete_entries
         if !deferred_entries.is_empty() {
+            let Some(deferred) = &self.state.deferred else {
+                warn!(message = "Deferred queue not configured, but received deferred entries.");
+                return;
+            };
             let cloned_entries = deferred_entries.clone();
-            match self.send_messages(deferred_entries).await {
+            match self.send_messages(deferred_entries, deferred.queue_url.clone()).await {
                 Ok(result) => {
                     if !result.successful.is_empty() {
                         emit!(SqsMessageSentSucceeded {
@@ -849,19 +853,15 @@ impl IngestorProcess {
     async fn send_messages(
         &mut self,
         entries: Vec<SendMessageBatchRequestEntry>,
+        queue_url: String,
     ) -> Result<SendMessageBatchOutput, SdkError<SendMessageBatchError, HttpResponse>> {
-        if let Some(deferred) = &self.state.deferred {
-            self.state
-                .sqs_client
-                .send_message_batch()
-                .queue_url(deferred.queue_url.clone())
-                .set_entries(Some(entries))
-                .send()
-                .await
-        } else {
-            // This shouldn't happen as we only call send_messages when we have deferred config
-            panic!("Attempted to send messages without deferred queue configuration")
-        }
+        self.state
+            .sqs_client
+            .send_message_batch()
+            .queue_url(queue_url.clone())
+            .set_entries(Some(entries))
+            .send()
+            .await
     }
 }
 
