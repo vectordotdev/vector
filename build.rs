@@ -142,13 +142,14 @@ fn main() {
 
         for path in ["google.rpc.Status"] {
             builder = builder
-                .type_attribute(path, "#[derive(serde::Serialize)]")
+                .type_attribute(path, "#[derive(serde::Serialize, serde::Deserialize)]")
                 .type_attribute(path, "#[serde(rename_all = \"camelCase\")]");
         }
 
         // TODO: fix
         for path in ["google.rpc.Status.details"] {
-            builder = builder.field_attribute(path, "#[serde(skip_serializing)]")
+            builder =
+                builder.field_attribute(path, "#[serde(skip_serializing, skip_deserializing)]")
         }
 
         builder
