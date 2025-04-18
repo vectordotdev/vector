@@ -1,11 +1,10 @@
 use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures_util::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
-use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
@@ -45,12 +44,45 @@ use crate::{
 use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
 
-#[derive(Clone, Copy, Debug, Snafu)]
+#[derive(Clone, Debug, Snafu)]
 pub(crate) enum ApiError {
-    ServerShutdown,
+    ContentType { content_type: String },
 }
 
 impl warp::reject::Reject for ApiError {}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ContentType {
+    Protobuf,
+    Json,
+}
+
+impl TryFrom<String> for ContentType {
+    type Error = ();
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "application/x-protobuf" => Ok(ContentType::Protobuf),
+            "application/json" => Ok(ContentType::Json),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<ContentType> for String {
+    fn from(content_type: ContentType) -> Self {
+        match content_type {
+            ContentType::Protobuf => "application/x-protobuf".to_string(),
+            ContentType::Json => "application/json".to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for ContentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Into::<String>::into(*self))
+    }
+}
 
 pub(crate) async fn run_http_server(
     address: SocketAddr,
@@ -138,6 +170,15 @@ fn enrich_events(
     );
 }
 
+fn extract_content_type() -> impl warp::Filter<Extract = (ContentType,), Error = Rejection> + Copy {
+    warp::header::<String>("content-type").and_then(|content_type: String| async move {
+        content_type
+            .clone()
+            .try_into()
+            .map_err(|_| warp::reject::custom(ApiError::ContentType { content_type }))
+    })
+}
+
 fn build_warp_log_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -148,31 +189,31 @@ fn build_warp_log_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
         .and(warp::body::bytes())
         .and_then(
-            move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
+            move |content_type: ContentType,
+                  encoding_header: Option<String>,
+                  headers_config: HeaderMap,
+                  body: Bytes| {
                 let events = decode(encoding_header.as_deref(), body)
                     .and_then(|body| {
                         bytes_received.emit(ByteSize(body.len()));
-                        decode_log_body(body, log_namespace, &events_received)
+                        decode_log_body(body, log_namespace, &events_received, content_type)
                     })
                     .map(|mut events| {
                         enrich_events(&mut events, &headers, &headers_config, log_namespace);
                         events
                     });
 
-                handle_request(
+                handle_request::<ExportLogsServiceResponse>(
                     events,
                     acknowledgements,
                     out.clone(),
                     super::LOGS,
-                    ExportLogsServiceResponse::default(),
+                    content_type,
                 )
             },
         )
@@ -187,26 +228,25 @@ fn build_warp_metrics_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "metrics"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
-                bytes_received.emit(ByteSize(body.len()));
-                decode_metrics_body(body, &events_received)
-            });
+        .and_then(
+            move |content_type: ContentType, encoding_header: Option<String>, body: Bytes| {
+                let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+                    bytes_received.emit(ByteSize(body.len()));
+                    decode_metrics_body(body, &events_received, content_type)
+                });
 
-            handle_request(
-                events,
-                acknowledgements,
-                out.clone(),
-                super::METRICS,
-                ExportMetricsServiceResponse::default(),
-            )
-        })
+                handle_request::<ExportMetricsServiceResponse>(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    super::METRICS,
+                    content_type,
+                )
+            },
+        )
         .boxed()
 }
 
@@ -218,39 +258,55 @@ fn build_warp_trace_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "traces"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
-                bytes_received.emit(ByteSize(body.len()));
-                decode_trace_body(body, &events_received)
-            });
+        .and_then(
+            move |content_type: ContentType, encoding_header: Option<String>, body: Bytes| {
+                let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+                    bytes_received.emit(ByteSize(body.len()));
+                    decode_trace_body(body, &events_received, content_type)
+                });
 
-            handle_request(
-                events,
-                acknowledgements,
-                out.clone(),
-                super::TRACES,
-                ExportTraceServiceResponse::default(),
-            )
-        })
+                handle_request::<ExportTraceServiceResponse>(
+                    events,
+                    acknowledgements,
+                    out.clone(),
+                    super::TRACES,
+                    content_type,
+                )
+            },
+        )
         .boxed()
+}
+
+fn decode_message<'a, T: prost::Message + std::default::Default + serde::de::DeserializeOwned>(
+    content_type: ContentType,
+    body: Bytes,
+) -> Result<T, ErrorMessage> {
+    let data: T = match content_type {
+        ContentType::Protobuf => T::decode(body).map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Could not decode request: {}", error),
+            )
+        }),
+        ContentType::Json => serde_json::from_reader(body.reader()).map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Could not decode request: {}", error),
+            )
+        }),
+    }?;
+    Ok(data)
 }
 
 fn decode_trace_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
+    content_type: ContentType,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
-        )
-    })?;
+    let request = decode_message::<ExportTraceServiceRequest>(content_type, body)?;
 
     let events: Vec<Event> = request
         .resource_spans
@@ -270,13 +326,9 @@ fn decode_log_body(
     body: Bytes,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
+    content_type: ContentType,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
-        )
-    })?;
+    let request = decode_message::<ExportLogsServiceRequest>(content_type, body)?;
 
     let events: Vec<Event> = request
         .resource_logs
@@ -295,13 +347,9 @@ fn decode_log_body(
 fn decode_metrics_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
+    content_type: ContentType,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
-        )
-    })?;
+    let request = decode_message::<ExportMetricsServiceRequest>(content_type, body)?;
 
     let events: Vec<Event> = request
         .resource_metrics
@@ -317,63 +365,111 @@ fn decode_metrics_body(
     Ok(events)
 }
 
-async fn handle_request(
+fn serialize_response<T: serde::Serialize + prost::Message>(
+    content_type: ContentType,
+    status_code: hyper::StatusCode,
+    payload: T,
+) -> Result<Response, Rejection> {
+    match content_type {
+        ContentType::Json => {
+            let mut resp = warp::reply::json(&payload).into_response();
+            *resp.status_mut() = status_code;
+            Ok(resp)
+        }
+        ContentType::Protobuf => Ok(protobuf(status_code, payload).into_response()),
+    }
+}
+
+async fn handle_request<T: prost::Message + serde::Serialize + std::default::Default>(
     events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
     mut out: SourceSender,
     output: &str,
-    resp: impl Message,
+    content_type: ContentType,
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
-            out.send_batch_named(output, events).await.map_err(|_| {
+            if let Err(_) = out.send_batch_named(output, events).await {
                 emit!(StreamClosedError { count });
-                warp::reject::custom(ApiError::ServerShutdown)
-            })?;
+                return serialize_response(
+                    content_type,
+                    hyper::StatusCode::SERVICE_UNAVAILABLE,
+                    Status {
+                        code: 14,
+                        message: "Vector is shutting down".into(),
+                        ..Default::default()
+                    },
+                );
+            }
 
             match receiver {
-                None => Ok(protobuf(resp).into_response()),
+                None => serialize_response(content_type, hyper::StatusCode::OK, T::default()),
                 Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
+                    BatchStatus::Delivered => {
+                        serialize_response(content_type, hyper::StatusCode::OK, T::default())
+                    }
+                    // # TODO: Is Errored retryable? If not, we need to change the status code
+                    // https://opentelemetry.io/docs/specs/otlp/#failures-1
+                    BatchStatus::Errored => serialize_response(
+                        content_type,
+                        hyper::StatusCode::BAD_GATEWAY,
+                        Status {
+                            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+                            message: "Error delivering contents to sink".into(),
+                            ..Default::default()
+                        },
+                    ),
+                    // # TODO: Is Rejected retryable? If not, we need to change the status code
+                    // https://opentelemetry.io/docs/specs/otlp/#failures-1
+                    BatchStatus::Rejected => serialize_response(
+                        content_type,
+                        hyper::StatusCode::BAD_REQUEST,
+                        Status {
+                            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+                            message: "Contents failed to deliver to sink".into(),
+                            ..Default::default()
+                        },
+                    ),
                 },
             }
         }
-        Err(err) => Err(warp::reject::custom(err)),
+        Err(err) => serialize_response(
+            content_type,
+            hyper::StatusCode::BAD_REQUEST,
+            Status {
+                code: 2,
+                message: format!("Unable to read events: {err}").into(),
+                ..Default::default()
+            },
+        ),
     }
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    if let Some(err_msg) = err.find::<ErrorMessage>() {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: err_msg.message().into(),
-            ..Default::default()
-        });
-
-        Ok(warp::reply::with_status(reply, err_msg.status_code()))
-    } else {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
-            ..Default::default()
-        });
-
+    if let Some(err_msg) = err.find::<ApiError>() {
+        match err_msg {
+            ApiError::ContentType { content_type } => Ok(warp::reply::with_status(
+                format!("Invalid Content-Type header value: {content_type}"),
+                hyper::StatusCode::BAD_REQUEST,
+            )),
+        }
+    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
         Ok(warp::reply::with_status(
-            reply,
-            StatusCode::INTERNAL_SERVER_ERROR,
+            "Method not allowed".to_string(),
+            hyper::StatusCode::METHOD_NOT_ALLOWED,
+        ))
+    } else if err.is_not_found() {
+        Ok(warp::reply::with_status(
+            "Not found".to_string(),
+            hyper::StatusCode::NOT_FOUND,
+        ))
+    } else {
+        Ok(warp::reply::with_status(
+            "Internal server error".to_string(),
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
         ))
     }
 }
