@@ -45,8 +45,11 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             byte_size.add_event(&event, event.estimated_json_encoded_size_of());
 
             let mut bytes = BytesMut::new();
-            match position {
-                Position::Last | Position::Only => {
+            match (position, encoder.framer()) {
+                (
+                    Position::Last | Position::Only,
+                    Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_),
+                ) => {
                     encoder
                         .serialize(event, &mut bytes)
                         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -144,10 +147,14 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::env;
+    use std::path::PathBuf;
 
+    use bytes::{BufMut, Bytes};
+    use vector_lib::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
     use vector_lib::codecs::{
-        CharacterDelimitedEncoder, JsonSerializerConfig, NewlineDelimitedEncoder,
-        TextSerializerConfig,
+        CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+        NewlineDelimitedEncoder, TextSerializerConfig,
     };
     use vector_lib::event::LogEvent;
     use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
@@ -374,5 +381,125 @@ mod tests {
 
         assert_eq!(String::from_utf8(writer).unwrap(), r"value");
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
+    }
+
+    fn test_data_dir() -> PathBuf {
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/protobuf")
+    }
+
+    #[test]
+    fn test_encode_batch_protobuf_single() {
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
+        let input_proto_size = message_raw.len();
+
+        // default LengthDelimitedCoderOptions.length_field_length is 4
+        let mut buf = BytesMut::with_capacity(64);
+        buf.reserve(4 + input_proto_size);
+        buf.put_uint(input_proto_size as u64, 4);
+        buf.extend_from_slice(&message_raw[..]);
+        let expected_bytes = buf.freeze();
+
+        let config = ProtobufSerializerConfig {
+            protobuf: ProtobufSerializerOptions {
+                desc_file: test_data_dir().join("test_proto.desc"),
+                message_type: "test_proto.User".to_string(),
+            },
+        };
+
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                LengthDelimitedEncoder::default().into(),
+                config.build().unwrap().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![Event::Log(LogEvent::from(BTreeMap::from([
+            (KeyString::from("id"), Value::from("123")),
+            (KeyString::from("name"), Value::from("Alice")),
+            (KeyString::from("age"), Value::from(30)),
+            (
+                KeyString::from("emails"),
+                Value::from(vec!["alice@example.com", "alice@work.com"]),
+            ),
+        ])))];
+
+        let input_json_size = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum::<JsonSize>();
+
+        let (written, size) = encoding.encode_input(input, &mut writer).unwrap();
+
+        assert_eq!(input_proto_size, 49);
+        assert_eq!(written, input_proto_size + 4);
+        assert_eq!(CountByteSize(1, input_json_size), size.size().unwrap());
+        assert_eq!(Bytes::copy_from_slice(&writer), expected_bytes);
+    }
+
+    #[test]
+    fn test_encode_batch_protobuf_multiple() {
+        let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
+        let messages = vec![message_raw.clone(), message_raw.clone()];
+        let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
+
+        let mut buf = BytesMut::with_capacity(128);
+        for message in messages {
+            // default LengthDelimitedCoderOptions.length_field_length is 4
+            buf.reserve(4 + message.len());
+            buf.put_uint(message.len() as u64, 4);
+            buf.extend_from_slice(&message[..]);
+        }
+        let expected_bytes = buf.freeze();
+
+        let config = ProtobufSerializerConfig {
+            protobuf: ProtobufSerializerOptions {
+                desc_file: test_data_dir().join("test_proto.desc"),
+                message_type: "test_proto.User".to_string(),
+            },
+        };
+
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                LengthDelimitedEncoder::default().into(),
+                config.build().unwrap().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let input = vec![
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (KeyString::from("id"), Value::from("123")),
+                (KeyString::from("name"), Value::from("Alice")),
+                (KeyString::from("age"), Value::from(30)),
+                (
+                    KeyString::from("emails"),
+                    Value::from(vec!["alice@example.com", "alice@work.com"]),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (KeyString::from("id"), Value::from("123")),
+                (KeyString::from("name"), Value::from("Alice")),
+                (KeyString::from("age"), Value::from(30)),
+                (
+                    KeyString::from("emails"),
+                    Value::from(vec!["alice@example.com", "alice@work.com"]),
+                ),
+            ]))),
+        ];
+
+        let input_json_size: JsonSize = input
+            .iter()
+            .map(|event| event.estimated_json_encoded_size_of())
+            .sum();
+
+        let (written, size) = encoding.encode_input(input, &mut writer).unwrap();
+
+        assert_eq!(total_input_proto_size, 49 * 2);
+        assert_eq!(written, total_input_proto_size + 8);
+        assert_eq!(CountByteSize(2, input_json_size), size.size().unwrap());
+        assert_eq!(Bytes::copy_from_slice(&writer), expected_bytes);
     }
 }

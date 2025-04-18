@@ -400,15 +400,21 @@ cli: {
 			}
 
 			options: {
-				"refresh-interval": {
+				"components": {
+					_short:      "c"
+					description: "Components IDs to observe (comma-separated; accepts glob patterns)"
+					type:        "list"
+					default:     "*"
+				}
+				"interval": {
 					_short:      "i"
-					description: "How often the screen refreshes (in milliseconds)"
+					description: "Interval to sample metrics at, in milliseconds"
 					type:        "integer"
-					default:     500
+					default:     1000
 				}
 				"url": {
 					_short:      "u"
-					description: "The URL for the GraphQL endpoint of the running Vector instance"
+					description: "Vector GraphQL API server endpoint"
 					type:        "string"
 				}
 			}

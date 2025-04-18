@@ -717,7 +717,7 @@ fn is_reset(error: &Status) -> bool {
         .and_then(|source| source.downcast_ref::<hyper::Error>())
         .and_then(|error| error.source())
         .and_then(|source| source.downcast_ref::<h2::Error>())
-        .map_or(false, |error| error.is_remote() && error.is_reset())
+        .is_some_and(|error| error.is_remote() && error.is_reset())
 }
 
 #[pin_project::pin_project]

@@ -13,6 +13,12 @@ RUN ARCH=$(if [ "$TARGETPLATFORM" = "linux/arm/v6" ]; then echo "arm"; else cat 
 RUN mkdir -p /var/lib/vector
 
 FROM docker.io/alpine:3.21
+
+# https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.url="https://vector.dev"
+LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
+LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
+
 # we want the latest versions of these
 # hadolint ignore=DL3018
 RUN apk --no-cache add ca-certificates tzdata

@@ -26,18 +26,27 @@ impl LengthDelimitedEncoderConfig {
 
 /// An encoder for handling bytes that are delimited by a length header.
 #[derive(Debug, Clone)]
-pub struct LengthDelimitedEncoder(LengthDelimitedCodec);
+pub struct LengthDelimitedEncoder {
+    codec: LengthDelimitedCodec,
+    inner_buffer: BytesMut,
+}
 
 impl LengthDelimitedEncoder {
     /// Creates a new `LengthDelimitedEncoder`.
     pub fn new(config: &LengthDelimitedCoderOptions) -> Self {
-        Self(config.build_codec())
+        Self {
+            codec: config.build_codec(),
+            inner_buffer: BytesMut::new(),
+        }
     }
 }
 
 impl Default for LengthDelimitedEncoder {
     fn default() -> Self {
-        Self(LengthDelimitedCodec::new())
+        Self {
+            codec: LengthDelimitedCodec::new(),
+            inner_buffer: BytesMut::new(),
+        }
     }
 }
 
@@ -45,8 +54,11 @@ impl Encoder<()> for LengthDelimitedEncoder {
     type Error = BoxedFramingError;
 
     fn encode(&mut self, _: (), buffer: &mut BytesMut) -> Result<(), BoxedFramingError> {
-        let bytes = buffer.split().freeze();
-        self.0.encode(bytes, buffer)?;
+        self.inner_buffer.clear();
+        self.inner_buffer.extend_from_slice(buffer);
+        buffer.clear();
+        let bytes = self.inner_buffer.split().freeze();
+        self.codec.encode(bytes, buffer)?;
         Ok(())
     }
 }

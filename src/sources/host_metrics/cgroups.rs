@@ -416,11 +416,11 @@ define_stat_struct! { MemoryStat(
 )}
 
 fn is_dir(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_dir())
+    std::fs::metadata(path.as_ref()).is_ok_and(|metadata| metadata.is_dir())
 }
 
 fn is_file(path: impl AsRef<Path>) -> bool {
-    std::fs::metadata(path.as_ref()).map_or(false, |metadata| metadata.is_file())
+    std::fs::metadata(path.as_ref()).is_ok_and(|metadata| metadata.is_file())
 }
 
 /// Join a base directory path with a cgroup name.
@@ -588,7 +588,7 @@ mod tests {
 
     impl Setup {
         fn new() -> Self {
-            Self(tempfile::tempdir().unwrap(), rand::thread_rng())
+            Self(tempfile::tempdir().unwrap(), rand::rng())
         }
 
         async fn test(&self) {
@@ -661,9 +661,9 @@ mod tests {
         }
 
         fn cpu_stat(&mut self, subdir: &str) {
-            let a = self.1.gen_range(1000000..1000000000);
-            let b = self.1.gen_range(1000000..1000000000);
-            let c = self.1.gen_range(1000000..1000000000);
+            let a = self.1.random_range(1000000..1000000000);
+            let b = self.1.random_range(1000000..1000000000);
+            let c = self.1.random_range(1000000..1000000000);
             self.f(
                 subdir,
                 "cpu.stat",
@@ -672,8 +672,8 @@ mod tests {
         }
 
         fn memory_stat(&mut self, subdir: &str) {
-            let anon = self.1.gen_range(1000000..1000000000);
-            let file = self.1.gen_range(1000000..1000000000);
+            let anon = self.1.random_range(1000000..1000000000);
+            let file = self.1.random_range(1000000..1000000000);
             self.f(
                 subdir,
                 "memory.stat",

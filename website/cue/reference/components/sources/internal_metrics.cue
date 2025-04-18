@@ -54,6 +54,12 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
+		active_clients: {
+			description:       "Number of clients attached to a component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"
@@ -563,6 +569,12 @@ components: sources: internal_metrics: {
 			tags: _internal_metrics_tags & {
 				file: _file
 			}
+		}
+		open_files: {
+			description:       "The total number of open files."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		grpc_server_messages_received_total: {
 			description:       "The total number of gRPC messages received."

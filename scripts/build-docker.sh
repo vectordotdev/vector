@@ -15,7 +15,8 @@ VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
-REPO="${REPO:-"timberio/vector"}"
+REPOS="${REPOS:-"timberio/vector"}"
+IFS=, read -ra REPO_LIST <<< "$REPOS"
 
 IFS=, read -ra REQUESTED_PLATFORMS <<< "$PLATFORM"
 declare -A SUPPORTED_PLATFORMS=(
@@ -50,34 +51,42 @@ evaluate_supported_platforms_for_base() {
 build() {
   local BASE="$1"
   local VERSION="$2"
-
-  local TAG="$REPO:$VERSION-$BASE"
   local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
+  local BUILDABLE_PLATFORMS=""
+  if [ -n "$PLATFORM" ]; then
+    BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base "$BASE")
+  fi
 
+  # Collect all tags
+  TAGS=()
+  for REPO in "${REPO_LIST[@]}"; do
+    TAGS+=(--tag "$REPO:$VERSION-$BASE")
+  done
+
+  # Build once with all tags
   if [ -n "$PLATFORM" ]; then
     ARGS=()
     if [[ "$PUSH" == "true" ]]; then
       ARGS+=(--push)
     fi
 
-    local BUILDABLE_PLATFORMS
-    BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base "$BASE")
-
     docker buildx build \
       --platform="$BUILDABLE_PLATFORMS" \
-      --tag "$TAG" \
+      "${TAGS[@]}" \
       target/artifacts \
       -f "$DOCKERFILE" \
       "${ARGS[@]}"
   else
     docker build \
-      --tag "$TAG" \
+      "${TAGS[@]}" \
       target/artifacts \
       -f "$DOCKERFILE"
 
-      if [[ "$PUSH" == "true" ]]; then
+    if [[ "$PUSH" == "true" ]]; then
+      for TAG in "${TAGS[@]}"; do
         docker push "$TAG"
-      fi
+      done
+    fi
   fi
 }
 
@@ -85,7 +94,7 @@ build() {
 # Build
 #
 
-echo "Building $REPO:* Docker images"
+echo "Building Docker images for $REPOS"
 
 if [[ "$CHANNEL" == "release" ]]; then
   VERSION_EXACT="$VERSION"

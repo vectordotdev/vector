@@ -712,7 +712,7 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 mod test {
     use bytes::BufMut;
     use futures::Stream;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
@@ -808,7 +808,7 @@ mod test {
 
     #[test]
     fn v1_decoder_does_not_panic() {
-        let seq = thread_rng().gen_range(1..u32::MAX);
+        let seq = rng().random_range(1..u32::MAX);
         let req = encode_req(seq, &[("message", "Hello, World!")]);
         for i in 0..req.len() - 1 {
             assert!(
@@ -819,7 +819,7 @@ mod test {
     }
 
     async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
-        let seq = thread_rng().gen_range(1..u32::MAX);
+        let seq = rng().random_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
         let req = encode_req(seq, pairs);

@@ -10,7 +10,7 @@ use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
-    http::HttpClient,
+    http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
@@ -175,7 +175,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    pub query: Option<HashMap<String, String>>,
+    pub query: Option<QueryParameters>,
 
     #[serde(default)]
     #[configurable(derived)]

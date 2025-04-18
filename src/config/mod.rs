@@ -8,7 +8,13 @@ use std::{
     time::Duration,
 };
 
-use crate::{conditions, event::Metric, secrets::SecretBackends, serde::OneOrMany};
+use crate::{
+    conditions,
+    event::{Metric, Value},
+    secrets::SecretBackends,
+    serde::OneOrMany,
+};
+
 use indexmap::IndexMap;
 use serde::Serialize;
 
@@ -69,6 +75,28 @@ pub use vector_lib::{
     },
     id::Inputs,
 };
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ComponentConfig {
+    pub config_paths: Vec<PathBuf>,
+    pub component_key: ComponentKey,
+}
+
+impl ComponentConfig {
+    pub const fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+        Self {
+            config_paths,
+            component_key,
+        }
+    }
+
+    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<ComponentKey> {
+        if config_paths.iter().any(|p| self.config_paths.contains(p)) {
+            return Some(self.component_key.clone());
+        }
+        None
+    }
+}
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum ConfigPath {
@@ -473,24 +501,6 @@ impl TestDefinition<OutputId> {
     }
 }
 
-/// Value for a log field.
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(untagged)]
-pub enum TestInputValue {
-    /// A string.
-    String(String),
-
-    /// An integer.
-    Integer(i64),
-
-    /// A floating-point number.
-    Float(f64),
-
-    /// A boolean.
-    Boolean(bool),
-}
-
 /// A unit test input.
 ///
 /// An input describes not only the type of event to insert, but also which transform within the
@@ -522,7 +532,7 @@ pub struct TestInput {
     /// The set of log fields to use when creating a log input event.
     ///
     /// Only relevant when `type` is `log`.
-    pub log_fields: Option<IndexMap<String, TestInputValue>>,
+    pub log_fields: Option<IndexMap<String, Value>>,
 
     /// The metric to use as an input event.
     ///

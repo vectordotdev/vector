@@ -111,7 +111,7 @@ impl<'a> Builder<'a> {
     /// Builds the new pieces of the topology found in `self.diff`.
     async fn build(mut self) -> Result<TopologyPieces, Vec<String>> {
         let enrichment_tables = self.load_enrichment_tables().await;
-        let source_tasks = self.build_sources().await;
+        let source_tasks = self.build_sources(enrichment_tables).await;
         self.build_transforms(enrichment_tables).await;
         self.build_sinks(enrichment_tables).await;
 
@@ -203,13 +203,28 @@ impl<'a> Builder<'a> {
         &ENRICHMENT_TABLES
     }
 
-    async fn build_sources(&mut self) -> HashMap<ComponentKey, Task> {
+    async fn build_sources(
+        &mut self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
+        let table_sources = self
+            .config
+            .enrichment_tables
+            .iter()
+            .filter_map(|(key, table)| table.as_source(key))
+            .collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
             .filter(|(key, _)| self.diff.sources.contains_new(key))
+            .chain(
+                table_sources
+                    .iter()
+                    .map(|(key, sink)| (key, sink))
+                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+            )
         {
             debug!(component = %key, "Building new source.");
 
@@ -322,6 +337,7 @@ impl<'a> Builder<'a> {
             let context = SourceContext {
                 key: key.clone(),
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 shutdown: shutdown_signal,
                 out: pipeline,
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -510,7 +526,7 @@ impl<'a> Builder<'a> {
             .config
             .enrichment_tables
             .iter()
-            .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+            .filter_map(|(key, table)| table.as_sink(key))
             .collect::<Vec<_>>();
         for (key, sink) in self
             .config
@@ -519,7 +535,7 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sinks
                     .iter()
-                    .map(|(key, sink)| (*key, sink))
+                    .map(|(key, sink)| (key, sink))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
@@ -580,6 +596,7 @@ impl<'a> Builder<'a> {
             let cx = SinkContext {
                 healthcheck,
                 globals: self.config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),

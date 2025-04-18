@@ -76,21 +76,21 @@ releases: "0.37.0": {
 			description: """
 				Added support for TCP mode for DNSTAP source. As the `dnstap` source now supports multiple socket types, you will need to update your configuration to specify which type - either `mode: unix` for the existing unix sockets mode or `mode: tcp` for the new tcp mode.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"
 			description: """
 				Added support for more DNS record types (HINFO, CSYNC, OPT, DNSSEC CDS, DNSSEC CDNSKEY, DNSSEC KEY)
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
 			description: """
 				Added support for parsing EDNS EDE (Extended DNS errors) options
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"
@@ -112,14 +112,14 @@ releases: "0.37.0": {
 				Added `lowercase_hostnames` option to `dnstap` source, to filter hostnames in DNS records and
 				lowercase them for consistency.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
 			description: """
 				Added support for `permit_origin` config option for all sources with TCP mode (`fluent`, `logstash`, `statsd`, `syslog`).
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "feat"
@@ -128,7 +128,7 @@ releases: "0.37.0": {
 				City type for unknown types and will instead return an error. New MMDB enrichment table should be
 				used for such types.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "chore"

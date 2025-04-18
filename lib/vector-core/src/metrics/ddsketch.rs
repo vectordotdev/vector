@@ -456,9 +456,7 @@ impl AgentDDSketch {
         // something horribly broken.
         assert!(
             keys.len()
-                <= u32::MAX
-                    .try_into()
-                    .expect("we don't support 16-bit systems")
+                <= TryInto::<usize>::try_into(u32::MAX).expect("we don't support 16-bit systems")
         );
 
         keys.sort_unstable();
@@ -1106,7 +1104,7 @@ mod tests {
     #[cfg(ddsketch_extended)]
     fn generate_pareto_distribution() -> Vec<OrderedFloat<f64>> {
         use ordered_float::OrderedFloat;
-        use rand::thread_rng;
+        use rand::rng;
         use rand_distr::{Distribution, Pareto};
 
         // Generate a set of samples that roughly correspond to the latency of a typical web
@@ -1116,7 +1114,7 @@ mod tests {
         //let distribution = Gamma::new(1.2, 100.0).unwrap();
         let distribution = Pareto::new(1.0, 1.0).expect("pareto distribution should be valid");
         let mut samples = distribution
-            .sample_iter(thread_rng())
+            .sample_iter(rng())
             // Scale by 10,000 to get microseconds.
             .map(|n| n * 10_000.0)
             .filter(|n| *n > 15_000.0 && *n < 10_000_000.0)

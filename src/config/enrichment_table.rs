@@ -2,12 +2,12 @@ use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_lib::config::GlobalOptions;
 use vector_lib::configurable::{configurable_component, Configurable, NamedComponent, ToValue};
-use vector_lib::id::Inputs;
+use vector_lib::id::{ComponentKey, Inputs};
 
 use crate::enrichment_tables::EnrichmentTables;
 
 use super::dot_graph::GraphConfig;
-use super::{SinkConfig, SinkOuter};
+use super::{SinkConfig, SinkOuter, SourceConfig, SourceOuter};
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
@@ -57,15 +57,34 @@ where
     // components to deserialization and build up the components and the topology in a more granular
     // way, with each having "modules" for inputs (making them valid as sinks), for healthchecks,
     // for providing outputs, etc.
-    pub fn as_sink(&self) -> Option<SinkOuter<T>> {
-        self.inner.sink_config().map(|sink| SinkOuter {
-            graph: self.graph.clone(),
-            inputs: self.inputs.clone(),
-            healthcheck_uri: None,
-            healthcheck: Default::default(),
-            buffer: Default::default(),
-            proxy: Default::default(),
-            inner: sink,
+    pub fn as_sink(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SinkOuter<T>)> {
+        self.inner.sink_config(default_key).map(|(key, sink)| {
+            (
+                key,
+                SinkOuter {
+                    graph: self.graph.clone(),
+                    inputs: self.inputs.clone(),
+                    healthcheck_uri: None,
+                    healthcheck: Default::default(),
+                    buffer: Default::default(),
+                    proxy: Default::default(),
+                    inner: sink,
+                },
+            )
+        })
+    }
+
+    pub fn as_source(&self, default_key: &ComponentKey) -> Option<(ComponentKey, SourceOuter)> {
+        self.inner.source_config(default_key).map(|(key, source)| {
+            (
+                key,
+                SourceOuter {
+                    graph: self.graph.clone(),
+                    sink_acknowledgements: false,
+                    proxy: Default::default(),
+                    inner: source,
+                },
+            )
         })
     }
 
@@ -107,7 +126,17 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
         globals: &GlobalOptions,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
 
-    fn sink_config(&self) -> Option<Box<dyn SinkConfig>> {
+    fn sink_config(
+        &self,
+        _default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SinkConfig>)> {
+        None
+    }
+
+    fn source_config(
+        &self,
+        _default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
         None
     }
 }

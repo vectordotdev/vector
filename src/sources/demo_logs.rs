@@ -1,7 +1,7 @@
 use chrono::Utc;
 use fakedata::logs::*;
 use futures::StreamExt;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
@@ -165,7 +165,7 @@ impl OutputFormat {
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because `lines` can't be empty
-        let line = lines.choose(&mut rand::thread_rng()).unwrap();
+        let line = lines.choose(&mut rand::rng()).unwrap();
 
         if sequence {
             format!("{} {}", n, line)

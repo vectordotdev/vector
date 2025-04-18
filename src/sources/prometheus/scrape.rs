@@ -10,6 +10,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::Event};
 
 use super::parser;
+use crate::http::QueryParameters;
 use crate::sources::util::http::HttpMethod;
 use crate::sources::util::http_client::{default_timeout, warn_if_interval_too_low};
 use crate::{
@@ -94,7 +95,7 @@ pub struct PrometheusScrapeConfig {
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_example()"))]
-    query: HashMap<String, Vec<String>>,
+    query: QueryParameters,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
@@ -330,6 +331,7 @@ mod test {
     use super::*;
     use crate::{
         config,
+        http::QueryParameterValue,
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
@@ -572,10 +574,13 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::from([
-                ("key1".to_string(), vec!["val2".to_string()]),
+                (
+                    "key1".to_string(),
+                    QueryParameterValue::MultiParams(vec!["val2".to_string()]),
+                ),
                 (
                     "key2".to_string(),
-                    vec!["val1".to_string(), "val2".to_string()],
+                    QueryParameterValue::MultiParams(vec!["val1".to_string(), "val2".to_string()]),
                 ),
             ]),
             auth: None,

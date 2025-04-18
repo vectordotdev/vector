@@ -47,6 +47,7 @@ use vrl::value::kind::Collection;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::common::http::ErrorMessage;
 use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -58,7 +59,7 @@ use crate::{
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self, util::ErrorMessage},
+    sources::{self},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };

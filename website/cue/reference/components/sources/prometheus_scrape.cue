@@ -66,6 +66,22 @@ components: sources: prometheus_scrape: {
 				but will only take the last value for each tag name specified.
 				"""
 		}
+
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				In query params, key needs to be `match[]` with array of values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							"match[]":
+								- '{job="somejob"}'
+								- '{__name__=~"job:.*"}'
+				```
+				"""
+		}
 	}
 
 	output: metrics: {

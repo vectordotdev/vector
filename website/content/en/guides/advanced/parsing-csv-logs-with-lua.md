@@ -15,8 +15,8 @@ tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 
 {{< /requirement >}}
 
-Vector has many built-in [parsers][urls.vector_parsing_transforms] for structured logs formats. However, when you need
-to ship logs in a custom or application-specific format, [programmable transforms][urls.vector_programmable_transforms]
+Vector has many built-in [parsers][docs.transforms.parser] for structured logs formats. However, when you need
+to ship logs in a custom or application-specific format, [programmable transforms][docs.transforms.lua]
 have got you covered.
 
 This guide walks through reading CSV logs using [`file`][docs.sources.file] source and parsing them using the [`lua`][docs.transforms.lua] transform with a loadable Lua module.
@@ -42,7 +42,7 @@ data_dir = "."
 [sources.file]
   type = "file"
   include = ["*.csv"]
-  start_at_beginning = true
+  ignore_checkpoints = true
 
 [transforms.lua]
   inputs = ["file"]
@@ -249,6 +249,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/
 [docs.transforms.coercer]: /docs/reference/vrl/functions/#coerce-functions
+[docs.transforms.parser]: /docs/reference/vrl/functions/#parse-functions
 [docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#hooks.process
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source
@@ -259,5 +260,3 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
 [urls.lua_tonumber]: https://www.lua.org/manual/5.3/manual.html#pdf-tonumber
 [urls.postgresql_csvlog]: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG
-[urls.vector_parsing_transforms]: /components/?functions%5B%5D=parse
-[urls.vector_programmable_transforms]: /components/?functions%5B%5D=program

@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   test-cli:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
@@ -44,7 +44,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test-cli

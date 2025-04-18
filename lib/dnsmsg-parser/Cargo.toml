@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-data-encoding = "2.7"
+data-encoding = "2.8"
 hickory-proto.workspace = true
 snafu.workspace = true
 

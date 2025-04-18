@@ -71,8 +71,10 @@ Vector**][docs.installation].
 
 * **Configuration**
   * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [many more...][docs.sources]
-  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [geoip][docs.transforms.geoip], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap], and [many more...][docs.transforms]
+  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap],
+    and [many more...][docs.transforms]
   * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [many more...][docs.sinks]
+  * [**Enrichment Tables**][docs.configuration.enrichment_tables]
   * [**Unit tests**][docs.configuration.tests]
 * [**Remap Language**][docs.reference.vrl]
 * [**API**][docs.reference.api]
@@ -168,6 +170,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.configuration.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.configuration.tests]: https://vector.dev/docs/reference/configuration/tests/
 [docs.configuration.transforms]: https://vector.dev/docs/reference/configuration/transforms/
+[docs.configuration.enrichment_tables]: https://vector.dev/docs/reference/configuration/global-options/#enrichment_tables
 [docs.data-model.log]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/
 [docs.data-model.metric]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/
 [docs.deployment.roles]: https://vector.dev/docs/setup/deployment/roles/

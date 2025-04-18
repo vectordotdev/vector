@@ -14,6 +14,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 
+use crate::common::http::ErrorMessage;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::log_schema,
@@ -28,7 +29,7 @@ use crate::{
             ddmetric_proto::{metric_payload, Metadata, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::{extract_tag_key_and_value, ErrorMessage},
+        util::extract_tag_key_and_value,
     },
     SourceSender,
 };

@@ -46,7 +46,7 @@ releases: "0.38.0": {
 			description: """
 				Support was added for additional config options for `length_delimited` framing.
 				"""
-			contributors: ["esensar"]
+			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"

@@ -18,10 +18,12 @@ use crate::{
     template::Template,
 };
 
-// Estimated maximum size of InputLogEvent with an empty message
+// Estimated maximum size of InputLogEvent is 50 bytes with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
-const MAX_EVENT_SIZE: usize = 256 * 1024;
-const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
+// Batch request overhead is added now that a single event can reach max batch size
+const BATCH_SIZE_OVERHEAD: usize = 26;
+const MAX_EVENT_SIZE: usize = 1024 * 1024;
+const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD - BATCH_SIZE_OVERHEAD;
 
 #[derive(Clone)]
 pub struct CloudwatchRequest {
@@ -99,7 +101,7 @@ impl CloudwatchRequestBuilder {
         }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
-        if message.len() > MAX_MESSAGE_SIZE {
+        if message.len() >= MAX_MESSAGE_SIZE {
             emit!(AwsCloudwatchLogsMessageSizeError {
                 size: message.len(),
                 max_size: MAX_MESSAGE_SIZE,
@@ -127,7 +129,7 @@ impl CloudwatchRequestBuilder {
 /// source: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html>
 impl ByteSizeOf for CloudwatchRequest {
     fn size_of(&self) -> usize {
-        self.message.len() + 26
+        self.message.len() + BATCH_SIZE_OVERHEAD
     }
 
     fn allocated_bytes(&self) -> usize {
@@ -141,7 +143,7 @@ mod tests {
     use vector_lib::config::log_schema;
     use vector_lib::event::LogEvent;
 
-    use super::CloudwatchRequestBuilder;
+    use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
 
     #[test]
     fn test() {
@@ -159,5 +161,23 @@ mod tests {
         let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
+    }
+
+    #[test]
+    fn test_rejects_oversized_log_event() {
+        let mut request_builder = CloudwatchRequestBuilder {
+            group_template: "group".try_into().unwrap(),
+            stream_template: "stream".try_into().unwrap(),
+            transformer: Default::default(),
+            encoder: Default::default(),
+        };
+
+        let timestamp = Utc::now();
+        let oversized = "X".repeat(MAX_MESSAGE_SIZE + 1);
+        let mut event = LogEvent::from(oversized);
+        event.insert(log_schema().timestamp_key_target_path().unwrap(), timestamp);
+
+        let request = request_builder.build(event.into());
+        assert!(request.is_none(), "Expected None for oversized log event");
     }
 }

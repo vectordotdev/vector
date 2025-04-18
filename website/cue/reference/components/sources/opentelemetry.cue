@@ -39,11 +39,7 @@ components: sources: opentelemetry: {
 
 	support: {
 		requirements: []
-		warnings: [
-			"""
-				The `opentelemetry` source only supports log and trace events at this time.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
@@ -64,6 +60,12 @@ components: sources: opentelemetry: {
 			name: "traces"
 			description: """
 				Received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
+				"""
+		},
+		{
+			name: "metrics"
+			description: """
+				Received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
 				"""
 		},
 	]
@@ -254,6 +256,19 @@ components: sources: opentelemetry: {
 			title: "Ingest OTLP traces"
 			body: """
 				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
+				"""
+		}
+		metrics: {
+			title: "Ingest metrics"
+			body: """
+				Metrics support is experimental and subject to change due to structural differences between the internal Vector metric data model and OpenTelemetry.
+				If aggregation temporality is supported for an OpenTelemetry metric type, it influences the corresponding Vector metric kind as follows: If temporality is set to Delta, the metric kind is Incremental; otherwise, it is Absolute.
+				Metric type mappings:
+				Gauge is mapped to a Vector Gauge;
+				Sum is mapped to a Vector Counter if `is_monotonic` is true, to Vector Gauge if `is_monotonic` is false;
+				Histogram is mapped to a Vector AggregatedHistogram;
+				Exponential Histogram is also mapped to a Vector AggregatedHistogram, bucket boundaries are reconstructed from the exponential scale;
+				Summary is mapped to a Vector Aggregated Summary.
 				"""
 		}
 	}

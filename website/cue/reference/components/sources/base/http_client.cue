@@ -518,13 +518,13 @@ base: components: sources: http_client: configuration: {
 		required: false
 		type: object: {
 			examples: [{
-				field: ["value"]
+				field: "value"
 				fruit: ["mango", "papaya", "kiwi"]
 			}]
 			options: "*": {
 				description: "A query string parameter and it's value(s)."
 				required:    true
-				type: array: items: type: string: {}
+				type: string: {}
 			}
 		}
 	}

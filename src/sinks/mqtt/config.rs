@@ -175,7 +175,7 @@ pub enum ConfigurationError {
 impl MqttSinkConfig {
     fn build_connector(&self) -> Result<MqttConnector, MqttError> {
         let client_id = self.client_id.clone().unwrap_or_else(|| {
-            let hash = rand::thread_rng()
+            let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
                 .take(6)
                 .map(char::from)

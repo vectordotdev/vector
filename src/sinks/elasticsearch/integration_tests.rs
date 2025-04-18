@@ -16,7 +16,7 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
-    http::HttpClient,
+    http::{HttpClient, QueryParameterValue},
     sinks::{
         util::{auth::Auth, BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
@@ -133,7 +133,10 @@ async fn ensure_pipeline_in_params() {
         .await
         .expect("Config error");
 
-    assert_eq!(common.query_params["pipeline"], pipeline);
+    assert_eq!(
+        common.query_params["pipeline"],
+        QueryParameterValue::SingleParam(pipeline)
+    );
 }
 
 #[tokio::test]

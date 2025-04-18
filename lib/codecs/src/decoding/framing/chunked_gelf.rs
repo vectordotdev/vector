@@ -511,7 +511,6 @@ impl Decoder for ChunkedGelfDecoder {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use bytes::{BufMut, BytesMut};
     use flate2::{write::GzEncoder, write::ZlibEncoder};
@@ -734,7 +733,7 @@ mod tests {
 
     #[tokio::test]
     async fn decode_shuffled_messages() {
-        let mut rng = SmallRng::seed_from_u64(420);
+        let mut rng = SmallRng::seed_from_u64(42);
         let total_chunks = 100u8;
         let first_message_id = 1u64;
         let first_payload = "first payload";
@@ -1065,7 +1064,7 @@ mod tests {
     async fn decode_malformed_zlib_message() {
         let mut compressed_payload = BytesMut::new();
         compressed_payload.extend(ZLIB_MAGIC);
-        compressed_payload.extend(&[0x9c, 0x12, 0x34, 0x56]);
+        compressed_payload.extend(&[0x9c, 0x12, 0x00, 0xFF]);
         let mut decoder = ChunkedGelfDecoder::default();
 
         let error = decoder

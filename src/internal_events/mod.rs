@@ -127,6 +127,10 @@ mod udp;
 mod unix;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
+#[cfg(feature = "sinks-websocket-server")]
+mod websocket_server;
+#[cfg(feature = "transforms-window")]
+mod window;
 
 #[cfg(any(
     feature = "sources-file",
@@ -261,6 +265,10 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
+#[cfg(feature = "sinks-websocket-server")]
+pub(crate) use self::websocket_server::*;
+#[cfg(feature = "transforms-window")]
+pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub use self::{

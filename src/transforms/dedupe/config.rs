@@ -93,7 +93,7 @@ mod tests {
         crate::test_util::test_generate_config::<DedupeConfig>();
     }
 
-    fn make_match_transform_config(
+    const fn make_match_transform_config(
         num_events: usize,
         fields: Vec<ConfigTargetPath>,
     ) -> DedupeConfig {

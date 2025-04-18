@@ -99,7 +99,7 @@ base: components: sources: prometheus_scrape: configuration: {
 			options: "*": {
 				description: "A query string parameter."
 				required:    true
-				type: array: items: type: string: {}
+				type: string: {}
 			}
 		}
 	}

@@ -10,6 +10,7 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
+use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::config::LogNamespace;
@@ -322,7 +323,7 @@ impl HostMetricsConfig {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
-        let generator = HostMetrics::new(self);
+        let mut generator = HostMetrics::new(self);
 
         let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
@@ -349,6 +350,7 @@ impl HostMetricsConfig {
 
 pub struct HostMetrics {
     config: HostMetricsConfig,
+    system: System,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -359,6 +361,7 @@ impl HostMetrics {
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
+            system: System::new(),
             events_received: register!(EventsReceived),
         }
     }
@@ -369,6 +372,7 @@ impl HostMetrics {
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
+            system: System::new(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
@@ -378,7 +382,7 @@ impl HostMetrics {
         MetricsBuffer::new(self.config.namespace.clone())
     }
 
-    async fn capture_metrics(&self) -> Vec<Metric> {
+    async fn capture_metrics(&mut self) -> Vec<Metric> {
         let mut buffer = self.buffer();
 
         #[cfg(target_os = "linux")]

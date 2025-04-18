@@ -81,8 +81,14 @@ impl TypedComponent {
         self.component_name.as_ref().map(|component_name| {
             let config_ty = &input.ident;
             let desc_ty: syn::Type = match self.component_type {
+                ComponentType::Api => {
+                    parse_quote! { ::vector_config::component::ApiDescription }
+                }
                 ComponentType::EnrichmentTable => {
                     parse_quote! { ::vector_config::component::EnrichmentTableDescription }
+                }
+                ComponentType::GlobalOption => {
+                    parse_quote! { ::vector_config::component::GlobalOptionDescription }
                 }
                 ComponentType::Provider => {
                     parse_quote! { ::vector_config::component::ProviderDescription }
@@ -347,7 +353,9 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
 /// derive for `NamedComponent`.
 fn get_named_component_helper_ident(component_type: ComponentType) -> Ident {
     let attr = match component_type {
+        ComponentType::Api => attrs::API_COMPONENT,
         ComponentType::EnrichmentTable => attrs::ENRICHMENT_TABLE_COMPONENT,
+        ComponentType::GlobalOption => attrs::GLOBAL_OPTION_COMPONENT,
         ComponentType::Provider => attrs::PROVIDER_COMPONENT,
         ComponentType::Secrets => attrs::SECRETS_COMPONENT,
         ComponentType::Sink => attrs::SINK_COMPONENT,
