@@ -2376,6 +2376,7 @@ mod tests {
                         schema_definitions: Default::default(),
                         schema: Default::default(),
                         extra_context: Default::default(),
+                        enrichment_tables: Default::default(),
                     },
                     client,
                 )
