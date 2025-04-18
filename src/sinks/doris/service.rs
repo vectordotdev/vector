@@ -10,7 +10,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::ServiceExt;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
@@ -78,7 +78,7 @@ pub struct HttpRequestBuilder {
 impl HttpRequestBuilder {
     pub fn new(common: &DorisCommon, config: &DorisConfig) -> HttpRequestBuilder {
         let auth = common.auth.clone().map(|http_auth| Auth::Basic(http_auth));
-
+        
         // Create and set headers
         let mut headers = HashMap::new();
         // Basic headers
@@ -87,24 +87,23 @@ impl HttpRequestBuilder {
             "Content-Type".to_string(),
             "text/plain;charset=utf-8".to_string(),
         );
-
+        
         // Add line delimiter header (if non-default)
         if !config.line_delimiter.is_empty() && config.line_delimiter != "\n" {
             headers.insert("line_delimiter".to_string(), config.line_delimiter.clone());
         }
-
+        
         // Add custom headers
         for (k, v) in &config.headers {
             headers.insert(k.clone(), v.clone());
         }
-
+        
         HttpRequestBuilder {
             auth,
             compression: config.compression.clone(),
             http_request_config: config.request.clone(),
             base_url: common.base_url.clone(),
             label_prefix: config.label_prefix.clone(),
-            // http_client: None,
             headers,
         }
     }
@@ -115,14 +114,14 @@ impl HttpRequestBuilder {
     ) -> Result<Request<Bytes>, crate::Error> {
         let database = &doris_req.partition_key.database;
         let table = &doris_req.partition_key.table;
-
+        
         debug!(
             message = "Building Doris Stream Load request",
             database = %database,
             table = %table,
             payload_size = doris_req.payload.len()
         );
-
+        
         // Generate a unique label
         let label = format!(
             "{}_{}_{}_{}_{}",
@@ -193,7 +192,7 @@ impl HttpRequestBuilder {
         for (header, value) in &self.headers {
             builder = builder.header(&header[..], &value[..]);
         }
-
+        
         // Add custom headers from http_request_config (for compatibility)
         for (header, value) in &self.http_request_config.headers {
             builder = builder.header(&header[..], &value[..]);
@@ -210,12 +209,21 @@ impl HttpRequestBuilder {
 
         // Apply authentication if configured
         if let Some(auth) = &self.auth {
-            if let Auth::Basic(http_auth) = auth {
+            match auth {
+                Auth::Basic(http_auth) => {
                 http_auth.apply(&mut request);
-                debug!(
-                    message = "Applied Basic authentication to request.",
-                    uri = %request.uri()
-                );
+                    debug!(
+                        message = "Applied Basic authentication to request.",
+                        uri = %request.uri()
+                    );
+                },
+                #[allow(unreachable_patterns)]
+                _ => {
+                    warn!(
+                        message = "Unsupported authentication type for Doris. Only Basic auth is supported.",
+                        uri = %request.uri()
+                    );
+                }
             }
         }
 
@@ -233,6 +241,7 @@ impl HttpRequestBuilder {
 pub struct DorisResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
+    #[allow(dead_code)]
     pub events_byte_size: GroupedCountByteSize,
 }
 
@@ -295,39 +304,57 @@ impl Service<DorisRequest> for DorisService {
         let mut http_service = self.batch_service.clone();
         let log_request = self.log_request;
         let reporter = Arc::clone(&self.reporter);
-
+        
+        // 在此处获取finalizers，而不是在异步闭包内
+        // 这确保我们可以先获取finalizers并在未来返回的响应中直接更新它们
+        let extracted_finalizers = req.take_finalizers();
+        
         Box::pin(async move {
             // Ensure service is ready
             http_service.ready().await?;
-
+            
             // Process metadata and byte size calculation
             let events_byte_size =
                 std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
 
-            // Create the current request and track visited URLs to prevent redirect loops
-            let mut current_req = req;
+            // 保存原始请求的分区键，因为我们需要在多个重定向间保留这些信息
+            let db_name = req.partition_key.database.clone();
+            let table_name = req.partition_key.table.clone();
+            
+            // 保存原始URL和负载，以便在重定向时使用
+            let original_redirect_url = req.redirect_url.clone();
+            let original_payload = req.payload.clone();
+            
+            // 创建将要发送的请求 - 不包含finalizers因为我们已经提取了它们
+            let request_to_send = DorisRequest {
+                payload: req.payload,
+                finalizers: EventFinalizers::default(), // 空的finalizers
+                metadata: req.metadata,
+                partition_key: req.partition_key,
+                redirect_url: original_redirect_url.clone(),
+            };
+            
+            // 发送初始请求
+            let mut http_response = http_service.call(request_to_send).await?;
+            let mut status = http_response.status();
+            
+            // 跟踪重定向URL和计数器
             let mut redirect_count = 0;
             let mut visited_urls = HashSet::new();
             const MAX_REDIRECTS: u8 = 3;
-
-            // Record initial URL
-            if let Some(url) = &current_req.redirect_url {
+            
+            // 记录初始URL
+            if let Some(url) = &original_redirect_url {
                 visited_urls.insert(url.clone());
             }
-
-            // Send initial request
-            let mut http_response = http_service.call(current_req.clone()).await?;
-
-            // Check if received a redirect response
-            let mut status = http_response.status();
-
-            // Handle redirects
+            
+            // 处理重定向循环
             while (status == StatusCode::TEMPORARY_REDIRECT
                 || status == StatusCode::PERMANENT_REDIRECT
                 || status == StatusCode::FOUND)
                 && redirect_count < MAX_REDIRECTS
             {
-                // Try to get redirect location
+                // 获取重定向位置
                 if let Some(location) = http_response.headers().get(http::header::LOCATION) {
                     if let Ok(location_str) = location.to_str() {
                         debug!(
@@ -336,29 +363,34 @@ impl Service<DorisRequest> for DorisService {
                             to = %location_str,
                             redirect_count = redirect_count + 1
                         );
-
-                        // Check for redirect loops
+                        
+                        // 检查重定向循环
                         if !visited_urls.insert(location_str.to_string()) {
                             return Err(crate::Error::from("Detected redirect loop"));
                         }
 
-                        // Create a new DorisRequest using the redirect URL
+                        // 创建带重定向URL的新请求
                         let redirect_req = DorisRequest {
+                            // 使用原始请求的payload，而不是响应体
+                            // 重定向应该保持原始负载不变，只是改变目标URL
+                            payload: original_payload.clone(),
+                            finalizers: EventFinalizers::default(), // 使用空的finalizers，我们已经提取了原始的finalizers
+                            metadata: RequestMetadata::default(),
+                            partition_key: DorisPartitionKey {
+                                database: db_name.clone(),
+                                table: table_name.clone(),
+                            },
                             redirect_url: Some(location_str.to_string()),
-                            ..current_req.clone()
                         };
 
-                        // Send redirect request
+                        // 发送重定向请求
                         http_service.ready().await?;
-                        http_response = http_service.call(redirect_req.clone()).await?;
+                        http_response = http_service.call(redirect_req).await?;
                         status = http_response.status();
-
-                        // Update current request to redirect request
-                        current_req = redirect_req;
-
-                        // Increment redirect count
+                        
+                        // 增加重定向计数器
                         redirect_count += 1;
-
+                        
                         debug!(
                             message = "Received response after redirect",
                             new_status = %status,
@@ -376,7 +408,7 @@ impl Service<DorisRequest> for DorisService {
                 }
             }
 
-            // Check if exceeded maximum redirects
+            // 检查是否超过最大重定向次数
             if redirect_count >= MAX_REDIRECTS {
                 return Err(crate::Error::from(format!(
                     "Exceeded maximum number of redirects ({})",
@@ -384,26 +416,23 @@ impl Service<DorisRequest> for DorisService {
                 )));
             }
 
-            // Process final response
-            let event_status = get_event_status(&http_response);
-
-            // Log final response body - regardless of success or failure
+            // 处理最终响应
+            let body = http_response.body();
+            let body_str = String::from_utf8_lossy(body);
             if log_request {
-                let body = http_response.body();
-                let body_str = String::from_utf8_lossy(body);
                 info!(
                     message = "Doris stream load response received.",
                     status_code = %status,
                     response = %body_str
                 );
 
-                // If response is successful, try to parse response body and update progress statistics
+                // 如果响应成功，尝试解析响应体并更新进度统计
                 if status.is_success() {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
                         if let Some(status_value) = json.get("Status") {
                             if let Some(status_str) = status_value.as_str() {
                                 if status_str == "Success" {
-                                    // Update byte count statistics
+                                    // 更新字节计数统计
                                     if let Some(load_bytes) =
                                         json.get("LoadBytes").and_then(|b| b.as_i64())
                                     {
@@ -414,7 +443,7 @@ impl Service<DorisRequest> for DorisService {
                                         );
                                     }
 
-                                    // Update row count statistics
+                                    // 更新行计数统计
                                     if let Some(loaded_rows) =
                                         json.get("NumberLoadedRows").and_then(|r| r.as_i64())
                                     {
@@ -425,7 +454,7 @@ impl Service<DorisRequest> for DorisService {
                                         );
                                     }
 
-                                    // Update filtered rows count statistics
+                                    // 更新过滤行计数统计
                                     if let Some(filtered_rows) =
                                         json.get("NumberFilteredRows").and_then(|r| r.as_i64())
                                     {
@@ -437,6 +466,7 @@ impl Service<DorisRequest> for DorisService {
                                             );
                                         }
                                     }
+
                                 }
                             }
                         }
@@ -444,6 +474,18 @@ impl Service<DorisRequest> for DorisService {
                 }
             }
 
+            // 处理最终响应状态
+            let event_status = get_event_status(&http_response);
+
+            // 添加debug日志，输出event_status
+            info!(message = "Event status for request", event_status = ?event_status, status_code = ?status);
+
+            // 直接更新我们在闭包外提取的原始finalizers
+            // 这是关键改变 - 确保finalizers被正确更新而不依赖于谁在何时调用take_finalizers
+            extracted_finalizers.update_status(event_status);
+
+
+            // 创建响应对象
             Ok(DorisResponse {
                 event_status,
                 http_response,
@@ -530,5 +572,159 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
                 return EventStatus::Rejected;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use vector_common::sensitive_string::SensitiveString;
+    use super::*;
+    use crate::sinks::doris::sink::DorisPartitionKey;
+    use crate::http::Auth as HttpAuth;
+    use vector_lib::request_metadata::RequestMetadata;
+
+    fn create_test_request() -> DorisRequest {
+        DorisRequest {
+            payload: Bytes::from("test payload"),
+            finalizers: EventFinalizers::default(),
+            metadata: RequestMetadata::default(),
+            partition_key: DorisPartitionKey {
+                database: "test_db".to_string(),
+                table: "test_table".to_string(),
+            },
+            redirect_url: None,
+        }
+    }
+
+    #[test]
+    fn test_event_status() {
+        // Test success status
+        let success_response = Response::builder()
+            .status(StatusCode::OK)
+            .body(Bytes::from(r#"{"Status": "Success"}"#))
+            .unwrap();
+        assert_eq!(get_event_status(&success_response), EventStatus::Delivered);
+
+        // Test failure status
+        let failure_response = Response::builder()
+            .status(StatusCode::OK)
+            .body(Bytes::from(r#"{"Status": "Failed"}"#))
+            .unwrap();
+        assert_eq!(get_event_status(&failure_response), EventStatus::Rejected);
+
+        // Test server error
+        let server_error = Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Bytes::from("Server Error"))
+            .unwrap();
+        assert_eq!(get_event_status(&server_error), EventStatus::Errored);
+
+        // Test client error
+        let client_error = Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(Bytes::from("Bad Request"))
+            .unwrap();
+        assert_eq!(get_event_status(&client_error), EventStatus::Rejected);
+    }
+    
+    #[tokio::test]
+    async fn test_build_request() {
+        // 1. 测试基本请求构建
+        let basic_builder = HttpRequestBuilder {
+            auth: None,
+            compression: Compression::None,
+            http_request_config: RequestConfig::default(),
+            base_url: "http://localhost:8030".to_string(),
+            label_prefix: "test".to_string(),
+            headers: HashMap::new(),
+        };
+        
+        let request = create_test_request();
+        let http_request = basic_builder.build_request(request).await.unwrap();
+        
+        // 验证基本请求属性
+        assert_eq!(http_request.method(), Method::PUT);
+        assert_eq!(
+            http_request.uri().to_string(),
+            "http://localhost:8030/api/test_db/test_table/_stream_load"
+        );
+        assert!(http_request.headers().get("label").is_some());
+        assert!(http_request.headers().get("Expect").is_some());
+        assert_eq!(
+            http_request.headers().get("Content-Type").unwrap().to_str().unwrap(),
+            "text/plain;charset=utf-8"
+        );
+        
+        // 2. 测试带有认证的请求
+        let auth_builder = HttpRequestBuilder {
+            auth: Some(Auth::Basic(HttpAuth::Basic {
+                user: "user".into(),
+                password: SensitiveString::from("pass".to_string())
+            })),
+            compression: Compression::None,
+            http_request_config: RequestConfig::default(),
+            base_url: "http://localhost:8030".to_string(),
+            label_prefix: "test".to_string(),
+            headers: HashMap::new(),
+        };
+        
+        let request = create_test_request();
+        let http_request = auth_builder.build_request(request).await.unwrap();
+        
+        // 验证认证头
+        assert!(http_request.headers().get("authorization").is_some());
+        
+        // 3. 测试带有压缩的请求
+        let compression_builder = HttpRequestBuilder {
+            auth: None,
+            compression: Compression::Gzip(Default::default()),
+            http_request_config: RequestConfig::default(),
+            base_url: "http://localhost:8030".to_string(),
+            label_prefix: "test".to_string(),
+            headers: HashMap::new(),
+        };
+        
+        let request = create_test_request();
+        let http_request = compression_builder.build_request(request).await.unwrap();
+        
+        // 验证压缩头
+        assert_eq!(
+            http_request.headers().get("Content-Encoding").unwrap().to_str().unwrap(),
+            "gzip"
+        );
+        
+        // 4. 测试带有自定义头的请求
+        let mut custom_headers = HashMap::new();
+        custom_headers.insert("X-Custom-Header".to_string(), "custom-value".to_string());
+        
+        let custom_headers_builder = HttpRequestBuilder {
+            auth: None,
+            compression: Compression::None,
+            http_request_config: RequestConfig::default(),
+            base_url: "http://localhost:8030".to_string(),
+            label_prefix: "test".to_string(),
+            headers: custom_headers,
+        };
+        
+        let request = create_test_request();
+        let http_request = custom_headers_builder.build_request(request).await.unwrap();
+        
+        // 验证自定义头
+        assert_eq!(
+            http_request.headers().get("X-Custom-Header").unwrap().to_str().unwrap(),
+            "custom-value"
+        );
+        
+        // 5. 测试重定向URL
+        let mut redirect_request = create_test_request();
+        redirect_request.redirect_url = Some("http://redirect.example.com:8030/api/test_db/test_table/_stream_load".to_string());
+        
+        let http_request = basic_builder.build_request(redirect_request).await.unwrap();
+        
+        // 验证重定向URL
+        assert_eq!(
+            http_request.uri().to_string(),
+            "http://redirect.example.com:8030/api/test_db/test_table/_stream_load"
+        );
     }
 }

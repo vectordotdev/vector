@@ -2,13 +2,25 @@ use crate::codecs::Encoder;
 use crate::http::{Auth, MaybeAuth};
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
 use crate::sinks::doris::DorisConfig;
-use crate::sinks::elasticsearch::{InvalidHostSnafu, ParseError};
 use crate::sinks::prelude::Compression;
 use crate::sinks::util::UriSerde;
 use crate::tls::TlsSettings;
 use http::Uri;
-use snafu::ResultExt;
+use snafu::prelude::*;
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+
+// 定义与 elasticsearch 同样的错误类型，避免依赖 elasticsearch 模块
+#[derive(Debug, Snafu)]
+pub enum ParseError {
+    #[snafu(display("Invalid host: {}, host must include hostname", host))]
+    HostMustIncludeHostname { host: String },
+}
+
+#[derive(Debug, Snafu)]
+pub struct InvalidHostError {
+    host: String,
+    source: http::uri::InvalidUri,
+}
 
 #[derive(Debug, Clone)]
 pub struct DorisCommon {
@@ -23,7 +35,7 @@ impl DorisCommon {
         let uri = format!("{}/_test", endpoint);
         let uri = uri
             .parse::<Uri>()
-            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
+            .context(InvalidHostSnafu { host: endpoint })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
                 host: endpoint.to_string(),

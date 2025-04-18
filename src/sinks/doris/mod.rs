@@ -17,4 +17,8 @@ mod retry;
 mod service;
 mod sink;
 
+#[cfg(test)]
+// #[cfg(feature = "doris-integration-tests")]
+mod integration_test;
+
 pub use self::config::DorisConfig;
