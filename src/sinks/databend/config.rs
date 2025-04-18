@@ -131,6 +131,7 @@ impl SinkConfig for DatabendConfig {
                 return Err("Bearer authentication is not supported currently".into());
             }
             None => {}
+            _ => {}
         }
         if let Some(database) = &self.database {
             endpoint.set_path(&format!("/{}", database));
