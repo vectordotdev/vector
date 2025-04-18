@@ -233,7 +233,7 @@ fn try_compile_vrl(param: &str, re: &Regex, functions: &Vec<Box<dyn Function>>) 
         Ok(result) => Some(result.program),
         Err(e) => {
             let error = Formatter::new(&raw, e).colored().to_string();
-            warn!(message = "VRL compilation failed", %error);
+            warn!(message = "VRL compilation failed.", %error);
             None
         }
     }
