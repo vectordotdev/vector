@@ -513,11 +513,17 @@ impl IngestorProcess {
         // Should consider removing failed deferrals from the delete_entries
         if !deferred_entries.is_empty() {
             let Some(deferred) = &self.state.deferred else {
-                warn!(message = "Deferred queue not configured, but received deferred entries.");
+                warn!(
+                    message = "Deferred queue not configured, but received deferred entries.",
+                    internal_log_rate_limit = true
+                );
                 return;
             };
             let cloned_entries = deferred_entries.clone();
-            match self.send_messages(deferred_entries, deferred.queue_url.clone()).await {
+            match self
+                .send_messages(deferred_entries, deferred.queue_url.clone())
+                .await
+            {
                 Ok(result) => {
                     if !result.successful.is_empty() {
                         emit!(SqsMessageSentSucceeded {
