@@ -384,7 +384,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.10", default-features = false }
-sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
+sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "mysql", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -811,7 +811,9 @@ sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
-sinks-doris = []
+sinks-doris = [
+  "dep:sqlx"
+]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
@@ -865,6 +867,7 @@ all-integration-tests = [
   "datadog-traces-integration-tests",
   "dnstap-integration-tests",
   "docker-logs-integration-tests",
+  "doris-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
@@ -929,6 +932,9 @@ datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+doris-integration-tests = [
+  "dep:sqlx"
+]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]

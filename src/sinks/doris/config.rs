@@ -389,3 +389,149 @@ impl DorisConfig {
         Ok(healthcheck)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DorisConfig>();
+    }
+
+    #[test]
+    fn test_build_uri() {
+        assert_eq!(
+            build_uri("http", "/api/bootstrap", "localhost", 8030).unwrap().to_string(),
+            "http://localhost:8030/api/bootstrap"
+        );
+        assert_eq!(
+            build_uri("https", "/api/test", "example.com", 443).unwrap().to_string(),
+            "https://example.com:443/api/test"
+        );
+    }
+
+    #[test]
+    fn test_get_http_scheme_host() {
+        let result = get_http_scheme_host("http://localhost:8030").unwrap();
+        assert_eq!(result.scheme, "http");
+        assert_eq!(result.host, "localhost");
+        assert_eq!(result.port, Some(8030));
+
+        let result = get_http_scheme_host("https://example.com").unwrap();
+        assert_eq!(result.scheme, "https");
+        assert_eq!(result.host, "example.com");
+        assert_eq!(result.port, None);
+    }
+
+    #[test]
+    fn test_default_values() {
+        assert_eq!(default_label_prefix(), "vector");
+        assert_eq!(default_line_delimiter(), "\n");
+        assert_eq!(default_log_request(), true);
+        assert_eq!(default_log_progress_interval(), 10);
+        assert_eq!(default_max_retries(), -1);
+    }
+
+    #[test]
+    fn parse_config_with_defaults() {
+        let config: DorisConfig = toml::from_str(
+            r#"
+            endpoints = ["http://localhost:8030"]
+            database = "test_db"
+            table = "test_table"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.endpoints, vec!["http://localhost:8030"]);
+        assert_eq!(config.database.to_string(), "test_db");
+        assert_eq!(config.table.to_string(), "test_table");
+        assert_eq!(config.label_prefix, "vector");
+        assert_eq!(config.line_delimiter, "\n");
+        assert!(config.log_request);
+        assert_eq!(config.log_progress_interval, 10);
+        assert_eq!(config.max_retries, -1);
+    }
+
+    #[test]
+    fn parse_config_with_custom_values() {
+        let config: DorisConfig = toml::from_str(
+            r#"
+            endpoints = ["http://doris1:8030", "http://doris2:8030"]
+            database = "custom_db"
+            table = "custom_table"
+            label_prefix = "custom_prefix"
+            line_delimiter = "\r\n"
+            log_request = false
+            log_progress_interval = 30
+            max_retries = 5
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.endpoints, vec!["http://doris1:8030", "http://doris2:8030"]);
+        assert_eq!(config.database.to_string(), "custom_db");
+        assert_eq!(config.table.to_string(), "custom_table");
+        assert_eq!(config.label_prefix, "custom_prefix");
+        assert_eq!(config.line_delimiter, "\r\n");
+        assert!(!config.log_request);
+        assert_eq!(config.log_progress_interval, 30);
+        assert_eq!(config.max_retries, 5);
+    }
+
+    #[test]
+    fn parse_config_with_auth() {
+        let config: DorisConfig = toml::from_str(
+            r#"
+            endpoints = ["http://localhost:8030"]
+            database = "test_db"
+            table = "test_table"
+            auth.strategy = "basic"
+            auth.user = "admin"
+            auth.password = "password"
+            "#,
+        )
+        .unwrap();
+
+        assert!(config.auth.is_some());
+        if let Some(Auth::Basic { user, password }) = &config.auth {
+            assert_eq!(user, "admin");
+            assert_eq!(password.inner(), "password");
+        } else {
+            panic!("Expected Basic auth");
+        }
+    }
+
+    #[test]
+    fn parse_config_with_custom_headers() {
+        let config: DorisConfig = toml::from_str(
+            r#"
+            endpoints = ["http://localhost:8030"]
+            database = "test_db"
+            table = "test_table"
+            [headers]
+            "X-Custom-Header" = "custom_value"
+            "Content-Type" = "application/json"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.headers.len(), 2);
+        assert_eq!(config.headers.get("X-Custom-Header").unwrap(), "custom_value");
+        assert_eq!(config.headers.get("Content-Type").unwrap(), "application/json");
+    }
+
+    #[test]
+    fn parse_distribution() {
+        toml::from_str::<DorisConfig>(
+            r#"
+            endpoints = ["", ""]
+            database = "test_db"
+            table = "test_table"
+            distribution.retry_initial_backoff_secs = 10
+        "#,
+        ) .unwrap();
+    }
+
+}

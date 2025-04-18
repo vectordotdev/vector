@@ -1,0 +1,18 @@
+version: "3"
+services:
+  fe:
+    image: apache/doris.fe-ubuntu:${CONFIG_VERSION}
+    hostname: fe
+    environment:
+      - FE_SERVERS=fe1:127.0.0.1:9010
+      - FE_ID=1
+    network_mode: host
+  be:
+    image: apache/doris.be-ubuntu:${CONFIG_VERSION}
+    hostname: be
+    environment:
+      - FE_SERVERS=fe1:127.0.0.1:9010
+      - BE_ADDR=127.0.0.1:9050
+    depends_on:
+      - fe
+    network_mode: host
