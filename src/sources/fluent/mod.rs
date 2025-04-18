@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -239,7 +238,7 @@ pub struct FluentUnixConfig {
     ///
     /// This should be an absolute path.
     #[configurable(metadata(docs::examples = "/path/to/socket"))]
-    pub path: PathBuf,
+    pub path: std::path::PathBuf,
 
     /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
     ///
