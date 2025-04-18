@@ -61,7 +61,7 @@ pub use loading::{
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
-pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
+pub use source::{BoxedSource, SourceConfig, SourceConfigTest, SourceContext, SourceOuter};
 pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
