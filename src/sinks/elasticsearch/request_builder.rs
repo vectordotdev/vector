@@ -26,6 +26,7 @@ pub struct Metadata {
     finalizers: EventFinalizers,
     batch_size: usize,
     events_byte_size: JsonSize,
+    original_events: Vec<ProcessedEvent>,
 }
 
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
@@ -60,6 +61,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             finalizers: events.take_finalizers(),
             batch_size: events.len(),
             events_byte_size,
+            original_events: events.clone(),
         };
         (es_metadata, metadata_builder, events)
     }
@@ -76,6 +78,8 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             batch_size: es_metadata.batch_size,
             events_byte_size: es_metadata.events_byte_size,
             metadata,
+            original_events: es_metadata.original_events,
+            elasticsearch_request_builder: self.clone(),
         }
     }
 }
