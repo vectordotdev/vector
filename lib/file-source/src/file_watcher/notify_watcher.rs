@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use tracing::{error, trace};
@@ -9,16 +8,9 @@ use crate::FilePosition;
 
 /// Represents the state of a file being watched by the notify-based watcher
 #[derive(Debug)]
-#[allow(dead_code)]
-pub struct NotifyWatcherState {
+struct FileState {
     /// Path to the file being watched
-    pub path: PathBuf,
-    /// Last known position in the file
-    pub file_position: FilePosition,
-    /// Last time the file was seen
-    pub last_seen: Instant,
-    /// Whether the file is currently being actively watched
-    pub is_active: bool,
+    path: PathBuf,
 }
 
 /// A watcher implementation that uses notify-rs/notify for filesystem notifications
@@ -29,8 +21,8 @@ pub struct NotifyWatcher {
     watcher: Option<Box<dyn Watcher>>,
     /// Channel for receiving events from the watcher
     event_rx: Option<std::sync::mpsc::Receiver<Result<Event, notify::Error>>>,
-    /// States of all files being watched
-    states: Arc<Mutex<Vec<NotifyWatcherState>>>,
+    /// Paths of all files being watched
+    watched_files: Arc<Mutex<Vec<FileState>>>,
 }
 
 impl NotifyWatcher {
@@ -39,7 +31,7 @@ impl NotifyWatcher {
         Ok(NotifyWatcher {
             watcher: None,
             event_rx: None,
-            states: Arc::new(Mutex::new(Vec::new())),
+            watched_files: Arc::new(Mutex::new(Vec::new())),
         })
     }
 
@@ -73,21 +65,18 @@ impl NotifyWatcher {
     pub fn watch_file(
         &mut self,
         path: PathBuf,
-        file_position: FilePosition,
+        _file_position: FilePosition, // We don't need to store the file position anymore
     ) -> Result<(), notify::Error> {
         if self.watcher.is_none() {
             self.initialize(&path)?;
         }
 
-        let state = NotifyWatcherState {
+        let state = FileState {
             path,
-            file_position,
-            last_seen: Instant::now(),
-            is_active: false,
         };
 
-        let mut states = self.states.lock().unwrap();
-        states.push(state);
+        let mut files = self.watched_files.lock().unwrap();
+        files.push(state);
 
         Ok(())
     }
@@ -121,8 +110,18 @@ impl NotifyWatcher {
 
                                 if is_relevant {
                                     for path in event.paths {
-                                        trace!(message = "Relevant file event detected", ?path, kind = ?event.kind);
-                                        events.push((path, event.kind));
+                                        // Check if this path is one of our watched files
+                                        let is_watched = {
+                                            let files = self.watched_files.lock().unwrap();
+                                            files.iter().any(|state| state.path == path)
+                                        };
+
+                                        if is_watched {
+                                            trace!(message = "Relevant file event detected for watched file", ?path, kind = ?event.kind);
+                                            events.push((path, event.kind));
+                                        } else {
+                                            trace!(message = "Ignoring event for unwatched file", ?path);
+                                        }
                                     }
                                 } else {
                                     trace!(message = "Ignoring non-relevant file event", kind = ?event.kind);
@@ -148,57 +147,6 @@ impl NotifyWatcher {
         events
     }
 
-    /// Activate watching for a file
-    #[allow(dead_code)]
-    pub fn activate(&mut self, path: &Path) -> bool {
-        let mut states = self.states.lock().unwrap();
-        for state in states.iter_mut() {
-            if state.path == path {
-                state.is_active = true;
-                state.last_seen = Instant::now();
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Deactivate watching for a file (switch to passive mode)
-    #[allow(dead_code)]
-    pub fn deactivate(&mut self, path: &Path, file_position: FilePosition) -> bool {
-        let mut states = self.states.lock().unwrap();
-        for state in states.iter_mut() {
-            if state.path == path {
-                state.is_active = false;
-                state.file_position = file_position;
-                state.last_seen = Instant::now();
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Get the current file position for a path
-    #[allow(dead_code)]
-    pub fn get_file_position(&self, path: &Path) -> Option<FilePosition> {
-        let states = self.states.lock().unwrap();
-        for state in states.iter() {
-            if state.path == path {
-                return Some(state.file_position);
-            }
-        }
-        None
-    }
-
-    /// Update the file position for a path
-    #[allow(dead_code)]
-    pub fn update_file_position(&mut self, path: &Path, file_position: FilePosition) {
-        let mut states = self.states.lock().unwrap();
-        for state in states.iter_mut() {
-            if state.path == path {
-                state.file_position = file_position;
-                state.last_seen = Instant::now();
-                break;
-            }
-        }
-    }
+    // Note: The methods activate, deactivate, get_file_position, and update_file_position
+    // have been removed as they were not used in the codebase.
 }

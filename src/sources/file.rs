@@ -161,13 +161,7 @@ pub struct FileConfig {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
-    /// Use filesystem notifications for file discovery instead of polling.
-    ///
-    /// This can significantly reduce CPU and disk usage, especially with large numbers of files.
-    /// It also makes file discovery more responsive, as new files are detected immediately.
-    #[serde(default = "default_use_notify_for_discovery")]
-    #[configurable(metadata(docs::human_name = "Use Notify for File Discovery"))]
-    pub use_notify_for_discovery: bool,
+    // Note: We now use filesystem notifications by default for file discovery
 
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
@@ -282,10 +276,6 @@ fn default_line_delimiter() -> String {
 
 const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
-}
-
-const fn default_use_notify_for_discovery() -> bool {
-    false
 }
 
 /// Configuration for how files should be identified.
@@ -415,7 +405,6 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
-            use_notify_for_discovery: default_use_notify_for_discovery(),
         }
     }
 }
@@ -544,36 +533,19 @@ pub fn file_source(
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
-    // Choose between notify-based or glob-based paths provider
-    let paths_provider = if config.use_notify_for_discovery {
-        debug!(
-            message = "Using notify-based file discovery",
-            include_patterns = ?config.include,
-            exclude_patterns = ?exclude_patterns,
-        );
-        BoxedPathsProvider::new(NotifyPathsProvider::new(
-            &config.include,
-            &exclude_patterns,
-            MatchOptions::default(),
-            glob_minimum_cooldown,
-            emitter.clone(),
-        ))
-    } else {
-        debug!(
-            message = "Using glob-based file discovery",
-            include_patterns = ?config.include,
-            exclude_patterns = ?exclude_patterns,
-        );
-        BoxedPathsProvider::new(
-            Glob::new(
-                &config.include,
-                &exclude_patterns,
-                MatchOptions::default(),
-                emitter.clone(),
-            )
-            .expect("invalid glob patterns"),
-        )
-    };
+    // Use notify-based paths provider by default
+    debug!(
+        message = "Using notify-based file discovery",
+        include_patterns = ?config.include,
+        exclude_patterns = ?exclude_patterns,
+    );
+    let paths_provider = BoxedPathsProvider::new(NotifyPathsProvider::new(
+        &config.include,
+        &exclude_patterns,
+        MatchOptions::default(),
+        glob_minimum_cooldown,
+        emitter.clone(),
+    ));
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -606,7 +578,7 @@ pub fn file_source(
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
         idle_timeout: Some(Duration::from_secs(60)), // Default to 60 seconds idle timeout
-        using_notify_discovery: config.use_notify_for_discovery,
+        using_notify_discovery: true, // Always use notify-based discovery
         checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing with notify
     };
 

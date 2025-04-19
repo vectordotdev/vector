@@ -832,7 +832,7 @@ impl Source {
             rotate_wait,
             // Default idle timeout for switching to passive mode
             idle_timeout: Some(Duration::from_secs(60)),
-            using_notify_discovery: false, // Kubernetes logs don't use notify-based discovery
+            using_notify_discovery: true, // Use notify-based discovery for better performance
             checkpoint_interval: Duration::from_secs(30),
         };
 
