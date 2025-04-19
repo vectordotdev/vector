@@ -830,6 +830,8 @@ impl Source {
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
             rotate_wait,
+            using_notify_discovery: true, // Use notify-based discovery for better performance
+            checkpoint_interval: Duration::from_secs(30),
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);

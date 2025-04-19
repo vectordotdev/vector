@@ -7,14 +7,14 @@ use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
-use tracing::{Instrument, Span};
+use tracing::{debug, Instrument, Span};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
     calculate_ignore_before,
-    paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
-    ReadFromConfig,
+    paths_provider::glob::MatchOptions,
+    BoxedPathsProvider, Checkpointer, FileFingerprint, FileServer, FingerprintStrategy,
+    Fingerprinter, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
 };
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -160,6 +160,8 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
+
+    // Note: We now use filesystem notifications by default for file discovery
 
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
@@ -531,13 +533,19 @@ pub fn file_source(
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
-    let paths_provider = Glob::new(
+    // Use notify-based paths provider by default
+    debug!(
+        message = "Using notify-based file discovery",
+        include_patterns = ?config.include,
+        exclude_patterns = ?exclude_patterns,
+    );
+    let paths_provider = BoxedPathsProvider::new(NotifyPathsProvider::new(
         &config.include,
         &exclude_patterns,
         MatchOptions::default(),
+        glob_minimum_cooldown,
         emitter.clone(),
-    )
-    .expect("invalid glob patterns");
+    ));
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -569,6 +577,8 @@ pub fn file_source(
         emitter,
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
+        using_notify_discovery: true, // Always use notify-based discovery
+        checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing
     };
 
     let event_metadata = EventMetadata {
