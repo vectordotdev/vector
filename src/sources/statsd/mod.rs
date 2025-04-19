@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
@@ -7,9 +8,12 @@ use vector_lib::ipallowlist::IpAllowlistConfig;
 use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
+use vector_config::schema::{InstanceType, SchemaGenerator, SchemaObject};
+use vector_config::{Configurable, GenerateError, ToValue};
 use vector_lib::codecs::{
     decoding::{self, Deserializer, Framer},
     NewlineDelimitedDecoder,
@@ -63,6 +67,41 @@ pub enum StatsdConfig {
     Unix(UnixConfig),
 }
 
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConversionUnit {
+    #[default]
+    Seconds,
+    Milliseconds,
+}
+
+impl ToValue for ConversionUnit {
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::Value::String(match self {
+            ConversionUnit::Seconds => "seconds".into(),
+            ConversionUnit::Milliseconds => "milliseconds".into(),
+        })
+    }
+}
+
+impl Configurable for ConversionUnit {
+    fn generate_schema(_gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        let schema = SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            enum_values: Some(vec!["seconds".into(), "milliseconds".into()]),
+            ..Default::default()
+        };
+        Ok(schema)
+    }
+
+    fn metadata() -> vector_config::Metadata {
+        let mut md = vector_config::Metadata::default();
+        md.set_description("Specifies the target unit for converting incoming StatsD timing values. When set to \"seconds\" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to \"milliseconds\", the original timing values are preserved.");
+        md.set_default_value(ConversionUnit::Seconds);
+        md
+    }
+}
+
 /// UDP configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -76,6 +115,10 @@ pub struct UdpConfig {
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]
     sanitize: bool,
+
+    #[serde(default = "default_convert_to")]
+    #[configurable(derived)]
+    convert_to: ConversionUnit,
 }
 
 impl UdpConfig {
@@ -84,6 +127,7 @@ impl UdpConfig {
             address,
             receive_buffer_bytes: None,
             sanitize: default_sanitize(),
+            convert_to: default_convert_to(),
         }
     }
 }
@@ -127,6 +171,10 @@ pub struct TcpConfig {
     #[serde(default = "default_sanitize")]
     #[configurable(derived)]
     sanitize: bool,
+
+    #[serde(default = "default_convert_to")]
+    #[configurable(derived)]
+    convert_to: ConversionUnit,
 }
 
 impl TcpConfig {
@@ -141,6 +189,7 @@ impl TcpConfig {
             receive_buffer_bytes: None,
             connection_limit: None,
             sanitize: default_sanitize(),
+            convert_to: default_convert_to(),
         }
     }
 }
@@ -151,6 +200,10 @@ const fn default_shutdown_timeout_secs() -> Duration {
 
 const fn default_sanitize() -> bool {
     true
+}
+
+const fn default_convert_to() -> ConversionUnit {
+    ConversionUnit::Seconds
 }
 
 impl GenerateConfig for StatsdConfig {
@@ -183,6 +236,7 @@ impl SourceConfig for StatsdConfig {
                 let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 let statsd_tcp_source = StatsdTcpSource {
                     sanitize: config.sanitize,
+                    convert_to: config.convert_to,
                 };
 
                 statsd_tcp_source.run(
@@ -232,29 +286,29 @@ pub(crate) struct StatsdDeserializer {
 }
 
 impl StatsdDeserializer {
-    pub fn udp(sanitize: bool) -> Self {
+    pub fn udp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Udp),
             // The other modes emit a different `EventsReceived`.
             events_received: Some(register!(EventsReceived)),
-            parser: Parser::new(sanitize),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 
-    pub const fn tcp(sanitize: bool) -> Self {
+    pub const fn tcp(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: None,
             events_received: None,
-            parser: Parser::new(sanitize),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 
     #[cfg(unix)]
-    pub const fn unix(sanitize: bool) -> Self {
+    pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
             events_received: None,
-            parser: Parser::new(sanitize),
+            parser: Parser::new(sanitize, convert_to),
         }
     }
 }
@@ -321,7 +375,10 @@ async fn statsd_udp(
 
     let codec = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer::udp(config.sanitize))),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::udp(
+            config.sanitize,
+            config.convert_to,
+        ))),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -347,6 +404,7 @@ async fn statsd_udp(
 #[derive(Clone)]
 struct StatsdTcpSource {
     sanitize: bool,
+    convert_to: ConversionUnit,
 }
 
 impl TcpSource for StatsdTcpSource {
@@ -358,7 +416,10 @@ impl TcpSource for StatsdTcpSource {
     fn decoder(&self) -> Self::Decoder {
         Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(StatsdDeserializer::tcp(self.sanitize))),
+            Deserializer::Boxed(Box::new(StatsdDeserializer::tcp(
+                self.sanitize,
+                self.convert_to,
+            ))),
         )
     }
 
@@ -467,6 +528,7 @@ mod test {
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),
                 sanitize: true,
+                convert_to: ConversionUnit::Seconds,
             });
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -482,6 +544,56 @@ mod test {
             test_statsd(config, sender).await;
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn test_statsd_udp_conversion_disabled() {
+        let in_addr = next_addr();
+        let mut config = UdpConfig::from_address(in_addr.into());
+        config.convert_to = ConversionUnit::Milliseconds;
+        let statsd_config = StatsdConfig::Udp(config);
+        let (mut sender, mut receiver) = mpsc::channel(200);
+
+        tokio::spawn(async move {
+            let bind_addr = next_addr();
+            let socket = UdpSocket::bind(bind_addr).await.unwrap();
+            socket.connect(in_addr).await.unwrap();
+            while let Some(bytes) = receiver.next().await {
+                socket.send(bytes).await.unwrap();
+            }
+        });
+
+        let component_key = ComponentKey::from("statsd_conversion_disabled");
+        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
+        let sink = statsd_config
+            .build(source_ctx)
+            .await
+            .expect("failed to build source");
+
+        tokio::spawn(async move {
+            sink.await.expect("sink should not fail");
+        });
+
+        sleep(Duration::from_millis(250)).await;
+        sender.send(b"timer:320|ms|@0.1\n").await.unwrap();
+        sleep(Duration::from_millis(250)).await;
+        shutdown
+            .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+            .await;
+        let state = collect_limited(rx)
+            .await
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<AbsoluteMetricState>();
+        let metrics = state.finish();
+        assert_distribution(
+            &metrics,
+            series!("timer"),
+            3200.0,
+            10,
+            &[(1.0, 0), (2.0, 0), (4.0, 0), (f64::INFINITY, 10)],
+        );
     }
 
     async fn test_statsd(statsd_config: StatsdConfig, mut sender: mpsc::Sender<&'static [u8]>) {

@@ -68,8 +68,10 @@ components: sources: statsd: {
 		timings: {
 			title: "StatsD timings"
 			body: """
-				Incoming timings are emitted as distributions. Timings in milliseconds (`ms`) are
-				converted to seconds (`s`).
+				Incoming timings are emitted as distributions. By default, timings in milliseconds (`ms`)
+				are converted to seconds (`s`). This behavior can be controlled via the
+				`convert_to` configuration option. Setting `convert_to` to "milliseconds" will preserve
+				the original timing values.
 				"""
 		}
 		timestamps: {
