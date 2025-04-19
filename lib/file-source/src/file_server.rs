@@ -19,7 +19,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::{FileWatcher, WatcherState},
+    file_watcher::FileWatcher,
     fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
     FileSourceInternalEvents, ReadFrom,
@@ -58,11 +58,9 @@ where
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
-    /// Duration after which to switch a file from active to passive watching
-    pub idle_timeout: Option<Duration>,
     /// Whether we're using notify-based file discovery
     pub using_notify_discovery: bool,
-    /// Duration after which to checkpoint files when using notify-based discovery
+    /// Duration after which to checkpoint files
     pub checkpoint_interval: Duration,
 }
 
@@ -102,6 +100,11 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
+        // We're using notify-based watching for all files
+        // This means we only need to glob once on startup to discover files
+        // that were added while Vector was stopped
+        debug!(message = "Using notify-based watching for all files");
+
         let mut fingerprint_buffer = Vec::new();
 
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
@@ -142,7 +145,7 @@ where
                 &mut fingerprint_buffer,
             );
 
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true, &mut lines);
         }
         self.emitter.emit_files_open(fp_map.len());
 
@@ -252,7 +255,7 @@ where
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, &mut lines);
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -331,40 +334,16 @@ where
                     continue;
                 }
 
-                // Handle transitions between active and passive states
-                if let Some(idle_timeout) = self.idle_timeout {
-                    match watcher.state() {
-                        // If the file is active but hasn't been read from in a while, switch to passive mode
-                        WatcherState::Active
-                            if watcher.last_read_success().elapsed() > idle_timeout =>
-                        {
-                            if watcher.reached_eof() {
-                                trace!(
-                                    message = "Switching file to passive mode",
-                                    ?watcher.path,
-                                    position = %watcher.get_file_position(),
-                                    idle_time = ?watcher.last_read_success().elapsed(),
-                                );
-
-                                if let Err(e) = watcher.deactivate() {
-                                    debug!(
-                                        message = "Failed to switch file to passive mode",
-                                        ?watcher.path,
-                                        error = ?e
-                                    );
-                                } else {
-                                    self.emitter.emit_file_switched_to_passive(
-                                        &watcher.path,
-                                        watcher.get_file_position(),
-                                    );
-                                }
-                            }
-                        }
-                        // Passive files are handled by the notify watcher and will be activated when needed
-                        WatcherState::Passive => {
-                            // The file watcher will automatically activate when events are detected
-                        }
-                        _ => {}
+                // Only update the watcher if we've read data from the file
+                // This avoids unnecessary updates that can cause excessive logging
+                if watcher.reached_eof() && watcher.last_read_success().elapsed() < Duration::from_secs(1) {
+                    // Update the notify watcher with the current position
+                    if let Err(e) = watcher.update_watcher() {
+                        debug!(
+                            message = "Failed to update watcher",
+                            ?watcher.path,
+                            error = ?e
+                        );
                     }
                 }
             }
@@ -398,20 +377,10 @@ where
             let start = time::Instant::now();
             // Determine the appropriate backoff based on file activity and discovery mode
             let backoff = if self.using_notify_discovery {
-                // When using notify-based discovery, we can use a more adaptive approach
-                let all_files_passive = fp_map.values().all(|w| w.state() == WatcherState::Passive);
-
-                if global_bytes_read > 0 {
-                    // If we read data, use minimal backoff for responsiveness
-                    1
-                } else if all_files_passive {
-                    // If all files are in passive mode, use a longer backoff
-                    // This significantly reduces CPU usage when files are idle
-                    cmp::min(5_000, backoff_cap)
-                } else {
-                    // Otherwise, use standard exponential backoff
-                    cmp::min(2_048, backoff_cap.saturating_mul(2))
-                }
+                // When using notify-based watching for all files, use minimal backoff
+                // This ensures we detect changes immediately
+                // 1ms is the minimum possible value to ensure immediate responsiveness
+                1
             } else {
                 // Standard behavior for polling-based discovery
                 backoff_cap = if global_bytes_read == 0 {
@@ -429,7 +398,9 @@ where
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {
-                    sleep(Duration::from_millis(backoff as u64)).await;
+                    // Always use a very short sleep duration to ensure responsiveness
+                    // This is especially important for notify-based watching
+                    sleep(Duration::from_millis(1)).await;
                 }
             };
             futures::pin_mut!(sleep);
@@ -460,6 +431,7 @@ where
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
+        lines: &mut Vec<Line>,
     ) {
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
@@ -500,6 +472,46 @@ where
                 } else {
                     self.emitter.emit_file_added(&path);
                 }
+                // Process any lines read at startup
+                let startup_lines = watcher.take_startup_lines();
+                if !startup_lines.is_empty() {
+                    // Count the original number of lines
+                    let original_count = startup_lines.len();
+
+                    // Filter out empty lines to avoid sending empty events
+                    let non_empty_lines: Vec<_> = startup_lines
+                        .into_iter()
+                        .filter(|line| !line.bytes.is_empty())
+                        .collect();
+                    let filtered_count = non_empty_lines.len();
+
+                    if filtered_count > 0 {
+                        debug!(
+                            message = "Processing startup lines",
+                            original_count = original_count,
+                            filtered_count = filtered_count,
+                            ?path
+                        );
+
+                        for line in non_empty_lines {
+                            let bytes_len = line.bytes.len() as u64;
+                            lines.push(Line {
+                                text: line.bytes,
+                                filename: path.to_str().expect("not a valid path").to_owned(),
+                                file_id,
+                                start_offset: line.offset,
+                                end_offset: line.offset + bytes_len,
+                            });
+                        }
+                    } else {
+                        debug!(
+                            message = "No non-empty startup lines to process",
+                            original_count = original_count,
+                            ?path
+                        );
+                    }
+                }
+
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }

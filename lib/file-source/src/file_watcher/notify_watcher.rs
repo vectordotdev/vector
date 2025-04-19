@@ -28,6 +28,21 @@ pub struct NotifyWatcher {
 impl NotifyWatcher {
     /// Create a new NotifyWatcher
     pub fn new() -> Result<Self, notify::Error> {
+        Self::create()
+    }
+
+    /// Create a dummy NotifyWatcher that doesn't do anything
+    /// This is used when we can't create a real watcher
+    pub fn dummy() -> Self {
+        Self {
+            watcher: None,
+            event_rx: None,
+            watched_files: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// Internal method to create a new NotifyWatcher
+    fn create() -> Result<Self, notify::Error> {
         Ok(NotifyWatcher {
             watcher: None,
             event_rx: None,
@@ -61,7 +76,7 @@ impl NotifyWatcher {
         Ok(())
     }
 
-    /// Add a file to be watched in passive mode
+    /// Add a file to be watched
     pub fn watch_file(
         &mut self,
         path: PathBuf,
@@ -71,12 +86,14 @@ impl NotifyWatcher {
             self.initialize(&path)?;
         }
 
-        let state = FileState {
-            path,
-        };
-
+        // Check if we're already watching this file to avoid duplicates
         let mut files = self.watched_files.lock().unwrap();
-        files.push(state);
+        if !files.iter().any(|state| state.path == path) {
+            let state = FileState {
+                path,
+            };
+            files.push(state);
+        }
 
         Ok(())
     }

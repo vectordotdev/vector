@@ -8,7 +8,7 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
@@ -32,21 +32,21 @@ pub(super) struct RawLine {
 }
 
 /// Represents the state of the file watcher
+///
+/// Note: Previously, we had Active and Passive states, but now we only use
+/// notification-based watching for all files, so we only need one state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WatcherState {
-    /// Actively watching the file with an open file handle
-    Active,
-    /// Passively watching the file using filesystem notifications
-    Passive,
+    /// Watching the file using filesystem notifications
+    Notify,
 }
 
 /// The `FileWatcher` struct defines the state machine which reads
-/// from a file path, transparently updating the underlying file descriptor when
-/// the file has been rolled over, as is common for logs.
+/// from a file path, transparently handling file rollovers as is common for logs.
 ///
-/// The `FileWatcher` can operate in two modes:
-/// 1. Active mode: Uses polling with an open file handle (original behavior)
-/// 2. Passive mode: Uses filesystem notifications without holding an open file handle
+/// The `FileWatcher` uses filesystem notifications exclusively for all files,
+/// without keeping any files open. Files are only opened when needed for reading,
+/// then closed immediately.
 ///
 /// The `FileWatcher` is expected to live for the lifetime of the file
 /// path. `FileServer` is responsible for clearing away `FileWatchers` which no
@@ -54,6 +54,7 @@ pub enum WatcherState {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
+    #[allow(dead_code)]
     reader: Option<Box<dyn BufRead>>,
     file_position: FilePosition,
     devno: u64,
@@ -66,10 +67,13 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
-    /// Current state of the watcher
+    /// Current state of the watcher (always Notify)
+    #[allow(dead_code)]
     state: WatcherState,
-    /// Notify-based watcher for passive mode
-    notify_watcher: Option<NotifyWatcher>,
+    /// Notify-based watcher for all files
+    notify_watcher: NotifyWatcher,
+    /// Buffer of lines read at startup
+    startup_lines: Vec<RawLine>,
 }
 
 impl FileWatcher {
@@ -102,7 +106,7 @@ impl FileWatcher {
         let gzipped = is_gzipped(&mut reader)?;
 
         // Determine the actual position at which we should start reading
-        let (reader, file_position): (Box<dyn BufRead>, FilePosition) =
+        let (_reader, file_position): (Box<dyn BufRead>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -158,13 +162,35 @@ impl FileWatcher {
             .and_then(|diff| Instant::now().checked_sub(diff))
             .unwrap_or_else(Instant::now);
 
-        // Create a notify watcher for passive mode
-        let notify_watcher = NotifyWatcher::new().ok();
+        // On startup, we need to read any content that was added while Vector was stopped
+        // We'll do this by immediately reading the file once to get any new content
+        // After that, we'll rely on notifications for further changes
 
-        Ok(FileWatcher {
-            path,
+        // Create a notify watcher for all files
+        let notify_watcher = match NotifyWatcher::new() {
+            Ok(mut watcher) => {
+                // Start watching this file immediately
+                if let Err(e) = watcher.watch_file(path.clone(), file_position) {
+                    debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
+                }
+                watcher
+            },
+            Err(e) => {
+                warn!(message = "Failed to create notify watcher", error = ?e);
+                // Create a dummy watcher that doesn't do anything
+                NotifyWatcher::dummy()
+            }
+        };
+
+        // We don't need to keep the file open permanently, but we'll read it once
+        // to get any content that was added while Vector was stopped
+        // This is especially important for files with checkpoints
+
+        // Create the FileWatcher instance
+        let mut fw = FileWatcher {
+            path: path.clone(),
             findable: true,
-            reader: Some(reader),
+            reader: None, // No reader is kept open
             file_position,
             devno,
             inode: ino,
@@ -176,34 +202,46 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
-            state: WatcherState::Active,
+            state: WatcherState::Notify, // Always in Notify state
             notify_watcher,
-        })
+            startup_lines: Vec::new(),
+        };
+
+        // Read all available lines at startup to get any content that was added while Vector was stopped
+        // This is especially important for files with checkpoints
+        // We'll ignore any errors since the file might not be readable yet
+        debug!(message = "Reading initial content from file at startup", ?path, position = file_position);
+
+        // Keep reading until we reach EOF or encounter an error
+        loop {
+            match fw.read_line() {
+                Ok(Some(line)) => {
+                    // Successfully read a line, store it and continue reading
+                    trace!(message = "Read a line from file at startup", ?path, new_position = fw.file_position);
+                    fw.startup_lines.push(line);
+                },
+                Ok(None) => {
+                    // Reached EOF
+                    debug!(message = "Reached EOF while reading initial content", ?path, final_position = fw.file_position, lines_read = fw.startup_lines.len());
+                    break;
+                },
+                Err(e) => {
+                    // Error reading file, log and break
+                    debug!(message = "Error reading initial content from file", ?path, error = ?e);
+                    break;
+                }
+            }
+        }
+
+        Ok(fw)
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let file_handle = File::open(&path)?;
         if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
-            // If we're in active mode, update the reader
-            if self.state == WatcherState::Active {
-                let mut reader = io::BufReader::new(fs::File::open(&path)?);
-                let gzipped = is_gzipped(&mut reader)?;
-                let new_reader: Box<dyn BufRead> = if gzipped {
-                    if self.file_position != 0 {
-                        Box::new(null_reader())
-                    } else {
-                        Box::new(io::BufReader::new(MultiGzDecoder::new(reader)))
-                    }
-                } else {
-                    reader.seek(io::SeekFrom::Start(self.file_position))?;
-                    Box::new(reader)
-                };
-                self.reader = Some(new_reader);
-            } else if let Some(ref mut notify_watcher) = self.notify_watcher {
-                // Update the notify watcher with the new path
-                if let Err(e) = notify_watcher.watch_file(path.clone(), self.file_position) {
-                    debug!(message = "Failed to update notify watcher", error = ?e);
-                }
+            // Update the notify watcher with the new path
+            if let Err(e) = self.notify_watcher.watch_file(path.clone(), self.file_position) {
+                debug!(message = "Failed to update notify watcher", error = ?e);
             }
             self.devno = file_handle.portable_dev()?;
             self.inode = file_handle.portable_ino()?;
@@ -251,42 +289,46 @@ impl FileWatcher {
             return Ok(None);
         }
 
-        // If we're in passive mode, check for events and potentially switch to active mode
-        if self.state == WatcherState::Passive {
-            if let Some(ref mut notify_watcher) = self.notify_watcher {
-                let events = notify_watcher.check_events();
-                if !events.is_empty() {
-                    trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
+        // Check for events from the notify watcher, but don't update the watcher here
+        // This avoids an infinite loop where reading the file triggers events
+        let events = self.notify_watcher.check_events();
+        if !events.is_empty() {
+            trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
 
-                    for (path, kind) in events {
-                        if path == self.path {
-                            debug!(
-                                message = "Detected relevant file event, activating watcher",
-                                ?path,
-                                ?kind
-                            );
-                            self.activate()?;
-                            // Note: The FileServer will handle emitting the event when it processes the file
-                            break;
-                        }
-                    }
+            for (path, kind) in events {
+                if path == self.path {
+                    debug!(
+                        message = "Detected relevant file event",
+                        ?path,
+                        ?kind
+                    );
+                    // We don't need to update the watcher here since we're about to read the file
+                    // and the position will be updated naturally
+                    break;
                 }
-            }
-
-            // If still in passive mode, return None (no data available)
-            if self.state == WatcherState::Passive {
-                return Ok(None);
             }
         }
 
-        let reader = match &mut self.reader {
-            Some(r) => r,
-            None => return Ok(None),
+        // Open the file for reading
+        let mut file = match fs::File::open(&self.path) {
+            Ok(f) => f,
+            Err(e) => {
+                if let io::ErrorKind::NotFound = e.kind() {
+                    self.set_dead();
+                }
+                return Err(e);
+            }
         };
+
+        // Seek to the current position
+        file.seek(io::SeekFrom::Start(self.file_position))?;
+
+        // Create a reader
+        let mut reader = io::BufReader::new(file);
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            reader,
+            &mut reader,
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
@@ -294,10 +336,18 @@ impl FileWatcher {
         ) {
             Ok(Some(_)) => {
                 self.track_read_success();
-                Ok(Some(RawLine {
-                    offset: initial_position,
-                    bytes: self.buf.split().freeze(),
-                }))
+                let bytes = self.buf.split().freeze();
+
+                // Don't return empty lines
+                if bytes.is_empty() {
+                    trace!(message = "Skipping empty line", ?self.path, position = initial_position);
+                    Ok(None)
+                } else {
+                    Ok(Some(RawLine {
+                        offset: initial_position,
+                        bytes,
+                    }))
+                }
             }
             Ok(None) => {
                 if !self.file_findable() {
@@ -311,6 +361,7 @@ impl FileWatcher {
                         self.reached_eof = true;
                         Ok(None)
                     } else {
+                        // We already checked that buf is not empty, so we can just return it
                         Ok(Some(RawLine {
                             offset: initial_position,
                             bytes: buf,
@@ -340,64 +391,35 @@ impl FileWatcher {
         self.last_read_success = Instant::now();
     }
 
-    /// Activate the watcher (switch from passive to active mode)
+    /// Update the watcher with the current file position
     ///
-    /// This opens a file handle and starts reading from the file.
-    pub fn activate(&mut self) -> io::Result<()> {
-        if self.state == WatcherState::Active {
-            return Ok(());
+    /// This updates the notify watcher with the current file position.
+    pub fn update_watcher(&mut self) -> io::Result<()> {
+        // Only log at trace level to avoid excessive logging
+        trace!(message = "Updating file watcher", ?self.path, position = %self.file_position);
+
+        // Update the notify watcher with the current position
+        if let Err(e) = self.notify_watcher.watch_file(self.path.clone(), self.file_position) {
+            debug!(message = "Failed to update notify watcher", error = ?e);
         }
-
-        debug!(message = "Activating file watcher", ?self.path);
-
-        // Open the file and create a reader
-        let f = fs::File::open(&self.path)?;
-        let mut reader = io::BufReader::new(f);
-
-        // Seek to the last known position
-        reader.seek(io::SeekFrom::Start(self.file_position))?;
-
-        self.reader = Some(Box::new(reader));
-        self.state = WatcherState::Active;
-        self.last_read_attempt = Instant::now();
-        self.reached_eof = false;
-
-        Ok(())
-    }
-
-    /// Deactivate the watcher (switch from active to passive mode)
-    ///
-    /// This closes the file handle but keeps tracking the file position
-    /// and watches for changes using filesystem notifications.
-    pub fn deactivate(&mut self) -> io::Result<()> {
-        if self.state == WatcherState::Passive {
-            return Ok(());
-        }
-
-        debug!(message = "Deactivating file watcher", ?self.path, position = %self.file_position);
-
-        // Initialize the notify watcher if it doesn't exist
-        if self.notify_watcher.is_none() {
-            self.notify_watcher = NotifyWatcher::new().ok();
-        }
-
-        // Add the file to the notify watcher
-        if let Some(ref mut notify_watcher) = self.notify_watcher {
-            if let Err(e) = notify_watcher.watch_file(self.path.clone(), self.file_position) {
-                debug!(message = "Failed to add file to notify watcher", error = ?e);
-            }
-        }
-
-        // Drop the reader to close the file handle
-        self.reader = None;
-        self.state = WatcherState::Passive;
 
         Ok(())
     }
 
     /// Get the current state of the watcher
+    ///
+    /// Note: This always returns WatcherState::Notify since we're always using
+    /// notification-based watching for all files.
+    #[allow(dead_code)]
     pub fn state(&self) -> WatcherState {
-        self.state
+        WatcherState::Notify
+    }
+
+    /// Get and clear the startup lines
+    ///
+    /// This returns all lines read at startup and clears the buffer.
+    pub fn take_startup_lines(&mut self) -> Vec<RawLine> {
+        std::mem::take(&mut self.startup_lines)
     }
 
     #[inline]

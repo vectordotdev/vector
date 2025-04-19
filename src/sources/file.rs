@@ -12,7 +12,7 @@ use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
     calculate_ignore_before,
-    paths_provider::glob::{Glob, MatchOptions},
+    paths_provider::glob::MatchOptions,
     BoxedPathsProvider, Checkpointer, FileFingerprint, FileServer, FingerprintStrategy,
     Fingerprinter, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
 };
@@ -577,9 +577,8 @@ pub fn file_source(
         emitter,
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
-        idle_timeout: Some(Duration::from_secs(60)), // Default to 60 seconds idle timeout
         using_notify_discovery: true, // Always use notify-based discovery
-        checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing with notify
+        checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing
     };
 
     let event_metadata = EventMetadata {
