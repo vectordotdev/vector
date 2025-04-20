@@ -33,7 +33,7 @@ pub(super) fn default_timestamp_field() -> String {
 /// Configuration for the `azure_logs_ingestion` sink.
 #[configurable_component(sink(
     "azure_logs_ingestion",
-    "Publish log events to the Azure Logs Ingestion API."
+    "Publish log events to the Azure Monitor Logs Ingestion API."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
