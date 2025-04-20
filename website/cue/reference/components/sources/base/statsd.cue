@@ -21,7 +21,13 @@ base: components: sources: statsd: configuration: {
 	convert_to: {
 		description: "Specifies the target unit for converting incoming StatsD timing values. When set to \"seconds\" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to \"milliseconds\", the original timing values are preserved."
 		required:    false
-		type: string: default: "seconds"
+		type: string: {
+			default: "seconds"
+			enum: {
+				milliseconds: "Convert to milliseconds."
+				seconds:      "Convert to seconds."
+			}
+		}
 	}
 	keepalive: {
 		description:   "TCP keepalive settings for socket-based components."

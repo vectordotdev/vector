@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
@@ -8,12 +7,9 @@ use vector_lib::ipallowlist::IpAllowlistConfig;
 use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
-use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::udp::UdpFramed;
-use vector_config::schema::{InstanceType, SchemaGenerator, SchemaObject};
-use vector_config::{Configurable, GenerateError, ToValue};
 use vector_lib::codecs::{
     decoding::{self, Deserializer, Framer},
     NewlineDelimitedDecoder,
@@ -67,39 +63,17 @@ pub enum StatsdConfig {
     Unix(UnixConfig),
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+/// Specifies the target unit for converting incoming StatsD timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
+#[configurable_component]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ConversionUnit {
+    /// Convert to seconds.
     #[default]
     Seconds,
+
+    /// Convert to milliseconds.
     Milliseconds,
-}
-
-impl ToValue for ConversionUnit {
-    fn to_value(&self) -> serde_json::Value {
-        serde_json::Value::String(match self {
-            ConversionUnit::Seconds => "seconds".into(),
-            ConversionUnit::Milliseconds => "milliseconds".into(),
-        })
-    }
-}
-
-impl Configurable for ConversionUnit {
-    fn generate_schema(_gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        let schema = SchemaObject {
-            instance_type: Some(InstanceType::String.into()),
-            enum_values: Some(vec!["seconds".into(), "milliseconds".into()]),
-            ..Default::default()
-        };
-        Ok(schema)
-    }
-
-    fn metadata() -> vector_config::Metadata {
-        let mut md = vector_config::Metadata::default();
-        md.set_description("Specifies the target unit for converting incoming StatsD timing values. When set to \"seconds\" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to \"milliseconds\", the original timing values are preserved.");
-        md.set_default_value(ConversionUnit::Seconds);
-        md
-    }
 }
 
 /// UDP configuration for the `statsd` source.
