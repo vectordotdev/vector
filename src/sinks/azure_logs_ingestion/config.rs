@@ -26,6 +26,10 @@ pub(super) fn default_scope() -> String {
     "https://monitor.azure.com/.default".into()
 }
 
+pub(super) fn default_timestamp_field() -> String {
+    "TimeGenerated".into()
+}
+
 /// Configuration for the `azure_logs_ingestion` sink.
 #[configurable_component(sink(
     "azure_logs_ingestion",
@@ -60,6 +64,17 @@ pub struct AzureLogsIngestionConfig {
     #[serde(default = "default_scope")]
     pub(super) token_scope: String,
 
+    /// The destination field (column) for the timestamp.
+    ///
+    /// The setting of `log_schema.timestamp_key`, usually `timestamp`, is used as the source.
+    /// Most schemas use `TimeGenerated`, but some use `Timestamp` (legacy) or `EventStartTime` (ASIM) [std_columns].
+    ///
+    /// [std_columns]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
+    #[configurable(metadata(docs::examples = "EventStartTime"))]
+    #[configurable(metadata(docs::examples = "Timestamp"))]
+    #[serde(default = "default_timestamp_field")]
+    pub timestamp_field: String,
+
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
@@ -91,6 +106,7 @@ impl Default for AzureLogsIngestionConfig {
             dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
             token_scope: default_scope(),
+            timestamp_field: default_timestamp_field(),
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -109,6 +125,7 @@ impl AzureLogsIngestionConfig {
         dcr_immutable_id: String,
         stream_name: String,
         token_scope: String,
+        timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = endpoint.with_default_parts().uri;
         let protocol = get_http_scheme_from_uri(&endpoint).to_string();
@@ -145,6 +162,7 @@ impl AzureLogsIngestionConfig {
             batch_settings,
             self.encoding.clone(),
             service,
+            timestamp_field,
             protocol,
         );
 
@@ -166,6 +184,7 @@ impl SinkConfig for AzureLogsIngestionConfig {
             self.dcr_immutable_id.clone(),
             self.stream_name.clone(),
             self.token_scope.clone(),
+            self.timestamp_field.clone(),
         ).await
     }
 

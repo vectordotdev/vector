@@ -2,6 +2,7 @@ use std::{fmt::Debug, io};
 
 use bytes::Bytes;
 use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
+use vector_lib::lookup::PathPrefix;
 
 use crate::sinks::prelude::*;
 
@@ -25,11 +26,12 @@ where
         batch_settings: BatcherSettings,
         transformer: Transformer,
         service: S,
+        timestamp_field: String,
         protocol: String,
     ) -> Self {
         Self {
             batch_settings,
-            encoding: JsonEncoding::new(transformer),
+            encoding: JsonEncoding::new(transformer, timestamp_field),
             service,
             protocol,
         }
@@ -76,16 +78,17 @@ where
     }
 }
 
-/// Customized encoding specific to the Azure Logs Ingestion sink, as the API does not support full
-/// 9-digit nanosecond precision timestamps.
+/// Customized encoding specific to the Azure Logs Ingestion sink.
 #[derive(Clone, Debug)]
 pub(super) struct JsonEncoding {
+    timestamp_field: String,
     encoder: (Transformer, Encoder<Framer>),
 }
 
 impl JsonEncoding {
-    pub fn new(transformer: Transformer) -> Self {
+    pub fn new(transformer: Transformer, timestamp_field: String) -> Self {
         Self {
+            timestamp_field,
             encoder: (
                 transformer,
                 Encoder::<Framer>::new(
@@ -100,9 +103,28 @@ impl JsonEncoding {
 impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(
         &self,
-        input: Vec<Event>,
+        mut input: Vec<Event>,
         writer: &mut dyn io::Write,
     ) -> io::Result<(usize, GroupedCountByteSize)> {
+        for event in input.iter_mut() {
+            let log = event.as_mut_log();
+
+            // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or
+            // Metadata, the following `insert()` ensures it's encoded in the request.
+            let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
+                ts
+            } else {
+                chrono::Utc::now()
+            };
+
+            log.insert(
+                (PathPrefix::Event, self.timestamp_field.as_str()),
+                serde_json::Value::String(
+                    timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                ),
+            );
+        }
+
         self.encoder.encode_input(input, writer)
     }
 }
