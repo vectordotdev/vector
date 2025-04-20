@@ -577,8 +577,10 @@ pub fn file_source(
         emitter,
         handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
-        using_notify_discovery: true, // Always use notify-based discovery
-        checkpoint_interval: Duration::from_secs(30), // Use a longer interval for checkpointing
+        // We exclusively use notify-based discovery
+        // Use a 30-second interval for checkpointing to balance between
+        // durability and performance
+        checkpoint_interval: Duration::from_secs(30),
     };
 
     let event_metadata = EventMetadata {

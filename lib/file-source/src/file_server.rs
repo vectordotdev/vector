@@ -1,5 +1,4 @@
 use std::{time::Instant,
-    cmp,
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
     path::PathBuf,
@@ -58,8 +57,6 @@ where
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
-    /// Whether we're using notify-based file discovery
-    pub using_notify_discovery: bool,
     /// Duration after which to checkpoint files
     pub checkpoint_interval: Duration,
 }
@@ -109,7 +106,7 @@ where
 
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
-        let mut backoff_cap: usize = 1;
+        // We no longer need backoff_cap since we use a fixed backoff
         let mut lines = Vec::new();
 
         checkpointer.read_checkpoints(self.ignore_before);
@@ -153,15 +150,9 @@ where
 
         let mut stats = TimingStats::default();
 
-        // Spawn the checkpoint writer task with appropriate interval
-        let checkpoint_interval = if self.using_notify_discovery {
-            // When using notify-based discovery, we can use a longer checkpoint interval
-            // since we're not relying on frequent polling
-            self.checkpoint_interval
-        } else {
-            // Standard behavior for polling-based discovery
-            self.glob_minimum_cooldown
-        };
+        // Spawn the checkpoint writer task with the configured interval
+        // This ensures that checkpoints are written periodically to disk
+        let checkpoint_interval = self.checkpoint_interval;
 
         let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
             checkpointer,
@@ -183,15 +174,10 @@ where
         loop {
             // Determine if we need to perform file discovery
             let now_time = time::Instant::now();
-            let should_discover = if self.using_notify_discovery {
-                // When using notify-based discovery, we want to check for new files frequently
-                // to minimize the delay between when a file is discovered by the notify watcher
-                // and when it's actually processed, but not on every iteration to avoid excessive CPU usage
-                next_glob_time <= now_time || now_time.duration_since(next_glob_time) > Duration::from_millis(100)
-            } else {
-                // Standard behavior for polling-based discovery
-                next_glob_time <= now_time
-            };
+            // Check for new files frequently to minimize the delay between when a file is discovered
+            // by the notify watcher and when it's actually processed, but not on every iteration
+            // to avoid excessive CPU usage
+            let should_discover = next_glob_time <= now_time || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
 
             // Report stats periodically, but only if enough time has passed since the last report
             // This prevents excessive logging when the main loop is running frequently
@@ -421,21 +407,9 @@ where
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
-            // Determine the appropriate backoff based on file activity and discovery mode
-            let backoff = if self.using_notify_discovery {
-                // When using notify-based watching for all files, use minimal backoff
-                // This ensures we detect changes immediately
-                // 1ms is the minimum possible value to ensure immediate responsiveness
-                1
-            } else {
-                // Standard behavior for polling-based discovery
-                backoff_cap = if global_bytes_read == 0 {
-                    cmp::min(2_048, backoff_cap.saturating_mul(2))
-                } else {
-                    1
-                };
-                backoff_cap.saturating_sub(global_bytes_read)
-            };
+            // Use minimal backoff to ensure we detect changes immediately
+            // 1ms is the minimum possible value to ensure immediate responsiveness
+            let backoff = 1;
 
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first

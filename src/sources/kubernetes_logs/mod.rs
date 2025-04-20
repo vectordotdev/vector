@@ -830,7 +830,9 @@ impl Source {
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
             rotate_wait,
-            using_notify_discovery: true, // Use notify-based discovery for better performance
+            // We exclusively use notify-based discovery for better performance
+            // Use a 30-second interval for checkpointing to balance between
+            // durability and performance
             checkpoint_interval: Duration::from_secs(30),
         };
 
