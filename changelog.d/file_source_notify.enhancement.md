@@ -14,4 +14,6 @@ This implementation:
 - Properly handles file deletion events to prevent repeated error messages
 - Removes deleted files from the discovered files cache to prevent unnecessary fingerprinting attempts
 
+The `glob_minimum_cooldown_ms` configuration option has been deprecated since Vector now only globs once on startup and then relies on filesystem notifications for file discovery.
+
 authors: tamer-hassan

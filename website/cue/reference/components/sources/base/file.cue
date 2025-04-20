@@ -154,12 +154,17 @@ base: components: sources: file: configuration: {
 			This controls the interval at which files are searched. A higher value results in greater
 			chances of some short-lived files being missed between searches, but a lower value increases
 			the performance impact of file discovery.
+
+			Note: This option is deprecated as Vector now uses filesystem notifications instead of polling
+			for file discovery. It is only used as a fallback mechanism when filesystem notifications fail.
 			"""
 		required: false
 		type: uint: {
 			default: 1000
 			unit:    "milliseconds"
 		}
+		deprecated: true
+		deprecation_message: "This option is deprecated as Vector now uses filesystem notifications instead of polling for file discovery."
 	}
 	host_key: {
 		description: """

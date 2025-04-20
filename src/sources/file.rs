@@ -152,6 +152,10 @@ pub struct FileConfig {
     /// This controls the interval at which files are searched. A higher value results in greater
     /// chances of some short-lived files being missed between searches, but a lower value increases
     /// the performance impact of file discovery.
+    ///
+    /// Note: This option is deprecated as Vector now uses filesystem notifications instead of polling
+    /// for file discovery. It is only used as a fallback mechanism when filesystem notifications fail.
+    #[configurable(deprecated = "This option is deprecated as Vector now uses filesystem notifications instead of polling for file discovery.")]
     #[serde(
         alias = "glob_minimum_cooldown",
         default = "default_glob_minimum_cooldown_ms"
