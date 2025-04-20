@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::future::Future;
 
 use super::PathsProvider;
 
@@ -6,12 +8,15 @@ use super::PathsProvider;
 ///
 /// This allows us to use dynamic dispatch with PathsProvider implementations.
 pub struct BoxedPathsProvider {
-    inner: Box<dyn PathsProvider<IntoIter = Vec<PathBuf>> + Send>,
+    inner: Box<dyn PathsProvider<IntoIter = Vec<PathBuf>> + Send + Sync + 'static>,
 }
 
 impl BoxedPathsProvider {
     /// Create a new BoxedPathsProvider
-    pub fn new<P: PathsProvider<IntoIter = Vec<PathBuf>> + Send + 'static>(provider: P) -> Self {
+    pub fn new<P>(provider: P) -> Self
+    where
+        P: PathsProvider<IntoIter = Vec<PathBuf>> + Send + Sync + 'static,
+    {
         BoxedPathsProvider {
             inner: Box::new(provider),
         }
@@ -21,7 +26,8 @@ impl BoxedPathsProvider {
 impl PathsProvider for BoxedPathsProvider {
     type IntoIter = Vec<PathBuf>;
 
-    fn paths(&self) -> Self::IntoIter {
+    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
+        // Return the inner future directly
         self.inner.paths()
     }
 }

@@ -18,27 +18,20 @@ pub mod notify;
 /// This allows us to use dynamic dispatch with PathsProvider implementations.
 pub mod boxed;
 
+use std::future::Future;
+use std::pin::Pin;
+
 /// Represents the ability to enumerate paths.
 ///
 /// For use at [`crate::FileServer`].
 ///
 /// # Notes
 ///
-/// Ideally we'd use an iterator with bound lifetime here:
-///
-/// ```ignore
-/// type Iter<'a>: Iterator<Item = PathBuf> + 'a;
-/// fn paths(&self) -> Self::Iter<'_>;
-/// ```
-///
-/// However, that's currently unavailable at Rust.
-/// See: <https://github.com/rust-lang/rust/issues/44265>
-///
-/// We use an `IntoIter` here as a workaround.
+/// This trait uses async methods to allow for more efficient file discovery.
 pub trait PathsProvider {
     /// Provides the iterator that returns paths.
     type IntoIter: IntoIterator<Item = PathBuf>;
 
-    /// Provides a set of paths.
-    fn paths(&self) -> Self::IntoIter;
+    /// Provides a set of paths asynchronously.
+    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>>;
 }

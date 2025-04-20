@@ -1,4 +1,4 @@
-use std::{
+use std::{time::Instant,
     cmp,
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
@@ -117,7 +117,9 @@ where
         let mut known_small_files = HashSet::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().into_iter() {
+        // Use block_on to call the async paths method
+        let paths = self.handle.block_on(self.paths_provider.paths());
+        for path in paths.into_iter() {
             if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                 &path,
                 &mut fingerprint_buffer,
@@ -182,33 +184,54 @@ where
             // Determine if we need to perform file discovery
             let now_time = time::Instant::now();
             let should_discover = if self.using_notify_discovery {
-                // When using notify-based discovery, we only need to glob occasionally as a fallback
-                // This is much less frequent than with polling-based discovery
-                next_glob_time <= now_time
-                    && now_time.duration_since(next_glob_time) > Duration::from_secs(10)
+                // When using notify-based discovery, we want to check for new files frequently
+                // to minimize the delay between when a file is discovered by the notify watcher
+                // and when it's actually processed, but not on every iteration to avoid excessive CPU usage
+                next_glob_time <= now_time || now_time.duration_since(next_glob_time) > Duration::from_millis(100)
             } else {
                 // Standard behavior for polling-based discovery
                 next_glob_time <= now_time
             };
 
+            // Report stats periodically, but only if enough time has passed since the last report
+            // This prevents excessive logging when the main loop is running frequently
+            static mut LAST_STATS_REPORT: Option<Instant> = None;
+            let now = Instant::now();
+            let should_report_stats = unsafe {
+                if let Some(last_report) = LAST_STATS_REPORT {
+                    if now.duration_since(last_report) >= Duration::from_secs(10) {
+                        LAST_STATS_REPORT = Some(now);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    LAST_STATS_REPORT = Some(now);
+                    true
+                }
+            };
+
+            if should_report_stats && stats.started_at.elapsed() > Duration::from_secs(10) {
+                stats.report();
+            }
+
+            if stats.started_at.elapsed() > Duration::from_secs(10) {
+                stats = TimingStats::default();
+            }
+
             if should_discover {
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
-
-                if stats.started_at.elapsed() > Duration::from_secs(1) {
-                    stats.report();
-                }
-
-                if stats.started_at.elapsed() > Duration::from_secs(10) {
-                    stats = TimingStats::default();
-                }
 
                 // Search (glob) for files to detect major file changes.
                 let start = time::Instant::now();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+
+                // Use async paths provider
+                let paths = self.handle.block_on(self.paths_provider.paths());
+                for path in paths.into_iter() {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,
@@ -255,7 +278,33 @@ where
                             }
                         } else {
                             // untracked file fingerprint
+                            // Immediately watch and read the new file
+                            let path_clone = path.clone();
+                            debug!(message = "Discovered new file during runtime", ?path_clone);
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, &mut lines);
+
+                            // Immediately read the file to avoid delay in detecting content
+                            if let Some(watcher) = fp_map.get_mut(&file_id) {
+                                debug!(message = "Immediately reading newly discovered file", ?path_clone);
+                                let mut bytes_read: usize = 0;
+                                while let Ok(Some(line)) = watcher.read_line() {
+                                    let sz = line.bytes.len();
+                                    trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
+                                    bytes_read += sz;
+
+                                    lines.push(Line {
+                                        text: line.bytes,
+                                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                                        file_id,
+                                        start_offset: line.offset,
+                                        end_offset: watcher.get_file_position(),
+                                    });
+                                }
+
+                                if bytes_read > 0 {
+                                    debug!(message = "Read initial content from newly discovered file", ?path_clone, bytes = bytes_read);
+                                }
+                            }
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -267,9 +316,6 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
-                if !watcher.should_read() {
-                    continue;
-                }
 
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
@@ -406,6 +452,12 @@ where
             futures::pin_mut!(sleep);
             match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
+                    // Shut down all file watchers to prevent further events
+                    debug!(message = "Shutting down all file watchers", count = fp_map.len());
+                    for (_, watcher) in fp_map.iter_mut() {
+                        watcher.shutdown();
+                    }
+
                     self.handle
                         .block_on(chans.close())
                         .expect("error closing file_server data channel.");

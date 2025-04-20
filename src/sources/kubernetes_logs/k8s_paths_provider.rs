@@ -2,10 +2,14 @@
 
 #![deny(missing_docs)]
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::reflector::{store::Store, ObjectRef};
+use tokio::task::spawn_blocking;
+use tracing::error;
 use vector_lib::file_source::paths_provider::PathsProvider;
 
 use super::path_helpers::build_pod_logs_directory;
@@ -40,34 +44,53 @@ impl K8sPathsProvider {
 impl PathsProvider for K8sPathsProvider {
     type IntoIter = Vec<PathBuf>;
 
-    fn paths(&self) -> Vec<PathBuf> {
-        let state = self.pod_state.state();
+    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
+        Box::pin(async move {
+        // Clone the data we need to move into the spawn_blocking task
+        let pod_state = self.pod_state.clone();
+        let namespace_state = self.namespace_state.clone();
+        let include_paths = self.include_paths.clone();
+        let exclude_paths = self.exclude_paths.clone();
 
-        state
-            .into_iter()
-            // filter out pods where we haven't fetched the namespace metadata yet
-            // they will be picked up on a later run
-            .filter(|pod| {
-                trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod.metadata.name);
-                if let Some(namespace) = pod.metadata.namespace.as_ref() {
-                    self.namespace_state
-                        .get(&ObjectRef::<Namespace>::new(namespace))
-                        .is_some()
-                } else {
-                    false
-                }
-            })
-            .flat_map(|pod| {
-                trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
-                let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
-                filter_paths(
-                    filter_paths(paths_iter, &self.include_paths, true),
-                    &self.exclude_paths,
-                    false,
-                )
-                .collect::<Vec<_>>()
-            })
-            .collect()
+        // Use spawn_blocking to run the potentially expensive operations in a separate thread
+        match spawn_blocking(move || {
+            let state = pod_state.state();
+
+            state
+                .into_iter()
+                // filter out pods where we haven't fetched the namespace metadata yet
+                // they will be picked up on a later run
+                .filter(|pod| {
+                    trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod.metadata.name);
+                    if let Some(namespace) = pod.metadata.namespace.as_ref() {
+                        namespace_state
+                            .get(&ObjectRef::<Namespace>::new(namespace))
+                            .is_some()
+                    } else {
+                        false
+                    }
+                })
+                .flat_map(|pod| {
+                    trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
+                    let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
+                    filter_paths(
+                        filter_paths(paths_iter, &include_paths, true),
+                        &exclude_paths,
+                        false,
+                    )
+                    .collect::<Vec<_>>()
+                })
+                .collect()
+        })
+        .await
+        {
+            Ok(paths) => paths,
+            Err(e) => {
+                error!(message = "Error during K8s paths discovery", error = ?e);
+                Vec::new()
+            }
+        }
+        })
     }
 }
 
