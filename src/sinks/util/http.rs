@@ -406,12 +406,12 @@ impl<F, B> HttpBatchService<F, B> {
     pub fn new_with_sig_v4(
         inner: HttpClient,
         request_builder: impl Fn(B) -> F + Send + Sync + 'static,
-        sig_v4_config: Option<SigV4Config>,
+        sig_v4_config: SigV4Config,
     ) -> Self {
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
-            sig_v4_config,
+            sig_v4_config: Some(sig_v4_config),
         }
     }
 }
@@ -802,7 +802,7 @@ where
     pub fn new_with_sig_v4(
         http_client: HttpClient<Body>,
         http_request_builder: B,
-        sig_v4_config: Option<SigV4Config>,
+        sig_v4_config: SigV4Config,
     ) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 

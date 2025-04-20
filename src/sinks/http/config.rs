@@ -8,26 +8,28 @@ use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, Stat
 use hyper::Body;
 use indexmap::IndexMap;
 use std::path::PathBuf;
-use vector_lib::{
-    codecs::{
-        encoding::{Framer, Serializer},
-        CharacterDelimitedEncoder,
-    },
-    config::proxy::ProxyConfig,
+use vector_lib::codecs::{
+    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoder,
 };
+#[cfg(feature = "aws-core")]
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
     encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
     sink::HttpSink,
 };
+#[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
+#[cfg(feature = "aws-core")]
+use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig, SigV4Config},
+            http::{http_response_retry_logic, HttpService, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
@@ -292,7 +294,7 @@ impl SinkConfig for HttpSinkConfig {
             content_encoding,
         );
 
-        let sig_v4_config = match &self.auth {
+        let service = match &self.auth {
             #[cfg(feature = "aws-core")]
             Some(Auth::Aws { auth, service }) => {
                 let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
@@ -307,19 +309,20 @@ impl SinkConfig for HttpSinkConfig {
                 .map_or(default_region, |r| Some(Region::new(r.to_string())))
                 .expect("Region must be specified");
 
-                Some(SigV4Config {
-                    shared_credentials_provider: auth
-                        .credentials_provider(region.clone(), &ProxyConfig::default(), None)
-                        .await?,
-                    region: region.clone(),
-                    service: service.clone(),
-                })
+                HttpService::new_with_sig_v4(
+                    client,
+                    http_sink_request_builder,
+                    SigV4Config {
+                        shared_credentials_provider: auth
+                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                            .await?,
+                        region: region.clone(),
+                        service: service.clone(),
+                    },
+                )
             }
-            _ => None,
+            _ => HttpService::new(client, http_sink_request_builder),
         };
-
-        let service =
-            HttpService::new_with_sig_v4(client, http_sink_request_builder, sig_v4_config);
 
         let request_limits = self.request.tower.into_settings();
 
