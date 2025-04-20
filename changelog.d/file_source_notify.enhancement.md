@@ -5,9 +5,11 @@ This implementation:
 - Eliminates polling completely, using only notification-based watching
 - Never keeps file handles open for idle files
 - Only opens files when needed for reading, then closes them immediately
-- Improves responsiveness to file changes
+- Significantly improves responsiveness to file changes (new files are detected and processed within 100ms)
 - Maintains proper checkpointing for all files
-- Reads pre-existing files at startup to detect changes that occurred while Vector was stopped
+- Reads files at startup to detect changes that occurred while Vector was stopped
 - Filters out empty lines to avoid sending empty events
+- Uses async/await for better performance and resource utilization
+- Optimizes CPU usage and log verbosity with intelligent throttling
 
 authors: tamer-hassan
