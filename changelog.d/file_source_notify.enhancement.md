@@ -8,7 +8,6 @@ This implementation:
 - Significantly improves responsiveness to file changes (new files are detected and processed within 100ms)
 - Maintains proper checkpointing for all files
 - Reads files at startup to detect changes that occurred while Vector was stopped
-- Filters out empty lines to avoid sending empty events
 - Uses async/await for better performance and resource utilization
 - Optimizes CPU usage and log verbosity with intelligent throttling
 - Properly handles file deletion events to prevent repeated error messages

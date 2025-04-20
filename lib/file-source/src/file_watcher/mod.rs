@@ -369,16 +369,11 @@ impl FileWatcher {
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
 
-                // Don't return empty lines
-                if bytes.is_empty() {
-                    trace!(message = "Skipping empty line", ?self.path, position = initial_position);
-                    Ok(None)
-                } else {
-                    Ok(Some(RawLine {
-                        offset: initial_position,
-                        bytes,
-                    }))
-                }
+                // Return all lines, including empty ones
+                Ok(Some(RawLine {
+                    offset: initial_position,
+                    bytes,
+                }))
             }
             Ok(None) => {
                 if !self.file_findable() {

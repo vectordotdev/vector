@@ -501,40 +501,26 @@ where
                 // Process any lines read at startup
                 let startup_lines = watcher.take_startup_lines();
                 if !startup_lines.is_empty() {
-                    // Count the original number of lines
-                    let original_count = startup_lines.len();
-
-                    // Filter out empty lines to avoid sending empty events
-                    let non_empty_lines: Vec<_> = startup_lines
-                        .into_iter()
-                        .filter(|line| !line.bytes.is_empty())
-                        .collect();
-                    let filtered_count = non_empty_lines.len();
-
-                    if filtered_count > 0 {
+                    // Process all startup lines, including empty ones
+                    let line_count = startup_lines.len();
+                    if line_count > 0 {
                         debug!(
                             message = "Processing startup lines",
-                            original_count = original_count,
-                            filtered_count = filtered_count,
+                            line_count = line_count,
                             ?path
                         );
 
-                        for line in non_empty_lines {
+                        // Add the lines to the output
+                        for line in startup_lines {
                             let bytes_len = line.bytes.len() as u64;
                             lines.push(Line {
                                 text: line.bytes,
-                                filename: path.to_str().expect("not a valid path").to_owned(),
+                                filename: path.to_string_lossy().into_owned(),
                                 file_id,
                                 start_offset: line.offset,
                                 end_offset: line.offset + bytes_len,
                             });
                         }
-                    } else {
-                        debug!(
-                            message = "No non-empty startup lines to process",
-                            original_count = original_count,
-                            ?path
-                        );
                     }
                 }
 
