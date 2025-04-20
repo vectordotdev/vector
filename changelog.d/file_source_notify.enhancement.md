@@ -11,5 +11,7 @@ This implementation:
 - Filters out empty lines to avoid sending empty events
 - Uses async/await for better performance and resource utilization
 - Optimizes CPU usage and log verbosity with intelligent throttling
+- Properly handles file deletion events to prevent repeated error messages
+- Removes deleted files from the discovered files cache to prevent unnecessary fingerprinting attempts
 
 authors: tamer-hassan

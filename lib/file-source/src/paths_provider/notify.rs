@@ -168,6 +168,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                         EventKind::Modify(notify::event::ModifyKind::Name(
                             notify::event::RenameMode::To,
                         )) => true,
+                        // File was removed
+                        EventKind::Remove(notify::event::RemoveKind::File) => true,
                         // Explicitly filter out Access events
                         EventKind::Access(_) => false,
                         // Explicitly filter out all Other events
@@ -181,6 +183,19 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                         for path in event.paths {
                             // Convert to PathBuf
                             let path_buf = path.to_path_buf();
+
+                            // Check if this is a removal event
+                            if let EventKind::Remove(notify::event::RemoveKind::File) = event.kind {
+                                // If the file was removed, remove it from our cache
+                                if discovered_files.contains_key(&path_buf) {
+                                    debug!(
+                                        message = "Removing deleted file from discovered files cache",
+                                        path = ?path_buf
+                                    );
+                                    discovered_files.remove(&path_buf);
+                                }
+                                continue;
+                            }
 
                             // Check if the path matches our patterns
                             let path_str = path_buf.to_str().unwrap_or_default();
