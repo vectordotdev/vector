@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use indexmap::IndexMap;
+use serde::Deserialize;
 use serde_with::serde_as;
 use vrl::path::{parse_target_path, PathPrefix};
 use vrl::prelude::{Collection, KeyString, Kind};
@@ -91,24 +92,128 @@ pub struct ReduceConfig {
     ///
     /// If this condition resolves to `true` for an event, the current transaction is immediately
     /// flushed with this event.
-    pub ends_when: Option<AnyCondition>,
+    pub ends_when: Option<ApplyTo>,
 
     /// A condition used to distinguish the first event of a transaction.
     ///
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
     pub starts_when: Option<AnyCondition>,
+}
 
-    /// Runs `ends_with` condition on the merged event instead of the original incoming event.
-    ///
-    /// Normally, the `ends_when` condition happens on the original incoming event. In some cases,
-    /// you may wish to run the conditional on the merged result.
-    ///
-    /// In these cases, `condition_on_merged` can be set to `true` to run the conditions
-    /// against the merged result.
-    #[serde(default = "crate::serde::default_false")]
-    #[configurable(metadata(docs::human_name = "Run Conditions on Merged Event"))]
-    pub condition_on_merged: bool,
+/// Incomming Event Conditional
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct IncommingEventCondition {
+    /// Condition to apply
+    #[serde(flatten)]
+    pub condition: AnyCondition,
+}
+
+/// Merged Event Condition
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct MergedEventCondition {
+    /// Condition to apply
+    #[serde(flatten)]
+    pub condition: AnyCondition,
+}
+
+/// Condition mode for ends_with
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
+#[serde(tag = "apply_to")]
+#[serde(deny_unknown_fields)]
+#[allow(clippy::large_enum_variant)] // just used for configuration
+pub enum ApplyTo {
+    /// Run condition on the incomming event
+    #[serde(rename = "incomming_event")]
+    IncommingEvent(IncommingEventCondition),
+
+    /// Run condition on the merged event
+    #[serde(rename = "merged_event")]
+    MergedEvent(MergedEventCondition),
+}
+
+mod deser {
+    use super::*;
+
+    #[derive(Deserialize)]
+    #[serde(tag = "apply_to")]
+    enum ApplyToTagged {
+        #[serde(rename = "incomming_event")]
+        IncommingEvent(IncommingEventCondition),
+
+        #[serde(rename = "merged_event")]
+        MergedEvent(MergedEventCondition),
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ApplyToDe {
+        Tagged(ApplyToTagged),
+
+        // Note: this must be last as serde attempts variants in order
+        Untagged(AnyCondition),
+    }
+
+    impl<'de> Deserialize<'de> for ApplyTo {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(match ApplyToDe::deserialize(deserializer)? {
+                ApplyToDe::Tagged(ApplyToTagged::IncommingEvent(config)) => {
+                    ApplyTo::IncommingEvent(config)
+                }
+                ApplyToDe::Tagged(ApplyToTagged::MergedEvent(config)) => {
+                    ApplyTo::MergedEvent(config)
+                }
+                ApplyToDe::Untagged(config) => {
+                    ApplyTo::IncommingEvent(IncommingEventCondition { condition: config })
+                }
+            })
+        }
+    }
+
+    #[cfg(all(test))]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_serde() {
+            let a = serde_json::json!(
+                {
+                    "type": "vrl",
+                    "source": "exists!(.)",
+                }
+            );
+            let s: ApplyTo = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.condition, ApplyTo::IncommingEvent(c) if c.type.unwrap() == "vrl"));
+
+            let a = serde_json::json!(
+                {
+                    "apply_to": "incomming_event",
+                    "type": "vrl",
+                    "source": "exists!(.)",
+                }
+            );
+            let s: ApplyTo = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.condition, ApplyTo::IncommingEvent(c) if c.type.unwrap() == "vrl"));
+
+            let a = serde_json::json!(
+                {
+                    "apply_to": "merged_event",
+                    "type": "vrl",
+                    "source": "exists!(.)",
+                }
+            );
+            let s: ApplyTo = serde_json::from_value(a).unwrap();
+            assert!(matches!(s.condition, ApplyTo::MergedEvent(c) if c.type.unwrap() == "vrl"));
+        }
+    }
 }
 
 const fn default_expire_after_ms() -> Duration {

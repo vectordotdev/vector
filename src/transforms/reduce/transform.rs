@@ -11,7 +11,7 @@ use crate::{
     conditions::Condition,
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
-    transforms::{reduce::config::ReduceConfig, TaskTransform},
+    transforms::{reduce::config::ApplyTo, reduce::config::ReduceConfig, TaskTransform},
 };
 use futures::Stream;
 use indexmap::IndexMap;
@@ -185,11 +185,21 @@ impl Reduce {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
         }
 
-        let ends_when = config
-            .ends_when
-            .as_ref()
-            .map(|c| c.build(enrichment_tables))
-            .transpose()?;
+        let condition_on_merged = match &config.ends_when {
+            Some(ApplyTo::IncommingEvent(_)) => false,
+            Some(ApplyTo::MergedEvent(_)) => true,
+            _ => false,
+        };
+
+        let ends_when = match &config.ends_when {
+            Some(ApplyTo::IncommingEvent(x)) => Some(x.condition.clone()),
+            Some(ApplyTo::MergedEvent(x)) => Some(x.condition.clone()),
+            _ => None,
+        }
+        .as_ref()
+        .map(|c| c.build(enrichment_tables))
+        .transpose()?;
+
         let starts_when = config
             .starts_when
             .as_ref()
@@ -223,7 +233,7 @@ impl Reduce {
             ends_when,
             starts_when,
             max_events,
-            condition_on_merged: config.condition_on_merged,
+            condition_on_merged,
         })
     }
 
@@ -501,11 +511,11 @@ group_by = [ "request_id" ]
         let reduce_config = toml::from_str::<ReduceConfig>(
             r#"
 group_by = [ "request_id" ]
-condition_on_merged = true
 merge_strategies.message = "array"
 merge_strategies.size = "retain"
 
 [ends_when]
+  apply_to = "merged_event"
   type = "vrl"
   source = "(is_array(.message) && (to_int!(.size)) == length!(.message)) || (is_string(.message) && to_int!(.size) == 1)"
 "#,
