@@ -7,7 +7,7 @@
     <a href="https://chat.vector.dev">Chat</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
-  </strong>
+  </strong> 
 </p>
 <p align="center">
   <img src="website/static/img/diagram.svg" alt="Vector">
