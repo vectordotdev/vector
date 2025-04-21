@@ -13,8 +13,6 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 
-use crate::sources::http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind};
-use crate::sources::util::add_headers;
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -42,7 +40,6 @@ struct Service {
     pipeline: SourceSender,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-    headers: Vec<HttpConfigParamKind>,
 }
 
 #[tonic::async_trait]
@@ -51,7 +48,6 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let request_metadata = request.metadata().clone();
         let mut events: Vec<Event> = request
             .into_inner()
             .events
@@ -69,13 +65,6 @@ impl proto::Service for Service {
                 );
             }
         }
-        add_headers(
-            &mut events,
-            &self.headers,
-            &request_metadata.into_headers(),
-            self.log_namespace,
-            VectorConfig::NAME,
-        );
 
         let count = events.len();
         let byte_size = events.estimated_json_encoded_size_of();
@@ -149,20 +138,6 @@ pub struct VectorConfig {
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
-
-    /// A list of HTTP headers to include in the log event.
-    ///
-    /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
-    ///
-    /// Specifying "*" results in all headers included in the log event.
-    ///
-    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
-    #[serde(default)]
-    #[configurable(metadata(docs::examples = "User-Agent"))]
-    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
-    #[configurable(metadata(docs::examples = "X-*"))]
-    #[configurable(metadata(docs::examples = "*"))]
-    headers: Vec<String>,
 }
 
 impl VectorConfig {
@@ -183,7 +158,6 @@ impl Default for VectorConfig {
             tls: None,
             acknowledgements: Default::default(),
             log_namespace: None,
-            headers: Default::default(),
         }
     }
 }
@@ -206,7 +180,6 @@ impl SourceConfig for VectorConfig {
             pipeline: cx.out,
             acknowledgements,
             log_namespace,
-            headers: build_param_matcher(&remove_duplicates(self.headers.clone(), "headers"))?,
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
