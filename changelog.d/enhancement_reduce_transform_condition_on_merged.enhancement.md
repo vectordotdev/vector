@@ -3,7 +3,7 @@ Add option to run `ends_when` condition on the merged event in reduce transform 
 authors: Goggin
 
 An optional tag is added to the reduce config to be able to use the merged event.
-The default is to operate on an incomming event.
+The default is to operate on an incoming event.
 
 New config:
 
@@ -19,7 +19,7 @@ transforms:
       source: "(is_array(.message) && (to_int!(._extra.size)) == length!(.message)) || (is_string(.message) && to_int!(._extra.size) == 1)"
 ```
 
-For incomming event, you can use the current sytax or
+For incoming event, you can use the current syntax or
 
 ```yaml
 transforms:
@@ -28,7 +28,7 @@ transforms:
     inputs:
       - my-source-or-transform-id
     ends_when:
-      apply_to: "incomming_event"
+      apply_to: "incoming_event"
       type: "vrl"
       source: ".status == 500"
 ```

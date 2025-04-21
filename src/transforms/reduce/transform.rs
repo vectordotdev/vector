@@ -186,13 +186,13 @@ impl Reduce {
         }
 
         let condition_on_merged = match &config.ends_when {
-            Some(ApplyTo::IncommingEvent(_)) => false,
+            Some(ApplyTo::IncomingEvent(_)) => false,
             Some(ApplyTo::MergedEvent(_)) => true,
             _ => false,
         };
 
         let ends_when = match &config.ends_when {
-            Some(ApplyTo::IncommingEvent(x)) => Some(x.condition.clone()),
+            Some(ApplyTo::IncomingEvent(x)) => Some(x.condition.clone()),
             Some(ApplyTo::MergedEvent(x)) => Some(x.condition.clone()),
             _ => None,
         }

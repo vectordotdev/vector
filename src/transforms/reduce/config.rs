@@ -101,11 +101,11 @@ pub struct ReduceConfig {
     pub starts_when: Option<AnyCondition>,
 }
 
-/// Incomming Event Conditional
+/// Incoming Event Conditional
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct IncommingEventCondition {
+pub struct IncomingEventCondition {
     /// Condition to apply
     #[serde(flatten)]
     pub condition: AnyCondition,
@@ -128,9 +128,9 @@ pub struct MergedEventCondition {
 #[serde(deny_unknown_fields)]
 #[allow(clippy::large_enum_variant)] // just used for configuration
 pub enum ApplyTo {
-    /// Run condition on the incomming event
-    #[serde(rename = "incomming_event")]
-    IncommingEvent(IncommingEventCondition),
+    /// Run condition on the incoming event
+    #[serde(rename = "incoming_event")]
+    IncomingEvent(IncomingEventCondition),
 
     /// Run condition on the merged event
     #[serde(rename = "merged_event")]
@@ -143,8 +143,8 @@ mod deser {
     #[derive(Deserialize)]
     #[serde(tag = "apply_to")]
     enum ApplyToTagged {
-        #[serde(rename = "incomming_event")]
-        IncommingEvent(IncommingEventCondition),
+        #[serde(rename = "incoming_event")]
+        IncomingEvent(IncomingEventCondition),
 
         #[serde(rename = "merged_event")]
         MergedEvent(MergedEventCondition),
@@ -165,14 +165,14 @@ mod deser {
             D: serde::Deserializer<'de>,
         {
             Ok(match ApplyToDe::deserialize(deserializer)? {
-                ApplyToDe::Tagged(ApplyToTagged::IncommingEvent(config)) => {
-                    ApplyTo::IncommingEvent(config)
+                ApplyToDe::Tagged(ApplyToTagged::IncomingEvent(config)) => {
+                    ApplyTo::IncomingEvent(config)
                 }
                 ApplyToDe::Tagged(ApplyToTagged::MergedEvent(config)) => {
                     ApplyTo::MergedEvent(config)
                 }
                 ApplyToDe::Untagged(config) => {
-                    ApplyTo::IncommingEvent(IncommingEventCondition { condition: config })
+                    ApplyTo::IncomingEvent(IncomingEventCondition { condition: config })
                 }
             })
         }
@@ -191,17 +191,17 @@ mod deser {
                 }
             );
             let s: ApplyTo = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.condition, ApplyTo::IncommingEvent(c) if c.type.unwrap() == "vrl"));
+            assert!(matches!(s.condition, ApplyTo::IncomingEvent(c) if c.type.unwrap() == "vrl"));
 
             let a = serde_json::json!(
                 {
-                    "apply_to": "incomming_event",
+                    "apply_to": "incoming_event",
                     "type": "vrl",
                     "source": "exists!(.)",
                 }
             );
             let s: ApplyTo = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.condition, ApplyTo::IncommingEvent(c) if c.type.unwrap() == "vrl"));
+            assert!(matches!(s.condition, ApplyTo::IncomingEvent(c) if c.type.unwrap() == "vrl"));
 
             let a = serde_json::json!(
                 {
