@@ -55,8 +55,6 @@ pub enum WatcherState {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    #[allow(dead_code)]
-    reader: Option<Box<dyn BufRead>>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -68,9 +66,6 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
-    /// Current state of the watcher (always Notify)
-    #[allow(dead_code)]
-    state: WatcherState,
     /// Notify-based watcher for all files
     notify_watcher: NotifyWatcher,
     /// Buffer of lines read at startup
@@ -199,7 +194,6 @@ impl FileWatcher {
         let mut fw = FileWatcher {
             path: path.clone(),
             findable: true,
-            reader: None, // No reader is kept open
             file_position,
             devno,
             inode: ino,
@@ -211,7 +205,6 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
-            state: WatcherState::Notify, // Always in Notify state
             notify_watcher,
             startup_lines: Vec::new(),
         };
@@ -440,14 +433,7 @@ impl FileWatcher {
         Ok(())
     }
 
-    /// Get the current state of the watcher
-    ///
-    /// Note: This always returns WatcherState::Notify since we're always using
-    /// notification-based watching for all files.
-    #[allow(dead_code)]
-    pub fn state(&self) -> WatcherState {
-        WatcherState::Notify
-    }
+
 
     /// Get and clear the startup lines
     ///

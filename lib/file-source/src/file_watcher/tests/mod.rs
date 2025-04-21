@@ -60,11 +60,7 @@ impl FileWatcherFile {
         self.reads_available = 0;
     }
 
-    /// Return the current read position
-    #[allow(dead_code)]
-    pub fn tell(&self) -> usize {
-        self.read_idx
-    }
+
 
     pub fn truncate(&mut self) {
         self.reads_available = 0;
