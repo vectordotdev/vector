@@ -695,12 +695,19 @@ impl Source {
             watcher::ListSemantic::MostRecent
         };
 
+        let limit = if use_apiserver_cache {
+            None
+        } else {
+            Some(500)
+        };
+
         let pod_watcher = watcher(
             pods,
             watcher::Config {
                 field_selector: Some(field_selector),
                 label_selector: Some(label_selector),
                 list_semantic: list_semantic.clone(),
+                page_size: limit,
                 ..Default::default()
             },
         )
