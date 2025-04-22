@@ -727,11 +727,17 @@ impl Source {
         // -----------------------------------------------------------------
 
         let namespaces = Api::<Namespace>::all(client.clone());
+        let page_size = if use_apiserver_cache {
+            None
+        } else {
+            Some(500)
+        };
         let ns_watcher = watcher(
             namespaces,
             watcher::Config {
                 label_selector: Some(namespace_label_selector),
                 list_semantic: list_semantic.clone(),
+                page_size: page_size.clone(),
                 ..Default::default()
             },
         )
@@ -755,6 +761,7 @@ impl Source {
             watcher::Config {
                 field_selector: Some(node_selector),
                 list_semantic,
+                page_size: page_size.clone(),
                 ..Default::default()
             },
         )
