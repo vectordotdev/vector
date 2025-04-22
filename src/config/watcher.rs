@@ -199,11 +199,12 @@ mod tests {
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
 
-        matches!(
-            tokio::time::timeout(timeout, receiver.recv()).await,
-            expected_signal
-        )
+        match tokio::time::timeout(timeout, receiver.recv()).await {
+            Ok(Ok(signal)) => signal == expected_signal,
+            _ => false,
+        }
     }
+
 
     #[tokio::test]
     async fn component_update() {
