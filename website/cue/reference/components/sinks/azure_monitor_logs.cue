@@ -6,7 +6,7 @@ components: sinks: azure_monitor_logs: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "batch"
 		service_providers: ["Azure"]
 		stateful: false
