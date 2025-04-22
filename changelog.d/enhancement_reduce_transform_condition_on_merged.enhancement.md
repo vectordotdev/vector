@@ -1,7 +1,5 @@
 Add option to run `ends_when` condition on the merged event in reduce transform which allows for things such as dynamic message count, etc
 
-authors: Goggin
-
 An optional tag is added to the reduce config to be able to use the merged event.
 The default is to operate on an incoming event.
 
@@ -32,3 +30,5 @@ transforms:
       type: "vrl"
       source: ".status == 500"
 ```
+
+authors: Goggin

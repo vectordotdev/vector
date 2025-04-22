@@ -186,7 +186,6 @@ impl Reduce {
         }
 
         let condition_on_merged = match &config.ends_when {
-            Some(ApplyTo::IncomingEvent(_)) => false,
             Some(ApplyTo::MergedEvent(_)) => true,
             _ => false,
         };
