@@ -192,7 +192,7 @@ mod tests {
 
     async fn test_signal(
         file: &mut File,
-        _expected_signal: crate::signal::SignalTo,
+        expected_signal: crate::signal::SignalTo,
         timeout: Duration,
         mut receiver: SignalRx,
     ) -> bool {
@@ -201,7 +201,7 @@ mod tests {
 
         matches!(
             tokio::time::timeout(timeout, receiver.recv()).await,
-            _expected_signal
+            expected_signal
         )
     }
 
