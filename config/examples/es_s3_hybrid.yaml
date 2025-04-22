@@ -8,7 +8,7 @@
 data_dir: "/var/lib/vector"
 
 # Ingest data by tailing one or more files
-# Docs: https://vector.dev/docs/reference/sources/file
+# Docs: https://vector.dev/docs/reference/configuration/sources/file
 sources:
   apache_logs:
     type: "file"
@@ -16,7 +16,7 @@ sources:
     ignore_older_secs: 86400 # 1 day
 
 # Optionally parse, structure and transform data here.
-# Docs: https://vector.dev/docs/reference/transforms
+# Docs: https://vector.dev/docs/reference/configuration/transforms
 
 # Send structured data to Elasticsearch for searching of recent data
 sinks:

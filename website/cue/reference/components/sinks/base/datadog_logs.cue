@@ -14,9 +14,9 @@ base: components: sinks: datadog_logs: configuration: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by **all
-				connected** sinks before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -92,6 +92,16 @@ base: components: sinks: datadog_logs: configuration: {
 				[zstd]: https://facebook.github.io/zstd/
 				"""
 		}
+	}
+	conforms_as_agent: {
+		description: """
+			When enabled this sink will normalize events to conform to the Datadog Agent standard. This
+			also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
+			will be overidden as `true` if this header has already been set in the request.headers
+			configuration setting.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	default_api_key: {
 		description: """
@@ -368,7 +378,7 @@ base: components: sinks: datadog_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -390,7 +400,7 @@ base: components: sinks: datadog_logs: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -441,7 +451,7 @@ base: components: sinks: datadog_logs: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

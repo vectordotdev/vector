@@ -38,7 +38,7 @@ pub struct ConfigBuilder {
 
     /// All configured enrichment tables.
     #[serde(default)]
-    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter<String>>,
 
     /// All configured sources.
     #[serde(default)]
@@ -106,6 +106,11 @@ impl From<Config> for ConfigBuilder {
             .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
             .collect();
 
+        let enrichment_tables = enrichment_tables
+            .into_iter()
+            .map(|(key, table)| (key, table.map_inputs(ToString::to_string)))
+            .collect();
+
         let tests = tests.into_iter().map(TestDefinition::stringify).collect();
 
         ConfigBuilder {
@@ -145,11 +150,16 @@ impl ConfigBuilder {
     pub fn add_enrichment_table<K: Into<String>, E: Into<EnrichmentTables>>(
         &mut self,
         key: K,
+        inputs: &[&str],
         enrichment_table: E,
     ) {
+        let inputs = inputs
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         self.enrichment_tables.insert(
             ComponentKey::from(key.into()),
-            EnrichmentTableOuter::new(enrichment_table),
+            EnrichmentTableOuter::new(inputs, enrichment_table),
         );
     }
 

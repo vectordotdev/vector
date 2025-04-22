@@ -336,14 +336,23 @@ base: components: sources: aws_s3: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}
@@ -400,6 +409,15 @@ base: components: sources: aws_s3: configuration: {
 		description: "Custom endpoint for use with AWS-compatible services."
 		required:    false
 		type: string: examples: ["http://127.0.0.0:5000/path/to/service"]
+	}
+	force_path_style: {
+		description: """
+			Specifies which addressing style to use.
+
+			This controls whether the bucket name is in the hostname, or part of the URL.
+			"""
+		required: false
+		type: bool: default: true
 	}
 	framing: {
 		description: """
@@ -690,6 +708,29 @@ base: components: sources: aws_s3: configuration: {
 					unit: "seconds"
 				}
 			}
+			deferred: {
+				description: "Configuration for deferring events to another queue based on their age."
+				required:    false
+				type: object: options: {
+					max_age_secs: {
+						description: """
+																Event must have been emitted within the last `max_age_secs` seconds to be processed.
+
+																If the event is older, it is forwarded to the `queue_url` for later processing.
+																"""
+						required: true
+						type: uint: {
+							examples: [3600]
+							unit: "seconds"
+						}
+					}
+					queue_url: {
+						description: "The URL of the queue to forward events to when they are older than `max_age_secs`."
+						required:    true
+						type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+					}
+				}
+			}
 			delete_failed_message: {
 				description: """
 					Whether to delete non-retryable messages.
@@ -778,7 +819,7 @@ base: components: sources: aws_s3: configuration: {
 						description: """
 																Sets the list of supported ALPN protocols.
 
-																Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+																Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 																that they are defined.
 																"""
 						required: false
@@ -800,7 +841,7 @@ base: components: sources: aws_s3: configuration: {
 																The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 																an inline string in PEM format.
 
-																If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+																If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 																"""
 						required: false
 						type: string: examples: ["/path/to/host_certificate.crt"]
@@ -841,7 +882,7 @@ base: components: sources: aws_s3: configuration: {
 																If enabled, certificates must not be expired and must be issued by a trusted
 																issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 																certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-																so on until the verification process reaches a root certificate.
+																so on, until the verification process reaches a root certificate.
 
 																Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 																"""
@@ -889,7 +930,7 @@ base: components: sources: aws_s3: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -911,7 +952,7 @@ base: components: sources: aws_s3: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -952,7 +993,7 @@ base: components: sources: aws_s3: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""
