@@ -151,9 +151,7 @@ mod deser {
                 ApplyToDe::Tagged(ApplyToTagged::MergedEvent(any_condition)) => {
                     ApplyTo::MergedEvent(any_condition)
                 }
-                ApplyToDe::Untagged(any_condition) => {
-                    ApplyTo::IncomingEvent(any_condition)
-                }
+                ApplyToDe::Untagged(any_condition) => ApplyTo::IncomingEvent(any_condition),
             })
         }
     }
