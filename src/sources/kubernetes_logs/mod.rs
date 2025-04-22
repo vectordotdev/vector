@@ -695,7 +695,7 @@ impl Source {
             watcher::ListSemantic::MostRecent
         };
 
-        let limit = if use_apiserver_cache {
+        let page_size = if use_apiserver_cache {
             None
         } else {
             Some(500)
@@ -707,11 +707,12 @@ impl Source {
                 field_selector: Some(field_selector),
                 label_selector: Some(label_selector),
                 list_semantic: list_semantic.clone(),
-                page_size: limit,
+                page_size: page_size.clone(),
                 ..Default::default()
             },
         )
         .backoff(watcher::DefaultBackoff::default());
+
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
