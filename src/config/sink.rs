@@ -176,7 +176,10 @@ pub struct SinkHealthcheckOptions {
 
     /// Timeout duration for healthcheck in seconds.
     #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
-    #[serde(default = "default_healthcheck_timeout")]
+    #[serde(
+        default = "default_healthcheck_timeout",
+        skip_serializing_if = "is_default_healthcheck_timeout"
+    )]
     pub timeout: Duration,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -189,6 +192,10 @@ pub struct SinkHealthcheckOptions {
 
 const fn default_healthcheck_timeout() -> Duration {
     Duration::from_secs(10)
+}
+
+fn is_default_healthcheck_timeout(timeout: &Duration) -> bool {
+    timeout == &default_healthcheck_timeout()
 }
 
 impl Default for SinkHealthcheckOptions {
