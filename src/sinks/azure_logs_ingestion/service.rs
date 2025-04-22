@@ -1,7 +1,7 @@
+use futures::executor;
+use std::sync::Arc;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
-use std::sync::Arc;
-use futures::executor;
 
 use azure_core::auth::TokenCredential;
 
@@ -121,19 +121,16 @@ impl AzureLogsIngestionService {
         let mut request = Request::post(&self.endpoint).body(Body::from(body))?;
 
         // TODO: make this an option, for soverign clouds
-        let access_token = executor::block_on(self.credential
-            .get_token(&[&self.token_scope]))
+        let access_token = executor::block_on(self.credential.get_token(&[&self.token_scope]))
             .expect("failed to get access token from credential");
-        
+
         let bearer = format!("Bearer {}", access_token.token.secret());
 
         *request.headers_mut() = self.default_headers.clone();
-        request
-            .headers_mut()
-            .insert(
-                header::AUTHORIZATION,
-                HeaderValue::from_str(&bearer).unwrap()
-            );
+        request.headers_mut().insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(&bearer).unwrap(),
+        );
 
         Ok(request)
     }

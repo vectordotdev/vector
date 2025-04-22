@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 
 use azure_core::auth::TokenCredential;
@@ -41,7 +40,9 @@ pub struct AzureLogsIngestionConfig {
     /// The [Data collection endpoint URI][endpoint] associated with the Log Analytics workspace.
     ///
     /// [endpoint]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
-    #[configurable(metadata(docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"))]
+    #[configurable(metadata(
+        docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+    ))]
     pub endpoint: String,
 
     /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
@@ -117,7 +118,6 @@ impl Default for AzureLogsIngestionConfig {
 }
 
 impl AzureLogsIngestionConfig {
-
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
@@ -176,7 +176,6 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 #[typetag::serde(name = "azure_logs_ingestion")]
 impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-
         let endpoint: UriSerde = self.endpoint.parse()?;
         self.build_inner(
             cx,
@@ -185,7 +184,8 @@ impl SinkConfig for AzureLogsIngestionConfig {
             self.stream_name.clone(),
             self.token_scope.clone(),
             self.timestamp_field.clone(),
-        ).await
+        )
+        .await
     }
 
     fn input(&self) -> Input {
