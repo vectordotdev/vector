@@ -185,25 +185,22 @@ impl Reduce {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
         }
 
-        let condition_on_merged = match &config.ends_when {
-            Some(ApplyTo::MergedEvent(_)) => true,
-            _ => false,
-        };
+        let condition_on_merged = matches!(&config.ends_when, Some(ApplyTo::MergedEvent(_)));
 
         let ends_when = match &config.ends_when {
-            Some(ApplyTo::IncomingEvent(x)) => Some(x.condition.clone()),
-            Some(ApplyTo::MergedEvent(x)) => Some(x.condition.clone()),
-            _ => None,
-        }
-        .as_ref()
-        .map(|c| c.build(enrichment_tables))
-        .transpose()?;
+            Some(ApplyTo::IncomingEvent(condition)) | Some(ApplyTo::MergedEvent(condition)) => {
+                condition.build(enrichment_tables).map(Some)
+            }
+            _ => Ok(None),
+        }?;
 
-        let starts_when = config
-            .starts_when
-            .as_ref()
-            .map(|c| c.build(enrichment_tables))
-            .transpose()?;
+        let starts_when = match &config.starts_when {
+            Some(ApplyTo::IncomingEvent(condition)) | Some(ApplyTo::MergedEvent(condition)) => {
+                condition.build(enrichment_tables).map(Some)
+            }
+            _ => Ok(None),
+        }?;
+
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
 
@@ -277,10 +274,9 @@ impl Reduce {
         };
     }
 
-    pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+    pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, mut event: Event) {
         let mut starts_here = false;
         let mut ends_here = false;
-        let mut event = event;
 
         if !self.condition_on_merged {
             (starts_here, event) = match &self.starts_when {

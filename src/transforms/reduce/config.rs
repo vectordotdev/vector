@@ -98,27 +98,7 @@ pub struct ReduceConfig {
     ///
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
-    pub starts_when: Option<AnyCondition>,
-}
-
-/// Incoming Event Conditional
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct IncomingEventCondition {
-    /// Condition to apply
-    #[serde(flatten)]
-    pub condition: AnyCondition,
-}
-
-/// Merged Event Condition
-#[configurable_component]
-#[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
-pub struct MergedEventCondition {
-    /// Condition to apply
-    #[serde(flatten)]
-    pub condition: AnyCondition,
+    pub starts_when: Option<ApplyTo>,
 }
 
 /// Condition mode for ends_with
@@ -130,11 +110,11 @@ pub struct MergedEventCondition {
 pub enum ApplyTo {
     /// Run condition on the incoming event
     #[serde(rename = "incoming_event")]
-    IncomingEvent(IncomingEventCondition),
+    IncomingEvent(AnyCondition),
 
     /// Run condition on the merged event
     #[serde(rename = "merged_event")]
-    MergedEvent(MergedEventCondition),
+    MergedEvent(AnyCondition),
 }
 
 mod deser {
@@ -144,10 +124,10 @@ mod deser {
     #[serde(tag = "apply_to")]
     enum ApplyToTagged {
         #[serde(rename = "incoming_event")]
-        IncomingEvent(IncomingEventCondition),
+        IncomingEvent(AnyCondition),
 
         #[serde(rename = "merged_event")]
-        MergedEvent(MergedEventCondition),
+        MergedEvent(AnyCondition),
     }
 
     #[derive(Deserialize)]
@@ -165,53 +145,58 @@ mod deser {
             D: serde::Deserializer<'de>,
         {
             Ok(match ApplyToDe::deserialize(deserializer)? {
-                ApplyToDe::Tagged(ApplyToTagged::IncomingEvent(config)) => {
-                    ApplyTo::IncomingEvent(config)
+                ApplyToDe::Tagged(ApplyToTagged::IncomingEvent(any_condition)) => {
+                    ApplyTo::IncomingEvent(any_condition)
                 }
-                ApplyToDe::Tagged(ApplyToTagged::MergedEvent(config)) => {
-                    ApplyTo::MergedEvent(config)
+                ApplyToDe::Tagged(ApplyToTagged::MergedEvent(any_condition)) => {
+                    ApplyTo::MergedEvent(any_condition)
                 }
-                ApplyToDe::Untagged(config) => {
-                    ApplyTo::IncomingEvent(IncomingEventCondition { condition: config })
+                ApplyToDe::Untagged(any_condition) => {
+                    ApplyTo::IncomingEvent(any_condition)
                 }
             })
         }
     }
 
-    #[cfg(all(test))]
+    #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::conditions::ConditionConfig;
 
         #[test]
         fn test_serde() {
-            let a = serde_json::json!(
-                {
-                    "type": "vrl",
-                    "source": "exists!(.)",
+            let incoming = serde_json::json!({
+                "apply_to": "incoming_event",
+                "type": "vrl",
+                "source": "exists!(.)",
+            });
+            let s: ApplyTo = serde_json::from_value(incoming).unwrap();
+            match s {
+                ApplyTo::IncomingEvent(AnyCondition::Map(ConditionConfig::Vrl(vrl))) => {
+                    assert_eq!(vrl.source, "exists!(.)");
                 }
-            );
-            let s: ApplyTo = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.condition, ApplyTo::IncomingEvent(c) if c.type.unwrap() == "vrl"));
+                _ => panic!("Expected IncomingEvent with VRL condition"),
+            }
 
-            let a = serde_json::json!(
-                {
-                    "apply_to": "incoming_event",
-                    "type": "vrl",
-                    "source": "exists!(.)",
+            let merged = serde_json::json!({
+                "apply_to": "merged_event",
+                "type": "vrl",
+                "source": "exists!(.)",
+            });
+            let s: ApplyTo = serde_json::from_value(merged).unwrap();
+            match s {
+                ApplyTo::MergedEvent(AnyCondition::Map(ConditionConfig::Vrl(vrl))) => {
+                    assert_eq!(vrl.source, "exists!(.)");
                 }
-            );
-            let s: ApplyTo = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.condition, ApplyTo::IncomingEvent(c) if c.type.unwrap() == "vrl"));
+                _ => panic!("Expected MergedEvent with VRL condition"),
+            }
 
-            let a = serde_json::json!(
-                {
-                    "apply_to": "merged_event",
-                    "type": "vrl",
-                    "source": "exists!(.)",
-                }
-            );
-            let s: ApplyTo = serde_json::from_value(a).unwrap();
-            assert!(matches!(s.condition, ApplyTo::MergedEvent(c) if c.type.unwrap() == "vrl"));
+            let short_string = serde_json::json!({
+                "apply_to": "incoming_event",
+                "vrl": "exists!(.)"
+            });
+            let result = serde_json::from_value::<ApplyTo>(short_string);
+            assert!(result.is_err(), "Should fail due to missing 'type'");
         }
     }
 }
