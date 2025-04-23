@@ -303,6 +303,7 @@ async fn topology_reload_component() {
         .await
         .unwrap());
 
+    // TODO: Implement notification to avoid the sleep()
     // Give the old topology configuration a chance to shutdown cleanly, etc.
     sleep(Duration::from_secs(2)).await;
 
