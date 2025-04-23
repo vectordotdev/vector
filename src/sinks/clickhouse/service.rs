@@ -1,6 +1,6 @@
 //! Service implementation for the `Clickhouse` sink.
 
-use super::config::ClickhouseQuerySettingsConfig;
+use super::config::QuerySettingsConfig;
 use super::sink::PartitionKey;
 use crate::{
     http::{Auth, HttpError},
@@ -68,7 +68,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) date_time_best_effort: bool,
     pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
-    pub(super) query_settings: ClickhouseQuerySettingsConfig,
+    pub(super) query_settings: QuerySettingsConfig,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
@@ -130,7 +130,7 @@ fn set_uri_query(
     skip_unknown: Option<bool>,
     date_time_best_effort: bool,
     insert_random_shard: bool,
-    query_settings: ClickhouseQuerySettingsConfig,
+    query_settings: QuerySettingsConfig,
 ) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
@@ -205,7 +205,7 @@ mod tests {
             Some(false),
             true,
             false,
-            ClickhouseQuerySettingsConfig::default(),
+            QuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -222,7 +222,7 @@ mod tests {
             Some(false),
             false,
             false,
-            ClickhouseQuerySettingsConfig::default(),
+            QuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -238,7 +238,7 @@ mod tests {
             Some(true),
             true,
             false,
-            ClickhouseQuerySettingsConfig::default(),
+            QuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -255,7 +255,7 @@ mod tests {
             None,
             true,
             false,
-            ClickhouseQuerySettingsConfig::default(),
+            QuerySettingsConfig::default(),
         )
         .unwrap();
         assert_eq!(uri.to_string(), "http://localhost:80/?\
@@ -271,11 +271,11 @@ mod tests {
             None,
             true,
             false,
-            ClickhouseQuerySettingsConfig {
+            QuerySettingsConfig {
                 async_insert: Some(true),
                 wait_for_async_insert: Some(true),
                 wait_for_async_insert_timeout: Some(500),
-                ..ClickhouseQuerySettingsConfig::default()
+                ..QuerySettingsConfig::default()
             },
         )
         .unwrap();
@@ -298,7 +298,7 @@ mod tests {
             Some(false),
             false,
             false,
-            ClickhouseQuerySettingsConfig::default(),
+            QuerySettingsConfig::default(),
         )
         .unwrap_err();
     }

@@ -117,14 +117,14 @@ pub struct ClickhouseConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub query_settings: ClickhouseQuerySettingsConfig,
+    pub query_settings: QuerySettingsConfig,
 }
 
 /// Query settings for the `clickhouse` sink.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]
 #[serde(deny_unknown_fields)]
-pub struct ClickhouseQuerySettingsConfig {
+pub struct QuerySettingsConfig {
     /// Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
