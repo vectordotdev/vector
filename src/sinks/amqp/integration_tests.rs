@@ -3,7 +3,7 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
-    template::{Template, UIntTemplate},
+    template::{Template, UnsignedIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string,
@@ -234,7 +234,7 @@ async fn amqp_priority_with_template(
     let exchange = format!("test-{}-exchange", random_string(10));
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     config.properties = Some(AmqpPropertiesConfig {
-        priority: Some(UIntTemplate::try_from(template).unwrap()),
+        priority: Some(UnsignedIntTemplate::try_from(template).unwrap()),
         ..Default::default()
     });
 

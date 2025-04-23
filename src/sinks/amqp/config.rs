@@ -24,7 +24,7 @@ pub struct AmqpPropertiesConfig {
     pub(crate) expiration_ms: Option<u64>,
 
     /// Priority for AMQP messages.
-    pub(crate) priority: Option<UIntTemplate>,
+    pub(crate) priority: Option<UnsignedIntTemplate>,
 }
 
 impl AmqpPropertiesConfig {

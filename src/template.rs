@@ -140,7 +140,7 @@ impl From<Template> for String {
 
 impl fmt::Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.src)
+        self.src.fmt(f)
     }
 }
 
@@ -248,24 +248,24 @@ impl Template {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[configurable_component]
 #[serde(untagged)]
-enum UIntTemplateSource {
+enum UnsignedIntTemplateSource {
     /// A static unsigned number.
     Number(u64),
     /// A string, which may be a template.
     String(String),
 }
 
-impl Default for UIntTemplateSource {
+impl Default for UnsignedIntTemplateSource {
     fn default() -> Self {
         Self::Number(Default::default())
     }
 }
 
-impl fmt::Display for UIntTemplateSource {
+impl fmt::Display for UnsignedIntTemplateSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Number(i) => write!(f, "{}", i),
-            Self::String(s) => write!(f, "{}", s),
+            Self::Number(i) => i.fmt(f),
+            Self::String(s) => s.fmt(f),
         }
     }
 }
@@ -274,60 +274,63 @@ impl fmt::Display for UIntTemplateSource {
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-#[serde(try_from = "UIntTemplateSource", into = "UIntTemplateSource")]
-pub struct UIntTemplate {
-    src: UIntTemplateSource,
+#[serde(
+    try_from = "UnsignedIntTemplateSource",
+    into = "UnsignedIntTemplateSource"
+)]
+pub struct UnsignedIntTemplate {
+    src: UnsignedIntTemplateSource,
 
     #[serde(skip)]
     parts: Vec<Part>,
 }
 
-impl TryFrom<UIntTemplateSource> for UIntTemplate {
+impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
     type Error = TemplateParseError;
 
-    fn try_from(src: UIntTemplateSource) -> Result<Self, Self::Error> {
+    fn try_from(src: UnsignedIntTemplateSource) -> Result<Self, Self::Error> {
         match src {
-            UIntTemplateSource::Number(num) => Ok(UIntTemplate {
-                src: UIntTemplateSource::Number(num),
+            UnsignedIntTemplateSource::Number(num) => Ok(UnsignedIntTemplate {
+                src: UnsignedIntTemplateSource::Number(num),
                 parts: Vec::new(),
             }),
-            UIntTemplateSource::String(s) => UIntTemplate::try_from(s),
+            UnsignedIntTemplateSource::String(s) => UnsignedIntTemplate::try_from(s),
         }
     }
 }
 
-impl From<UIntTemplate> for UIntTemplateSource {
-    fn from(template: UIntTemplate) -> UIntTemplateSource {
+impl From<UnsignedIntTemplate> for UnsignedIntTemplateSource {
+    fn from(template: UnsignedIntTemplate) -> UnsignedIntTemplateSource {
         template.src
     }
 }
 
-impl TryFrom<&str> for UIntTemplate {
+impl TryFrom<&str> for UnsignedIntTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
-        UIntTemplate::try_from(Cow::Borrowed(src))
+        UnsignedIntTemplate::try_from(Cow::Borrowed(src))
     }
 }
 
-impl TryFrom<String> for UIntTemplate {
+impl TryFrom<String> for UnsignedIntTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        UIntTemplate::try_from(Cow::Owned(src))
+        UnsignedIntTemplate::try_from(Cow::Owned(src))
     }
 }
 
-impl From<u64> for UIntTemplate {
-    fn from(num: u64) -> UIntTemplate {
-        UIntTemplate {
-            src: UIntTemplateSource::Number(num),
+impl From<u64> for UnsignedIntTemplate {
+    fn from(num: u64) -> UnsignedIntTemplate {
+        UnsignedIntTemplate {
+            src: UnsignedIntTemplateSource::Number(num),
             parts: Vec::new(),
         }
     }
 }
 
-impl TryFrom<Cow<'_, str>> for UIntTemplate {
+impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
     type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
@@ -337,8 +340,8 @@ impl TryFrom<Cow<'_, str>> for UIntTemplate {
 
             if is_static {
                 match src.parse::<u64>() {
-                    Ok(num) => Ok(UIntTemplate {
-                        src: UIntTemplateSource::Number(num),
+                    Ok(num) => Ok(UnsignedIntTemplate {
+                        src: UnsignedIntTemplateSource::Number(num),
                         parts,
                     }),
                     Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
@@ -346,29 +349,29 @@ impl TryFrom<Cow<'_, str>> for UIntTemplate {
                     }),
                 }
             } else {
-                Ok(UIntTemplate {
+                Ok(UnsignedIntTemplate {
                     parts,
-                    src: UIntTemplateSource::String(src.into_owned()),
+                    src: UnsignedIntTemplateSource::String(src.into_owned()),
                 })
             }
         })
     }
 }
 
-impl From<UIntTemplate> for String {
-    fn from(template: UIntTemplate) -> String {
+impl From<UnsignedIntTemplate> for String {
+    fn from(template: UnsignedIntTemplate) -> String {
         template.src.to_string()
     }
 }
 
-impl fmt::Display for UIntTemplate {
+impl fmt::Display for UnsignedIntTemplate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.src)
+        self.src.fmt(f)
     }
 }
 
-impl ConfigurableString for UIntTemplate {}
-impl ConfigurableNumber for UIntTemplate {
+impl ConfigurableString for UnsignedIntTemplate {}
+impl ConfigurableNumber for UnsignedIntTemplate {
     type Numeric = u64;
 
     fn class() -> NumberClass {
@@ -376,15 +379,15 @@ impl ConfigurableNumber for UIntTemplate {
     }
 }
 
-impl UIntTemplate {
+impl UnsignedIntTemplate {
     /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
         event: impl Into<EventRef<'a>>,
     ) -> Result<u64, TemplateRenderingError> {
         match self.src {
-            UIntTemplateSource::Number(num) => Ok(num),
-            UIntTemplateSource::String(_) => self.render_event(event.into()),
+            UnsignedIntTemplateSource::Number(num) => Ok(num),
+            UnsignedIntTemplateSource::String(_) => self.render_event(event.into()),
         }
     }
 
@@ -617,11 +620,11 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
-        let f5 = UIntTemplate::try_from("{{ foo }}-{{ bar }}")
+        let f5 = UnsignedIntTemplate::try_from("{{ foo }}-{{ bar }}")
             .unwrap()
             .get_fields()
             .unwrap();
-        let f6 = UIntTemplate::from(123u64).get_fields();
+        let f6 = UnsignedIntTemplate::from(123u64).get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
@@ -654,7 +657,7 @@ mod tests {
     #[test]
     fn render_log_unsigned_number() {
         let event = Event::Log(LogEvent::from("hello world"));
-        let template = UIntTemplate::from(123);
+        let template = UnsignedIntTemplate::from(123);
 
         assert_eq!(Ok(123), template.render(&event))
     }
@@ -664,7 +667,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", 123);
 
-        let template = UIntTemplate::try_from("{{ foo }}").unwrap();
+        let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
         assert_eq!(Ok(123), template.render(&event))
     }
 
