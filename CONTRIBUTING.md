@@ -121,7 +121,7 @@ complex changes.
 To reduce iterations you can create do the following:
 
 ```shell
-touch git/hooks/pre-push
+touch .git/hooks/pre-push
 chmod +x .git/hooks/pre-push
 ```
 
