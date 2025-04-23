@@ -59,19 +59,19 @@ const fn default_keep_alive() -> u16 {
 #[snafu(visibility(pub))]
 pub enum MqttError {
     /// Topic template parsing failed
-    #[snafu(display("invalid topic template: {}", source))]
+    #[snafu(display("invalid topic template: {source}"))]
     TopicTemplate {
         /// Source of error
         source: TemplateParseError,
     },
     /// TLS error
-    #[snafu(display("TLS error: {}", source))]
+    #[snafu(display("TLS error: {source}"))]
     Tls {
         /// Source of error
         source: TlsError,
     },
     /// Configuration error
-    #[snafu(display("MQTT configuration error: {}", source))]
+    #[snafu(display("MQTT configuration error: {source}"))]
     Configuration {
         /// Source of error
         source: ConfigurationError,
