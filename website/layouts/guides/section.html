@@ -16,7 +16,7 @@
     {{ $columnedSections := where .Sections ".Params.self_standing" "ne" true }}
     {{ $fullWidthSections := where .Sections ".Params.self_standing" true  }}
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div class="space-y-8">
       {{ range $columnedSections }}
       <div>
         <span class="prose dark:prose-dark">
