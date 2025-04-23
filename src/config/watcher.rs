@@ -205,7 +205,6 @@ mod tests {
         }
     }
 
-
     #[tokio::test]
     async fn component_update() {
         trace_init();
