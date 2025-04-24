@@ -27,7 +27,23 @@ pub enum SignalTo {
     Quit,
 }
 
-#[derive(Clone, Debug, Snafu)]
+impl PartialEq for SignalTo {
+    fn eq(&self, other: &Self) -> bool {
+        use SignalTo::*;
+
+        match (self, other) {
+            (ReloadComponents(a), ReloadComponents(b)) => a == b,
+            // TODO: This will require a lot of plumbing but ultimately we can derive equality for config builders.
+            (ReloadFromConfigBuilder(_), ReloadFromConfigBuilder(_)) => true,
+            (ReloadFromDisk, ReloadFromDisk) => true,
+            (Shutdown(a), Shutdown(b)) => a == b,
+            (Quit, Quit) => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Snafu, PartialEq, Eq)]
 pub enum ShutdownError {
     // For future work: It would be nice if we could keep the actual errors in here, but
     // `crate::Error` doesn't implement `Clone`, and adding `DynClone` for errors is tricky.
