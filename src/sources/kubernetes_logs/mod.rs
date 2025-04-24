@@ -2277,6 +2277,7 @@ mod tests {
                             acknowledgements: AcknowledgementsConfig::from(acks),
                             expire_metrics: Default::default(),
                             expire_metrics_secs: Default::default(),
+                            expire_metrics_per_metric_set: Default::default(),
                         },
                         shutdown: shutdown,
                         out: tx,
