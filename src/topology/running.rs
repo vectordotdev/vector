@@ -509,13 +509,13 @@ impl RunningTopology {
                 self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
                     self.config
                         .enrichment_table(key)
-                        .and_then(EnrichmentTableOuter::as_sink)
-                        .map(|s| s.buffer)
+                        .and_then(|t| t.as_sink(key))
+                        .map(|(_, s)| s.buffer)
                 }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
                     self.config
                         .enrichment_table(key)
-                        .and_then(EnrichmentTableOuter::as_sink)
-                        .map(|s| s.buffer)
+                        .and_then(|t| t.as_sink(key))
+                        .map(|(_, s)| s.buffer)
                 })
             })
             .cloned()
