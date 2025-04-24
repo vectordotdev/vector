@@ -526,6 +526,33 @@ mod test {
     }
 
     #[test]
+    fn rate_limits_default() {
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedLayer::new(recorder).with_default_limit(10));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                info!(message = "Hello world!");
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        assert_eq!(
+            *events,
+            vec![
+                "Hello world!",
+                "Internal log [Hello world!] is being suppressed to avoid flooding.",
+            ]
+            .into_iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>()
+        );
+    }
+    #[test]
     fn override_rate_limit_at_callsite() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
