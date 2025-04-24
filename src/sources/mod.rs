@@ -62,6 +62,8 @@ pub mod mongodb_metrics;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-odbc")]
+pub mod odbc;
 #[cfg(feature = "sources-opentelemetry")]
 pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
