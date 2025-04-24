@@ -830,10 +830,6 @@ impl Source {
             // A handle to the current tokio runtime
             handle: tokio::runtime::Handle::current(),
             rotate_wait,
-            // We exclusively use notify-based discovery for better performance
-            // Use a 30-second interval for checkpointing to balance between
-            // durability and performance
-            checkpoint_interval: Duration::from_secs(30),
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);

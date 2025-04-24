@@ -2,24 +2,20 @@ use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
-use tokio::runtime::Handle;
-use tracing::{debug, trace, warn};
+use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
     buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
 };
-mod notify_watcher;
 #[cfg(test)]
 mod tests;
-
-use notify_watcher::NotifyWatcher;
 
 /// The `RawLine` struct is a thin wrapper around the bytes that have been read
 /// in order to retain the context of where in the file they have been read from.
@@ -32,22 +28,9 @@ pub(super) struct RawLine {
     pub bytes: Bytes,
 }
 
-/// Represents the state of the file watcher
-///
-/// Note: Previously, we had Active and Passive states, but now we only use
-/// notification-based watching for all files, so we only need one state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WatcherState {
-    /// Watching the file using filesystem notifications
-    Notify,
-}
-
-/// The `FileWatcher` struct defines the state machine which reads
-/// from a file path, transparently handling file rollovers as is common for logs.
-///
-/// The `FileWatcher` uses filesystem notifications exclusively for all files,
-/// without keeping any files open. Files are only opened when needed for reading,
-/// then closed immediately.
+/// The `FileWatcher` struct defines the polling based state machine which reads
+/// from a file path, transparently updating the underlying file descriptor when
+/// the file has been rolled over, as is common for logs.
 ///
 /// The `FileWatcher` is expected to live for the lifetime of the file
 /// path. `FileServer` is responsible for clearing away `FileWatchers` which no
@@ -55,6 +38,7 @@ pub enum WatcherState {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
+    reader: Box<dyn BufRead>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -66,10 +50,6 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
-    /// Notify-based watcher for all files
-    notify_watcher: NotifyWatcher,
-    /// Buffer of lines read at startup
-    startup_lines: Vec<RawLine>,
 }
 
 impl FileWatcher {
@@ -102,7 +82,7 @@ impl FileWatcher {
         let gzipped = is_gzipped(&mut reader)?;
 
         // Determine the actual position at which we should start reading
-        let (_reader, file_position): (Box<dyn BufRead>, FilePosition) =
+        let (reader, file_position): (Box<dyn BufRead>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -158,42 +138,10 @@ impl FileWatcher {
             .and_then(|diff| Instant::now().checked_sub(diff))
             .unwrap_or_else(Instant::now);
 
-        // On startup, we need to read any content that was added while Vector was stopped
-        // We'll do this by immediately reading the file once to get any new content
-        // After that, we'll rely on notifications for further changes
-
-        // Create a notify watcher for all files
-        let notify_watcher = match NotifyWatcher::new() {
-            Ok(mut watcher) => {
-                // Start watching this file immediately
-                // Use the tokio runtime to run the async watch_file method if available
-                if let Ok(handle) = Handle::try_current() {
-                    // We're in a tokio runtime, so we can use block_on
-                    if let Err(e) = handle.block_on(watcher.watch_file(path.clone(), file_position)) {
-                        debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
-                    }
-                } else {
-                    // We're not in a tokio runtime, so we can't use block_on
-                    // This should never happen in practice, but just in case
-                    warn!(message = "Not in a tokio runtime, can't set up watcher");
-                }
-                watcher
-            },
-            Err(e) => {
-                warn!(message = "Failed to create notify watcher", error = ?e);
-                // Create a dummy watcher that doesn't do anything
-                NotifyWatcher::dummy()
-            }
-        };
-
-        // We don't need to keep the file open permanently, but we'll read it once
-        // to get any content that was added while Vector was stopped
-        // This is especially important for files with checkpoints
-
-        // Create the FileWatcher instance
-        let mut fw = FileWatcher {
-            path: path.clone(),
+        Ok(FileWatcher {
+            path,
             findable: true,
+            reader,
             file_position,
             devno,
             inode: ino,
@@ -205,54 +153,25 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
-            notify_watcher,
-            startup_lines: Vec::new(),
-        };
-
-        // Read all available lines at startup to get any content that was added while Vector was stopped
-        // This is especially important for files with checkpoints
-        // We'll ignore any errors since the file might not be readable yet
-        debug!(message = "Reading initial content from file at startup", ?path, position = file_position);
-
-        // Keep reading until we reach EOF or encounter an error
-        loop {
-            match fw.read_line() {
-                Ok(Some(line)) => {
-                    // Successfully read a line, store it and continue reading
-                    trace!(message = "Read a line from file at startup", ?path, new_position = fw.file_position);
-                    fw.startup_lines.push(line);
-                },
-                Ok(None) => {
-                    // Reached EOF
-                    debug!(message = "Reached EOF while reading initial content", ?path, final_position = fw.file_position, lines_read = fw.startup_lines.len());
-                    break;
-                },
-                Err(e) => {
-                    // Error reading file, log and break
-                    debug!(message = "Error reading initial content from file", ?path, error = ?e);
-                    break;
-                }
-            }
-        }
-
-        Ok(fw)
+        })
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let file_handle = File::open(&path)?;
         if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
-            // Update the notify watcher with the new path
-            // Use the tokio runtime to run the async watch_file method
-            if let Ok(handle) = Handle::try_current() {
-                // We're in a tokio runtime, so we can use block_on
-                if let Err(e) = handle.block_on(self.notify_watcher.watch_file(path.clone(), self.file_position)) {
-                    debug!(message = "Failed to update notify watcher", error = ?e);
+            let mut reader = io::BufReader::new(fs::File::open(&path)?);
+            let gzipped = is_gzipped(&mut reader)?;
+            let new_reader: Box<dyn BufRead> = if gzipped {
+                if self.file_position != 0 {
+                    Box::new(null_reader())
+                } else {
+                    Box::new(io::BufReader::new(MultiGzDecoder::new(reader)))
                 }
             } else {
-                // We're not in a tokio runtime, so we can't use block_on
-                // This should never happen in practice, but just in case
-                warn!(message = "Not in a tokio runtime, can't update watcher path");
-            }
+                reader.seek(io::SeekFrom::Start(self.file_position))?;
+                Box::new(reader)
+            };
+            self.reader = new_reader;
             self.devno = file_handle.portable_dev()?;
             self.inode = file_handle.portable_ino()?;
         }
@@ -283,10 +202,6 @@ impl FileWatcher {
         self.file_position
     }
 
-    pub fn reached_eof(&self) -> bool {
-        self.reached_eof
-    }
-
     /// Read a single line from the underlying file
     ///
     /// This function will attempt to read a new line from its file, blocking,
@@ -295,64 +210,11 @@ impl FileWatcher {
     pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         self.track_read_attempt();
 
-        if self.is_dead {
-            return Ok(None);
-        }
-
-        // Check for events from the notify watcher, but don't update the watcher here
-        // This avoids an infinite loop where reading the file triggers events
-        // Use the tokio runtime to run the async check_events method
-        let events = if let Ok(handle) = Handle::try_current() {
-            // We're in a tokio runtime, so we can use block_on
-            match handle.block_on(self.notify_watcher.check_events()) {
-                events if !events.is_empty() => {
-                    trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
-                    events
-                },
-                _ => Vec::new(),
-            }
-        } else {
-            // We're not in a tokio runtime, so we can't use block_on
-            // This should never happen in practice, but just in case
-            warn!(message = "Not in a tokio runtime, can't check for events");
-            Vec::new()
-        };
-
-        if !events.is_empty() {
-            for (path, kind) in events {
-                if path == self.path {
-                    debug!(
-                        message = "Detected relevant file event",
-                        ?path,
-                        ?kind
-                    );
-                    // We don't need to update the watcher here since we're about to read the file
-                    // and the position will be updated naturally
-                    break;
-                }
-            }
-        }
-
-        // Open the file for reading
-        let mut file = match fs::File::open(&self.path) {
-            Ok(f) => f,
-            Err(e) => {
-                if let io::ErrorKind::NotFound = e.kind() {
-                    self.set_dead();
-                }
-                return Err(e);
-            }
-        };
-
-        // Seek to the current position
-        file.seek(io::SeekFrom::Start(self.file_position))?;
-
-        // Create a reader
-        let mut reader = io::BufReader::new(file);
+        let reader = &mut self.reader;
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            &mut reader,
+            reader,
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
@@ -360,12 +222,9 @@ impl FileWatcher {
         ) {
             Ok(Some(_)) => {
                 self.track_read_success();
-                let bytes = self.buf.split().freeze();
-
-                // Return all lines, including empty ones
                 Ok(Some(RawLine {
                     offset: initial_position,
-                    bytes,
+                    bytes: self.buf.split().freeze(),
                 }))
             }
             Ok(None) => {
@@ -380,7 +239,6 @@ impl FileWatcher {
                         self.reached_eof = true;
                         Ok(None)
                     } else {
-                        // We already checked that buf is not empty, so we can just return it
                         Ok(Some(RawLine {
                             offset: initial_position,
                             bytes: buf,
@@ -410,69 +268,25 @@ impl FileWatcher {
         self.last_read_success = Instant::now();
     }
 
-    /// Update the watcher with the current file position
-    ///
-    /// This updates the notify watcher with the current file position.
-    pub fn update_watcher(&mut self) -> io::Result<()> {
-        // Only log at trace level to avoid excessive logging
-        trace!(message = "Updating file watcher", ?self.path, position = %self.file_position);
-
-        // Update the notify watcher with the current position
-        // Use the tokio runtime to run the async watch_file method
-        if let Ok(handle) = Handle::try_current() {
-            // We're in a tokio runtime, so we can use block_on
-            if let Err(e) = handle.block_on(self.notify_watcher.watch_file(self.path.clone(), self.file_position)) {
-                debug!(message = "Failed to update notify watcher", error = ?e);
-            }
-        } else {
-            // We're not in a tokio runtime, so we can't use block_on
-            // This should never happen in practice, but just in case
-            warn!(message = "Not in a tokio runtime, can't update watcher");
-        }
-
-        Ok(())
-    }
-
-
-
-    /// Get and clear the startup lines
-    ///
-    /// This returns all lines read at startup and clears the buffer.
-    pub fn take_startup_lines(&mut self) -> Vec<RawLine> {
-        std::mem::take(&mut self.startup_lines)
-    }
-
     #[inline]
     pub fn last_read_success(&self) -> Instant {
         self.last_read_success
     }
 
-    // should_read method removed - we now always read all files on every iteration
+    #[inline]
+    pub fn should_read(&self) -> bool {
+        self.last_read_success.elapsed() < Duration::from_secs(10)
+            || self.last_read_attempt.elapsed() > Duration::from_secs(10)
+    }
 
     #[inline]
     pub fn last_seen(&self) -> Instant {
         self.last_seen
     }
 
-    /// Shutdown the file watcher
-    ///
-    /// This method should be called when the watcher is no longer needed,
-    /// such as when Vector is shutting down. It shuts down the notify watcher
-    /// to prevent further events from being sent.
-    pub fn shutdown(&mut self) {
-        // Shut down the notify watcher
-        if let Ok(handle) = Handle::try_current() {
-            // We're in a tokio runtime, so we can use block_on
-            handle.block_on(async {
-                self.notify_watcher.shutdown();
-            });
-        } else {
-            // We're not in a tokio runtime, so we can't use block_on
-            // Just call shutdown directly
-            self.notify_watcher.shutdown();
-        }
-
-        debug!(message = "FileWatcher shut down", ?self.path);
+    #[inline]
+    pub fn reached_eof(&self) -> bool {
+        self.reached_eof
     }
 }
 

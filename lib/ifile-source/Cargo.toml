@@ -1,8 +1,8 @@
 [package]
-name = "file-source"
+name = "ifile-source"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
-edition = "2021"
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>", "Tamer Hassan <thameruddin@gmail.com>"]
+edition = "2025"
 publish = false
 license = "MIT"
 
@@ -13,6 +13,7 @@ winapi = { version = "0.3", features = ["winioctl"] }
 [dependencies]
 crc = "3.2.1"
 glob.workspace = true
+notify = "8.0.0"
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }

@@ -108,6 +108,7 @@ members = [
   "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
+  "lib/ifile-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
@@ -562,6 +563,7 @@ sources-logs = [
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
+  "sources-ifile",
   "sources-fluent",
   "sources-gcp_pubsub",
   "sources-heroku_logs",
@@ -612,6 +614,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["vector-lib/file-source"]
+sources-ifile = ["vector-lib/ifile-source"]
 sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]

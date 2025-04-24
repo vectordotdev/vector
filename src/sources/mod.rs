@@ -27,6 +27,8 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(feature = "sources-ifile")]
+pub mod ifile;
 #[cfg(any(
     feature = "sources-stdin",
     all(unix, feature = "sources-file_descriptor")

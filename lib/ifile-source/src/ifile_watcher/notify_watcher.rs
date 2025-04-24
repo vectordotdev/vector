@@ -6,7 +6,7 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, trace};
 
-use crate::FilePosition;
+use crate::IFilePosition;
 
 /// Represents the state of a file being watched by the notify-based watcher
 #[derive(Debug)]
@@ -114,7 +114,7 @@ impl NotifyWatcher {
     pub async fn watch_file(
         &mut self,
         path: PathBuf,
-        _file_position: FilePosition, // We don't need to store the file position anymore
+        _file_position: IFilePosition, // We don't need to store the file position anymore
     ) -> Result<(), notify::Error> {
         if self.watcher.is_none() {
             self.initialize(&path).await?

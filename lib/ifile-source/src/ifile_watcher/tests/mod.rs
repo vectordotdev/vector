@@ -60,6 +60,8 @@ impl FileWatcherFile {
         self.reads_available = 0;
     }
 
+
+
     pub fn truncate(&mut self) {
         self.reads_available = 0;
         self.contents.truncate(0);

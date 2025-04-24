@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, trace, warn};
 
 use super::PathsProvider;
-use crate::FileSourceInternalEvents;
+use crate::IFileSourceInternalEvents;
 
 /// Metadata about a discovered file
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ struct FileMetadata {
 ///
 /// Uses filesystem notifications to discover files that match include patterns
 /// and don't match the exclude patterns, instead of continuously globbing.
-pub struct NotifyPathsProvider<E: FileSourceInternalEvents + Clone> {
+pub struct NotifyPathsProvider<E: IFileSourceInternalEvents + Clone> {
     /// Patterns to include
     include_patterns: Vec<String>,
     /// Patterns to exclude
@@ -36,10 +36,7 @@ pub struct NotifyPathsProvider<E: FileSourceInternalEvents + Clone> {
     discovered_files: Arc<DashMap<PathBuf, FileMetadata>>,
     /// The underlying notify watcher
     watcher: Option<notify::RecommendedWatcher>,
-    /// Last time we did a full glob scan (as fallback)
-    last_glob_scan: Instant,
-    /// Minimum time between full glob scans
-    glob_minimum_cooldown: Duration,
+
     /// Event emitter
     emitter: E,
     /// Mutex for thread-safe access to the event receiver
@@ -48,13 +45,12 @@ pub struct NotifyPathsProvider<E: FileSourceInternalEvents + Clone> {
     use_glob_fallback: bool,
 }
 
-impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
+impl<E: IFileSourceInternalEvents> NotifyPathsProvider<E> {
     /// Create a new NotifyPathsProvider
     pub fn new(
         include_patterns: &[PathBuf],
         exclude_patterns: &[PathBuf],
         glob_match_options: MatchOptions,
-        glob_minimum_cooldown: Duration,
         emitter: E,
     ) -> Self {
         // Convert exclude patterns to Pattern objects
@@ -79,10 +75,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
             glob_match_options,
             discovered_files: Arc::new(DashMap::new()),
             watcher: None,
-            last_glob_scan: Instant::now()
-                .checked_sub(glob_minimum_cooldown)
-                .unwrap_or_else(Instant::now),
-            glob_minimum_cooldown,
+
             emitter,
             event_mutex: Arc::new(Mutex::new(())),
             use_glob_fallback: false, // Default to not using glob fallback
@@ -305,14 +298,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
 
     /// Perform a full glob scan as fallback
     async fn glob_scan(&mut self) {
-        // Check if we need to do a full glob scan
         let now = Instant::now();
-        if now.duration_since(self.last_glob_scan) < self.glob_minimum_cooldown {
-            return;
-        }
-
         debug!(message = "Performing full glob scan for file discovery");
-        self.last_glob_scan = now;
 
         // Use tokio to run the glob scan in a blocking task to avoid blocking the async runtime
         let include_patterns = self.include_patterns.clone();
@@ -369,7 +356,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
     // The matches_patterns methods have been removed since they're not used
 }
 
-impl<E: FileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
+impl<E: IFileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
     fn clone(&self) -> Self {
         // Create a new instance with the same configuration
         // but without the watcher and event_rx
@@ -379,8 +366,7 @@ impl<E: FileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
             glob_match_options: self.glob_match_options,
             discovered_files: self.discovered_files.clone(),
             watcher: None, // Don't clone the watcher
-            last_glob_scan: self.last_glob_scan,
-            glob_minimum_cooldown: self.glob_minimum_cooldown,
+
             emitter: self.emitter.clone(),
             event_mutex: self.event_mutex.clone(),
             use_glob_fallback: self.use_glob_fallback,
@@ -388,7 +374,7 @@ impl<E: FileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
     }
 }
 
-impl<E: FileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider for NotifyPathsProvider<E> {
+impl<E: IFileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider for NotifyPathsProvider<E> {
     type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {

@@ -6,8 +6,8 @@ extern crate scan_fmt;
 
 pub mod buffer;
 mod checkpointer;
-mod file_server;
-mod file_watcher;
+mod ifile_server;
+mod ifile_watcher;
 mod fingerprinter;
 mod internal_events;
 mod metadata_ext;
@@ -15,20 +15,22 @@ pub mod paths_provider;
 
 pub use self::{
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
-    fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
-    internal_events::FileSourceInternalEvents,
+    ifile_server::{calculate_ignore_before, IFileServer, Line, Shutdown as IFileServerShutdown},
+    ifile_watcher::{IFileWatcher, WatcherState},
+    fingerprinter::{IFileFingerprint, FingerprintStrategy, Fingerprinter},
+    internal_events::IFileSourceInternalEvents,
+    paths_provider::{boxed::BoxedPathsProvider, notify::NotifyPathsProvider},
 };
 use vector_config::configurable_component;
 
-pub type FilePosition = u64;
+pub type IFilePosition = u64;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ReadFrom {
     #[default]
     Beginning,
     End,
-    Checkpoint(FilePosition),
+    Checkpoint(IFilePosition),
 }
 
 /// File position to use when reading a new file.

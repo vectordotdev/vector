@@ -2,7 +2,7 @@ use std::{io::Error, path::Path, time::Duration};
 
 /// Every internal event in this crate has a corresponding
 /// method in this trait which should emit the event.
-pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
+pub trait IFileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_file_added(&self, path: &Path);
 
     fn emit_file_resumed(&self, path: &Path, file_position: u64);
@@ -24,6 +24,10 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_file_checkpoint_write_error(&self, error: Error);
 
     fn emit_files_open(&self, count: usize);
+
+    fn emit_file_switched_to_passive(&self, path: &Path, file_position: u64);
+
+    fn emit_file_switched_to_active(&self, path: &Path, file_position: u64);
 
     fn emit_path_globbing_failed(&self, path: &Path, error: &Error);
 }

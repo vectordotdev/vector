@@ -3754,7 +3754,6 @@ dependencies = [
  "glob",
  "indexmap 2.8.0",
  "libc",
- "notify",
  "quickcheck",
  "scan_fmt",
  "serde",
@@ -5174,6 +5173,35 @@ checksum = "daca1df1c957320b2cf139ac61e7bd64fed304c5040df000a745aa1de3b4ef71"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "ifile-source"
+version = "0.1.0"
+dependencies = [
+ "bstr 1.11.3",
+ "bytes 1.10.1",
+ "chrono",
+ "crc",
+ "criterion",
+ "dashmap 6.1.0",
+ "flate2",
+ "futures 0.3.31",
+ "glob",
+ "indexmap 2.8.0",
+ "libc",
+ "notify",
+ "quickcheck",
+ "scan_fmt",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.41",
+ "vector-common",
+ "vector-config",
+ "winapi",
 ]
 
 [[package]]
@@ -11735,6 +11763,7 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
+ "ifile-source",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
