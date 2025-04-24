@@ -219,8 +219,13 @@ impl IFileWatcher {
             match fw.read_line() {
                 Ok(Some(line)) => {
                     // Successfully read a line, store it and continue reading
-                    trace!(message = "Read a line from file at startup", ?path, new_position = fw.file_position);
-                    fw.startup_lines.push(line);
+                    // Skip empty lines at the end of the file to avoid processing them on every startup
+                    if !line.bytes.is_empty() || !fw.startup_lines.is_empty() {
+                        trace!(message = "Read a line from file at startup", ?path, new_position = fw.file_position);
+                        fw.startup_lines.push(line);
+                    } else {
+                        trace!(message = "Skipping empty line at beginning of file", ?path);
+                    }
                 },
                 Ok(None) => {
                     // Reached EOF
