@@ -3,7 +3,7 @@ package metadata
 components: sources: ifile: {
 	_directory: "/var/log"
 
-	title: "Improved File"
+	title: "IFile"
 
 	classes: {
 		commonly_used: true
@@ -417,6 +417,42 @@ components: sources: ifile: {
 				behavior, you can set the `ignore_checkpoints` option to `true`.  This
 				will cause Vector to disregard existing checkpoints when determining the
 				starting read position of a file.
+				"""
+		}
+
+		async_implementation: {
+			title: "Async Implementation"
+			body: """
+				The `ifile` source is a complete rewrite of the original `file` source using
+				async/await throughout. This provides better performance and resource utilization,
+				especially when watching a large number of files.
+
+				The implementation uses the [notify-rs](https://github.com/notify-rs/notify) library
+				to detect file changes through OS-level notifications instead of polling. This means
+				Vector can detect new files and changes to existing files within milliseconds, without
+				the need for periodic globbing.
+
+				The `ifile` source also never keeps file handles open for idle files, only opening them
+				when needed for reading. This reduces the number of open file handles and improves
+				resource usage.
+				"""
+		}
+
+		checkpointing: {
+			title: "Checkpointing"
+			body: """
+				The `ifile` source introduces a new `checkpoint_interval` configuration option that
+				controls how frequently the current read position is saved to disk during normal operation.
+
+				Vector always saves the current read position before a proper shutdown (e.g., when
+				receiving SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
+
+				The `checkpoint_interval` setting only affects recovery after an abrupt termination
+				(e.g., SIGKILL or power loss). In such cases, Vector may reprocess up to `checkpoint_interval`
+				seconds worth of data from each file.
+
+				A lower value results in less data being re-processed if Vector is terminated abruptly,
+				but increases the performance impact of checkpointing during normal operation.
 				"""
 		}
 	}

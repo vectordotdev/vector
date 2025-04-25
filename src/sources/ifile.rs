@@ -147,15 +147,22 @@ pub struct IFileConfig {
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// The interval between checkpointing the current read position.
+    /// The interval between writing the current read position to disk during normal operation.
     ///
-    /// This controls how frequently the current read position is saved to disk.
-    /// A lower value results in less data being re-processed if Vector is restarted,
-    /// but increases the performance impact of checkpointing.
+    /// This controls how frequently the current read position is saved to disk during normal operation.
+    /// Vector always saves the current read position before a proper shutdown (e.g., when receiving SIGINT),
+    /// so data will not be reprocessed when Vector is gracefully restarted.
+    /// This setting only affects recovery after an abrupt termination (e.g., SIGKILL or power loss).
+    /// In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
+    /// A lower value results in less data being re-processed if Vector is terminated abruptly,
+    /// but increases the performance impact of checkpointing during normal operation.
     #[serde(default = "default_checkpoint_interval")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::human_name = "Checkpoint Interval"))]
+    #[configurable(metadata(docs::examples = 5))]
+    #[configurable(metadata(docs::examples = 10))]
+    #[configurable(metadata(docs::examples = 60))]
+    #[configurable(metadata(docs::human_name = "Checkpoint Write Interval"))]
     pub checkpoint_interval: Duration,
 
     // Note: We now use filesystem notifications by default for file discovery

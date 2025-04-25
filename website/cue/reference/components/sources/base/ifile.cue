@@ -22,6 +22,25 @@ base: components: sources: ifile: configuration: {
 			type: bool: {}
 		}
 	}
+	checkpoint_interval: {
+		description: """
+			The interval between writing the current read position to disk during normal operation.
+
+			This controls how frequently the current read position is saved to disk during normal operation.
+			Vector always saves the current read position before a proper shutdown (e.g., when receiving SIGINT),
+			so data will not be reprocessed when Vector is gracefully restarted.
+			This setting only affects recovery after an abrupt termination (e.g., SIGKILL or power loss).
+			In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
+			A lower value results in less data being re-processed if Vector is terminated abruptly,
+			but increases the performance impact of checkpointing during normal operation.
+			"""
+		required: false
+		type: uint: {
+			default: 30
+			examples: [5, 10, 60]
+			unit: "seconds"
+		}
+	}
 	data_dir: {
 		description: """
 			The directory used to persist file checkpoint positions.
@@ -145,26 +164,6 @@ base: components: sources: ifile: configuration: {
 					}
 				}
 			}
-		}
-	}
-	checkpoint_interval: {
-		description: """
-			The interval between checkpointing the current read position.
-
-			This controls how frequently the current read position is saved to disk during normal operation.
-			Vector always saves the current read position before a proper shutdown (e.g., when receiving SIGINT),
-			so data will not be reprocessed when Vector is gracefully restarted.
-
-			This setting only affects recovery after an abrupt termination (e.g., SIGKILL or power loss).
-			In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
-
-			A lower value results in less data being re-processed if Vector is terminated abruptly,
-			but increases the performance impact of checkpointing during normal operation.
-			"""
-		required: false
-		type: uint: {
-			default: 30
-			unit:    "seconds"
 		}
 	}
 	host_key: {
