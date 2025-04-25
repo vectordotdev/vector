@@ -52,6 +52,8 @@ struct Prepare {
     debian_version: Option<String>,
     repo_root: PathBuf,
     latest_vector_version: Version,
+    release_branch: String,
+    release_preparation_branch: String,
 }
 
 impl Cli {
@@ -61,12 +63,16 @@ impl Cli {
         env::set_current_dir(repo_root.clone())?;
 
         let prepare = Prepare {
-            new_vector_version: self.version,
+            new_vector_version: self.version.clone(),
             vrl_version: self.vrl_version,
             alpine_version: self.alpine_version,
             debian_version: self.debian_version,
             repo_root,
             latest_vector_version: get_latest_version_from_vector_tags()?,
+            release_branch: format!("v{}.{}", self.version.major, self.version.minor),
+            // Websites containing `website` will also generate website previews.
+            // Caveat is these branches can only contain alphanumeric chars and dashes.
+            release_preparation_branch: format!("prepare-v-{}-{}-{}-website", self.version.major, self.version.minor, self.version.patch),
         };
         prepare.run()
     }
@@ -109,16 +115,13 @@ impl Prepare {
         git::run_and_check_output(&["fetch"])?;
         git::checkout_main_branch()?;
 
-        let new_version = &self.new_vector_version;
-        let release_branch = format!("v{}.{}", new_version.major, new_version.minor);
-        git::create_branch(release_branch.as_str())?;
-        git::push_and_set_upstream(release_branch.as_str())?;
+        git::create_branch(self.release_branch.as_str())?;
+        git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
-        let release_preparation_branch = format!("website-prepare-v{new_version}");
-        git::create_branch(release_preparation_branch.as_str())?;
-        git::push_and_set_upstream(release_preparation_branch.as_str())?;
+        git::create_branch(self.release_preparation_branch.as_str())?;
+        git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         Ok(())
     }
 
@@ -126,7 +129,7 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
+        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
 
         // Needs this hybrid approach to preserve ordering.
         let mut lines: Vec<String> = contents.lines().map(String::from).collect();
@@ -148,7 +151,8 @@ impl Prepare {
             }
         }
 
-        fs::write(&cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        lines.push(String::new()); // File should end with a newline.
+        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
         run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
@@ -319,6 +323,7 @@ impl Prepare {
 
 
         let new_file_path = releases_dir.join(format!("{new_version}.md"));
+        updated_lines.push(String::new()); // File should end with a newline.
         let updated_content = updated_lines.join("\n");
         fs::write(&new_file_path, updated_content)?;
         git::add_files_in_current_dir()?;
@@ -332,18 +337,16 @@ impl Prepare {
         git::push()?;
 
         let new_vector_version = &self.new_vector_version;
-        let release_branch = format!("v{}.{}", new_vector_version.major, new_vector_version.minor);
         let pr_title = format!("chore(releasing): prepare v{new_vector_version} release");
         let pr_body = format!("This PR prepares the release for Vector v{new_vector_version}");
-        let current_branch = format!("website-prepare-v{new_vector_version}");
         let gh_status = Command::new("gh")
             .arg("pr")
             .arg("create")
             .arg("--draft")
             .arg("--base")
-            .arg(&release_branch)
+            .arg(self.release_branch.as_str())
             .arg("--head")
-            .arg(&current_branch)
+            .arg(self.release_preparation_branch.as_str())
             .arg("--title")
             .arg(&pr_title)
             .arg("--body")
@@ -355,7 +358,7 @@ impl Prepare {
         if !gh_status.success() {
             return Err(anyhow!("Failed to create PR with gh CLI"));
         }
-        info!("Successfully created PR against {release_branch}");
+        info!("Successfully created PR against {}", self.release_branch);
         Ok(())
     }
 
