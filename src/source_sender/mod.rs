@@ -398,7 +398,11 @@ impl Output {
         )
     }
 
-    async fn send(&mut self, mut events: EventArray) -> Result<(), ClosedError> {
+    async fn send(
+        &mut self,
+        mut events: EventArray,
+        unsent_event_count: &mut UnsentEventCount,
+    ) -> Result<(), ClosedError> {
         let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
         events
@@ -425,6 +429,7 @@ impl Output {
             .await
             .map_err(|_| ClosedError)?;
         self.events_sent.emit(CountByteSize(count, byte_size));
+        unsent_event_count.decr(count);
         Ok(())
     }
 
@@ -433,11 +438,8 @@ impl Output {
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
-        let count = event.len();
-        let mut unsent_event_count = UnsentEventCount::new(count);
-        let res = self.send(event).await;
-        unsent_event_count.discard();
-        res
+        let mut unsent_event_count = UnsentEventCount::new(event.len());
+        self.send(event, &mut unsent_event_count).await
     }
 
     async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
@@ -464,13 +466,13 @@ impl Output {
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            let count = events.len();
-            self.send(events).await.inspect_err(|_| {
-                // The unsent event count is discarded here because the callee emits the
-                // `StreamClosedError`.
-                unsent_event_count.discard();
-            })?;
-            unsent_event_count.decr(count);
+            self.send(events, &mut unsent_event_count)
+                .await
+                .inspect_err(|_| {
+                    // The unsent event count is discarded here because the callee emits the
+                    // `StreamClosedError`.
+                    unsent_event_count.discard();
+                })?;
         }
         Ok(())
     }
