@@ -48,9 +48,27 @@ use super::{reply::protobuf, status::Status};
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
     ServerShutdown,
+    ContentType,
 }
 
 impl warp::reject::Reject for ApiError {}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ContentType {
+    Protobuf,
+}
+
+// Extractor for the Content-Type header
+fn extract_content_type() -> impl warp::Filter<Extract = (ContentType,), Error = Rejection> + Copy {
+    warp::header::<String>(http::header::CONTENT_TYPE.as_str()).and_then(
+        |content_type: String| async move {
+            match content_type.as_str() {
+                "application/x-protobuf" => Ok(ContentType::Protobuf),
+                _ => Err(warp::reject::custom(ApiError::ContentType)),
+            }
+        },
+    )
+}
 
 pub(crate) async fn run_http_server(
     address: SocketAddr,
@@ -148,15 +166,12 @@ fn build_warp_log_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
         .and(warp::body::bytes())
         .and_then(
-            move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
+            move |_, encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
                 let events = decode(encoding_header.as_deref(), body)
                     .and_then(|body| {
                         bytes_received.emit(ByteSize(body.len()));
@@ -187,13 +202,10 @@ fn build_warp_metrics_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "metrics"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
+        .and_then(move |_, encoding_header: Option<String>, body: Bytes| {
             let events = decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_metrics_body(body, &events_received)
@@ -218,13 +230,10 @@ fn build_warp_trace_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "traces"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
+        .and(extract_content_type())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
+        .and_then(move |_, encoding_header: Option<String>, body: Bytes| {
             let events = decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_trace_body(body, &events_received)
@@ -355,7 +364,7 @@ async fn handle_request(
     }
 }
 
-async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
+async fn handle_rejection(err: Rejection) -> Result<Box<dyn Reply>, std::convert::Infallible> {
     if let Some(err_msg) = err.find::<ErrorMessage>() {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
@@ -363,7 +372,15 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
             ..Default::default()
         });
 
-        Ok(warp::reply::with_status(reply, err_msg.status_code()))
+        Ok(Box::new(warp::reply::with_status(
+            reply,
+            err_msg.status_code(),
+        )))
+    } else if let Some(ApiError::ContentType) = err.find::<ApiError>() {
+        Ok(Box::new(warp::reply::with_status(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE.to_string(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        )))
     } else {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
@@ -371,9 +388,9 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
             ..Default::default()
         });
 
-        Ok(warp::reply::with_status(
+        Ok(Box::new(warp::reply::with_status(
             reply,
             StatusCode::INTERNAL_SERVER_ERROR,
-        ))
+        )))
     }
 }
