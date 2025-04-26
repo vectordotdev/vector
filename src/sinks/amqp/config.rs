@@ -20,10 +20,10 @@ pub struct AmqpPropertiesConfig {
     /// Content-Encoding for the AMQP messages.
     pub(crate) content_encoding: Option<String>,
 
-    /// Expiration for AMQP messages (in milliseconds)
+    /// Expiration for AMQP messages (in milliseconds).
     pub(crate) expiration_ms: Option<u64>,
 
-    /// Priority for AMQP messages.
+    /// Priority for AMQP messages. It can be templated to an integer between 0 and 255 inclusive.
     pub(crate) priority: Option<UnsignedIntTemplate>,
 }
 
