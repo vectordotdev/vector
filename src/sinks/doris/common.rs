@@ -1,5 +1,6 @@
 use crate::codecs::Encoder;
 use crate::http::{Auth, MaybeAuth};
+use crate::sinks::doris::client::ThreadSafeDorisSinkClient;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
 use crate::sinks::doris::DorisConfig;
 use crate::sinks::prelude::Compression;
@@ -9,7 +10,6 @@ use http::Uri;
 use snafu::prelude::*;
 use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
-// 定义与 elasticsearch 同样的错误类型，避免依赖 elasticsearch 模块
 #[derive(Debug, Snafu)]
 pub enum ParseError {
     #[snafu(display("Invalid host: {}, host must include hostname", host))]
@@ -72,5 +72,9 @@ impl DorisCommon {
             commons.push(Self::parse_config(config, endpoint).await?);
         }
         Ok(commons)
+    }
+
+    pub async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
+        client.healthcheck_fenode(self.base_url.clone()).await
     }
 }

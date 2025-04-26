@@ -1,8 +1,8 @@
 //! `RequestBuilder` implementation for the `Doris` sink.
 
 use super::sink::DorisPartitionKey;
-use crate::sinks::doris::service::DorisRequest;
 use crate::sinks::prelude::*;
+use crate::sinks::util::http::HttpRequest;
 use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
 
@@ -12,17 +12,12 @@ pub struct DorisRequestBuilder {
     pub(super) encoder: (Transformer, Encoder<Framer>),
 }
 
-pub struct DorisMetadata {
-    finalizers: EventFinalizers,
-    partition_key: DorisPartitionKey,
-}
-
 impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
-    type Metadata = DorisMetadata;
+    type Metadata = (DorisPartitionKey, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
-    type Request = DorisRequest;
+    type Request = HttpRequest<DorisPartitionKey>;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
@@ -39,30 +34,26 @@ impl RequestBuilder<(DorisPartitionKey, Vec<Event>)> for DorisRequestBuilder {
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let (key, mut events) = input;
 
+        let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        let doris_metadata = DorisMetadata {
-            finalizers: events.take_finalizers(),
-            partition_key: key,
-        };
-
-        (doris_metadata, builder, events)
+        ((key, finalizers), builder, events)
     }
 
     fn build_request(
         &self,
-        doris_metadata: Self::Metadata,
+        metadata: Self::Metadata,
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        DorisRequest {
-            payload: payload.into_payload(),
-            finalizers: doris_metadata.finalizers,
-            metadata: request_metadata,
-            partition_key: DorisPartitionKey {
-                database: doris_metadata.partition_key.database,
-                table: doris_metadata.partition_key.table,
+        let (key, finalizers) = metadata;
+        HttpRequest::new(
+            payload.into_payload(),
+            finalizers,
+            request_metadata,
+            DorisPartitionKey {
+                database: key.database,
+                table: key.table,
             },
-            redirect_url: None,
-        }
+        )
     }
 }

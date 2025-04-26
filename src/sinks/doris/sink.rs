@@ -1,41 +1,38 @@
+use crate::sinks::doris::common::DorisCommon;
 use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use crate::sinks::doris::service::DorisRequest;
 use crate::sinks::doris::DorisConfig;
 use crate::sinks::prelude::*;
+use crate::sinks::util::http::HttpRequest;
 
 pub struct DorisSink<S> {
     batch_settings: BatcherSettings,
     service: S,
-    config: DorisConfig,
     request_builder: DorisRequestBuilder,
+    database: Template,
+    table: Template,
 }
 
 impl<S> DorisSink<S>
 where
-    // S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
-    S: Service<DorisRequest> + Send + 'static,
+    S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
 {
-    pub fn new(
-        batch_settings: BatcherSettings,
-        service: S,
-        config: DorisConfig,
-        request_builder: DorisRequestBuilder,
-    ) -> Self {
-        DorisSink {
+    pub fn new(service: S, config: &DorisConfig, common: &DorisCommon) -> crate::Result<Self> {
+        let batch_settings = config.batch.into_batcher_settings()?;
+        Ok(DorisSink {
             batch_settings,
             service,
-            config,
-            request_builder,
-        }
+            request_builder: common.request_builder.clone(),
+            database: config.database.clone(),
+            table: config.table.clone(),
+        })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
-        let key_partitioner = DorisKeyPartitioner::new(self.config.database, self.config.table);
-
+        let key_partitioner = DorisKeyPartitioner::new(self.database, self.table);
         input
             .batched_partitioned(key_partitioner, || batch_settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
@@ -61,7 +58,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for DorisSink<S>
 where
-    S: Service<DorisRequest> + Send + 'static,
+    S: Service<HttpRequest<DorisPartitionKey>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,

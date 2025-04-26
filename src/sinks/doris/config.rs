@@ -3,10 +3,10 @@
 use super::progress::ProgressReporter;
 use super::sink::DorisSink;
 
+use crate::sinks::doris::client::DorisSinkClient;
 use crate::sinks::doris::common::DorisCommon;
 use crate::sinks::doris::retry::DorisRetryLogic;
-use crate::sinks::doris::service::{DorisService, HttpRequestBuilder};
-use crate::sinks::util::http::RequestConfig;
+use crate::sinks::doris::service::DorisService;
 use crate::{
     http::{Auth, HttpClient},
     sinks::{
@@ -17,46 +17,9 @@ use crate::{
 };
 use futures;
 use futures_util::TryFutureExt;
-use http::{Request, Uri};
-use hyper::Body;
-use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vector_lib::codecs::JsonSerializerConfig;
-
-// Define URI handling function for Doris service
-fn get_http_scheme_host(host: &str) -> crate::Result<UriComponents> {
-    let uri = host
-        .parse::<Uri>()
-        .map_err(|e| format!("Failed to parse URI: {}", e))?;
-
-    // Get scheme, default to http
-    let scheme = uri.scheme_str().unwrap_or("http").to_string();
-
-    // Get host
-    let host = uri.host().unwrap_or("localhost").to_string();
-
-    // Get port
-    let port = uri.port_u16();
-
-    Ok(UriComponents { scheme, host, port })
-}
-
-// Build complete URI
-fn build_uri(scheme: &str, path: &str, host: &str, port: u16) -> crate::Result<Uri> {
-    let uri_str = format!("{}://{}:{}{}", scheme, host, port, path);
-    uri_str
-        .parse::<Uri>()
-        .map_err(|e| format!("Failed to build URI: {}", e).into())
-}
-
-// URI components struct
-#[derive(Debug)]
-struct UriComponents {
-    scheme: String,
-    host: String,
-    port: Option<u16>,
-}
 
 /// Configuration for the `doris` sink.
 #[configurable_component(sink("doris", "Deliver log data to an Apache Doris database."))]
@@ -128,7 +91,7 @@ pub struct DorisConfig {
 
     #[serde(default)]
     #[configurable(derived)]
-    pub request: RequestConfig,
+    pub request: TowerRequestConfig,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -184,8 +147,6 @@ impl SinkConfig for DorisConfig {
 
         let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
 
-        let batch_settings = self.batch.into_batcher_settings()?;
-
         // Create and start the progress reporter
         let reporter = ProgressReporter::new(self.log_progress_interval);
         let reporter_clone = reporter.clone();
@@ -196,33 +157,60 @@ impl SinkConfig for DorisConfig {
         });
 
         // Setup retry logic using the configured request settings
-        let request_settings = self.request.tower.into_settings();
+        let request_settings = self.request.into_settings();
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         // Wrap reporter in Arc for sharing
         let reporter_arc = Arc::new(reporter);
 
-        // Use our new DorisService implementation instead of HttpService
-        let services = commons
+        // Create a shared client instance to avoid repeated creation
+        let shared_doris_client = {
+            let doris_client = DorisSinkClient::new(
+                client.clone(),
+                common.base_url.clone(),
+                common.auth.clone(),
+                self.compression.clone(),
+                self.label_prefix.clone(),
+                self.headers.clone(),
+            )
+            .await;
+            doris_client.into_thread_safe()
+        };
+
+        let services_futures = commons
             .iter()
             .cloned()
             .map(|common| {
-                let endpoint = common.base_url.clone();
-                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                let client_for_service = shared_doris_client.clone(); // Use cloned client
+                let reporter_arc_clone = Arc::clone(&reporter_arc);
 
-                let service = DorisService::new(
-                    client.clone(),
-                    http_request_builder,
-                    self.log_request,
-                    Arc::clone(&reporter_arc),
-                );
-                (endpoint, service)
+                async move {
+                    let endpoint = common.base_url.clone();
+
+                    // Directly use the shared client, no need to create a new instance
+                    let service = DorisService::new(
+                        client_for_service,
+                        self.log_request.clone(),
+                        reporter_arc_clone,
+                    );
+
+                    Ok::<_, crate::Error>((endpoint, service))
+                }
             })
             .collect::<Vec<_>>();
 
+        // Wait for all futures to complete
+        let services_results = futures::future::join_all(services_futures).await;
+
+        // Filter out successful results
+        let services = services_results
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+
         let service = request_settings.distributed_service(
-            DorisRetryLogic::new(),
+            DorisRetryLogic {},
             services,
             health_config,
             DorisHealthLogic,
@@ -230,15 +218,17 @@ impl SinkConfig for DorisConfig {
         );
 
         // Create DorisSink with the configured service
-        let sink = DorisSink::new(
-            batch_settings,
-            service,
-            self.clone(),
-            common.request_builder.clone(),
-        );
+        let sink = DorisSink::new(service, self, &common)?;
 
         let sink = VectorSink::from_event_streamsink(sink);
-        let healthcheck = self.build_healthcheck(client, endpoints)?;
+
+        // Use the previously saved client for health check, no need to create a new instance
+        let healthcheck = futures::future::select_ok(commons.into_iter().map(move |common| {
+            let client = shared_doris_client.clone();
+            async move { common.healthcheck(client).await }.boxed()
+        }))
+        .map_ok(|((), _)| ())
+        .boxed();
 
         Ok((sink, healthcheck))
     }
@@ -283,111 +273,6 @@ impl DorisConfig {
 
         headers
     }
-
-    fn build_healthcheck(
-        &self,
-        client: HttpClient,
-        hosts: Vec<String>,
-    ) -> crate::Result<Healthcheck> {
-        // Create a health check for each node
-        let healthchecks = hosts
-            .into_iter()
-            .map(move |host| {
-                let client = client.clone();
-
-                async move {
-                    let parsed_url = get_http_scheme_host(&host)?;
-
-                    // Use Doris bootstrap API endpoint for health check
-                    let query_path = "/api/bootstrap";
-                    let uri = build_uri(
-                        &parsed_url.scheme,
-                        query_path,
-                        &parsed_url.host,
-                        parsed_url.port.unwrap_or(8030),
-                    )?;
-
-                    debug!(
-                        message = "Checking health of Doris node.",
-                        node = %uri
-                    );
-
-                    let request = Request::get(uri.to_string())
-                        .body(Body::empty())
-                        .map_err(|_| "Failed to build request".to_string())?;
-
-                    let request = request;
-
-                    let response = client.send(request).await?;
-                    let (parts, body) = response.into_parts();
-                    let body_bytes = hyper::body::to_bytes(body)
-                        .await
-                        .map_err(|e| format!("Failed to read response body: {}", e))?;
-
-                    if parts.status.is_success() {
-                        // Try to parse JSON response
-                        match serde_json::from_slice::<serde_json::Value>(&body_bytes) {
-                            Ok(json) => {
-                                // Check if code field in response is 0
-                                if let Some(code) = json.get("code").and_then(|c| c.as_i64()) {
-                                    if code == 0 {
-                                        info!(
-                                            message = "Doris node is healthy.",
-                                            node = %host
-                                        );
-                                        return Ok(());
-                                    } else {
-                                        let msg = json
-                                            .get("msg")
-                                            .and_then(|m| m.as_str())
-                                            .unwrap_or("unknown error");
-                                        warn!(
-                                            message = "Doris node is unhealthy.",
-                                            node = %host,
-                                            code = %code,
-                                            error_msg = %msg
-                                        );
-                                        return Err(format!(
-                                            "Healthcheck failed for host {}: code={}, msg={}",
-                                            host, code, msg
-                                        )
-                                        .into());
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!(
-                                    message = "Failed to parse JSON response from node.",
-                                    node = %host,
-                                    error = %e
-                                );
-                            }
-                        }
-                    }
-
-                    // If we reach here, response was not successful or JSON parsing failed
-                    warn!(
-                        message = "Doris node is unhealthy.",
-                        node = %host,
-                        status = %parts.status
-                    );
-                    Err(format!(
-                        "Healthcheck failed for host {} with status: {}",
-                        host, parts.status
-                    )
-                    .into())
-                }
-                .boxed()
-            })
-            .collect::<Vec<_>>();
-
-        // Use select_ok to select the first successful health check
-        let healthcheck = futures::future::select_ok(healthchecks)
-            .map_ok(|((), _)| ())
-            .boxed();
-
-        Ok(healthcheck)
-    }
 }
 
 #[cfg(test)]
@@ -397,31 +282,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DorisConfig>();
-    }
-
-    #[test]
-    fn test_build_uri() {
-        assert_eq!(
-            build_uri("http", "/api/bootstrap", "localhost", 8030).unwrap().to_string(),
-            "http://localhost:8030/api/bootstrap"
-        );
-        assert_eq!(
-            build_uri("https", "/api/test", "example.com", 443).unwrap().to_string(),
-            "https://example.com:443/api/test"
-        );
-    }
-
-    #[test]
-    fn test_get_http_scheme_host() {
-        let result = get_http_scheme_host("http://localhost:8030").unwrap();
-        assert_eq!(result.scheme, "http");
-        assert_eq!(result.host, "localhost");
-        assert_eq!(result.port, Some(8030));
-
-        let result = get_http_scheme_host("https://example.com").unwrap();
-        assert_eq!(result.scheme, "https");
-        assert_eq!(result.host, "example.com");
-        assert_eq!(result.port, None);
     }
 
     #[test]
@@ -470,7 +330,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(config.endpoints, vec!["http://doris1:8030", "http://doris2:8030"]);
+        assert_eq!(
+            config.endpoints,
+            vec!["http://doris1:8030", "http://doris2:8030"]
+        );
         assert_eq!(config.database.to_string(), "custom_db");
         assert_eq!(config.table.to_string(), "custom_table");
         assert_eq!(config.label_prefix, "custom_prefix");
@@ -518,8 +381,14 @@ mod tests {
         .unwrap();
 
         assert_eq!(config.headers.len(), 2);
-        assert_eq!(config.headers.get("X-Custom-Header").unwrap(), "custom_value");
-        assert_eq!(config.headers.get("Content-Type").unwrap(), "application/json");
+        assert_eq!(
+            config.headers.get("X-Custom-Header").unwrap(),
+            "custom_value"
+        );
+        assert_eq!(
+            config.headers.get("Content-Type").unwrap(),
+            "application/json"
+        );
     }
 
     #[test]
@@ -531,7 +400,7 @@ mod tests {
             table = "test_table"
             distribution.retry_initial_backoff_secs = 10
         "#,
-        ) .unwrap();
+        )
+        .unwrap();
     }
-
 }

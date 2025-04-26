@@ -21,4 +21,6 @@ mod sink;
 // #[cfg(feature = "doris-integration-tests")]
 mod integration_test;
 
+mod client;
+
 pub use self::config::DorisConfig;
