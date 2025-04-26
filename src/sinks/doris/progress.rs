@@ -159,19 +159,19 @@ mod tests {
     #[test]
     fn test_increment_counters() {
         let reporter = ProgressReporter::new(10);
-        
+
         // Test total bytes
         reporter.incr_total_bytes(100);
         assert_eq!(reporter.total_bytes.load(Ordering::Relaxed), 100);
         reporter.incr_total_bytes(50);
         assert_eq!(reporter.total_bytes.load(Ordering::Relaxed), 150);
-        
+
         // Test total rows
         reporter.incr_total_rows(20);
         assert_eq!(reporter.total_rows.load(Ordering::Relaxed), 20);
         reporter.incr_total_rows(10);
         assert_eq!(reporter.total_rows.load(Ordering::Relaxed), 30);
-        
+
         // Test failed rows (also updates total rows)
         reporter.incr_failed_rows(5);
         assert_eq!(reporter.failed_rows.load(Ordering::Relaxed), 5);
@@ -184,19 +184,19 @@ mod tests {
         reporter.incr_total_bytes(200);
         reporter.incr_total_rows(50);
         reporter.incr_failed_rows(10);
-        
+
         let cloned = reporter.clone();
-        
+
         // Verify cloned instance has the same values
         assert_eq!(cloned.interval, reporter.interval);
         assert_eq!(cloned.total_bytes.load(Ordering::Relaxed), 200);
         assert_eq!(cloned.total_rows.load(Ordering::Relaxed), 60); // 50 + 10
         assert_eq!(cloned.failed_rows.load(Ordering::Relaxed), 10);
-        
+
         // Verify that updates to one affect the other due to Arc
         reporter.incr_total_bytes(100);
         assert_eq!(cloned.total_bytes.load(Ordering::Relaxed), 300);
-        
+
         cloned.incr_total_rows(40);
         assert_eq!(reporter.total_rows.load(Ordering::Relaxed), 100); // 60 + 40
     }
@@ -213,21 +213,21 @@ mod tests {
     async fn test_report_shutdown() {
         // Create a reporter with a long interval to ensure it won't trigger during test
         let reporter = ProgressReporter::new(100);
-        
+
         // Use ShutdownSignal::noop() which returns a signal that can be awaited
         let shutdown_signal = ShutdownSignal::noop();
-        
+
         // Start the reporter in a separate task
         let handle = tokio::spawn(async move {
             reporter.report(Some(shutdown_signal)).await;
         });
-        
+
         // Give it a moment to start
         tokio::time::sleep(Duration::from_millis(50)).await;
-        
+
         // Cancel the task directly since we can't trigger the noop signal
         handle.abort();
-        
+
         // The report task should complete within a reasonable time
         let result = timeout(Duration::from_millis(200), handle).await;
         assert!(result.is_ok());

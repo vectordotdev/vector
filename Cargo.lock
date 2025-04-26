@@ -11565,6 +11565,7 @@ dependencies = [
  "derivative",
  "futures 0.3.31",
  "indexmap 2.8.0",
+ "lazy_static",
  "metrics",
  "paste",
  "pin-project",

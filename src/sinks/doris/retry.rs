@@ -4,10 +4,7 @@ use tracing::{debug, error};
 use crate::sinks::doris::service::DorisResponse;
 use crate::{
     http::HttpError,
-    sinks::{
-        prelude::*,
-        util::{http::HttpRetryLogic, retries::RetryAction},
-    },
+    sinks::{prelude::*, util::retries::RetryAction},
 };
 
 /// Internal struct for parsing Doris Stream Load API responses
@@ -21,30 +18,14 @@ struct DorisStreamLoadResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct DorisRetryLogic {
-    inner: HttpRetryLogic,
-}
-
-impl DorisRetryLogic {
-    /// Create a new DorisRetryLogic
-    pub fn new() -> Self {
-        Self {
-            inner: HttpRetryLogic,
-        }
-    }
-}
+pub struct DorisRetryLogic;
 
 impl RetryLogic for DorisRetryLogic {
     type Error = HttpError;
     type Response = DorisResponse;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        // All HTTP errors can be retried
-        debug!(
-            message = "HTTP error encountered, will retry.",
-            %error
-        );
-        self.inner.is_retriable_error(error)
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -60,7 +41,7 @@ impl RetryLogic for DorisRetryLogic {
                     debug!(message = "Doris stream load completed successfully.");
                     return RetryAction::Successful;
                 }
-                
+
                 // Retry for non-Success status
                 let message = doris_resp.message.unwrap_or_default();
                 error!(
@@ -68,16 +49,18 @@ impl RetryLogic for DorisRetryLogic {
                     doris_status = %doris_resp.status,
                     error_message = %message
                 );
-                return RetryAction::Retry(format!("Doris error: {} - {}", doris_resp.status, message).into());
+                return RetryAction::Retry(
+                    format!("Doris error: {} - {}", doris_resp.status, message).into(),
+                );
             }
         }
-        
+
         // Retry for all other cases
         error!(
             message = "Error encountered, will retry.",
             status_code = %status
         );
-        
+
         RetryAction::Retry("Error response from Doris, will retry.".into())
     }
 }
