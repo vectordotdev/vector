@@ -5,6 +5,10 @@ use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{
         logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
     },
+    metrics::v1::{
+        metrics_service_server::MetricsService, ExportMetricsServiceRequest,
+        ExportMetricsServiceResponse,
+    },
     trace::v1::{
         trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
     },
@@ -17,7 +21,7 @@ use vector_lib::{
 
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::{LOGS, TRACES},
+    sources::opentelemetry::{LOGS, METRICS, TRACES},
     SourceSender,
 };
 
@@ -64,6 +68,26 @@ impl LogsService for Service {
         self.handle_events(events, LOGS).await?;
 
         Ok(Response::new(ExportLogsServiceResponse {
+            partial_success: None,
+        }))
+    }
+}
+
+#[tonic::async_trait]
+impl MetricsService for Service {
+    async fn export(
+        &self,
+        request: Request<ExportMetricsServiceRequest>,
+    ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+        let events: Vec<Event> = request
+            .into_inner()
+            .resource_metrics
+            .into_iter()
+            .flat_map(|v| v.into_event_iter())
+            .collect();
+        self.handle_events(events, METRICS).await?;
+
+        Ok(Response::new(ExportMetricsServiceResponse {
             partial_success: None,
         }))
     }
