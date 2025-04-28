@@ -8,10 +8,7 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::{
-    path::{OwnedSegment, OwnedTargetPath, PathPrefix},
-    value::KeyString,
-};
+use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
@@ -165,29 +162,8 @@ pub fn normalize_as_agent_event(event: &mut Event) {
     let Some(object_map) = log.as_map_mut() else {
         return;
     };
-
-    // Extract the `message` object from the log if it already exists. Then JSON deserialize its
-    // value field. All non reserved fields placed at the root will be moved there.
-    let mut message = if let Some(outer_msg) = object_map.remove(MESSAGE) {
-        if let Value::Object(current_message) = outer_msg {
-            current_message // already JSON
-        } else {
-            // possible payload is stringified JSON
-            outer_msg
-                .as_bytes()
-                .and_then(|b| serde_json::from_slice::<ObjectMap>(b).ok())
-                .unwrap_or_else(|| {
-                    [(KeyString::from(MESSAGE), outer_msg)]
-                        .into_iter()
-                        .collect()
-                })
-        }
-    } else {
-        ObjectMap::default()
-    };
-
     // Move all non reserved fields into a new object
-    let mut collisions = ObjectMap::default();
+    let mut local_root = ObjectMap::default();
     let keys_to_move = object_map
         .keys()
         .filter(|ks| !is_reserved_attribute(ks.as_str()))
@@ -195,29 +171,11 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         .collect::<Vec<_>>();
     for key in keys_to_move {
         if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
-            if let Some(returned_entry_v) = message.insert(entry_k, entry_v) {
-                collisions.insert(key, returned_entry_v);
-            }
+            local_root.insert(entry_k, entry_v);
         }
     }
-    if !collisions.is_empty() {
-        if message
-            .insert(KeyString::from("_collisions"), Value::Object(collisions))
-            .is_none()
-        {
-            warn!(
-                message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'.",
-                internal_log_rate_limit = true,
-            );
-        } else {
-            error!(
-                message = "A field with the name 'message._collisions' already exists, replacing its value with an object containing key collisions.",
-                internal_log_rate_limit = true,
-            );
-        }
-    }
-    // .. finally nest this object at the root under the reserved key named 'message'
-    log.insert(MESSAGE, message);
+    // .. nest this object at the root under the reserved key named 'message'
+    log.insert(MESSAGE, local_root);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
@@ -693,6 +651,7 @@ mod tests {
         log.insert(event_path!("severity"), "the_severity");
 
         let sample_message = value!({
+            "message": "hello world",
             "field_a": "field_a_value",
             "field_b": "field_b_value",
             "field_c": { "field_c_nested" : "field_c_value" },
@@ -731,12 +690,13 @@ mod tests {
             Some(&value!({
                 "source_type": "datadog_agent",
                 "field_a": "replaced_field_a_value",
-                "field_b": "field_b_value",
                 "field_c": "replaced_field_c_value",
-                "_collisions": {
+                "message": (value!({
+                    "message": "hello world",
                     "field_a": "field_a_value",
+                    "field_b": "field_b_value",
                     "field_c": { "field_c_nested" : "field_c_value" },
-                }
+                }).to_string()),
             }))
         );
     }
@@ -765,9 +725,12 @@ mod tests {
             log.get(event_path!("message")),
             Some(&value!({
                 "source_type": "datadog_agent",
-                "field_a": "field_a_value",
-                "field_b": "field_b_value",
-                "field_c": { "field_c_nested" : "field_c_value" },
+                "message": (value!({
+                    "message": "hello world",
+                    "field_a": "field_a_value",
+                    "field_b": "field_b_value",
+                    "field_c": { "field_c_nested" : "field_c_value" },
+                }).to_string()),
                 "field_1": "value_1",
                 "field_2": "value_2",
                 "field_3": {
