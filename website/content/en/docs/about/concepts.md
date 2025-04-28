@@ -27,6 +27,7 @@ A **metric** event represents a numerical operation performed on a time series. 
 ### Traces
 
 A **trace** event can be thought of as a special kind of log event. The components that support trace events are:
+
 * the `datadog_agent` source
 * the `datadog_traces` sink
 * the `opentelemetry` source
@@ -105,9 +106,9 @@ For example, if you have a single source sending to 3 sinks in this configuratio
 backpressure from sink 2 (500 events/sec) since that is the slowest sink configured to provide backpressure.
 Sink 1 will drop up to 250 events/sec, and sink 3 will be underutilized.
 
-- Sink 1: Can send at 250 events/sec (`buffer.when_full = drop_newest`)
-- Sink 2: Can send at 500 events/sec  (`buffer.when_full = block`)
-- Sink 3: Can send at 1000 events/sec  (`buffer.when_full = block`)
+* Sink 1: Can send at 250 events/sec (`buffer.when_full = drop_newest`)
+* Sink 2: Can send at 500 events/sec  (`buffer.when_full = block`)
+* Sink 3: Can send at 1000 events/sec  (`buffer.when_full = block`)
 
 If there are multiple sources configured for a single component, Vector currently makes no guarantees
 which source will have priority during backpressure. To make sure all inputs are fully processed, make
