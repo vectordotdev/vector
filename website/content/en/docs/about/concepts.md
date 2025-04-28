@@ -26,7 +26,7 @@ A **metric** event represents a numerical operation performed on a time series. 
 
 ### Traces
 
-A **trace** event can be thought of as a special kind of log event. The components that support trace events are: 
+A **trace** event can be thought of as a special kind of log event. The components that support trace events are:
 * the `datadog_agent` source
 * the `datadog_traces` sink
 * the `opentelemetry` source
@@ -34,13 +34,12 @@ A **trace** event can be thought of as a special kind of log event. The componen
 * the `remap` transform
 * the `native`, `native_json` decoders
 * the `native`, `native_json` and `json` encoders
-  * the `opentelemetry` sink and any other sink that uses the above encoders 
-
+  * the `opentelemetry` sink and any other sink that uses the above encoders
 
 **Note**: Support for traces is limited and is in alpha.
 
-If you’re interested in using traces with a Vector component that doesn’t yet support them, 
-please check the list of open issues [here](https://github.com/vectordotdev/vector/issues?q=is%3Aissue+state%3Aopen+label%3A%22domain%3A%20traces%22).  
+If you’re interested in using traces with a Vector component that doesn’t yet support them,
+please check the list of open issues [here](https://github.com/vectordotdev/vector/issues?q=is%3Aissue+state%3Aopen+label%3A%22domain%3A%20traces%22).
 If you don’t see your use case covered, feel free to [open a new issue](https://github.com/vectordotdev/vector/issues/new?template=feature.yml).
 
 
