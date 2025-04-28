@@ -6,7 +6,6 @@ use futures_util::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
 use prost::Message;
-use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -45,26 +44,22 @@ use crate::{
 use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
 
-#[derive(Clone, Copy, Debug, Snafu)]
-pub(crate) enum ApiError {
-    ServerShutdown,
-    ContentType,
-}
-
-impl warp::reject::Reject for ApiError {}
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ContentType {
     Protobuf,
 }
 
-// Extractor for the Content-Type header
+#[derive(Debug)]
+struct InvalidContentType;
+
+impl warp::reject::Reject for InvalidContentType {}
+
 fn extract_content_type() -> impl warp::Filter<Extract = (ContentType,), Error = Rejection> + Copy {
     warp::header::<String>(http::header::CONTENT_TYPE.as_str()).and_then(
         |content_type: String| async move {
             match content_type.as_str() {
                 "application/x-protobuf" => Ok(ContentType::Protobuf),
-                _ => Err(warp::reject::custom(ApiError::ContentType)),
+                _ => Err(warp::reject::custom(InvalidContentType)),
             }
         },
     )
@@ -73,14 +68,15 @@ fn extract_content_type() -> impl warp::Filter<Extract = (ContentType,), Error =
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
-    filters: BoxedFilter<(Response,)>,
+    routes: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
     let listener = tls_settings.bind(&address).await?;
-    let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
+
+    let routes = routes.recover(handle_rejection);
 
     let span = Span::current();
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
@@ -133,10 +129,40 @@ pub(crate) fn build_warp_filter(
         bytes_received,
         events_received,
     );
+
+    // The OTLP spec says that HTTP 4xx errors must include a grpc Status message
+    // by doing it here we get access to the content-type header, which is required
+    // to differentiate between protobuf and json encoding
+    let handle_errors: BoxedFilter<(Response,)> = warp::any()
+        .and(warp::method())
+        .and(warp::path::peek())
+        .and(extract_content_type())
+        .then(|method, path: warp::filters::path::Peek, _ct| async move {
+            if method != hyper::Method::POST {
+                let reply = protobuf(Status {
+                    code: 2,
+                    message: "method not allowed, supported: [POST]".into(),
+                    ..Default::default()
+                });
+                warp::reply::with_status(reply, hyper::StatusCode::METHOD_NOT_ALLOWED)
+                    .into_response()
+            } else {
+                let reply = protobuf(Status {
+                    code: 2,
+                    message: format!("unknown route: {}", path.as_str()),
+                    ..Default::default()
+                });
+                warp::reply::with_status(reply, hyper::StatusCode::NOT_FOUND).into_response()
+            }
+        })
+        .boxed();
+
     log_filters
         .or(trace_filters)
         .unify()
         .or(metrics_filters)
+        .unify()
+        .or(handle_errors)
         .unify()
         .boxed()
 }
@@ -333,64 +359,74 @@ async fn handle_request(
     output: &str,
     resp: impl Message,
 ) -> Result<Response, Rejection> {
-    match events {
-        Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
-            let count = events.len();
+    let reply_with_status =
+        |http_code: hyper::StatusCode, code: i32, message: String| -> Result<Response, Rejection> {
+            let mut resp = protobuf(Status {
+                code,
+                message,
+                ..Default::default()
+            })
+            .into_response();
+            *resp.status_mut() = http_code;
+            Ok(resp)
+        };
 
-            out.send_batch_named(output, events).await.map_err(|_| {
-                emit!(StreamClosedError { count });
-                warp::reject::custom(ApiError::ServerShutdown)
-            })?;
+    if let Err(err) = events {
+        return reply_with_status(
+            err.status_code(),
+            2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+            err.message().into(),
+        );
+    }
 
-            match receiver {
-                None => Ok(protobuf(resp).into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
-                },
-            }
-        }
-        Err(err) => Err(warp::reject::custom(err)),
+    let mut events = events.unwrap();
+    let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
+    let count = events.len();
+
+    if let Err(_) = out.send_batch_named(output, events).await {
+        emit!(StreamClosedError { count });
+        // the client can try again later
+        return reply_with_status(
+            hyper::StatusCode::SERVICE_UNAVAILABLE,
+            2,
+            "Server is shutting down".into(),
+        );
+    };
+
+    match receiver {
+        None => Ok(protobuf(resp).into_response()),
+        Some(receiver) => match receiver.await {
+            BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
+            BatchStatus::Errored => reply_with_status(
+                hyper::StatusCode::INTERNAL_SERVER_ERROR,
+                2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+                "Error delivering contents to sink".into(),
+            ),
+            BatchStatus::Rejected => reply_with_status(
+                hyper::StatusCode::INTERNAL_SERVER_ERROR,
+                2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+                "Contents failed to deliver to sink".into(),
+            ),
+        },
     }
 }
 
-async fn handle_rejection(err: Rejection) -> Result<Box<dyn Reply>, std::convert::Infallible> {
-    if let Some(err_msg) = err.find::<ErrorMessage>() {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: err_msg.message().into(),
-            ..Default::default()
-        });
-
-        Ok(Box::new(warp::reply::with_status(
-            reply,
-            err_msg.status_code(),
-        )))
-    } else if let Some(ApiError::ContentType) = err.find::<ApiError>() {
-        Ok(Box::new(warp::reply::with_status(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE.to_string(),
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-        )))
+async fn handle_rejection(err: Rejection) -> Result<Response, Infallible> {
+    let reply = if let Some(_) = err.find::<InvalidContentType>() {
+        warp::reply::with_status(
+            hyper::StatusCode::UNSUPPORTED_MEDIA_TYPE.as_str(),
+            hyper::StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        )
     } else {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
-            ..Default::default()
-        });
+        warn!("Unhandled rejection: {:?}", err);
+        warp::reply::with_status(
+            "Internal server error".into(),
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
+        )
+    };
 
-        Ok(Box::new(warp::reply::with_status(
-            reply,
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )))
-    }
+    let mut resp = reply.into_response();
+    resp.headers_mut()
+        .insert(http::header::CONTENT_TYPE, "text/plain".parse().unwrap());
+    Ok(resp)
 }
