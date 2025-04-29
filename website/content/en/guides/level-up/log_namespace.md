@@ -44,18 +44,16 @@ transforms:
     inputs:
       - s0
     source: |
-      %from = "t0"
       .message = .
-      .meta = %
+      .from = "t0"
 
   t1:
     type: remap
     inputs:
       - s0
     source: |
-      .message = "overwrite"
-      %from = "t1"
-      .meta = %
+      .message = .
+      .from = "t1"
 
 sinks:
   text_console:
@@ -81,25 +79,15 @@ sinks:
 Sample output from `text_console`:
 
 ```text
-{"message":"Hello World!","meta":{"demo_logs":{"host":"localhost","service":"vector"},"from":"t0","vector":{"ingest_timestamp":"2025-04-23T17:42:39.568583Z","source_type":"demo_logs"}}}
+{"from":"t0","message":"Hello World!"}
 ```
 
 Sample output from `json_console`:
 
 ```json
 {
-  "message": "overwrite",
-  "meta": {
-    "demo_logs": {
-      "host": "localhost",
-      "service": "vector"
-    },
-    "from": "t1",
-    "vector": {
-      "ingest_timestamp": "2025-04-23T17:42:39.568583Z",
-      "source_type": "demo_logs"
-    }
-  }
+  "from": "t1",
+  "message": "Hello World!"
 }
 ```
 
@@ -133,7 +121,6 @@ We can always prepare events for ingestion by using a [remap](/docs/reference/co
 schema:
   log_namespace: true
 
-
 sources:
   s0:
     type: demo_logs
@@ -149,6 +136,7 @@ transforms:
       - s0
     source: |
       set_semantic_meaning(.custom_field, "message")
+      # This becomes the new payload. The `.` is overwritten.
       .custom_field = "foo"
 
   t1:
@@ -156,6 +144,7 @@ transforms:
     inputs:
       - s0
     source: |
+      # Preserve the `Hello World!` payload.
       .message = .
       .custom_field = "bar"
 
