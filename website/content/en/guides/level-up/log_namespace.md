@@ -2,7 +2,7 @@
 title: The Log Namespace feature
 short: Log Namespace
 description: Learn how the log namespacing works.
-author_github: https://github.com/hoverbear
+author_github: https://github.com/pront
 domain: schemas
 weight: 2
 tags: ["log_namespace", "logs", "namespace", "level up", "guides", "guide"]
@@ -101,7 +101,7 @@ schema:
 ```
 
 Then we will observe a big difference for these two encoders:
-- The `text` encoder only encodes the result of `log.get_message()`.
+- The `text` encoder only encodes the value that `log_schema.message_key` point to (which is `.message` by default).
 - The `json` encoder passes the **whole** log to serde JSON for encoding.
   - For example `"foo"` is a valid JSON string but not a JSON object.
   - We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
