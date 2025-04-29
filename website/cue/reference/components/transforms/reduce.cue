@@ -87,7 +87,9 @@ components: transforms: reduce: {
 			configuration: {
 				group_by: ["host", "pid", "tid"]
 				merge_strategies: {
-					message: "concat_newline"
+					message: "concat_newline",
+					"pid": "discard",
+					"tid": "discard",
 				}
 				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
