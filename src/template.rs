@@ -16,7 +16,10 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
-static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+static RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\{\{(?P<key>[^\|\}]+)(?:\|\s*default:\s*(?P<default>[^\}]+))?\}\}").unwrap()
+});
+// static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 /// Errors raised whilst parsing a Template field.
 #[allow(missing_docs)]
@@ -65,6 +68,9 @@ pub struct Template {
 
     #[serde(skip)]
     tz_offset: Option<FixedOffset>,
+
+    #[serde(default)]
+    default: Option<String>,
 }
 
 impl TryFrom<&str> for Template {
@@ -108,7 +114,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                     Part::Literal(lit) => lit.len(),
                     // We can't really put a useful number here, assume at least one byte will come
                     // from the input event.
-                    Part::Reference(_path) => 1,
+                    Part::Reference { key: _, default: _ } => 1,
                     Part::Strftime(parsed) => parsed.reserve_size(),
                 })
                 .sum();
@@ -119,6 +125,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 is_static,
                 reserve_size,
                 tz_offset: None,
+                default: None,
             }
         })
     }
@@ -174,7 +181,7 @@ impl Template {
                 Part::Strftime(items) => {
                     out.push_str(&render_timestamp(items, event, self.tz_offset))
                 }
-                Part::Reference(key) => {
+                Part::Reference { key, default } => {
                     out.push_str(
                         &match event {
                             EventRef::Log(log) => log
@@ -189,9 +196,12 @@ impl Template {
                                 .ok()
                                 .and_then(|v| v.map(Value::to_string_lossy)),
                         }
-                        .unwrap_or_else(|| {
-                            missing_keys.push(key.to_owned());
-                            Cow::Borrowed("")
+                        .unwrap_or_else(|| match default {
+                            None => {
+                                missing_keys.push(key.to_owned());
+                                Cow::Borrowed("")
+                            }
+                            Some(default) => Cow::Borrowed(default),
                         }),
                     );
                 }
@@ -210,8 +220,8 @@ impl Template {
             .parts
             .iter()
             .filter_map(|part| {
-                if let Part::Reference(r) = part {
-                    Some(r.to_owned())
+                if let Part::Reference { key, .. } = part {
+                    Some(key.to_owned())
                 } else {
                     None
                 }
@@ -244,7 +254,10 @@ enum Part {
     /// A literal piece of text containing a time format string.
     Strftime(ParsedStrftime),
     /// A reference to the source event, to be copied from the relevant field or tag.
-    Reference(String),
+    Reference {
+        key: String,
+        default: Option<String>,
+    },
 }
 
 // Wrap the parsed time formatter in order to provide `impl Hash` and some convenience functions.
@@ -335,7 +348,11 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
             return Err(TemplateParseError::InvalidPathSyntax { path });
         }
 
-        parts.push(Part::Reference(path));
+        let default = cap
+            .name("default")
+            .map(|value| value.as_str().trim().to_string());
+
+        parts.push(Part::Reference { key: path, default });
         last_end = all.end();
     }
     if src.len() > last_end {
@@ -739,5 +756,14 @@ mod tests {
             Template::try_from("%E").unwrap_err(),
             TemplateParseError::StrftimeError
         );
+    }
+
+    #[test]
+    fn render_log_default() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("log_stream", "stream");
+        let template = Template::try_from("{{ asdf | default: test }}").unwrap();
+
+        assert_eq!(Ok(Bytes::from("test")), template.render(&event))
     }
 }
