@@ -552,6 +552,7 @@ mod test {
             .collect::<Vec<String>>()
         );
     }
+
     #[test]
     fn override_rate_limit_at_callsite() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
