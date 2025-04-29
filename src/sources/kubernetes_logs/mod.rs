@@ -197,7 +197,7 @@ pub struct Config {
     ///
     /// If your files share a common header that is not always a fixed size,
     ///
-    /// If the file has less than this amount of lines, it won’t be read at all.
+    /// If the file has less than this amount of lines, it won't be read at all.
     #[configurable(metadata(docs::type_unit = "lines"))]
     fingerprint_lines: usize,
 
@@ -695,15 +695,13 @@ impl Source {
             watcher::ListSemantic::MostRecent
         };
 
-        let page_size = if use_apiserver_cache { None } else { Some(500) };
-
         let pod_watcher = watcher(
             pods,
             watcher::Config {
                 field_selector: Some(field_selector),
                 label_selector: Some(label_selector),
                 list_semantic: list_semantic.clone(),
-                page_size,
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
@@ -723,13 +721,12 @@ impl Source {
         // -----------------------------------------------------------------
 
         let namespaces = Api::<Namespace>::all(client.clone());
-        let page_size = if use_apiserver_cache { None } else { Some(500) };
         let ns_watcher = watcher(
             namespaces,
             watcher::Config {
                 label_selector: Some(namespace_label_selector),
                 list_semantic: list_semantic.clone(),
-                page_size,
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
@@ -753,7 +750,7 @@ impl Source {
             watcher::Config {
                 field_selector: Some(node_selector),
                 list_semantic,
-                page_size,
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
@@ -951,6 +948,15 @@ impl Source {
         }
         info!(message = "Done.");
         Ok(())
+    }
+}
+
+// Set page size to None if use_apiserver_cache is true, to make the list requests containing `resourceVersion=0`` parameters.
+fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
+    if use_apiserver_cache {
+        None
+    } else {
+        watcher::Config::default().page_size
     }
 }
 
