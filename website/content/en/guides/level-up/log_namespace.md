@@ -76,6 +76,7 @@ sinks:
 </details>
 
 ### stdout
+
 Sample output from `text_console`:
 
 ```text
@@ -101,10 +102,11 @@ schema:
 ```
 
 Then we will observe a big difference for these two encoders:
-- The `text` encoder only encodes the value that `log_schema.message_key` point to (which is `.message` by default).
-- The `json` encoder passes the **whole** log to serde JSON for encoding.
-  - For example `"foo"` is a valid JSON string but not a JSON object.
-  - We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
+
+* The `text` encoder only encodes the value that `log_schema.message_key` point to (which is `.message` by default).
+* The `json` encoder passes the **whole** log to serde JSON for encoding.
+  * For example `"foo"` is a valid JSON string but not a JSON object.
+  * We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
 
 {{< info >}}
 We can always prepare events for ingestion by using a [remap](/docs/reference/configuration/transforms/remap/) transform and a suitable encoder in the sink.
@@ -169,6 +171,7 @@ sinks:
 </details>
 
 #### stdout
+
 Sample output from `text_console`:
 
 ```text
