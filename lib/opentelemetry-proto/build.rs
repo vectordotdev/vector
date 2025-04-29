@@ -56,25 +56,6 @@ fn set_serde_attributes(mut builder: tonic_build::Builder) -> tonic_build::Build
             .field_attribute(path, "#[cfg_attr(feature = \"with-serde\", serde(serialize_with = \"crate::proto::serializers::serialize_to_hex_string\", deserialize_with = \"crate::proto::serializers::deserialize_from_hex_string\"))]")
     }
 
-    // special serializer and deserializer for timestamp
-    // OTLP/JSON format may uses string for timestamp
-    // the proto file uses u64 for timestamp
-    // Thus, special serializer and deserializer are needed
-    for path in [
-        "trace.v1.Span.start_time_unix_nano",
-        "trace.v1.Span.end_time_unix_nano",
-        "trace.v1.Span.Event.time_unix_nano",
-        "logs.v1.LogRecord.time_unix_nano",
-        "logs.v1.LogRecord.observed_time_unix_nano",
-        "metrics.v1.HistogramDataPoint.start_time_unix_nano",
-        "metrics.v1.HistogramDataPoint.time_unix_nano",
-        "metrics.v1.NumberDataPoint.start_time_unix_nano",
-        "metrics.v1.NumberDataPoint.time_unix_nano",
-    ] {
-        builder = builder
-            .field_attribute(path, "#[cfg_attr(feature = \"with-serde\", serde(serialize_with = \"crate::proto::serializers::serialize_u64_to_string\", deserialize_with = \"crate::proto::serializers::deserialize_string_to_u64\"))]")
-    }
-
     // flatten
     for path in [
         "metrics.v1.Metric.data",
@@ -101,6 +82,24 @@ fn main() -> Result<(), Error> {
         );
 
     builder = set_serde_attributes(builder);
+
+    // Note that according to Protobuf specs 64-bit integer numbers
+    // in JSON-encoded payloads are encoded as decimal strings, and
+    // either numbers or strings are accepted when decoding.
+    for path in [
+        "trace.v1.Span.start_time_unix_nano",
+        "trace.v1.Span.end_time_unix_nano",
+        "trace.v1.Span.Event.time_unix_nano",
+        "logs.v1.LogRecord.time_unix_nano",
+        "logs.v1.LogRecord.observed_time_unix_nano",
+        "metrics.v1.HistogramDataPoint.start_time_unix_nano",
+        "metrics.v1.HistogramDataPoint.time_unix_nano",
+        "metrics.v1.NumberDataPoint.start_time_unix_nano",
+        "metrics.v1.NumberDataPoint.time_unix_nano",
+    ] {
+        builder = builder
+            .field_attribute(path, "#[cfg_attr(feature = \"with-serde\", serde(serialize_with = \"crate::proto::serializers::serialize_u64_to_string\", deserialize_with = \"crate::proto::serializers::deserialize_from_str_or_u64_to_u64\"))]")
+    }
 
     builder
         .compile(
