@@ -1252,6 +1252,176 @@ async fn delivery_error() {
 }
 
 #[tokio::test]
+async fn json_log_request() {
+    // JSON log payload with u64 timestamp
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env_status(LOGS, None, EventStatus::Rejected, false).await;
+
+        // from https://opentelemetry.io/docs/specs/otel/protocol/file-exporter/#examples
+        // note we are testing both string and u64 timestamps
+        let log = r#"
+            {
+              "resourceLogs": [
+                {
+                  "resource": {
+                    "attributes": [
+                      {
+                        "key": "resource-attr",
+                        "value": {
+                          "stringValue": "resource-attr-val-1"
+                        }
+                      }
+                    ]
+                  },
+                  "scopeLogs": [
+                    {
+                      "scope": {},
+                      "logRecords": [
+                        {
+                          "timeUnixNano": "1581452773000000789",
+                          "observedTimeUnixNano": 1581452773000000780,
+                          "severityNumber": 9,
+                          "severityText": "Info",
+                          "body": {
+                            "stringValue": "This is a log message"
+                          },
+                          "attributes": [
+                            {
+                              "key": "app",
+                              "value": {
+                                "stringValue": "server"
+                              }
+                            },
+                            {
+                              "key": "instance_num",
+                              "value": {
+                                "intValue": 1
+                              }
+                            }
+                          ],
+                          "droppedAttributesCount": 1,
+                          "traceId": "08040201000000000000000000000000",
+                          "spanId": "0102040800000000"
+                        },
+                        {
+                          "timeUnixNano": "1581452773000000789",
+                          "observedTimeUnixNano": 1581452773000000780,
+                          "severityNumber": 9,
+                          "severityText": "Info",
+                          "body": {
+                            "stringValue": "something happened"
+                          },
+                          "attributes": [
+                            {
+                              "key": "customer",
+                              "value": {
+                                "stringValue": "acme"
+                              }
+                            },
+                            {
+                              "key": "env",
+                              "value": {
+                                "stringValue": "dev"
+                              }
+                            }
+                          ],
+                          "droppedAttributesCount": 1,
+                          "traceId": "",
+                          "spanId": ""
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }"#;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!("http://{}/v1/logs", env.config.http.address,))
+            .header("Content-Type", "application/json")
+            .body(log)
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(
+            res.status() == hyper::StatusCode::OK,
+            "Unexpected Status: {}",
+            res.status()
+        );
+
+        let mut output = test_util::collect_ready(env.output).await;
+        assert_eq!(output.len(), 2);
+        // clone to get rid of json_encoded_size_cache
+        let e2 = output.pop().unwrap().clone();
+        let e1 = output.pop().unwrap();
+
+        let schema_definitions = env
+            .config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true)
+            .expect("Failed to get schema definition");
+
+        schema_definitions.assert_valid_for_event(&e1);
+
+        let (v1, _) = e1.into_log().into_parts();
+        let ev1: Value = vec_into_btmap(vec![
+            ("message", "This is a log message".into()),
+            ("trace_id", "08040201000000000000000000000000".into()),
+            ("span_id", "0102040800000000".into()),
+            ("severity_number", 9.into()),
+            ("severity_text", "Info".into()),
+            ("dropped_attributes_count", 1.into()),
+            ("timestamp", Utc.timestamp_nanos(1581452773000000789).into()),
+            (
+                "observed_timestamp",
+                Utc.timestamp_nanos(1581452773000000780).into(),
+            ),
+            ("source_type", "opentelemetry".into()),
+            (
+                "resources",
+                vec_into_btmap(vec![("resource-attr", "resource-attr-val-1".into())]).into(),
+            ),
+            (
+                "attributes",
+                vec_into_btmap(vec![("app", "server".into()), ("instance_num", 1.into())]).into(),
+            ),
+        ])
+        .into();
+        assert_eq!(v1, ev1);
+
+        schema_definitions.assert_valid_for_event(&e2);
+
+        let (v2, _) = e2.into_log().into_parts();
+        let ev2: Value = vec_into_btmap(vec![
+            ("message", "something happened".into()),
+            ("severity_number", 9.into()),
+            ("severity_text", "Info".into()),
+            ("dropped_attributes_count", 1.into()),
+            ("timestamp", Utc.timestamp_nanos(1581452773000000789).into()),
+            (
+                "observed_timestamp",
+                Utc.timestamp_nanos(1581452773000000780).into(),
+            ),
+            ("source_type", "opentelemetry".into()),
+            (
+                "resources",
+                vec_into_btmap(vec![("resource-attr", "resource-attr-val-1".into())]).into(),
+            ),
+            (
+                "attributes",
+                vec_into_btmap(vec![("customer", "acme".into()), ("env", "dev".into())]).into(),
+            ),
+        ])
+        .into();
+        assert_eq!(v2, ev2);
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn http_headers() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let grpc_addr = next_addr();
