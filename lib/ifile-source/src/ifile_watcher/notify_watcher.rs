@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use futures::{channel::mpsc::{channel, Receiver}, SinkExt, StreamExt};
+use futures::{
+    channel::mpsc::{channel, Receiver},
+    SinkExt, StreamExt,
+};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, trace};
@@ -57,14 +60,16 @@ impl NotifyWatcher {
     }
 
     /// Create an async watcher that uses futures channels
-    async fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
+    async fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)>
+    {
         let (tx, rx) = channel(100); // Use a larger buffer to avoid missing events
 
         // Create a watcher with a callback that sends events to the channel
         let watcher = RecommendedWatcher::new(
             move |res| {
                 // Check if we're shutting down
-                static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                static SHUTTING_DOWN: std::sync::atomic::AtomicBool =
+                    std::sync::atomic::AtomicBool::new(false);
                 if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
                     // Skip sending events during shutdown
                     return;
@@ -123,9 +128,7 @@ impl NotifyWatcher {
         // Check if we're already watching this file to avoid duplicates
         let mut files = self.watched_files.lock().unwrap();
         if !files.iter().any(|state| state.path == path) {
-            let state = FileState {
-                path,
-            };
+            let state = FileState { path };
             files.push(state);
         }
 
@@ -146,10 +149,8 @@ impl NotifyWatcher {
 
         if let Some(ref mut rx) = self.event_rx {
             // Try to receive events with a timeout
-            let timeout = tokio::time::timeout(
-                std::time::Duration::from_millis(10),
-                rx.next()
-            ).await;
+            let timeout =
+                tokio::time::timeout(std::time::Duration::from_millis(10), rx.next()).await;
 
             match timeout {
                 Ok(Some(Ok(event))) => {
@@ -157,10 +158,10 @@ impl NotifyWatcher {
                     match event.kind {
                         EventKind::Access(_) => {
                             // Skip logging for Access events
-                        },
+                        }
                         EventKind::Other => {
                             // Skip logging for all Other events
-                        },
+                        }
                         _ => {
                             debug!(message = "Received file event", ?event);
                         }
@@ -182,7 +183,7 @@ impl NotifyWatcher {
                         _ => {
                             trace!(message = "Ignoring other event type", kind = ?event.kind);
                             false
-                        },
+                        }
                     };
 
                     if is_relevant {
@@ -203,14 +204,14 @@ impl NotifyWatcher {
                     } else {
                         trace!(message = "Ignoring non-relevant file event", kind = ?event.kind);
                     }
-                },
+                }
                 Ok(Some(Err(e))) => {
                     error!(message = "Error receiving file event", error = ?e);
-                },
+                }
                 Ok(None) => {
                     // Channel closed
                     error!(message = "Notify watcher channel closed");
-                },
+                }
                 Err(_) => {
                     // Timeout occurred, no events available
                     trace!(message = "No events received within timeout");
@@ -232,7 +233,8 @@ impl NotifyWatcher {
     pub fn shutdown(&mut self) {
         // First, set a flag to indicate we're shutting down
         // This is used in the callback to avoid sending events during shutdown
-        static SHUTTING_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        static SHUTTING_DOWN: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
         SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
 
         // Drop the watcher to stop receiving events

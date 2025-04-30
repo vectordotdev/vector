@@ -169,7 +169,8 @@ impl IFileWatcher {
                 // Use the tokio runtime to run the async watch_file method if available
                 if let Ok(handle) = Handle::try_current() {
                     // We're in a tokio runtime, so we can use block_on
-                    if let Err(e) = handle.block_on(watcher.watch_file(path.clone(), file_position)) {
+                    if let Err(e) = handle.block_on(watcher.watch_file(path.clone(), file_position))
+                    {
                         debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
                     }
                 } else {
@@ -178,7 +179,7 @@ impl IFileWatcher {
                     warn!(message = "Not in a tokio runtime, can't set up watcher");
                 }
                 watcher
-            },
+            }
             Err(e) => {
                 warn!(message = "Failed to create notify watcher", error = ?e);
                 // Create a dummy watcher that doesn't do anything
@@ -212,7 +213,11 @@ impl IFileWatcher {
         // Read all available lines at startup to get any content that was added while Vector was stopped
         // This is especially important for files with checkpoints
         // We'll ignore any errors since the file might not be readable yet
-        debug!(message = "Reading initial content from file at startup", ?path, position = file_position);
+        debug!(
+            message = "Reading initial content from file at startup",
+            ?path,
+            position = file_position
+        );
 
         // Keep reading until we reach EOF or encounter an error
         loop {
@@ -221,17 +226,26 @@ impl IFileWatcher {
                     // Successfully read a line, store it and continue reading
                     // Skip empty lines at the end of the file to avoid processing them on every startup
                     if !line.bytes.is_empty() || !fw.startup_lines.is_empty() {
-                        trace!(message = "Read a line from file at startup", ?path, new_position = fw.file_position);
+                        trace!(
+                            message = "Read a line from file at startup",
+                            ?path,
+                            new_position = fw.file_position
+                        );
                         fw.startup_lines.push(line);
                     } else {
                         trace!(message = "Skipping empty line at beginning of file", ?path);
                     }
-                },
+                }
                 Ok(None) => {
                     // Reached EOF
-                    debug!(message = "Reached EOF while reading initial content", ?path, final_position = fw.file_position, lines_read = fw.startup_lines.len());
+                    debug!(
+                        message = "Reached EOF while reading initial content",
+                        ?path,
+                        final_position = fw.file_position,
+                        lines_read = fw.startup_lines.len()
+                    );
                     break;
-                },
+                }
                 Err(e) => {
                     // Error reading file, log and break
                     debug!(message = "Error reading initial content from file", ?path, error = ?e);
@@ -250,7 +264,10 @@ impl IFileWatcher {
             // Use the tokio runtime to run the async watch_file method
             if let Ok(handle) = Handle::try_current() {
                 // We're in a tokio runtime, so we can use block_on
-                if let Err(e) = handle.block_on(self.notify_watcher.watch_file(path.clone(), self.file_position)) {
+                if let Err(e) = handle.block_on(
+                    self.notify_watcher
+                        .watch_file(path.clone(), self.file_position),
+                ) {
                     debug!(message = "Failed to update notify watcher", error = ?e);
                 }
             } else {
@@ -313,7 +330,7 @@ impl IFileWatcher {
                 events if !events.is_empty() => {
                     trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
                     events
-                },
+                }
                 _ => Vec::new(),
             }
         } else {
@@ -326,11 +343,7 @@ impl IFileWatcher {
         if !events.is_empty() {
             for (path, kind) in events {
                 if path == self.path {
-                    debug!(
-                        message = "Detected relevant file event",
-                        ?path,
-                        ?kind
-                    );
+                    debug!(message = "Detected relevant file event", ?path, ?kind);
                     // We don't need to update the watcher here since we're about to read the file
                     // and the position will be updated naturally
                     break;
@@ -426,7 +439,10 @@ impl IFileWatcher {
         // Use the tokio runtime to run the async watch_file method
         if let Ok(handle) = Handle::try_current() {
             // We're in a tokio runtime, so we can use block_on
-            if let Err(e) = handle.block_on(self.notify_watcher.watch_file(self.path.clone(), self.file_position)) {
+            if let Err(e) = handle.block_on(
+                self.notify_watcher
+                    .watch_file(self.path.clone(), self.file_position),
+            ) {
                 debug!(message = "Failed to update notify watcher", error = ?e);
             }
         } else {
@@ -437,8 +453,6 @@ impl IFileWatcher {
 
         Ok(())
     }
-
-
 
     /// Get and clear the startup lines
     ///

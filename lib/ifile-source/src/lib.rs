@@ -6,18 +6,18 @@ extern crate scan_fmt;
 
 pub mod buffer;
 mod checkpointer;
+mod fingerprinter;
 mod ifile_server;
 mod ifile_watcher;
-mod fingerprinter;
 mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
 pub use self::{
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
+    fingerprinter::{FingerprintStrategy, Fingerprinter, IFileFingerprint},
     ifile_server::{calculate_ignore_before, IFileServer, Line, Shutdown as IFileServerShutdown},
     ifile_watcher::{IFileWatcher, WatcherState},
-    fingerprinter::{IFileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::IFileSourceInternalEvents,
     paths_provider::{boxed::BoxedPathsProvider, notify::NotifyPathsProvider},
 };

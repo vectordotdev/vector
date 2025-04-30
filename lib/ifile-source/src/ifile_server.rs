@@ -1,8 +1,9 @@
-use std::{time::Instant,
+use std::{
     collections::{BTreeMap, HashMap},
     fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
+    time::Instant,
     time::{self, Duration},
 };
 
@@ -18,10 +19,10 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
+    fingerprinter::{Fingerprinter, IFileFingerprint},
     ifile_watcher::IFileWatcher,
-    fingerprinter::{IFileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
-    IFileSourceInternalEvents, ReadFrom, IFilePosition,
+    IFilePosition, IFileSourceInternalEvents, ReadFrom,
 };
 
 /// `IFileServer` is a Source which schedules reads over files,
@@ -176,7 +177,8 @@ where
             // Check for new files frequently to minimize the delay between when a file is discovered
             // by the notify watcher and when it's actually processed, but not on every iteration
             // to avoid excessive CPU usage
-            let should_discover = next_glob_time <= now_time || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
+            let should_discover = next_glob_time <= now_time
+                || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
 
             // Report stats periodically, but only if enough time has passed since the last report
             // This prevents excessive logging when the main loop is running frequently
@@ -266,11 +268,21 @@ where
                             // Immediately watch and read the new file
                             let path_clone = path.clone();
                             debug!(message = "Discovered new file during runtime", ?path_clone);
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, &mut lines);
+                            self.watch_new_file(
+                                path,
+                                file_id,
+                                &mut fp_map,
+                                &checkpoints,
+                                false,
+                                &mut lines,
+                            );
 
                             // Immediately read the file to avoid delay in detecting content
                             if let Some(watcher) = fp_map.get_mut(&file_id) {
-                                debug!(message = "Immediately reading newly discovered file", ?path_clone);
+                                debug!(
+                                    message = "Immediately reading newly discovered file",
+                                    ?path_clone
+                                );
                                 let mut bytes_read: usize = 0;
                                 while let Ok(Some(line)) = watcher.read_line() {
                                     let sz = line.bytes.len();
@@ -279,7 +291,11 @@ where
 
                                     lines.push(Line {
                                         text: line.bytes,
-                                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                                        filename: watcher
+                                            .path
+                                            .to_str()
+                                            .expect("not a valid path")
+                                            .to_owned(),
                                         file_id,
                                         start_offset: line.offset,
                                         end_offset: watcher.get_file_position(),
@@ -287,7 +303,11 @@ where
                                 }
 
                                 if bytes_read > 0 {
-                                    debug!(message = "Read initial content from newly discovered file", ?path_clone, bytes = bytes_read);
+                                    debug!(
+                                        message = "Read initial content from newly discovered file",
+                                        ?path_clone,
+                                        bytes = bytes_read
+                                    );
                                 }
                             }
                             self.emitter.emit_files_open(fp_map.len());
@@ -324,7 +344,6 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
-
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
@@ -390,7 +409,9 @@ where
 
                 // Only update the watcher if we've read data from the file
                 // This avoids unnecessary updates that can cause excessive logging
-                if watcher.reached_eof() && watcher.last_read_success().elapsed() < Duration::from_secs(1) {
+                if watcher.reached_eof()
+                    && watcher.last_read_success().elapsed() < Duration::from_secs(1)
+                {
                     // Update the notify watcher with the current position
                     if let Err(e) = watcher.update_watcher() {
                         debug!(
@@ -449,7 +470,10 @@ where
             match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
                     // Shut down all file watchers to prevent further events
-                    debug!(message = "Shutting down all file watchers", count = fp_map.len());
+                    debug!(
+                        message = "Shutting down all file watchers",
+                        count = fp_map.len()
+                    );
                     for (_, watcher) in fp_map.iter_mut() {
                         watcher.shutdown();
                     }

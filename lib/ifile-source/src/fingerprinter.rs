@@ -395,7 +395,7 @@ mod test {
     use flate2::write::GzEncoder;
     use tempfile::{tempdir, TempDir};
 
-    use super::{IFileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use super::{FingerprintStrategy, Fingerprinter, IFileSourceInternalEvents};
 
     fn gzip(data: &mut [u8]) -> Vec<u8> {
         let mut buffer = vec![];

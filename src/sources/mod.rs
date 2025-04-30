@@ -27,8 +27,6 @@ pub mod eventstoredb_metrics;
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
-#[cfg(feature = "sources-ifile")]
-pub mod ifile;
 #[cfg(any(
     feature = "sources-stdin",
     all(unix, feature = "sources-file_descriptor")
@@ -46,6 +44,8 @@ pub mod host_metrics;
 pub mod http_client;
 #[cfg(feature = "sources-http_server")]
 pub mod http_server;
+#[cfg(feature = "sources-ifile")]
+pub mod ifile;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]

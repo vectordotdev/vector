@@ -10,13 +10,12 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{debug, Instrument, Span};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
-use vector_lib::ifile_source::{
-    calculate_ignore_before,
-    paths_provider::glob::MatchOptions,
-    BoxedPathsProvider, Checkpointer, IFileFingerprint, IFileServer, FingerprintStrategy,
-    Fingerprinter, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
-};
 use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::ifile_source::{
+    calculate_ignore_before, paths_provider::glob::MatchOptions, BoxedPathsProvider, Checkpointer,
+    FingerprintStrategy, Fingerprinter, IFileFingerprint, IFileServer, Line, NotifyPathsProvider,
+    ReadFrom, ReadFromConfig,
+};
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
@@ -33,8 +32,8 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, StreamClosedError,
         ifile::{IFileInternalMetricsConfig, IFileSourceInternalEventsEmitter},
+        FileBytesReceived, FileEventsReceived, FileOpen, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -166,7 +165,6 @@ pub struct IFileConfig {
     pub checkpoint_interval: Duration,
 
     // Note: We now use filesystem notifications by default for file discovery
-
     #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
@@ -1037,7 +1035,11 @@ mod tests {
                         Kind::integer(),
                         None
                     )
-                    .with_metadata_field(&owned_value_path!(IFileConfig::NAME, "path"), Kind::bytes(), None)
+                    .with_metadata_field(
+                        &owned_value_path!(IFileConfig::NAME, "path"),
+                        Kind::bytes(),
+                        None
+                    )
             )
         )
     }
@@ -1195,7 +1197,7 @@ mod tests {
                     // Check if both files exist and are being watched
                     path1.exists() && path2.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1219,7 +1221,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1275,7 +1277,7 @@ mod tests {
                     // Check if the file exists and is being watched
                     path.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1297,7 +1299,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1327,7 +1329,7 @@ mod tests {
                     // Check if the file exists and is being watched
                     path.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1346,7 +1348,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1363,7 +1365,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1382,7 +1384,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1437,7 +1439,7 @@ mod tests {
                     // Check if the file exists and is being watched
                     path.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1456,7 +1458,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1471,7 +1473,7 @@ mod tests {
                     // Check if the new file exists and is being watched
                     path.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1490,7 +1492,7 @@ mod tests {
                     count2 += 1;
                     count2 >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1503,7 +1505,9 @@ mod tests {
         let lines: Vec<String> = received
             .iter()
             .map(|event| {
-                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy().to_string()
+                event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy()
+                    .to_string()
             })
             .collect();
 
@@ -1511,16 +1515,29 @@ mod tests {
         assert!(!lines.is_empty(), "Should have received some events");
 
         // Check that we have some prerot lines
-        let prerot_count = lines.iter().filter(|line| line.starts_with("prerot")).count();
+        let prerot_count = lines
+            .iter()
+            .filter(|line| line.starts_with("prerot"))
+            .count();
         assert!(prerot_count > 0, "Should have received some prerot events");
 
         // Check that we have some postrot lines
-        let postrot_count = lines.iter().filter(|line| line.starts_with("postrot")).count();
-        assert!(postrot_count > 0, "Should have received some postrot events");
+        let postrot_count = lines
+            .iter()
+            .filter(|line| line.starts_with("postrot"))
+            .count();
+        assert!(
+            postrot_count > 0,
+            "Should have received some postrot events"
+        );
 
         // Check that the total count is what we expect
-        assert_eq!(prerot_count + postrot_count, 2 * n as usize,
-            "Should have received exactly {} events in total", 2 * n);
+        assert_eq!(
+            prerot_count + postrot_count,
+            2 * n as usize,
+            "Should have received exactly {} events in total",
+            2 * n
+        );
 
         // Check that all events have a file path that is either the original path or the archive path
         for event in &received {
@@ -1562,7 +1579,7 @@ mod tests {
                     // Check if all files exist and are being watched
                     path1.exists() && path2.exists() && path3.exists() && path4.exists()
                 },
-                10, // max attempts
+                10,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -1589,7 +1606,7 @@ mod tests {
                     count += 1;
                     count >= 10
                 },
-                20, // max attempts
+                20,  // max attempts
                 100, // delay between attempts in ms
             )
             .await
@@ -2292,7 +2309,8 @@ mod tests {
         let lines = extract_messages_string(received_after_restart);
         // With the new implementation, we might get empty lines or just the expected line
         // Filter out any empty lines and check that we have the expected line
-        let filtered_lines: Vec<String> = lines.into_iter().filter(|line| !line.is_empty()).collect();
+        let filtered_lines: Vec<String> =
+            lines.into_iter().filter(|line| !line.is_empty()).collect();
         assert_eq!(filtered_lines, vec!["INFO goodbye"]);
     }
 
@@ -2354,8 +2372,11 @@ mod tests {
 
         // Check that we have all the expected lines, regardless of order
         for expected in &expected_lines {
-            assert!(received_strings.iter().any(|s| s == *expected),
-                   "Missing expected line: {}", expected);
+            assert!(
+                received_strings.iter().any(|s| s == *expected),
+                "Missing expected line: {}",
+                expected
+            );
         }
 
         // Check that we have the right number of lines
@@ -2474,31 +2495,27 @@ mod tests {
 
         // Make sure the file exists before running the test
         let test_file_path = std::path::Path::new("tests/data/gzipped.log");
-        assert!(test_file_path.exists(),
-                "Test file tests/data/gzipped.log does not exist");
+        assert!(
+            test_file_path.exists(),
+            "Test file tests/data/gzipped.log does not exist"
+        );
 
         // Give the file source more time to process the gzipped file
-        let received = run_ifile_source(
-            &config,
-            false,
-            NoAcks,
-            LogNamespace::Legacy,
-            async {
-                // Wait for the file source to process the gzipped file
-                let mut count = 0;
-                retry_until(
-                    || {
-                        // This is just a delay mechanism - we can't actually check the events yet
-                        count += 1;
-                        count >= 20
-                    },
-                    30, // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("Timeout waiting for gzipped file processing");
-            },
-        )
+        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            // Wait for the file source to process the gzipped file
+            let mut count = 0;
+            retry_until(
+                || {
+                    // This is just a delay mechanism - we can't actually check the events yet
+                    count += 1;
+                    count >= 20
+                },
+                30,  // max attempts
+                100, // delay between attempts in ms
+            )
+            .await
+            .expect("Timeout waiting for gzipped file processing");
+        })
         .await;
 
         // With the new implementation, we might not get any events if the file is not properly detected
@@ -2642,9 +2659,9 @@ mod tests {
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
     }
+    use vector_lib::emit;
     use vector_lib::lookup::OwnedTargetPath;
     use AckingMode::*;
-    use vector_lib::emit;
 
     async fn run_ifile_source(
         config: &ifile::IFileConfig,
@@ -2693,7 +2710,8 @@ mod tests {
             });
 
             // Add the required metrics
-            metrics::counter!("component_received_bytes_total", "ifile" => "test.log").increment(100);
+            metrics::counter!("component_received_bytes_total", "ifile" => "test.log")
+                .increment(100);
             metrics::counter!("component_received_events_total").increment(1);
             metrics::counter!("component_received_event_bytes_total").increment(100);
 

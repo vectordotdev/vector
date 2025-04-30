@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::{
-    fingerprinter::{IFileFingerprint, Fingerprinter},
+    fingerprinter::{Fingerprinter, IFileFingerprint},
     IFilePosition,
 };
 
