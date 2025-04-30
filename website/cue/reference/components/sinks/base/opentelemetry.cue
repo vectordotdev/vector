@@ -152,6 +152,11 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 							required: false
 							type: string: examples: ["vector-indexer-role"]
 						}
+						session_token: {
+							description: "The AWS session token."
+							required:    false
+							type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						}
 					}
 				}
 				password: {
