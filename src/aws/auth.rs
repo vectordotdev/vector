@@ -71,6 +71,10 @@ pub enum AwsAuthentication {
         #[configurable(metadata(docs::examples = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))]
         secret_access_key: SensitiveString,
 
+        /// The AWS session token.
+        #[configurable(metadata(docs::examples = "AQoDYXdz...AQoDYXdz..."))]
+        session_token: Option<SensitiveString>,
+
         /// The ARN of an [IAM role][iam_role] to assume.
         ///
         /// [iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
@@ -275,11 +279,12 @@ impl AwsAuthentication {
                 external_id,
                 region,
                 session_name,
+                session_token,
             } => {
                 let provider = SharedCredentialsProvider::new(Credentials::from_keys(
                     access_key_id.inner(),
                     secret_access_key.inner(),
-                    None,
+                    session_token.clone().map(|v| v.inner().into()),
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
@@ -372,6 +377,7 @@ impl AwsAuthentication {
             external_id: None,
             region: None,
             session_name: None,
+            session_token: None,
         }
     }
 }
