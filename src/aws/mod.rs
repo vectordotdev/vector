@@ -126,7 +126,8 @@ pub trait ClientBuilder {
     fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
-fn region_provider(
+/// Provides the configured AWS region.
+pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion> {
@@ -222,6 +223,10 @@ where
 
     if let Some(endpoint_override) = endpoint {
         config_builder = config_builder.endpoint_url(endpoint_override);
+    } else if let Some(endpoint_from_config) =
+        aws_config::default_provider::endpoint_url::endpoint_url_provider(&provider_config).await
+    {
+        config_builder = config_builder.endpoint_url(endpoint_from_config);
     }
 
     if let Some(use_fips) =

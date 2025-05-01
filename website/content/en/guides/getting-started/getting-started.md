@@ -40,14 +40,17 @@ types of components:
 
 Let's create a configuration file:
 
-```toml title="vector.toml"
-[sources.in]
-  type = "stdin"
+```yaml title="vector.yaml"
+sources:
+  in:
+    type: stdin
 
-[sinks.out]
-  inputs = ["in"]
-  type = "console"
-  encoding.codec = "text"
+sinks:
+  out:
+    inputs: ["in"]
+    type: console
+    encoding:
+      codec: text
 ```
 
 Each component has a unique ID and is prefixed with the type of component, for example, `sources` for a
@@ -65,7 +68,7 @@ coming from. In our case, events are received from our other component, the sour
 That's it for our first config. Now let's pipe an event through it:
 
 ```bash
-echo 'Hello World!' | vector --config ./vector.toml
+echo 'Hello World!' | vector --config ./vector.yaml
 ```
 
 The `echo` statement sends a single log to Vector via stdin. The `vector...` command starts Vector with our
@@ -89,24 +92,27 @@ Let's take a classic problem, collecting and processing Syslog events, and see h
 To do this, we're going to add two new components to our configuration file. Let's look at our updated
 configuration now:
 
-```toml title="vector.toml"
-[sources.generate_syslog]
-  type = "demo_logs"
-  format = "syslog"
-  count = 100
+```yaml title="vector.yaml"
+sources:
+  generate_syslog:
+    type: demo_logs
+    format: syslog
+    count: 100
 
-[transforms.remap_syslog]
-  inputs = [ "generate_syslog"]
-  type = "remap"
-  source = '''
-    structured = parse_syslog!(.message)
-    . = merge(., structured)
-  '''
+transforms:
+  remap_syslog:
+    inputs: [generate_syslog]
+    type: remap
+    source: |
+      structured = parse_syslog!(.message)
+      . = merge(., structured)
 
-[sinks.emit_syslog]
-  inputs = ["remap_syslog"]
-  type = "console"
-  encoding.codec = "json"
+sinks:
+  emit_syslog:
+    inputs: [remap_syslog]
+    type: console
+    encoding:
+      codec: json
 ```
 
 The first component uses the [`demo_logs` source][docs.sources.demo_logs]. The `demo_logs` source creates sample
@@ -148,7 +154,7 @@ Let's rerun Vector. This time we don't need to echo any data to it; just run in 
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
 
 ```shell
-vector --config ./vector.toml
+vector --config ./vector.yaml
 ```
 
 Now you should have a series of JSON-formatted events, something like this:

@@ -31,17 +31,17 @@ pub mod logs {
     }
 }
 
-/// Generated types used for trace.
-pub mod trace {
-    pub mod v1 {
-        tonic::include_proto!("opentelemetry.proto.trace.v1");
-    }
-}
-
 /// Generated types used for metrics.
 pub mod metrics {
     pub mod v1 {
         tonic::include_proto!("opentelemetry.proto.metrics.v1");
+    }
+}
+
+/// Generated types used for trace.
+pub mod trace {
+    pub mod v1 {
+        tonic::include_proto!("opentelemetry.proto.trace.v1");
     }
 }
 

@@ -93,6 +93,16 @@ base: components: sinks: datadog_logs: configuration: {
 				"""
 		}
 	}
+	conforms_as_agent: {
+		description: """
+			When enabled this sink will normalize events to conform to the Datadog Agent standard. This
+			also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
+			will be overidden as `true` if this header has already been set in the request.headers
+			configuration setting.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	default_api_key: {
 		description: """
 			The default Datadog [API key][api_key] to use in authentication of HTTP requests.

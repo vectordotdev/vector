@@ -12,7 +12,7 @@ use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     sync::{mpsc::UnboundedSender, oneshot},
-    time::{timeout, Duration},
+    time::timeout,
 };
 use tracing::Instrument;
 use vector_lib::config::LogNamespace;
@@ -209,10 +209,22 @@ impl<'a> Builder<'a> {
     ) -> HashMap<ComponentKey, Task> {
         let mut source_tasks = HashMap::new();
 
+        let table_sources = self
+            .config
+            .enrichment_tables
+            .iter()
+            .filter_map(|(key, table)| table.as_source(key))
+            .collect::<Vec<_>>();
         for (key, source) in self
             .config
             .sources()
             .filter(|(key, _)| self.diff.sources.contains_new(key))
+            .chain(
+                table_sources
+                    .iter()
+                    .map(|(key, sink)| (key, sink))
+                    .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
+            )
         {
             debug!(component = %key, "Building new source.");
 
@@ -514,7 +526,7 @@ impl<'a> Builder<'a> {
             .config
             .enrichment_tables
             .iter()
-            .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+            .filter_map(|(key, table)| table.as_sink(key))
             .collect::<Vec<_>>();
         for (key, sink) in self
             .config
@@ -523,7 +535,7 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sinks
                     .iter()
-                    .map(|(key, sink)| (*key, sink))
+                    .map(|(key, sink)| (key, sink))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
@@ -532,6 +544,7 @@ impl<'a> Builder<'a> {
             let sink_inputs = &sink.inputs;
             let healthcheck = sink.healthcheck();
             let enable_healthcheck = healthcheck.enabled && self.config.healthchecks.enabled;
+            let healthcheck_timeout = healthcheck.timeout;
 
             let typetag = sink.inner.get_component_name();
             let input_type = sink.inner.input().data_type();
@@ -647,8 +660,7 @@ impl<'a> Builder<'a> {
             let component_key = key.clone();
             let healthcheck_task = async move {
                 if enable_healthcheck {
-                    let duration = Duration::from_secs(10);
-                    timeout(duration, healthcheck)
+                    timeout(healthcheck_timeout, healthcheck)
                         .map(|result| match result {
                             Ok(Ok(_)) => {
                                 info!("Healthcheck passed.");
