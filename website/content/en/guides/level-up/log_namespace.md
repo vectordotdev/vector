@@ -38,26 +38,18 @@ sources:
       - Hello World!
     interval: 10
 
-transforms:
-  t0:
-    type: remap
-    inputs:
-      - s0
-    source: |
-      .message = .
-
 sinks:
   text_console:
     type: console
     inputs:
-    - t0
+    - s0
     encoding:
       codec: text
 
   json_console:
     type: console
     inputs:
-    - t0
+    - s0
     encoding:
       codec: json
       json:
@@ -71,15 +63,13 @@ sinks:
 Sample output from `text_console`:
 
 ```text
-{"message":"Hello World!"}
+Hello World!
 ```
 
 Sample output from `json_console`:
 
 ```json
-{
-  "message": "Hello World!"
-}
+"Hello World!"
 ```
 
 ## Difference with global schema
