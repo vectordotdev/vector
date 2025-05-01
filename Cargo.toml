@@ -413,7 +413,7 @@ windows-service = "0.7.0"
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-netlink-packet-utils = "0.5.2"
+netlink-packet-utils = "0.6.0"
 netlink-packet-sock-diag = "0.4.2"
 netlink-packet-core = "0.7.0"
 netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
