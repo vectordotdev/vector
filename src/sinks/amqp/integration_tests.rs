@@ -3,6 +3,7 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
+    sinks::amqp::channel::AmqpChannel,
     template::{Template, UnsignedIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -37,7 +38,7 @@ async fn healthcheck() {
     let mut config = make_config();
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     await_connection(&config.connection).await;
-    let (_conn, channel) = config.connection.connect().await.unwrap();
+    let channel = AmqpChannel::new(&config.connection).await.unwrap();
     super::config::healthcheck(Arc::new(channel)).await.unwrap();
 }
 
