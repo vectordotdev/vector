@@ -11,7 +11,7 @@ tags: ["log_namespace", "logs", "namespace", "level up", "guides", "guide"]
 {{< requirement >}}
 Before you begin, this guide assumes the following:
 
-* You understand this feature, and the global schemas are mutually exclusive.
+* You understand that this feature, and the global schemas are mutually exclusive.
 * When log namespacing is enabled, the [global schema settings] are ignored.
 * This feature is still in `beta` so behavior might change.
 
