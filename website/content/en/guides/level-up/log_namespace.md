@@ -163,8 +163,7 @@ transforms:
     inputs:
       - s0
     source: |
-      # Preserve the `Hello World!` payload.
-      .message = .
+      # The `.` value at this point is `Hello World!`, however the following line overwrites it.
       .custom_field = "bar"
 
 sinks:
@@ -199,7 +198,6 @@ Sample output from `json_console`:
 
 ```json
 {
-  "custom_field": "bar",
-  "message": "Hello World!"
+  "custom_field": "bar"
 }
 ```
