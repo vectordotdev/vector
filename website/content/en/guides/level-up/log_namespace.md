@@ -45,15 +45,6 @@ transforms:
       - s0
     source: |
       .message = .
-      .from = "t0"
-
-  t1:
-    type: remap
-    inputs:
-      - s0
-    source: |
-      .message = .
-      .from = "t1"
 
 sinks:
   text_console:
@@ -66,7 +57,7 @@ sinks:
   json_console:
     type: console
     inputs:
-    - t1
+    - t0
     encoding:
       codec: json
       json:
@@ -80,14 +71,13 @@ sinks:
 Sample output from `text_console`:
 
 ```text
-{"from":"t0","message":"Hello World!"}
+{"message":"Hello World!"}
 ```
 
 Sample output from `json_console`:
 
 ```json
 {
-  "from": "t1",
   "message": "Hello World!"
 }
 ```
@@ -103,10 +93,37 @@ schema:
 
 Then we observe a big difference for these two encoders:
 
-* The `text` encoder only encodes the value that `log_schema.message_key` points to (which is `.message` by default).
-* The `json` encoder passes the **whole** log to Serde JSON for encoding.
-  * For example `"foo"` is a valid JSON string but not a JSON object.
-  * We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
+The `text` encoder only encodes the value that `log_schema.message_key` points to (which is `.message` by default).
+
+Sample output from the `text_console` sink:
+
+```text
+{"host":"localhost","message":"Hello World!","service":"vector","source_type":"demo_logs","timestamp":"2025-05-01T19:06:12.227425Z"}
+```
+
+The `json` encoder passes the **whole** log to Serde JSON for encoding.
+
+Sample output from the `json_console` sink:
+
+```json
+{
+  "host": "localhost",
+  "message": {
+    "host": "localhost",
+    "message": "Hello World!",
+    "service": "vector",
+    "source_type": "demo_logs",
+    "timestamp": "2025-05-01T19:06:12.227425Z"
+  },
+  "service": "vector",
+  "source_type": "demo_logs",
+  "timestamp": "2025-05-01T19:06:12.227425Z"
+}
+```
+
+The following example helps illustrate the difference between the two encoders.
+Consider the input `"foo"`, which is a valid JSON string but not a JSON object.
+Vector converts it into a structured object by wrapping it with the `log_schema.message_key` (e.g., `"message"`), resulting in: `{"message": "foo"}`.
 
 {{< info >}}
 We can always prepare events for ingestion by using a [remap](/docs/reference/configuration/transforms/remap/) transform and a suitable encoder in the sink.
