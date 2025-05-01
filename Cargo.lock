@@ -5907,9 +5907,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "227748d55f2f0ab4735d87fd623798cb6b664512fe979705f829c9f81c934465"
+checksum = "9f8cc7106155f10bdf99a6f379688f543ad6596a415375b36a59a054ceda1198"
 
 [[package]]
 name = "lru-cache"
@@ -11488,7 +11488,7 @@ dependencies = [
  "libc",
  "listenfd",
  "loki-logproto",
- "lru 0.13.0",
+ "lru 0.14.0",
  "maxminddb",
  "md-5",
  "metrics",
