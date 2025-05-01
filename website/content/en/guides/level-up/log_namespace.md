@@ -11,7 +11,7 @@ tags: ["log_namespace", "logs", "namespace", "level up", "guides", "guide"]
 {{< requirement >}}
 Before you begin, this guide assumes the following:
 
-* You understand this feature and the global schema are mutually exclusive.
+* You understand this feature, and the global schemas are mutually exclusive.
 * When log namespacing is enabled, the [global schema settings] are ignored.
 * This feature is still in `beta` so behavior might change.
 
@@ -101,10 +101,10 @@ schema:
   log_namespace: false
 ```
 
-Then we will observe a big difference for these two encoders:
+Then we observe a big difference for these two encoders:
 
 * The `text` encoder only encodes the value that `log_schema.message_key` point to (which is `.message` by default).
-* The `json` encoder passes the **whole** log to serde JSON for encoding.
+* The `json` encoder passes the **whole** log to Serde JSON for encoding.
   * For example `"foo"` is a valid JSON string but not a JSON object.
   * We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
 
