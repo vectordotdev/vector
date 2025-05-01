@@ -110,7 +110,7 @@ impl GenerateConfig for OpenTelemetryConfig {
             type = "http"
             uri = "http://localhost:5318/v1/logs"
             encoding.codec = "json"
-            
+
             metrics_endpoint = "http://localhost:4317/v1/metrics"
             healthcheck_endpoint = "http://localhost:13133"
             default_namespace = "vector"
@@ -253,7 +253,7 @@ mod test {
             type = "http"
             uri = "http://localhost:5318/v1/logs"
             encoding.codec = "json"
-            
+
             endpoint = "http://localhost:4317/v1/metrics"
             healthcheck_endpoint = "http://localhost:13133"
             default_namespace = "myservice"
