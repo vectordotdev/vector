@@ -103,7 +103,7 @@ schema:
 
 Then we observe a big difference for these two encoders:
 
-* The `text` encoder only encodes the value that `log_schema.message_key` point to (which is `.message` by default).
+* The `text` encoder only encodes the value that `log_schema.message_key` points to (which is `.message` by default).
 * The `json` encoder passes the **whole** log to Serde JSON for encoding.
   * For example `"foo"` is a valid JSON string but not a JSON object.
   * We convert it to a JSON object with the meaning as the key e.g. `{"message": "foo" }`.
