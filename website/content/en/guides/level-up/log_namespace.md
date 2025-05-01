@@ -153,8 +153,8 @@ transforms:
     inputs:
       - s0
     source: |
-      # The `.` value at this point is `Hello World!`, however the following line overwrites it.
-      .custom_field = "bar"
+      # The value of `.` is `Hello World!` at this point, however the following line overwrites it.
+      . = "bar"
 
 sinks:
   text_console:
@@ -187,7 +187,5 @@ foo
 Sample output from `json_console`:
 
 ```json
-{
-  "custom_field": "bar"
-}
+"bar"
 ```
