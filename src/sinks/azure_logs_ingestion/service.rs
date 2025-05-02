@@ -23,8 +23,6 @@ const CONTENT_TYPE: &str = "application/json";
 
 static CONTENT_TYPE_VALUE: LazyLock<HeaderValue> =
     LazyLock::new(|| HeaderValue::from_static(CONTENT_TYPE));
-// static X_MS_CLIENT_REQUEST_ID_HEADER: LazyLock<HeaderName> =
-//     LazyLock::new(|| HeaderName::from_static("x-ms-client-request-id"));
 
 #[derive(Debug, Clone)]
 pub struct AzureLogsIngestionRequest {
@@ -94,7 +92,6 @@ impl AzureLogsIngestionService {
     ) -> crate::Result<Self> {
         let mut parts = endpoint.into_parts();
         parts.path_and_query = Some(
-            // https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/dataCollectionRules/dcr-000a00a000a00000a000000aa000a0aa/streams/Custom-MyTable?api-version=2023-01-01
             format!("/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}")
                 .parse()
                 .expect("path and query should never fail to parse"),
