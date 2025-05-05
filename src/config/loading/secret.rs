@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     sync::LazyLock,
 };
 
@@ -9,11 +8,13 @@ use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
+use toml::Value;
 use vector_lib::config::ComponentKey;
 
+use crate::config::loading::interpolate_toml_table;
 use crate::{
     config::{
-        loading::{deserialize_table, prepare_input, process::Process, ComponentHint, Loader},
+        loading::{deserialize_table, process::Process, ComponentHint, Loader},
         SecretBackend,
     },
     secrets::SecretBackends,
@@ -88,11 +89,9 @@ impl SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input)?;
-        // Collect secret placeholders just after env var processing
-        collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok(config_string)
+    fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
+        collect_secret_keys_from_table(&table, &mut self.secret_keys);
+        Ok(table)
     }
 
     fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
@@ -125,7 +124,52 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
     });
 }
 
-pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
+/// Recursively collects all secret references from keys and string values in a TOML table.
+pub fn collect_secret_keys_from_table(table: &Table, keys: &mut HashMap<String, HashSet<String>>) {
+    for (k, v) in table {
+        // Check key for secrets like SECRET[backend.key]
+        collect_secret_keys(k, keys);
+
+        // Check the value
+        match v {
+            Value::String(s) => collect_secret_keys(s, keys),
+            Value::Array(arr) => {
+                for item in arr {
+                    collect_secret_keys_from_value(item, keys);
+                }
+            }
+            Value::Table(inner) => {
+                collect_secret_keys_from_table(inner, keys);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn collect_secret_keys_from_value(value: &Value, keys: &mut HashMap<String, HashSet<String>>) {
+    match value {
+        Value::String(s) => collect_secret_keys(s, keys),
+        Value::Array(arr) => {
+            for item in arr {
+                collect_secret_keys_from_value(item, keys);
+            }
+        }
+        Value::Table(t) => collect_secret_keys_from_table(t, keys),
+        _ => {}
+    }
+}
+
+pub fn interpolate_toml_table_with_secrets(
+    table: &Table,
+    vars: &HashMap<String, String>,
+) -> Result<Table, Vec<String>> {
+    interpolate_toml_table(table, vars, interpolate_secrets)
+}
+
+fn interpolate_secrets(
+    input: &str,
+    secrets: &HashMap<String, String>,
+) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR
         .replace_all(input, |caps: &Captures<'_>| {
@@ -155,7 +199,7 @@ mod tests {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, interpolate};
+    use super::{collect_secret_keys, interpolate_secrets};
 
     #[test]
     fn replacement() {
@@ -168,30 +212,30 @@ mod tests {
 
         assert_eq!(
             Ok("value".into()),
-            interpolate("SECRET[a.secret.key]", &secrets)
+            interpolate_secrets("SECRET[a.secret.key]", &secrets)
         );
         assert_eq!(
             Ok("value value".into()),
-            interpolate("SECRET[a.secret.key] SECRET[a.secret.key]", &secrets)
+            interpolate_secrets("SECRET[a.secret.key] SECRET[a.secret.key]", &secrets)
         );
 
         assert_eq!(
             Ok("xxxvalueyyy".into()),
-            interpolate("xxxSECRET[a.secret.key]yyy", &secrets)
+            interpolate_secrets("xxxSECRET[a.secret.key]yyy", &secrets)
         );
         assert_eq!(
             Ok("a...value".into()),
-            interpolate("SECRET[a...key]", &secrets)
+            interpolate_secrets("SECRET[a...key]", &secrets)
         );
         assert_eq!(
             Ok("xxxSECRET[non_matching_syntax]yyy".into()),
-            interpolate("xxxSECRET[non_matching_syntax]yyy", &secrets)
+            interpolate_secrets("xxxSECRET[non_matching_syntax]yyy", &secrets)
         );
         assert_eq!(
             Err(vec![
                 "Unable to find secret replacement for SECRET[a.non.existing.key].".into()
             ]),
-            interpolate("xxxSECRET[a.non.existing.key]yyy", &secrets)
+            interpolate_secrets("xxxSECRET[a.non.existing.key]yyy", &secrets)
         );
     }
 
