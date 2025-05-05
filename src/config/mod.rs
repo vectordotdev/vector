@@ -632,6 +632,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn misplaced_env_var() {
+        let errors = load(
+            r#"
+            ${DEMO_SOURCE}
+
+            sinks:
+              s0:
+                type: consloe
+                inputs: [ "t0" ]
+                encoding:
+                  codec: json
+            "#,
+            Format::Yaml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            vec!["mapping values are not allowed in this context at line 4 column 18"],
+            errors,
+        );
+    }
+
+    #[tokio::test]
     async fn duplicate_name() {
         let err = load(
             r#"
