@@ -135,7 +135,6 @@ components: transforms: reduce: {
 			output: log: {
 				message:       "Received GET /path"
 				timestamp:     "2020-10-07T12:33:21.223543Z"
-				timestamp_end: "2020-10-07T12:33:22.742322Z"
 				request_id:    "abcd1234"
 				request_path:  "/path"
 				template:      "_partial.erb"
@@ -143,7 +142,7 @@ components: transforms: reduce: {
 				query:                "SELECT * FROM table"
 				query_duration_ms:    13.0
 				render_duration_ms:   2.3
-				status:               200
+				response_status:      200
 				response_duration_ms: 5.2
 			}
 		},
