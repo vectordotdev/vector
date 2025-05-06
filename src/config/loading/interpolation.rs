@@ -84,25 +84,24 @@ pub fn interpolate_toml_table_with_env_vars(
 }
 
 /// Returns a new TOML `Table` with all string values interpolated.
-/// Leaves original table untouched.
 pub fn interpolate_toml_table(
     table: &Table,
     vars: &HashMap<String, String>,
     interpolate_fn: InterpolateFn,
 ) -> Result<Table, Vec<String>> {
     let mut result = Table::new();
-    let mut all_errors = Vec::new();
+    let mut errors = Vec::new();
 
     for (key, value) in table {
         let new_key = match interpolate_fn(key, vars) {
             Ok(k) => k,
             Err(errs) => {
-                all_errors.extend(errs);
+                errors.extend(errs);
                 key.clone()
             }
         };
 
-        let new_value = match interpolate_toml_value(value, vars, &mut all_errors, interpolate_fn) {
+        let new_value = match interpolate_toml_value(value, vars, &mut errors, interpolate_fn) {
             Some(v) => v,
             None => value.clone(),
         };
@@ -110,10 +109,10 @@ pub fn interpolate_toml_table(
         result.insert(new_key, new_value);
     }
 
-    if all_errors.is_empty() {
+    if errors.is_empty() {
         Ok(result)
     } else {
-        Err(all_errors)
+        Err(errors)
     }
 }
 
@@ -203,12 +202,12 @@ mod test {
     }
 
     #[test]
-    fn test_interpolate_toml_table_recursive() {
+    fn test_interpolate_toml_table() {
         let raw = indoc! {r#"
         # ${IN_COMMENT_BUT_DOES_NOT_EXIST}
         [[tests]]
             name = "${NAME}"
-            # noop = "SECRET[i_dont_exist]"
+            # This line should not cause a loading failure - "SECRET[backend_1.i_dont_exist]"
             [[tests.inputs]]
                 insert_at = "${UNDEFINED:-foo}"
                 type = "log"

@@ -53,11 +53,14 @@ pub(super) mod process {
     /// in here with subtly different names that can be hidden from public view, hence why
     /// this is nested in a private mod.
     pub trait Process {
-        /// This is invoked after the input string deserialization. This can be a useful step to interpolate
+        /// This is invoked after input deserialization. This can be a useful step to interpolate
         /// environment variables or perform some other post-processing on the table.
         fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>>;
 
-        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
+        /// Deserializes the input using the given format and runs postprocessing on the result.
+        ///
+        /// This reads the input into a string, deserializes it into a `Table`, and then
+        /// applies `postprocess` to the resulting table.
         fn load<R: Read>(&mut self, input: R, format: Format) -> Result<Table, Vec<String>> {
             let value = string_from_input(input)?;
             let table: Table = format::deserialize(&value, format)?;
