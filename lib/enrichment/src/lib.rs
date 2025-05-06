@@ -26,7 +26,7 @@ pub enum Condition<'a> {
         from: chrono::DateTime<chrono::Utc>,
         to: chrono::DateTime<chrono::Utc>,
     },
-    /// The date in the field is greater than or equal to from.
+    /// The date in the field is greater than or equal to `from`.
     FromDate {
         field: &'a str,
         from: chrono::DateTime<chrono::Utc>,
