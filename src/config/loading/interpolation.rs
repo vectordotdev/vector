@@ -124,7 +124,17 @@ fn interpolate_toml_value(
 ) -> Option<Value> {
     match value {
         Value::String(s) => match interpolate_fn(s, vars) {
-            Ok(new) => Some(Value::String(new)),
+            Ok(new) => {
+                if let Ok(i) = new.parse::<i64>() {
+                    Some(Value::Integer(i))
+                } else if let Ok(f) = new.parse::<f64>() {
+                    Some(Value::Float(f))
+                } else if let Ok(b) = new.parse::<bool>() {
+                    Some(Value::Boolean(b))
+                } else {
+                    Some(Value::String(new))
+                }
+            }
             Err(errs) => {
                 errors.extend(errs);
                 None
@@ -154,9 +164,10 @@ mod test {
     use crate::config::loading::{
         interpolate_toml_table_with_env_vars, interpolate_toml_table_with_secrets,
     };
+    use crate::config::{format, Format};
     use indoc::indoc;
     use std::collections::HashMap;
-    use toml::{Table, Value};
+    use toml::Value;
 
     #[test]
     fn interpolation() {
@@ -203,7 +214,7 @@ mod test {
 
     #[test]
     fn test_interpolate_toml_table() {
-        let raw = indoc! {r#"
+        let input = indoc! {r#"
         # ${IN_COMMENT_BUT_DOES_NOT_EXIST}
         [[tests]]
             name = "${NAME}"
@@ -213,23 +224,21 @@ mod test {
                 type = "log"
                 [tests.inputs.log_fields]
                   "$FIELD1" = 1
-                  "$FIELD2" = 2
+                  "$FIELD2" = "${COUNT}"
                   top_secret = "SECRET[backend_1.some_secret]"
+                  some_bool = "${SOME_BOOL}"
         "#};
-
-        let root_value: Value = toml::from_str(raw).expect("valid toml");
-        let root_table = match root_value {
-            Value::Table(t) => t,
-            _ => panic!("expected root table"),
-        };
 
         let vars = HashMap::from([
             ("NAME".into(), "Some_Transform".into()),
             ("FIELD1".into(), "f1".into()),
             ("FIELD2".into(), "f2".into()),
+            ("COUNT".into(), "20".into()),
+            ("SOME_BOOL".into(), "true".into()),
         ]);
 
-        let result = interpolate_toml_table_with_env_vars(&root_table, &vars).unwrap();
+        let table = format::deserialize(input, Format::Toml).unwrap();
+        let result = interpolate_toml_table_with_env_vars(&table, &vars).unwrap();
 
         let secrets = HashMap::from([("backend_1.some_secret".into(), "foo".into())]);
         let result = interpolate_toml_table_with_secrets(&result, &secrets).unwrap();
@@ -242,16 +251,110 @@ mod test {
                     type = "log"
                     [tests.inputs.log_fields]
                     f1 = 1
-                    f2 = 2
+                    f2 = 20
                     top_secret = "foo"
+                    some_bool = true
         "#})
         .unwrap();
         assert_eq!(Value::Table(result), expected);
     }
 
     #[test]
+    fn test_interpolate_yaml_equivalent() {
+        // Step 1: Raw YAML input with env vars and secrets
+        let input = indoc! {r#"
+            secret:
+              backend_1:
+                type: file
+                path: some.json
+
+            # {IN_COMMENT_BUT_DOES_NOT_EXIST}
+
+            sources:
+              demo_logs_1:
+                type: demo_logs
+                format: json
+                interval: $INTERVAL
+                # noop: SECRET[i_dont_exist.1]
+
+            transforms:
+              t0:
+                inputs:
+                  - demo_logs_1
+                type: "remap"
+                source: |
+                  .host = "${HOSTNAME}"
+                  .environment = "${ENV:?emv must be supplied}"
+                  .tenant = "${TENANT:-undefined}"
+                  .day = "SECRET[backend_1.day]"
+
+            sinks:
+              s0:
+                type: "SECRET[backend_1.type]"
+                inputs: [ "t0" ]
+                encoding:
+                  codec: json
+                  json:
+                    pretty: true
+        "#};
+
+        // Step 2: Parse YAML and convert to TOML Table
+        let toml_table = format::deserialize(&input, Format::Yaml).unwrap();
+
+        // Step 3: Env var mappings
+        let env_vars = HashMap::from([
+            ("INTERVAL".into(), "60".into()),
+            ("HOSTNAME".into(), "vector-dev".into()),
+            ("ENV".into(), "production".into()),
+            ("TENANT".into(), "acme".into()),
+        ]);
+        let table_after_env = interpolate_toml_table_with_env_vars(&toml_table, &env_vars).unwrap();
+
+        // Step 4: Fake secrets
+        let secrets = HashMap::from([
+            ("backend_1.day".into(), "Tuesday".into()),
+            ("backend_1.type".into(), "console".into()),
+        ]);
+        let final_table = interpolate_toml_table_with_secrets(&table_after_env, &secrets).unwrap();
+
+        // Step 5: Compare to expected TOML
+        let expected: Value = toml::from_str(indoc! {r#"
+            [secret.backend_1]
+            type = "file"
+            path = "some.json"
+
+            [sources.demo_logs_1]
+            type = "demo_logs"
+            format = "json"
+            interval = 60
+
+            [transforms.t0]
+            inputs = ["demo_logs_1"]
+            type = "remap"
+            source = """
+            .host = "vector-dev"
+            .environment = "production"
+            .tenant = "acme"
+            .day = "Tuesday"
+            """
+
+            [sinks.s0]
+            type = "console"
+            inputs = ["t0"]
+
+            [sinks.s0.encoding]
+            codec = "json"
+
+            [sinks.s0.encoding.json]
+            pretty = true
+        "#}).unwrap();
+
+        assert_eq!(Value::Table(final_table), expected);
+    }
+
+    #[test]
     fn multiline_interpolation() {
-        let raw = indoc! {r#"
+        let input = indoc! {r#"
         transforms:
           parse_logs:
             type: $CONFIG_BLOCK
@@ -271,9 +374,8 @@ mod test {
             .to_string(),
         )]);
 
-        let yaml_value: Value = serde_yaml::from_str(raw).unwrap();
-        let toml_table: Table = yaml_value.try_into().unwrap();
-        let result = interpolate_toml_table_with_env_vars(&toml_table, &vars).unwrap();
+        let table = format::deserialize(&input, format::Format::Yaml).unwrap();
+        let result = interpolate_toml_table_with_env_vars(&table, &vars).unwrap();
 
         let actual = result["transforms"]["parse_logs"]["type"].as_str().unwrap();
         assert_eq!(
