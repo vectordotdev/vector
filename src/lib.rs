@@ -129,7 +129,7 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use source_sender::SourceSender;
+pub use source_sender::{SourceOutputMode, SourceSender};
 pub use vector_lib::{event, metrics, schema, tcp, tls};
 pub use vector_lib::{shutdown, Error, Result};
 

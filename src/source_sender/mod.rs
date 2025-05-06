@@ -93,24 +93,24 @@ impl From<SourceSenderItem> for EventArray {
 }
 
 pub struct Builder {
+    mode: SourceOutputMode,
     buf_size: usize,
     default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
     lag_time: Option<Histogram>,
 }
 
-impl Default for Builder {
-    fn default() -> Self {
+impl Builder {
+    fn new(mode: SourceOutputMode) -> Self {
         Self {
+            mode,
             buf_size: CHUNK_SIZE,
             default_output: None,
             named_outputs: Default::default(),
             lag_time: Some(histogram!(LAG_TIME_NAME)),
         }
     }
-}
 
-impl Builder {
     pub const fn with_buffer(mut self, n: usize) -> Self {
         self.buf_size = n;
         self
@@ -131,6 +131,7 @@ impl Builder {
             None => {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
+                    self.mode,
                     DEFAULT_OUTPUT.to_owned(),
                     lag_time,
                     log_definition,
@@ -142,6 +143,7 @@ impl Builder {
             Some(name) => {
                 let (output, rx) = Output::new_with_buffer(
                     self.buf_size,
+                    self.mode,
                     name.clone(),
                     lag_time,
                     log_definition,
@@ -168,8 +170,8 @@ pub struct SourceSender {
 }
 
 impl SourceSender {
-    pub fn builder() -> Builder {
-        Builder::default()
+    pub fn builder(mode: SourceOutputMode) -> Builder {
+        Builder::new(mode)
     }
 
     #[cfg(any(test, feature = "test-utils"))]
@@ -179,8 +181,14 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: None,
         };
-        let (default_output, rx) =
-            Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
+        let (default_output, rx) = Output::new_with_buffer(
+            n,
+            SourceOutputMode::Simple,
+            DEFAULT_OUTPUT.to_owned(),
+            lag_time,
+            None,
+            output_id,
+        );
         (
             Self {
                 default_output,
@@ -252,7 +260,14 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: Some(name.clone()),
         };
-        let (output, recv) = Output::new_with_buffer(100, name.clone(), None, None, output_id);
+        let (output, recv) = Output::new_with_buffer(
+            100,
+            SourceOutputMode::Simple,
+            name.clone(),
+            None,
+            None,
+            output_id,
+        );
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -320,12 +335,12 @@ impl SourceSender {
 /// If its internal count is greater than 0 when dropped, the appropriate [ComponentEventsDropped]
 /// event is emitted.
 struct UnsentEventCount {
-    count: usize,
+    count: Option<usize>,
     span: Span,
 }
 
 impl UnsentEventCount {
-    fn new(count: usize) -> Self {
+    fn new(count: Option<usize>) -> Self {
         Self {
             count,
             span: Span::current(),
@@ -333,28 +348,55 @@ impl UnsentEventCount {
     }
 
     fn decr(&mut self, count: usize) {
-        self.count = self.count.saturating_sub(count);
+        if let Some(current_count) = &mut self.count {
+            *current_count = current_count.saturating_sub(count);
+        }
     }
 
     fn discard(&mut self) {
-        self.count = 0;
+        self.count = None;
     }
 }
 
 impl Drop for UnsentEventCount {
     fn drop(&mut self) {
-        if self.count > 0 {
-            let _enter = self.span.enter();
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: self.count,
-                reason: "Source send cancelled."
-            });
+        if let Some(count) = self.count {
+            if count > 0 {
+                let _enter = self.span.enter();
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count,
+                    reason: "Source send cancelled."
+                });
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SourceOutputMode {
+    /// Simple mode does no unsent event tracking. This is intended for sources where
+    /// the upstream is _known_ to retry on timeouts or dropped connections or where
+    /// dropped connections will not cause a dropped future within Vector.
+    #[default]
+    Simple,
+    /// Counting mode tracks the number of unsent events and emits a
+    /// [ComponentEventsDropped] event when the count is greater than 0
+    /// if the sending task is dropped (i.e. due to a dropped connection).
+    Counting,
+}
+
+impl SourceOutputMode {
+    fn start_send(self, count: usize) -> UnsentEventCount {
+        match self {
+            SourceOutputMode::Counting => UnsentEventCount::new(Some(count)),
+            _ => UnsentEventCount::new(None),
         }
     }
 }
 
 #[derive(Clone)]
 struct Output {
+    mode: SourceOutputMode,
     sender: LimitedSender<SourceSenderItem>,
     lag_time: Option<Histogram>,
     events_sent: Registered<EventsSent>,
@@ -368,6 +410,7 @@ struct Output {
 impl fmt::Debug for Output {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Output")
+            .field("mode", &self.mode)
             .field("sender", &self.sender)
             .field("output_id", &self.output_id)
             // `metrics::Histogram` is missing `impl Debug`
@@ -378,6 +421,7 @@ impl fmt::Debug for Output {
 impl Output {
     fn new_with_buffer(
         n: usize,
+        mode: SourceOutputMode,
         output: String,
         lag_time: Option<Histogram>,
         log_definition: Option<Arc<Definition>>,
@@ -386,6 +430,7 @@ impl Output {
         let (tx, rx) = channel::limited(n);
         (
             Self {
+                mode,
                 sender: tx,
                 lag_time,
                 events_sent: register!(EventsSent::from(internal_event::Output(Some(
@@ -396,6 +441,18 @@ impl Output {
             },
             rx,
         )
+    }
+
+    /// Sends a SourceSenderItem and handles discard on error.
+    async fn send_item(
+        &mut self,
+        item: SourceSenderItem,
+        unsent_event_count: &mut UnsentEventCount,
+    ) -> Result<(), ClosedError> {
+        self.sender.send(item).await.map_err(|_| {
+            unsent_event_count.discard();
+            ClosedError
+        })
     }
 
     async fn send(
@@ -421,13 +478,16 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.sender
-            .send(SourceSenderItem {
+
+        self.send_item(
+            SourceSenderItem {
                 events,
                 send_reference,
-            })
-            .await
-            .map_err(|_| ClosedError)?;
+            },
+            unsent_event_count,
+        )
+        .await?;
+
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
@@ -438,7 +498,7 @@ impl Output {
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
-        let mut unsent_event_count = UnsentEventCount::new(event.len());
+        let mut unsent_event_count = self.mode.start_send(event.len());
         self.send(event, &mut unsent_event_count).await
     }
 
@@ -464,15 +524,10 @@ impl Output {
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
-        let mut unsent_event_count = UnsentEventCount::new(events.len());
+        let events_len = events.len();
+        let mut unsent_event_count = self.mode.start_send(events_len);
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            self.send(events, &mut unsent_event_count)
-                .await
-                .inspect_err(|_| {
-                    // The unsent event count is discarded here because the callee emits the
-                    // `StreamClosedError`.
-                    unsent_event_count.discard();
-                })?;
+            self.send(events, &mut unsent_event_count).await?;
         }
         Ok(())
     }
