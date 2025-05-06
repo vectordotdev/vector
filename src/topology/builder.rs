@@ -52,7 +52,7 @@ use crate::{
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     utilization::wrap,
-    SourceOutputMode, SourceSender,
+    SourceSender,
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -245,7 +245,7 @@ impl<'a> Builder<'a> {
                 key.id()
             );
 
-            let mut builder = SourceSender::builder(SourceOutputMode::Counting)
+            let mut builder = SourceSender::builder(source.inner.output_mode())
                 .with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();

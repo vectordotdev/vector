@@ -16,7 +16,11 @@ use vector_lib::{
 };
 
 use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
-use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
+use crate::{
+    extra_context::ExtraContext,
+    shutdown::ShutdownSignal,
+    source_sender::{SourceOutputMode, SourceSender},
+};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -117,6 +121,12 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
+
+    /// What output mode should be used for the `SourceSender` created for this source.
+    fn output_mode(&self) -> SourceOutputMode {
+        // By default, keep the old standard behavior.
+        SourceOutputMode::Counting
+    }
 }
 
 dyn_clone::clone_trait_object!(SourceConfig);
