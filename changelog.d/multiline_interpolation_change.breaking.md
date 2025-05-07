@@ -4,6 +4,7 @@ As a side effect, this fixes a bug where comment lines referring to env vars or 
 This change breaks existing behavior. Injecting whole blocks now results in error e.g.
 
 A block:
+
 ```shell
 export SOURCES_BLOCK="sources:\"
   demo:
@@ -13,6 +14,7 @@ export SOURCES_BLOCK="sources:\"
 ```
 
 Config snippet:
+
 ```yaml
 ${SOURCES_BLOCK}
 ```
