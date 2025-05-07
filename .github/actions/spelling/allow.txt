@@ -531,3 +531,4 @@ meme
 simdutf
 vhosts
 miniz
+envsubst
