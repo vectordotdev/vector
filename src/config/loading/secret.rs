@@ -198,9 +198,10 @@ fn interpolate_secrets(
 mod tests {
     use std::collections::HashMap;
 
-    use indoc::indoc;
-
     use super::{collect_secret_keys, interpolate_secrets};
+    use crate::config::loading::interpolate_toml_table_with_secrets;
+    use indoc::indoc;
+    use toml::{Table, Value};
 
     #[test]
     fn replacement() {
@@ -287,5 +288,52 @@ mod tests {
         let first_backend_keys = keys.get("first_backend").unwrap();
         assert_eq!(first_backend_keys.len(), 1);
         assert!(first_backend_keys.contains("secret_key"));
+    }
+
+    #[test]
+    fn interpolate_secrets_all_types() {
+        // Step 1: create a TOML table with secret placeholders
+        let mut log_fields = Table::new();
+        log_fields.insert(
+            "str".into(),
+            Value::String("SECRET[backend.str_key]".into()),
+        );
+        log_fields.insert(
+            "int".into(),
+            Value::String("SECRET[backend.int_key]".into()),
+        );
+        log_fields.insert(
+            "float".into(),
+            Value::String("SECRET[backend.float_key]".into()),
+        );
+        log_fields.insert(
+            "bool".into(),
+            Value::String("SECRET[backend.bool_key]".into()),
+        );
+
+        let mut inputs = Table::new();
+        inputs.insert("log_fields".into(), Value::Table(log_fields));
+        let mut root_table = Table::new();
+        root_table.insert("inputs".into(), Value::Table(inputs));
+
+        // Step 2: define mock secrets with correct types as strings
+        let secrets = HashMap::from([
+            ("backend.str_key".to_string(), "hello".to_string()),
+            ("backend.int_key".to_string(), "42".to_string()),
+            ("backend.float_key".to_string(), "3.14".to_string()),
+            ("backend.bool_key".to_string(), "true".to_string()),
+        ]);
+
+        // Step 3: interpolate secrets
+        let result = interpolate_toml_table_with_secrets(&root_table, &secrets).unwrap();
+
+        // Step 4: verify only the secret-related values, including type coercion
+        let log_fields = &result["inputs"]["log_fields"];
+        let log_fields = log_fields.as_table().expect("log_fields is a table");
+
+        assert_eq!(log_fields["str"], Value::String("hello".into()));
+        assert_eq!(log_fields["int"], Value::Integer(42));
+        assert_eq!(log_fields["float"], Value::Float(3.14));
+        assert_eq!(log_fields["bool"], Value::Boolean(true));
     }
 }

@@ -348,7 +348,7 @@ mod test {
             [sinks.s0.encoding.json]
             pretty = true
         "#})
-            .unwrap();
+        .unwrap();
 
         assert_eq!(Value::Table(final_table), expected);
     }
