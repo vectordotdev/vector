@@ -299,7 +299,7 @@ mod test {
         "#};
 
         // Step 2: Parse YAML and convert to TOML Table
-        let toml_table = format::deserialize(&input, Format::Yaml).unwrap();
+        let toml_table = format::deserialize(input, Format::Yaml).unwrap();
 
         // Step 3: Env var mappings
         let env_vars = HashMap::from([
@@ -347,7 +347,8 @@ mod test {
 
             [sinks.s0.encoding.json]
             pretty = true
-        "#}).unwrap();
+        "#})
+            .unwrap();
 
         assert_eq!(Value::Table(final_table), expected);
     }
@@ -374,7 +375,7 @@ mod test {
             .to_string(),
         )]);
 
-        let table = format::deserialize(&input, format::Format::Yaml).unwrap();
+        let table = format::deserialize(input, Format::Yaml).unwrap();
         let result = interpolate_toml_table_with_env_vars(&table, &vars).unwrap();
 
         let actual = result["transforms"]["parse_logs"]["type"].as_str().unwrap();
