@@ -52,9 +52,12 @@ pub struct GlobalOptions {
     ///
     /// If enabled, this option allows configurations with wildcards that do not match any inputs
     /// to be accepted without causing an error.
-    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[serde(
+        default = "default_relaxed_wildcard_matching",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
     #[configurable(metadata(docs::common = false, docs::required = false))]
-    pub relax_wildcard_matching: Option<bool>,
+    pub relax_wildcard_matching: bool,
 
     /// Default log schema for all events.
     ///
@@ -130,6 +133,10 @@ pub struct GlobalOptions {
 
 impl_generate_config_from_default!(GlobalOptions);
 
+const fn default_relaxed_wildcard_matching() -> bool {
+    false
+}
+
 impl GlobalOptions {
     /// Resolve the `data_dir` option in either the global or local config, and
     /// validate that it exists and is writable.
@@ -190,10 +197,7 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
-        if conflicts(
-            self.relax_wildcard_matching.as_ref(),
-            with.relax_wildcard_matching.as_ref(),
-        ) {
+        if self.relax_wildcard_matching != with.relax_wildcard_matching {
             errors.push("conflicting values for 'relax_wildcard_matching' found".to_owned());
         }
 
@@ -265,9 +269,7 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
-                relax_wildcard_matching: self
-                    .relax_wildcard_matching
-                    .or(with.relax_wildcard_matching),
+                relax_wildcard_matching: self.relax_wildcard_matching,
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),

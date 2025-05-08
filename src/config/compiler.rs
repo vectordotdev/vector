@@ -76,7 +76,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         &transforms,
         &all_sinks,
         schema,
-        global.relax_wildcard_matching.unwrap_or_default(),
+        global.relax_wildcard_matching,
     ) {
         Ok(graph) => graph,
         Err(graph_errors) => {

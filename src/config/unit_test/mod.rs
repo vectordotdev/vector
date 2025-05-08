@@ -385,10 +385,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
         transform_only_config.schema,
-        transform_only_config
-            .global
-            .relax_wildcard_matching
-            .unwrap_or_default(),
+        transform_only_config.global.relax_wildcard_matching,
     );
     let test = test.resolve_outputs(&transform_only_graph)?;
 
@@ -405,10 +402,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         config_builder.schema,
-        config_builder
-            .global
-            .relax_wildcard_matching
-            .unwrap_or_default(),
+        config_builder.global.relax_wildcard_matching,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -440,10 +434,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         config_builder.schema,
-        config_builder
-            .global
-            .relax_wildcard_matching
-            .unwrap_or_default(),
+        config_builder.global.relax_wildcard_matching,
     );
     let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
