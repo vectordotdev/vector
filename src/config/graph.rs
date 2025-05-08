@@ -173,7 +173,7 @@ impl Graph {
             // allow empty result if relaxed wildcard matching is enabled
             // using value != glob::Pattern::escape(value) to check if value is a glob
             // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
-            if from != glob::Pattern::escape(from) && relax_wildcard_matching {
+            if relax_wildcard_matching && from != glob::Pattern::escape(from) {
                 info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
                 return Ok(());
             }
