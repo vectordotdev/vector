@@ -502,9 +502,9 @@ mod test {
             }
         }
 
-        fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
+        fn test_add_input(&mut self, node: &str, input: &str, relax_wildcard_matching: bool) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs)
+            self.add_input(input, &node.into(), &available_inputs, relax_wildcard_matching)
         }
     }
 
@@ -685,14 +685,14 @@ mod test {
         // make sure we're good with dotted paths
         assert_eq!(
             Ok(()),
-            graph.test_add_input("errored_log_sink", "log_to_log.errors")
+            graph.test_add_input("errored_log_sink", "log_to_log.errors", false)
         );
 
         // make sure that we're not cool with an unknown dotted path
         let expected = "Input \"log_to_log.not_errors\" for sink \"bad_log_sink\" doesn't match any components.".to_string();
         assert_eq!(
             Err(expected),
-            graph.test_add_input("bad_log_sink", "log_to_log.not_errors")
+            graph.test_add_input("bad_log_sink", "log_to_log.not_errors", false)
         );
     }
 
