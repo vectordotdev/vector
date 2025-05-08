@@ -852,6 +852,17 @@ base: configuration: configuration: {
 			}
 		}
 	}
+	relax_wildcard_matching: {
+		common: false
+		description: """
+			Enable relaxed wildcard matching to specify inputs.
+
+			If enabled, this option allows configurations with wildcards that do not match any inputs
+			to be accepted without causing an error.
+			"""
+		required: false
+		type: bool: {}
+	}
 	telemetry: {
 		common: false
 		description: """
