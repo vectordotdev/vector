@@ -48,6 +48,14 @@ pub struct GlobalOptions {
     #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
 
+    /// Enable relaxed wildcard matching to specify inputs.
+    ///
+    /// If enabled, this option allows configurations with wildcards that do not match any inputs
+    /// to be accepted without causing an error.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
+    pub relax_wildcard_matching: Option<bool>,
+
     /// Default log schema for all events.
     ///
     /// This is used if a component does not have its own specific log schema. All events use a log
@@ -182,6 +190,10 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
+        if conflicts(self.relax_wildcard_matching.as_ref(), with.relax_wildcard_matching.as_ref()) {
+            errors.push("conflicting values for 'relax_wildcard_matching' found".to_owned());
+        }
+
         if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
             errors.push("conflicting values for 'proxy.http' found".to_owned());
         }
@@ -250,6 +262,7 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
+                relax_wildcard_matching: self.relax_wildcard_matching.or(with.relax_wildcard_matching),
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
