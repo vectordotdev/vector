@@ -502,9 +502,19 @@ mod test {
             }
         }
 
-        fn test_add_input(&mut self, node: &str, input: &str, relax_wildcard_matching: bool) -> Result<(), String> {
+        fn test_add_input(
+            &mut self,
+            node: &str,
+            input: &str,
+            relax_wildcard_matching: bool,
+        ) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs, relax_wildcard_matching)
+            self.add_input(
+                input,
+                &node.into(),
+                &available_inputs,
+                relax_wildcard_matching,
+            )
         }
     }
 
