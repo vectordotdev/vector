@@ -61,9 +61,9 @@ pub struct GlobalOptions {
     #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
 
-    /// Enable relaxed wildcard matching to specify inputs.
+    /// Set wildcard matching mode for inputs
     ///
-    /// If enabled, this option allows configurations with wildcards that do not match any inputs
+    /// Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
