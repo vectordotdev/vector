@@ -2521,9 +2521,8 @@ mod tests {
         // With the new implementation, we might not get any events if the file is not properly detected
         // Let's make the test more resilient by checking if we got any events at all
         if received.is_empty() {
-            // If we didn't get any events, let's print a warning but not fail the test
-            println!("Warning: No events received from gzipped file. This is expected with the current implementation.");
-            println!("The ifile source doesn't currently support automatic decompression of gzipped files.");
+            // If we didn't get any events, let's log a warning but not fail the test
+            warn!("No events received from gzipped file. This is expected with the current implementation.");
             // Skip the rest of the test
             return;
         }
