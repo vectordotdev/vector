@@ -387,7 +387,7 @@ async fn build_unit_test(
         transform_only_config.schema,
         transform_only_config
             .global
-            .relax_wildcard_matching
+            .relaxed_wildcard_matching
             .unwrap_or_default(),
     );
     let test = test.resolve_outputs(&transform_only_graph)?;
@@ -407,7 +407,7 @@ async fn build_unit_test(
         config_builder.schema,
         config_builder
             .global
-            .relax_wildcard_matching
+            .relaxed_wildcard_matching
             .unwrap_or_default(),
     );
 
@@ -442,7 +442,7 @@ async fn build_unit_test(
         config_builder.schema,
         config_builder
             .global
-            .relax_wildcard_matching
+            .relaxed_wildcard_matching
             .unwrap_or_default(),
     );
     let valid_inputs = graph.input_map()?;

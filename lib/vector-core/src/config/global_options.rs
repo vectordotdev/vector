@@ -54,7 +54,7 @@ pub struct GlobalOptions {
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
-    pub relax_wildcard_matching: Option<bool>,
+    pub relaxed_wildcard_matching: Option<bool>,
 
     /// Default log schema for all events.
     ///
@@ -191,10 +191,10 @@ impl GlobalOptions {
         let mut errors = Vec::new();
 
         if conflicts(
-            self.relax_wildcard_matching.as_ref(),
-            with.relax_wildcard_matching.as_ref(),
+            self.relaxed_wildcard_matching.as_ref(),
+            with.relaxed_wildcard_matching.as_ref(),
         ) {
-            errors.push("conflicting values for 'relax_wildcard_matching' found".to_owned());
+            errors.push("conflicting values for 'relaxed_wildcard_matching' found".to_owned());
         }
 
         if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
@@ -265,9 +265,9 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
-                relax_wildcard_matching: self
-                    .relax_wildcard_matching
-                    .or(with.relax_wildcard_matching),
+                relaxed_wildcard_matching: self
+                    .relaxed_wildcard_matching
+                    .or(with.relaxed_wildcard_matching),
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),

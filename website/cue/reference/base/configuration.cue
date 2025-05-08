@@ -852,7 +852,7 @@ base: configuration: configuration: {
 			}
 		}
 	}
-	relax_wildcard_matching: {
+	relaxed_wildcard_matching: {
 		common: false
 		description: """
 			Enable relaxed wildcard matching to specify inputs.
