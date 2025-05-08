@@ -71,7 +71,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         )
         .collect::<IndexMap<_, _>>();
 
-    let graph = match Graph::new(&sources_and_table_sources, &transforms, &all_sinks, schema) {
+    let graph = match Graph::new(&sources_and_table_sources, &transforms, &all_sinks, schema, global.relax_wildcard_matching.unwrap_or_default()) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);

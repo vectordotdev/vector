@@ -65,8 +65,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
+        relax_wildcard_matching: bool,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema)
+        Self::new_inner(sources, transforms, sinks, false, schema, relax_wildcard_matching)
     }
 
     pub fn new_unchecked(
@@ -74,8 +75,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
+        relax_wildcard_matching: bool,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, true, schema, relax_wildcard_matching).expect("errors ignored")
     }
 
     fn new_inner(
@@ -84,6 +86,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         ignore_errors: bool,
         schema: schema::Options,
+        relax_wildcard_matching: bool,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -127,7 +130,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, relax_wildcard_matching) {
                     errors.push(e);
                 }
             }
@@ -135,7 +138,7 @@ impl Graph {
 
         for (id, config) in sinks {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, relax_wildcard_matching) {
                     errors.push(e);
                 }
             }
@@ -153,6 +156,7 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
+        relax_wildcard_matching: bool,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
@@ -166,6 +170,13 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
+            // allow empty result if relaxed wildcard matching is enabled
+            // using value != glob::Pattern::escape(value) to check if value is a glob
+            // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
+            if from != glob::Pattern::escape(from) && relax_wildcard_matching {
+                info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
+                return Ok(());
+            }
             info!(
                 "Available components:\n{}",
                 self.nodes
