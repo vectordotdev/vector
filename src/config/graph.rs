@@ -1,6 +1,6 @@
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput,
+    TransformOutput, WildcardMatching,
 };
 use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -65,16 +65,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
-        relaxed_wildcard_matching: bool,
+        wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(
-            sources,
-            transforms,
-            sinks,
-            false,
-            schema,
-            relaxed_wildcard_matching,
-        )
+        Self::new_inner(sources, transforms, sinks, false, schema, wildcard_matching)
     }
 
     pub fn new_unchecked(
@@ -82,17 +75,10 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
-        relaxed_wildcard_matching: bool,
+        wildcard_matching: WildcardMatching,
     ) -> Self {
-        Self::new_inner(
-            sources,
-            transforms,
-            sinks,
-            true,
-            schema,
-            relaxed_wildcard_matching,
-        )
-        .expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, true, schema, wildcard_matching)
+            .expect("errors ignored")
     }
 
     fn new_inner(
@@ -101,7 +87,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         ignore_errors: bool,
         schema: schema::Options,
-        relaxed_wildcard_matching: bool,
+        wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -145,9 +131,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) =
-                    graph.add_input(input, id, &available_inputs, relaxed_wildcard_matching)
-                {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);
                 }
             }
@@ -155,9 +139,7 @@ impl Graph {
 
         for (id, config) in sinks {
             for input in config.inputs.iter() {
-                if let Err(e) =
-                    graph.add_input(input, id, &available_inputs, relaxed_wildcard_matching)
-                {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);
                 }
             }
@@ -175,7 +157,7 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
-        relaxed_wildcard_matching: bool,
+        wildcard_matching: WildcardMatching,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
@@ -190,11 +172,16 @@ impl Graph {
                 _ => panic!("only transforms and sinks have inputs"),
             };
             // allow empty result if relaxed wildcard matching is enabled
-            // using value != glob::Pattern::escape(value) to check if value is a glob
-            // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
-            if relaxed_wildcard_matching && from != glob::Pattern::escape(from) {
-                info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
-                return Ok(());
+            match wildcard_matching {
+                WildcardMatching::Relaxed => {
+                    // using value != glob::Pattern::escape(value) to check if value is a glob
+                    // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
+                    if from != glob::Pattern::escape(from) {
+                        info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
+                        return Ok(());
+                    }
+                }
+                WildcardMatching::Strict => {}
             }
             info!(
                 "Available components:\n{}",
@@ -506,15 +493,10 @@ mod test {
             &mut self,
             node: &str,
             input: &str,
-            relaxed_wildcard_matching: bool,
+            wildcard_matching: WildcardMatching,
         ) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(
-                input,
-                &node.into(),
-                &available_inputs,
-                relaxed_wildcard_matching,
-            )
+            self.add_input(input, &node.into(), &available_inputs, wildcard_matching)
         }
     }
 
@@ -695,14 +677,22 @@ mod test {
         // make sure we're good with dotted paths
         assert_eq!(
             Ok(()),
-            graph.test_add_input("errored_log_sink", "log_to_log.errors", false)
+            graph.test_add_input(
+                "errored_log_sink",
+                "log_to_log.errors",
+                WildcardMatching::Strict
+            )
         );
 
         // make sure that we're not cool with an unknown dotted path
         let expected = "Input \"log_to_log.not_errors\" for sink \"bad_log_sink\" doesn't match any components.".to_string();
         assert_eq!(
             Err(expected),
-            graph.test_add_input("bad_log_sink", "log_to_log.not_errors", false)
+            graph.test_add_input(
+                "bad_log_sink",
+                "log_to_log.not_errors",
+                WildcardMatching::Strict
+            )
         );
     }
 
@@ -786,36 +776,36 @@ mod test {
     }
 
     #[test]
-    fn relaxed_wildcard_matching() {
+    fn wildcard_matching() {
         let mut graph = Graph::default();
         graph.add_source("log_source", DataType::Log);
 
         // don't add inputs to these yet since they're not validated via these helpers
         graph.add_sink("sink", DataType::Log, vec![]);
 
-        // make sure we're not good with non existing inputs with relaxed_wildcard_matching disabled
-        let relaxed_wildcard_matching = false;
+        // make sure we're not good with non existing inputs with relaxed wildcard matching disabled
+        let wildcard_matching = WildcardMatching::Strict;
         let expected =
             "Input \"bad_source-*\" for sink \"sink\" doesn't match any components.".to_string();
         assert_eq!(
             Err(expected),
-            graph.test_add_input("sink", "bad_source-*", relaxed_wildcard_matching)
+            graph.test_add_input("sink", "bad_source-*", wildcard_matching)
         );
 
-        // make sure we're good with non existing inputs with relaxed_wildcard_matching enabled
-        let relaxed_wildcard_matching = true;
+        // make sure we're good with non existing inputs with relaxed wildcard matching enabled
+        let wildcard_matching = WildcardMatching::Relaxed;
         assert_eq!(
             Ok(()),
-            graph.test_add_input("sink", "bad_source-*", relaxed_wildcard_matching)
+            graph.test_add_input("sink", "bad_source-*", wildcard_matching)
         );
 
-        // make sure we're not good with non existing inputs that are not wildcards even when relaxed_wildcard_matching is enabled
-        let relaxed_wildcard_matching = true;
+        // make sure we're not good with non existing inputs that are not wildcards even when relaxed wildcard matching is enabled
+        let wildcard_matching = WildcardMatching::Relaxed;
         let expected =
             "Input \"bad_source-1\" for sink \"sink\" doesn't match any components.".to_string();
         assert_eq!(
             Err(expected),
-            graph.test_add_input("sink", "bad_source-1", relaxed_wildcard_matching)
+            graph.test_add_input("sink", "bad_source-1", wildcard_matching)
         );
     }
 

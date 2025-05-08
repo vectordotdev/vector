@@ -31,6 +31,19 @@ pub(crate) enum DataDirError {
     },
 }
 
+/// Specifies the wildcard matching mode, relaxed allows configurations where wildcard doesn not match any existing inputs
+#[configurable_component]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WildcardMatching {
+    /// Strict matching (must match at least one existing input)
+    #[default]
+    Strict,
+
+    /// Relaxed matching (must match 0 or more inputs)
+    Relaxed,
+}
+
 /// Global configuration options.
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
@@ -54,7 +67,7 @@ pub struct GlobalOptions {
     /// to be accepted without causing an error.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
-    pub relaxed_wildcard_matching: Option<bool>,
+    pub wildcard_matching: Option<WildcardMatching>,
 
     /// Default log schema for all events.
     ///
@@ -191,10 +204,10 @@ impl GlobalOptions {
         let mut errors = Vec::new();
 
         if conflicts(
-            self.relaxed_wildcard_matching.as_ref(),
-            with.relaxed_wildcard_matching.as_ref(),
+            self.wildcard_matching.as_ref(),
+            with.wildcard_matching.as_ref(),
         ) {
-            errors.push("conflicting values for 'relaxed_wildcard_matching' found".to_owned());
+            errors.push("conflicting values for 'wildcard_matching' found".to_owned());
         }
 
         if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
@@ -265,9 +278,7 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
-                relaxed_wildcard_matching: self
-                    .relaxed_wildcard_matching
-                    .or(with.relaxed_wildcard_matching),
+                wildcard_matching: self.wildcard_matching.or(with.wildcard_matching),
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),

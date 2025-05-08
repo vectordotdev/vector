@@ -21,7 +21,7 @@ use serde::Serialize;
 use vector_config::configurable_component;
 pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
-    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput, WildcardMatching,
 };
 pub use vector_lib::configurable::component::{
     GenerateConfig, SinkDescription, TransformDescription,
