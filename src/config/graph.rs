@@ -67,7 +67,14 @@ impl Graph {
         schema: schema::Options,
         relax_wildcard_matching: bool,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema, relax_wildcard_matching)
+        Self::new_inner(
+            sources,
+            transforms,
+            sinks,
+            false,
+            schema,
+            relax_wildcard_matching,
+        )
     }
 
     pub fn new_unchecked(
@@ -77,7 +84,15 @@ impl Graph {
         schema: schema::Options,
         relax_wildcard_matching: bool,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema, relax_wildcard_matching).expect("errors ignored")
+        Self::new_inner(
+            sources,
+            transforms,
+            sinks,
+            true,
+            schema,
+            relax_wildcard_matching,
+        )
+        .expect("errors ignored")
     }
 
     fn new_inner(
@@ -130,7 +145,9 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, relax_wildcard_matching) {
+                if let Err(e) =
+                    graph.add_input(input, id, &available_inputs, relax_wildcard_matching)
+                {
                     errors.push(e);
                 }
             }
@@ -138,7 +155,9 @@ impl Graph {
 
         for (id, config) in sinks {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, relax_wildcard_matching) {
+                if let Err(e) =
+                    graph.add_input(input, id, &available_inputs, relax_wildcard_matching)
+                {
                     errors.push(e);
                 }
             }

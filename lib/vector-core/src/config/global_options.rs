@@ -190,7 +190,10 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
-        if conflicts(self.relax_wildcard_matching.as_ref(), with.relax_wildcard_matching.as_ref()) {
+        if conflicts(
+            self.relax_wildcard_matching.as_ref(),
+            with.relax_wildcard_matching.as_ref(),
+        ) {
             errors.push("conflicting values for 'relax_wildcard_matching' found".to_owned());
         }
 
@@ -262,7 +265,9 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
-                relax_wildcard_matching: self.relax_wildcard_matching.or(with.relax_wildcard_matching),
+                relax_wildcard_matching: self
+                    .relax_wildcard_matching
+                    .or(with.relax_wildcard_matching),
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
