@@ -786,6 +786,40 @@ mod test {
     }
 
     #[test]
+    fn relaxed_wildcard_matching() {
+        let mut graph = Graph::default();
+        graph.add_source("log_source", DataType::Log);
+
+        // don't add inputs to these yet since they're not validated via these helpers
+        graph.add_sink("sink", DataType::Log, vec![]);
+
+        // make sure we're not good with non existing inputs with relaxed_wildcard_matching disabled
+        let relaxed_wildcard_matching = false;
+        let expected =
+            "Input \"bad_source-*\" for sink \"sink\" doesn't match any components.".to_string();
+        assert_eq!(
+            Err(expected),
+            graph.test_add_input("sink", "bad_source-*", relaxed_wildcard_matching)
+        );
+
+        // make sure we're good with non existing inputs with relaxed_wildcard_matching enabled
+        let relaxed_wildcard_matching = true;
+        assert_eq!(
+            Ok(()),
+            graph.test_add_input("sink", "bad_source-*", relaxed_wildcard_matching)
+        );
+
+        // make sure we're not good with non existing inputs that are not wildcards even when relaxed_wildcard_matching is enabled
+        let relaxed_wildcard_matching = true;
+        let expected =
+            "Input \"bad_source-1\" for sink \"sink\" doesn't match any components.".to_string();
+        assert_eq!(
+            Err(expected),
+            graph.test_add_input("sink", "bad_source-1", relaxed_wildcard_matching)
+        );
+    }
+
+    #[test]
     fn paths_to_sink_simple() {
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
