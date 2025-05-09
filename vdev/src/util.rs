@@ -12,6 +12,9 @@ use anyhow::{Context as _, Result};
 use serde::Deserialize;
 use serde_json::Value;
 
+#[cfg(unix)]
+use libc;
+
 pub static IS_A_TTY: LazyLock<bool> = LazyLock::new(|| std::io::stdout().is_terminal());
 
 #[derive(Deserialize)]
@@ -103,3 +106,13 @@ pub fn run_command(cmd: &str) -> String {
 
     String::from_utf8_lossy(&output.stdout).to_string()
 }
+
+#[cfg(unix)]
+pub(crate) fn catch_sigs() {
+    unsafe {
+        libc::signal(libc::SIGINT, libc::SIG_IGN);
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) fn catch_sigs() {}
