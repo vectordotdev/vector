@@ -179,7 +179,7 @@ mod tests {
         use crate::config::ConfigBuilder;
 
         macro_rules! concat_with_newlines {
-            ($($e:expr,)*) => { concat!( $($e, "\n"),+ ) };
+            ($($e:expr_2021,)*) => { concat!( $($e, "\n"),+ ) };
         }
 
         const SAMPLE_TOML: &str = r#"

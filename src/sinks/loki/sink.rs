@@ -407,7 +407,7 @@ impl RecordFilter {
 
 impl RecordFilter {
     pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<FilteredRecord> {
-        if let Some(latest) = self.timestamps.get_mut(&record.partition) {
+        match self.timestamps.get_mut(&record.partition) { Some(latest) => {
             if record.event.timestamp < *latest {
                 match self.out_of_order_action {
                     OutOfOrderAction::Drop => None,
@@ -421,11 +421,11 @@ impl RecordFilter {
                 *latest = record.event.timestamp;
                 Some(FilteredRecord::valid(record))
             }
-        } else {
+        } _ => {
             self.timestamps
                 .insert(record.partition.clone(), record.event.timestamp);
             Some(FilteredRecord::valid(record))
-        }
+        }}
     }
 }
 

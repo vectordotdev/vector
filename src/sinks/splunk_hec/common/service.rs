@@ -57,7 +57,7 @@ where
         indexer_acknowledgements: HecClientAcknowledgementsConfig,
     ) -> Self {
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
-        let tx = if let Some(ack_client) = ack_client {
+        let tx = match ack_client { Some(ack_client) => {
             let (tx, rx) = mpsc::channel(128);
             tokio::spawn(run_acknowledgements(
                 rx,
@@ -66,9 +66,9 @@ where
                 indexer_acknowledgements,
             ));
             Some(tx)
-        } else {
+        } _ => {
             None
-        };
+        }};
 
         let ack_slots = PollSemaphore::new(Arc::new(Semaphore::new(max_pending_acks as usize)));
         Self {
@@ -121,7 +121,7 @@ where
         Box::pin(async move {
             let response = response.await.map_err(Into::into)?;
             let event_status = if response.is_successful() {
-                if let Some(ack_finalizer_tx) = ack_finalizer_tx {
+                match ack_finalizer_tx { Some(ack_finalizer_tx) => {
                     let _ack_slot = ack_slot.expect("poll_ready not called before invoking call");
                     let body = serde_json::from_slice::<HecAckResponseBody>(response.body());
                     match body {
@@ -149,10 +149,10 @@ where
                             EventStatus::Delivered
                         }
                     }
-                } else {
+                } _ => {
                     // Default behavior if indexer acknowledgements is disabled by configuration
                     EventStatus::Delivered
-                }
+                }}
             } else if response.is_transient() {
                 EventStatus::Errored
             } else {
