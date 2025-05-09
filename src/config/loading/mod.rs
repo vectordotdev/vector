@@ -1,4 +1,5 @@
 mod config_builder;
+mod interpolation;
 mod loader;
 mod secret;
 mod source;
@@ -13,15 +14,14 @@ use std::{
 
 use config_builder::ConfigBuilderLoader;
 use glob::glob;
+pub use interpolation::*;
 use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
 pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
-use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
-};
+use super::{builder::ConfigBuilder, validation, Config, ConfigPath, Format, FormatHint};
 use crate::{config::ProviderConfig, signal};
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
@@ -268,30 +268,6 @@ fn load_from_inputs(
     } else {
         Err(errors)
     }
-}
-
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<String>> {
-    let mut source_string = String::new();
-    input
-        .read_to_string(&mut source_string)
-        .map_err(|e| vec![e.to_string()])?;
-
-    let mut vars = std::env::vars().collect::<HashMap<_, _>>();
-    if !vars.contains_key("HOSTNAME") {
-        if let Ok(hostname) = crate::get_hostname() {
-            vars.insert("HOSTNAME".into(), hostname);
-        }
-    }
-    vars::interpolate(&source_string, &vars)
-}
-
-pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let with_vars = prepare_input(input)?;
-
-    format::deserialize(&with_vars, format)
 }
 
 #[cfg(not(windows))]
