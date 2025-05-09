@@ -73,7 +73,6 @@ impl InternalEvent for VectorReloadError {
             error_code = "reload",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -95,7 +94,6 @@ impl InternalEvent for VectorConfigLoadError {
             error_code = "config_load",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -117,7 +115,6 @@ impl InternalEvent for VectorRecoveryError {
             error_code = "recovery",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
