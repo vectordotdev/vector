@@ -214,6 +214,11 @@ base: components: sinks: aws_s3: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: "The AWS session token."
+				required:    false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	batch: {

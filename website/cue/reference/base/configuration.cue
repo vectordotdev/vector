@@ -364,6 +364,11 @@ base: configuration: configuration: {
 														"""
 						required: false
 					}
+					session_token: {
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						description: "The AWS session token."
+						required:    false
+					}
 					credentials_file: {
 						type: string: examples: ["/my/aws/credentials"]
 						description: "Path to the credentials file."

@@ -155,6 +155,12 @@ base: components: sinks: prometheus_remote_write: configuration: {
 				required:      false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description:   "The AWS session token."
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 			strategy: {
 				description: "The authentication strategy to use."
 				required:    true

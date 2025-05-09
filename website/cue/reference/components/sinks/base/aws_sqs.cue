@@ -139,6 +139,11 @@ base: components: sinks: aws_sqs: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: "The AWS session token."
+				required:    false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	encoding: {
