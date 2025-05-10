@@ -537,7 +537,7 @@ pub fn ifile_source(
 
     // Use notify-based paths provider by default
     debug!(
-        message = "Using notify-based file discovery",
+        message = "Using notify-based file discovery.",
         include_patterns = ?config.include,
         exclude_patterns = ?exclude_patterns,
     );

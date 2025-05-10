@@ -577,7 +577,7 @@ mod source {
 
         fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
             debug!(
-                message = "File switched to passive watching mode",
+                message = "File switched to passive watching mode.",
                 file = %file.display(),
                 position = %file_position,
             );
@@ -594,7 +594,7 @@ mod source {
 
         fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
             debug!(
-                message = "File switched to active watching mode",
+                message = "File switched to active watching mode.",
                 file = %file.display(),
                 position = %file_position,
             );
