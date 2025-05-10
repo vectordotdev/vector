@@ -35,9 +35,9 @@ use vector_lib::{
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
 use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
-use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
 use warp::reject;
+use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
     acknowledgements::{
@@ -534,12 +534,12 @@ impl SplunkSource {
     fn lenient_json_content_type_check(
     ) -> impl Filter<Extract = (), Error = Rejection> + Clone + Send + Sync + 'static {
         warp::header::header::<HeaderValue>(CONTENT_TYPE.as_str())
-        .and_then(|value: HeaderValue| async move {
-            match value.to_str() {
-                Ok(h) if h.to_lowercase().contains("application/json") => Ok(()),
-                _ => Err(warp::Rejection::from(ApiError::UnsupportedEncoding)),
-            }
-        })
+            .and_then(|value: HeaderValue| async move {
+                match value.to_str() {
+                    Ok(h) if h.to_lowercase().contains("application/json") => Ok(()),
+                    _ => Err(warp::Rejection::from(ApiError::UnsupportedEncoding)),
+                }
+            })
             .untuple_one()
     }
 
@@ -556,9 +556,8 @@ impl SplunkSource {
                 let idx_ack = idx_ack.clone();
                 async move {
                     // parse JSON, unit-variant BadRequest
-                    let req: HecAckStatusRequest =
-                        serde_json::from_slice(&body_bytes)
-                            .map_err(|_| reject::custom(ApiError::BadRequest))?;
+                    let req: HecAckStatusRequest = serde_json::from_slice(&body_bytes)
+                        .map_err(|_| reject::custom(ApiError::BadRequest))?;
 
                     if let Some(idx_ack) = idx_ack {
                         let acks = idx_ack
