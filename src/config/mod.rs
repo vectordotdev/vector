@@ -2,6 +2,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
+    fs,
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
@@ -83,9 +84,14 @@ pub struct ComponentConfig {
 }
 
 impl ComponentConfig {
-    pub const fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+        let canonicalized_paths = config_paths
+            .into_iter()
+            .filter_map(|p| fs::canonicalize(p).ok())
+            .collect();
+
         Self {
-            config_paths,
+            config_paths: canonicalized_paths,
             component_key,
         }
     }
