@@ -36,6 +36,8 @@ use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStre
 use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+use warp::http::header::{HeaderValue, CONTENT_TYPE};
+use warp::reject;
 
 use self::{
     acknowledgements::{
@@ -529,26 +531,42 @@ impl SplunkSource {
             .boxed()
     }
 
+    fn lenient_json_content_type_check(
+    ) -> impl Filter<Extract = (), Error = Rejection> + Clone + Send + Sync + 'static {
+        warp::header::header::<HeaderValue>(CONTENT_TYPE.as_str())
+        .and_then(|value: HeaderValue| async move {
+            match value.to_str() {
+                Ok(h) if h.to_lowercase().contains("application/json") => Ok(()),
+                _ => Err(warp::Rejection::from(ApiError::UnsupportedEncoding)),
+            }
+        })
+            .untuple_one()
+    }
+
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
         let idx_ack = self.idx_ack.clone();
+
         warp::post()
-            .and(path!("ack"))
+            .and(warp::path!("ack"))
             .and(self.authorization())
             .and(SplunkSource::required_channel())
-            .and(warp::body::json())
-            .and_then(move |_, channel_id: String, body: HecAckStatusRequest| {
+            .and(Self::lenient_json_content_type_check())
+            .and(warp::body::bytes())
+            .and_then(move |_, channel: String, body_bytes: Bytes| {
                 let idx_ack = idx_ack.clone();
                 async move {
+                    // parse JSON, unit-variant BadRequest
+                    let req: HecAckStatusRequest =
+                        serde_json::from_slice(&body_bytes)
+                            .map_err(|_| reject::custom(ApiError::BadRequest))?;
+
                     if let Some(idx_ack) = idx_ack {
-                        let ack_statuses = idx_ack
-                            .get_acks_status_from_channel(channel_id, &body.acks)
+                        let acks = idx_ack
+                            .get_acks_status_from_channel(channel, &req.acks)
                             .await?;
-                        Ok(
-                            warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
-                                .into_response(),
-                        )
+                        Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
                     } else {
-                        Err(Rejection::from(ApiError::AckIsDisabled))
+                        Err(reject::custom(ApiError::AckIsDisabled))
                     }
                 }
             })
