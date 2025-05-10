@@ -16,7 +16,5 @@ use snafu::Snafu;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating amqp producer failed: {}", source))]
-    AmqpCreateFailed {
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
+    AmqpCreateFailed { source: vector_common::Error },
 }
