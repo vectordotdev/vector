@@ -96,9 +96,7 @@ pub(super) enum AmqpError {
     Nack,
 
     #[snafu(display("Failed to open AMQP channel: {}", error))]
-    ConnectFailed {
-        error: Box<dyn std::error::Error + Send + Sync>,
-    },
+    ConnectFailed { error: vector_common::Error },
 }
 
 impl Service<AmqpRequest> for AmqpService {
