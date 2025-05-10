@@ -1,4 +1,5 @@
 //! Configuration functionality for the `AMQP` sink.
+use super::channel::AmqpChannel;
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{types::ShortString, BasicProperties};
 use std::sync::Arc;
@@ -135,8 +136,10 @@ impl SinkConfig for AmqpSinkConfig {
     }
 }
 
-pub(super) async fn healthcheck(channel: Arc<lapin::Channel>) -> crate::Result<()> {
+pub(super) async fn healthcheck(channel: Arc<AmqpChannel>) -> crate::Result<()> {
     trace!("Healthcheck started.");
+
+    let channel = channel.channel().await?;
 
     if !channel.status().connected() {
         return Err(Box::new(std::io::Error::new(
