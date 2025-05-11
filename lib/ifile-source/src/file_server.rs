@@ -18,12 +18,12 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::FileWatcher,
-    paths_provider::PathsProvider,
-    FilePosition, ReadFrom, Checkpointer, CheckpointsView,
+    file_watcher::FileWatcher, paths_provider::PathsProvider, Checkpointer, CheckpointsView,
+    FilePosition, ReadFrom,
 };
 use file_source_common::{
-    FileFingerprint, Fingerprinter, internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents,
+    internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents, FileFingerprint,
+    Fingerprinter,
 };
 
 /// `FileServer` is a Source which schedules reads over files,

@@ -10,13 +10,11 @@ use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{debug, Instrument, Span};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
+use vector_lib::file_source_common::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::ifile_source::{
     calculate_ignore_before, paths_provider::glob::MatchOptions, BoxedPathsProvider, Checkpointer,
     FileServer, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
-};
-use vector_lib::file_source_common::{
-    FileFingerprint, FingerprintStrategy, Fingerprinter,
 };
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{

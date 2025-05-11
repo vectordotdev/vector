@@ -260,8 +260,7 @@ impl Checkpointer {
             }
             'i' => {
                 let (dev, ino, pos) =
-                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], u64)
-                        .unwrap();
+                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], u64).unwrap();
                 (DevInode(dev, ino), pos)
             }
             _ => {
@@ -427,17 +426,14 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
     use chrono::{Duration, Utc};
     use similar_asserts::assert_eq;
+    use std::io::Write;
     use tempfile::tempdir;
 
-    use super::{
-        Checkpoint, Checkpointer, CHECKPOINT_FILE_NAME,
-        TMP_FILE_NAME,
-    };
-    use crate::{FileFingerprint, FingerprintStrategy, Fingerprinter};
+    use super::{Checkpoint, Checkpointer, CHECKPOINT_FILE_NAME, TMP_FILE_NAME};
     use crate::fingerprinter::FINGERPRINT_CRC;
+    use crate::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 
     #[test]
     fn test_checkpointer_basics() {

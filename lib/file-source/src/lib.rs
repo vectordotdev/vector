@@ -5,13 +5,14 @@ mod file_server;
 mod file_watcher;
 pub mod paths_provider;
 
-pub use self::{
-    file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
+pub use self::file_server::{
+    calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown,
 };
 pub use file_source_common::{
-    buffer, checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
+    buffer,
+    checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
     internal_events::FileSourceInternalEvents,
+    FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
 };
 use vector_config::configurable_component;
 

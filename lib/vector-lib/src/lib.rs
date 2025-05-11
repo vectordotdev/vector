@@ -2,9 +2,9 @@ pub use codecs;
 pub use enrichment;
 #[cfg(feature = "file-source")]
 pub use file_source;
+pub use file_source_common;
 #[cfg(feature = "ifile-source")]
 pub use ifile_source;
-pub use file_source_common;
 #[cfg(feature = "api-client")]
 pub use vector_api_client as api_client;
 pub use vector_buffers as buffers;

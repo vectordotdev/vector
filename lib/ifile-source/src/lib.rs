@@ -11,9 +11,10 @@ pub use self::{
     paths_provider::{boxed::BoxedPathsProvider, notify::NotifyPathsProvider},
 };
 pub use file_source_common::{
-    buffer, checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
+    buffer,
+    checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
     internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents,
+    FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
 };
 use vector_config::configurable_component;
 

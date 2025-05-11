@@ -12,9 +12,7 @@ use tokio::runtime::Handle;
 use tracing::{debug, trace, warn};
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{
-    FilePosition, ReadFrom,
-};
+use crate::{FilePosition, ReadFrom};
 use file_source_common::buffer::read_until_with_max_size;
 use file_source_common::PortableFileExt;
 mod notify_watcher;
