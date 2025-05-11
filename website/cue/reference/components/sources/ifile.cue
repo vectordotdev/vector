@@ -441,13 +441,6 @@ components: sources: ifile: {
 		checkpointing: {
 			title: "Checkpointing"
 			body: """
-				Vector checkpoints the current read position after each
-				successful read. This ensures that Vector resumes where it left
-				off if restarted, preventing data from being read twice. The
-				checkpoint positions are stored in the data directory which is
-				specified via the global `data_dir` option, but can be overridden
-				via the `data_dir` option in the file source directly.
-
 				The `ifile` source introduces a new `checkpoint_interval` configuration option that
 				controls how frequently the current read position is saved to disk during normal operation.
 
