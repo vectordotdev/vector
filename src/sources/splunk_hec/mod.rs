@@ -13,6 +13,7 @@ use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{
     de::{Read as JsonRead, StrRead},
@@ -36,7 +37,6 @@ use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStre
 use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
-use warp::reject;
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -531,16 +531,30 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn lenient_json_content_type_check(
-    ) -> impl Filter<Extract = (), Error = Rejection> + Clone + Send + Sync + 'static {
-        warp::header::header::<HeaderValue>(CONTENT_TYPE.as_str())
-            .and_then(|value: HeaderValue| async move {
-                match value.to_str() {
-                    Ok(h) if h.to_lowercase().contains("application/json") => Ok(()),
-                    _ => Err(warp::Rejection::from(ApiError::UnsupportedEncoding)),
-                }
-            })
-            .untuple_one()
+    fn lenient_json_content_type_check<T>() -> impl Filter<Extract = (T,), Error = Rejection> + Clone
+    where
+        T: Send + DeserializeOwned + 'static,
+    {
+        warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
+            .and(warp::body::bytes())
+            .and_then(
+                |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
+                    let ok = ctype
+                        .as_ref()
+                        .and_then(|v| v.to_str().ok())
+                        .map(|h| h.to_ascii_lowercase().contains("application/json"))
+                        .unwrap_or(false);
+
+                    if !ok {
+                        return Err(warp::reject::custom(ApiError::UnsupportedContentType));
+                    }
+
+                    let value = serde_json::from_slice::<T>(&body)
+                        .map_err(|_| warp::reject::custom(ApiError::BadRequest))?;
+
+                    Ok(value)
+                },
+            )
     }
 
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
@@ -550,22 +564,17 @@ impl SplunkSource {
             .and(warp::path!("ack"))
             .and(self.authorization())
             .and(SplunkSource::required_channel())
-            .and(Self::lenient_json_content_type_check())
-            .and(warp::body::bytes())
-            .and_then(move |_, channel: String, body_bytes: Bytes| {
+            .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>())
+            .and_then(move |_, channel: String, req: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {
-                    // parse JSON, unit-variant BadRequest
-                    let req: HecAckStatusRequest = serde_json::from_slice(&body_bytes)
-                        .map_err(|_| reject::custom(ApiError::BadRequest))?;
-
                     if let Some(idx_ack) = idx_ack {
                         let acks = idx_ack
                             .get_acks_status_from_channel(channel, &req.acks)
                             .await?;
                         Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
                     } else {
-                        Err(reject::custom(ApiError::AckIsDisabled))
+                        Err(warp::reject::custom(ApiError::AckIsDisabled))
                     }
                 }
             })
@@ -1111,6 +1120,7 @@ pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
+    UnsupportedContentType,
     MissingChannel,
     NoData,
     InvalidDataFormat { event: usize },
@@ -1205,6 +1215,14 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     response_json(StatusCode::OK, body)
 }
 
+fn response_plain(code: StatusCode, msg: &'static str) -> Response {
+    warp::reply::with_status(
+        warp::reply::with_header(msg, http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        code,
+    )
+    .into_response()
+}
+
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
         emit!(SplunkHecRequestError { error });
@@ -1217,6 +1235,10 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 splunk_response::INVALID_AUTHORIZATION,
             ),
             ApiError::UnsupportedEncoding => empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE),
+            ApiError::UnsupportedContentType => response_plain(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "The request's content-type is not supported",
+            ),
             ApiError::MissingChannel => {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL)
             }
