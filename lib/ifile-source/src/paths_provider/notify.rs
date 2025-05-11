@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, trace, warn};
 
 use super::PathsProvider;
-use crate::IFileSourceInternalEvents;
+use crate::FileSourceInternalEvents;
 
 /// Metadata about a discovered file
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ struct FileMetadata {
 ///
 /// Uses filesystem notifications to discover files that match include patterns
 /// and don't match the exclude patterns, instead of continuously globbing.
-pub struct NotifyPathsProvider<E: IFileSourceInternalEvents + Clone> {
+pub struct NotifyPathsProvider<E: FileSourceInternalEvents + Clone> {
     /// Patterns to include
     include_patterns: Vec<String>,
     /// Patterns to exclude
@@ -45,7 +45,7 @@ pub struct NotifyPathsProvider<E: IFileSourceInternalEvents + Clone> {
     use_glob_fallback: bool,
 }
 
-impl<E: IFileSourceInternalEvents> NotifyPathsProvider<E> {
+impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
     /// Create a new NotifyPathsProvider
     pub fn new(
         include_patterns: &[PathBuf],
@@ -363,7 +363,7 @@ impl<E: IFileSourceInternalEvents> NotifyPathsProvider<E> {
     // The matches_patterns methods have been removed since they're not used
 }
 
-impl<E: IFileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
+impl<E: FileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
     fn clone(&self) -> Self {
         // Create a new instance with the same configuration
         // but without the watcher and event_rx
@@ -381,7 +381,7 @@ impl<E: IFileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
     }
 }
 
-impl<E: IFileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider
+impl<E: FileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider
     for NotifyPathsProvider<E>
 {
     type IntoIter = Vec<PathBuf>;

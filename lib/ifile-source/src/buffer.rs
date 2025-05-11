@@ -4,7 +4,7 @@ use bstr::Finder;
 use bytes::BytesMut;
 use tracing::warn;
 
-use crate::IFilePosition;
+use crate::FilePosition;
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///
@@ -31,7 +31,7 @@ use crate::IFilePosition;
 /// the overhead of setup dominates our benchmarks.
 pub fn read_until_with_max_size<R: BufRead + ?Sized>(
     reader: &mut R,
-    position: &mut IFilePosition,
+    position: &mut FilePosition,
     delim: &[u8],
     buf: &mut BytesMut,
     max_size: usize,

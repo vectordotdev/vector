@@ -19,27 +19,27 @@ use tracing::{debug, error, info, trace};
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
-    fingerprinter::{Fingerprinter, IFileFingerprint},
-    ifile_watcher::IFileWatcher,
+    fingerprinter::{Fingerprinter, FileFingerprint},
+    file_watcher::FileWatcher,
     paths_provider::PathsProvider,
-    IFilePosition, IFileSourceInternalEvents, ReadFrom,
+    FilePosition, FileSourceInternalEvents, ReadFrom,
 };
 
-/// `IFileServer` is a Source which schedules reads over files,
+/// `FileServer` is a Source which schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
-/// `IFileServer` uses a hybrid approach for file monitoring:
+/// `FileServer` uses a hybrid approach for file monitoring:
 /// 1. Active polling: For files that are actively being read
 /// 2. Passive watching: For idle files, using filesystem notifications via notify-rs/notify
 ///
-/// This approach allows `IFileServer` to efficiently monitor many files without
+/// This approach allows `FileServer` to efficiently monitor many files without
 /// holding open file handles for all of them, while still maintaining checkpoints
 /// in case files receive future writes.
 ///
-/// `IFileServer` is configured on a path to watch. The files do _not_ need to
-/// exist at startup. `IFileServer` will discover new files which match
+/// `FileServer` is configured on a path to watch. The files do _not_ need to
+/// exist at startup. `FileServer` will discover new files which match
 /// its path in at most 60 seconds.
-pub struct IFileServer<PP, E: IFileSourceInternalEvents>
+pub struct FileServer<PP, E: FileSourceInternalEvents>
 where
     PP: PathsProvider,
 {
@@ -61,23 +61,23 @@ where
     pub checkpoint_interval: Duration,
 }
 
-/// `IFileServer` as Source
+/// `FileServer` as Source
 ///
-/// The 'run' of `IFileServer` performs the cooperative scheduling of reads over
-/// `IFileServer`'s configured files. Much care has been taking to make this
+/// The 'run' of `FileServer` performs the cooperative scheduling of reads over
+/// `FileServer`'s configured files. Much care has been taking to make this
 /// scheduling 'fair', meaning busy files do not drown out quiet files or vice
 /// versa but there's no one perfect approach. Very fast files _will_ be lost if
-/// your system aggressively rolls log files. `IFileServer` will keep a file
+/// your system aggressively rolls log files. `FileServer` will keep a file
 /// handler open but should your system move so quickly that a file disappears
-/// before `IFileServer` is able to open it the contents will be lost. This should be a
+/// before `FileServer` is able to open it the contents will be lost. This should be a
 /// rare occurrence.
 ///
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.
-impl<PP, E> IFileServer<PP, E>
+impl<PP, E> FileServer<PP, E>
 where
     PP: PathsProvider,
-    E: IFileSourceInternalEvents,
+    E: FileSourceInternalEvents,
 {
     // The first `shutdown_data` signal here is to stop this file
     // server from outputting new data; the second
@@ -104,7 +104,7 @@ where
 
         let mut fingerprint_buffer = Vec::new();
 
-        let mut fp_map: IndexMap<IFileFingerprint, IFileWatcher> = Default::default();
+        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
         // We no longer need backoff_cap since we use a fixed backoff
         let mut lines = Vec::new();
@@ -499,8 +499,8 @@ where
     fn watch_new_file(
         &self,
         path: PathBuf,
-        file_id: IFileFingerprint,
-        fp_map: &mut IndexMap<IFileFingerprint, IFileWatcher>,
+        file_id: FileFingerprint,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
         lines: &mut Vec<Line>,
@@ -531,7 +531,7 @@ where
             fallback
         };
 
-        match IFileWatcher::new(
+        match FileWatcher::new(
             path.clone(),
             read_from,
             self.ignore_before,
@@ -582,7 +582,7 @@ async fn checkpoint_writer(
     checkpointer: Checkpointer,
     sleep_duration: Duration,
     mut shutdown: impl Future + Unpin,
-    emitter: impl IFileSourceInternalEvents,
+    emitter: impl FileSourceInternalEvents,
 ) -> Arc<Checkpointer> {
     let checkpointer = Arc::new(checkpointer);
     loop {
@@ -685,7 +685,7 @@ impl Default for TimingStats {
 pub struct Line {
     pub text: Bytes,
     pub filename: String,
-    pub file_id: IFileFingerprint,
-    pub start_offset: IFilePosition,
-    pub end_offset: IFilePosition,
+    pub file_id: FileFingerprint,
+    pub start_offset: FilePosition,
+    pub end_offset: FilePosition,
 }

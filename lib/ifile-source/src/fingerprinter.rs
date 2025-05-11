@@ -11,7 +11,7 @@ use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{metadata_ext::PortableFileExt, IFileSourceInternalEvents};
+use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
@@ -39,7 +39,7 @@ pub enum FingerprintStrategy {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
-pub enum IFileFingerprint {
+pub enum FileFingerprint {
     #[serde(rename = "checksum")]
     BytesChecksum(u64),
     #[serde(alias = "first_line_checksum")]
@@ -48,9 +48,9 @@ pub enum IFileFingerprint {
     Unknown(u64),
 }
 
-impl IFileFingerprint {
+impl FileFingerprint {
     pub fn as_legacy(&self) -> u64 {
-        use IFileFingerprint::*;
+        use FileFingerprint::*;
 
         match self {
             BytesChecksum(c) => *c,
@@ -66,9 +66,9 @@ impl IFileFingerprint {
     }
 }
 
-impl From<u64> for IFileFingerprint {
+impl From<u64> for FileFingerprint {
     fn from(c: u64) -> Self {
-        IFileFingerprint::Unknown(c)
+        FileFingerprint::Unknown(c)
     }
 }
 
@@ -166,8 +166,8 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<IFileFingerprint, io::Error> {
-        use IFileFingerprint::*;
+    ) -> Result<FileFingerprint, io::Error> {
+        use FileFingerprint::*;
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
@@ -202,8 +202,8 @@ impl Fingerprinter {
         path: &Path,
         buffer: &mut Vec<u8>,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
-        emitter: &impl IFileSourceInternalEvents,
-    ) -> Option<IFileFingerprint> {
+        emitter: &impl FileSourceInternalEvents,
+    ) -> Option<FileFingerprint> {
         metadata(path)
             .and_then(|metadata| {
                 if metadata.is_dir() {
@@ -245,7 +245,7 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<IFileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 bytes,
@@ -257,7 +257,7 @@ impl Fingerprinter {
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
                 fp.read_exact(&mut buffer[..bytes])?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
-                Ok(Some(IFileFingerprint::BytesChecksum(fingerprint)))
+                Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),
         }
@@ -269,7 +269,7 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<IFileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -285,7 +285,7 @@ impl Fingerprinter {
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
-                Ok(Some(IFileFingerprint::FirstLinesChecksum(fingerprint)))
+                Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
         }
@@ -296,7 +296,7 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<IFileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -312,7 +312,7 @@ impl Fingerprinter {
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
-                Ok(Some(IFileFingerprint::FirstLinesChecksum(fingerprint)))
+                Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
         }
@@ -395,7 +395,7 @@ mod test {
     use flate2::write::GzEncoder;
     use tempfile::{tempdir, TempDir};
 
-    use super::{FingerprintStrategy, Fingerprinter, IFileSourceInternalEvents};
+    use super::{FingerprintStrategy, Fingerprinter, FileSourceInternalEvents};
 
     fn gzip(data: &mut [u8]) -> Vec<u8> {
         let mut buffer = vec![];
@@ -779,7 +779,7 @@ mod test {
     #[derive(Clone)]
     struct NoErrors;
 
-    impl IFileSourceInternalEvents for NoErrors {
+    impl FileSourceInternalEvents for NoErrors {
         fn emit_file_added(&self, _: &Path) {}
 
         fn emit_file_resumed(&self, _: &Path, _: u64) {}

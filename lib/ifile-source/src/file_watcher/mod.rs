@@ -13,7 +13,7 @@ use tracing::{debug, trace, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
-    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, IFilePosition, ReadFrom,
+    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
 };
 mod notify_watcher;
 #[cfg(test)]
@@ -28,7 +28,7 @@ use notify_watcher::NotifyWatcher;
 /// the file that it was read from.
 #[derive(Debug)]
 pub struct RawLine {
-    pub offset: IFilePosition,
+    pub offset: FilePosition,
     pub bytes: Bytes,
 }
 
@@ -42,20 +42,20 @@ pub enum WatcherState {
     Notify,
 }
 
-/// The `IFileWatcher` struct defines the state machine which reads
+/// The `FileWatcher` struct defines the state machine which reads
 /// from a file path, transparently handling file rollovers as is common for logs.
 ///
-/// The `IFileWatcher` uses filesystem notifications exclusively for all files,
+/// The `FileWatcher` uses filesystem notifications exclusively for all files,
 /// without keeping any files open. Files are only opened when needed for reading,
 /// then closed immediately.
 ///
-/// The `IFileWatcher` is expected to live for the lifetime of the file
-/// path. `IFileServer` is responsible for clearing away `IFileWatchers` which no
+/// The `FileWatcher` is expected to live for the lifetime of the file
+/// path. `FileServer` is responsible for clearing away `FileWatchers` which no
 /// longer exist.
-pub struct IFileWatcher {
+pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    file_position: IFilePosition,
+    file_position: FilePosition,
     devno: u64,
     inode: u64,
     is_dead: bool,
@@ -72,11 +72,11 @@ pub struct IFileWatcher {
     startup_lines: Vec<RawLine>,
 }
 
-impl IFileWatcher {
-    /// Create a new `IFileWatcher`
+impl FileWatcher {
+    /// Create a new `FileWatcher`
     ///
-    /// The input path will be used by `IFileWatcher` to prime its state
-    /// machine. A `IFileWatcher` tracks _only one_ file. This function returns
+    /// The input path will be used by `FileWatcher` to prime its state
+    /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by the current process.
     pub fn new(
         path: PathBuf,
@@ -84,7 +84,7 @@ impl IFileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
-    ) -> Result<IFileWatcher, io::Error> {
+    ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
         let metadata = f.metadata()?;
@@ -102,7 +102,7 @@ impl IFileWatcher {
         let gzipped = is_gzipped(&mut reader)?;
 
         // Determine the actual position at which we should start reading
-        let (_reader, file_position): (Box<dyn BufRead>, IFilePosition) =
+        let (_reader, file_position): (Box<dyn BufRead>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -192,7 +192,7 @@ impl IFileWatcher {
         // This is especially important for files with checkpoints
 
         // Create the FileWatcher instance
-        let mut fw = IFileWatcher {
+        let mut fw = FileWatcher {
             path: path.clone(),
             findable: true,
             file_position,
@@ -301,7 +301,7 @@ impl IFileWatcher {
         self.is_dead
     }
 
-    pub fn get_file_position(&self) -> IFilePosition {
+    pub fn get_file_position(&self) -> FilePosition {
         self.file_position
     }
 

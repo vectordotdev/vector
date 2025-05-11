@@ -13,7 +13,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::ifile_source::{
     calculate_ignore_before, paths_provider::glob::MatchOptions, BoxedPathsProvider, Checkpointer,
-    FingerprintStrategy, Fingerprinter, IFileFingerprint, IFileServer, Line, NotifyPathsProvider,
+    FingerprintStrategy, Fingerprinter, FileFingerprint, FileServer, Line, NotifyPathsProvider,
     ReadFrom, ReadFromConfig,
 };
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -32,7 +32,7 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        ifile::{IFileInternalMetricsConfig, IFileSourceInternalEventsEmitter},
+        ifile::{FileInternalMetricsConfig, FileSourceInternalEventsEmitter},
         FileBytesReceived, FileEventsReceived, FileOpen, StreamClosedError,
     },
     line_agg::{self, LineAgg},
@@ -59,7 +59,7 @@ enum BuildError {
 #[configurable_component(source("ifile", "Collect logs from files with improved implementation."))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct IFileConfig {
+pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     #[configurable(metadata(docs::examples = "/var/log/**/*.log"))]
     pub include: Vec<PathBuf>,
@@ -238,7 +238,7 @@ pub struct IFileConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    internal_metrics: IFileInternalMetricsConfig,
+    internal_metrics: FileInternalMetricsConfig,
 
     /// How long to keep an open handle to a rotated log file.
     /// The default value represents "no limit"
@@ -374,11 +374,11 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
-    pub(crate) file_id: IFileFingerprint,
+    pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
 
-impl Default for IFileConfig {
+impl Default for FileConfig {
     fn default() -> Self {
         Self {
             include: vec![PathBuf::from("/var/log/**/*.log")],
@@ -411,11 +411,11 @@ impl Default for IFileConfig {
     }
 }
 
-impl_generate_config_from_default!(IFileConfig);
+impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "ifile")]
-impl SourceConfig for IFileConfig {
+impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
@@ -505,7 +505,7 @@ impl SourceConfig for IFileConfig {
 }
 
 pub fn ifile_source(
-    config: &IFileConfig,
+    config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
@@ -531,7 +531,7 @@ pub fn ifile_source(
         Some(config.read_from),
     );
 
-    let emitter = IFileSourceInternalEventsEmitter {
+    let emitter = FileSourceInternalEventsEmitter {
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
@@ -558,7 +558,7 @@ pub fn ifile_source(
     };
 
     let checkpointer = Checkpointer::new(&data_dir);
-    let file_server = IFileServer {
+    let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
         ignore_checkpoints,
@@ -800,7 +800,7 @@ fn create_event(
         &mut event,
         log_schema().source_type_key(),
         path!("source_type"),
-        Bytes::from_static(IFileConfig::NAME.as_bytes()),
+        Bytes::from_static(FileConfig::NAME.as_bytes()),
     );
     log_namespace.insert_vector_metadata(
         &mut event,
@@ -813,7 +813,7 @@ fn create_event(
     // `meta.host_key` is already `unwrap_or_else`ed so we can just pass it in.
     if let Some(hostname) = &meta.hostname {
         log_namespace.insert_source_metadata(
-            IFileConfig::NAME,
+            FileConfig::NAME,
             &mut event,
             legacy_host_key,
             path!("host"),
@@ -823,7 +823,7 @@ fn create_event(
 
     let legacy_offset_key = meta.offset_key.as_ref().map(LegacyKey::Overwrite);
     log_namespace.insert_source_metadata(
-        IFileConfig::NAME,
+        FileConfig::NAME,
         &mut event,
         legacy_offset_key,
         path!("offset"),
@@ -832,7 +832,7 @@ fn create_event(
 
     let legacy_file_key = meta.file_key.as_ref().map(LegacyKey::Overwrite);
     log_namespace.insert_source_metadata(
-        IFileConfig::NAME,
+        FileConfig::NAME,
         &mut event,
         legacy_file_key,
         path!("path"),
@@ -880,11 +880,11 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<IFileConfig>();
+        crate::test_util::test_generate_config::<FileConfig>();
     }
 
-    fn test_default_file_config(dir: &tempfile::TempDir) -> ifile::IFileConfig {
-        ifile::IFileConfig {
+    fn test_default_file_config(dir: &tempfile::TempDir) -> ifile::FileConfig {
+        ifile::FileConfig {
             fingerprint: ifile::FingerprintConfig::Checksum {
                 bytes: Some(8),
                 ignored_header_bytes: 0,
@@ -892,7 +892,7 @@ mod tests {
             },
             data_dir: Some(dir.path().to_path_buf()),
             checkpoint_interval: Duration::from_millis(100),
-            internal_metrics: ifile::IFileInternalMetricsConfig {
+            internal_metrics: ifile::FileInternalMetricsConfig {
                 include_file_tag: true,
             },
             ..Default::default()
@@ -905,7 +905,7 @@ mod tests {
 
     #[test]
     fn parse_config() {
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
             include = [ "/var/log/**/*.log" ]
             file_key = "file"
@@ -915,7 +915,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        assert_eq!(config, IFileConfig::default());
+        assert_eq!(config, FileConfig::default());
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
@@ -925,7 +925,7 @@ mod tests {
             }
         );
 
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
         include = [ "/var/log/**/*.log" ]
         [fingerprint]
@@ -935,7 +935,7 @@ mod tests {
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
         include = [ "/var/log/**/*.log" ]
         [fingerprint]
@@ -954,7 +954,7 @@ mod tests {
             }
         );
 
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
         include = [ "/var/log/**/*.log" ]
         [encoding]
@@ -964,7 +964,7 @@ mod tests {
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
         include = [ "/var/log/**/*.log" ]
         read_from = "beginning"
@@ -973,7 +973,7 @@ mod tests {
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
-        let config: IFileConfig = toml::from_str(
+        let config: FileConfig = toml::from_str(
             r#"
         include = [ "/var/log/**/*.log" ]
         read_from = "end"
@@ -1005,7 +1005,7 @@ mod tests {
 
     #[test]
     fn output_schema_definition_vector_namespace() {
-        let definitions = IFileConfig::default()
+        let definitions = FileConfig::default()
             .outputs(LogNamespace::Vector)
             .remove(0)
             .schema_definition(true);
@@ -1026,17 +1026,17 @@ mod tests {
                         None
                     )
                     .with_metadata_field(
-                        &owned_value_path!(IFileConfig::NAME, "host"),
+                        &owned_value_path!(FileConfig::NAME, "host"),
                         Kind::bytes().or_undefined(),
                         Some("host")
                     )
                     .with_metadata_field(
-                        &owned_value_path!(IFileConfig::NAME, "offset"),
+                        &owned_value_path!(FileConfig::NAME, "offset"),
                         Kind::integer(),
                         None
                     )
                     .with_metadata_field(
-                        &owned_value_path!(IFileConfig::NAME, "path"),
+                        &owned_value_path!(FileConfig::NAME, "path"),
                         Kind::bytes(),
                         None
                     )
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn output_schema_definition_legacy_namespace() {
-        let definitions = IFileConfig::default()
+        let definitions = FileConfig::default()
             .outputs(LogNamespace::Legacy)
             .remove(0)
             .schema_definition(true);
@@ -1094,7 +1094,7 @@ mod tests {
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["offset"], 0.into());
         assert_eq!(*log.get_message().unwrap(), "hello world".into());
-        assert_eq!(*log.get_source_type().unwrap(), IFileConfig::NAME.into());
+        assert_eq!(*log.get_source_type().unwrap(), FileConfig::NAME.into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1116,7 +1116,7 @@ mod tests {
         assert_eq!(log["hostname"], "Some.Machine".into());
         assert_eq!(log["off"], 0.into());
         assert_eq!(*log.get_message().unwrap(), "hello world".into());
-        assert_eq!(*log.get_source_type().unwrap(), IFileConfig::NAME.into());
+        assert_eq!(*log.get_source_type().unwrap(), FileConfig::NAME.into());
         assert!(log[log_schema().timestamp_key().unwrap().to_string()].is_timestamp());
     }
 
@@ -1141,7 +1141,7 @@ mod tests {
                 .value()
                 .get(path!("vector", "source_type"))
                 .unwrap(),
-            &value!(IFileConfig::NAME)
+            &value!(FileConfig::NAME)
         );
         assert!(log
             .metadata()
@@ -1153,21 +1153,21 @@ mod tests {
         assert_eq!(
             log.metadata()
                 .value()
-                .get(path!(IFileConfig::NAME, "host"))
+                .get(path!(FileConfig::NAME, "host"))
                 .unwrap(),
             &value!("Some.Machine")
         );
         assert_eq!(
             log.metadata()
                 .value()
-                .get(path!(IFileConfig::NAME, "offset"))
+                .get(path!(FileConfig::NAME, "offset"))
                 .unwrap(),
             &value!(0)
         );
         assert_eq!(
             log.metadata()
                 .value()
-                .get(path!(IFileConfig::NAME, "path"))
+                .get(path!(FileConfig::NAME, "path"))
                 .unwrap(),
             &value!("some_file.rs")
         );
@@ -1178,7 +1178,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1261,7 +1261,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1315,7 +1315,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1423,7 +1423,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1557,7 +1557,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
             exclude: vec![dir.path().join("a.*.txt")],
             ..test_default_file_config(&dir)
@@ -1636,7 +1636,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("a//b/*.log.*")],
             exclude: vec![dir.path().join("a//b/test.log.*")],
             ..test_default_file_config(&dir)
@@ -1709,7 +1709,7 @@ mod tests {
         // Default
         {
             let dir = tempdir().unwrap();
-            let config = ifile::IFileConfig {
+            let config = ifile::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
@@ -1736,7 +1736,7 @@ mod tests {
         // Custom
         {
             let dir = tempdir().unwrap();
-            let config = ifile::IFileConfig {
+            let config = ifile::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: OptionalValuePath::from(owned_value_path!("source")),
                 ..test_default_file_config(&dir)
@@ -1764,7 +1764,7 @@ mod tests {
         // Hidden
         {
             let dir = tempdir().unwrap();
-            let config = ifile::IFileConfig {
+            let config = ifile::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
@@ -1816,7 +1816,7 @@ mod tests {
     #[cfg(target_os = "linux")] // see #7988
     async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1852,7 +1852,7 @@ mod tests {
         }
         // Restart server, read files from beginning.
         {
-            let config = ifile::IFileConfig {
+            let config = ifile::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
                 read_from: ifile::ReadFromConfig::Beginning,
@@ -1876,7 +1876,7 @@ mod tests {
     #[tokio::test]
     async fn file_start_position_server_restart_unfinalized() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1921,7 +1921,7 @@ mod tests {
     #[tokio::test]
     async fn file_duplicate_processing_after_restart() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1983,7 +1983,7 @@ mod tests {
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -2035,7 +2035,7 @@ mod tests {
         };
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_older_secs: Some(5),
             ..test_default_file_config(&dir)
@@ -2108,7 +2108,7 @@ mod tests {
     #[tokio::test]
     async fn file_max_line_bytes() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             max_line_bytes: 10,
             ..test_default_file_config(&dir)
@@ -2149,7 +2149,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_line_aggregation_legacy() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             message_start_indicator: Some("INFO".into()),
             multi_line_timeout: 25, // less than 50 in sleep()
@@ -2204,7 +2204,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_line_aggregation() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             multiline: Some(MultilineConfig {
                 start_pattern: "INFO".to_owned(),
@@ -2263,7 +2263,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_line_checkpointing() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             offset_key: Some(OptionalValuePath::from(owned_value_path!("offset"))),
             multiline: Some(MultilineConfig {
@@ -2317,7 +2317,7 @@ mod tests {
     #[tokio::test]
     async fn test_fair_reads() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
             oldest_first: false,
@@ -2386,7 +2386,7 @@ mod tests {
     #[tokio::test]
     async fn test_oldest_first() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
             oldest_first: true,
@@ -2440,7 +2440,7 @@ mod tests {
     #[tokio::test]
     async fn test_split_reads() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
@@ -2481,7 +2481,7 @@ mod tests {
     #[tokio::test]
     async fn test_gzipped_file() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![PathBuf::from("tests/data/gzipped.log")],
             // TODO: remove this once files are fingerprinted after decompression
             //
@@ -2544,7 +2544,7 @@ mod tests {
     #[tokio::test]
     async fn test_non_utf8_encoded_file() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![PathBuf::from("tests/data/utf-16le.log")],
             encoding: Some(EncodingConfig { charset: UTF_16LE }),
             ..test_default_file_config(&dir)
@@ -2576,7 +2576,7 @@ mod tests {
     #[tokio::test]
     async fn test_non_default_line_delimiter() {
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             line_delimiter: "\r\n".to_string(),
             ..test_default_file_config(&dir)
@@ -2616,7 +2616,7 @@ mod tests {
         let remove_after_secs = 1;
 
         let dir = tempdir().unwrap();
-        let config = ifile::IFileConfig {
+        let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             remove_after_secs: Some(remove_after_secs),
             ..test_default_file_config(&dir)
@@ -2663,7 +2663,7 @@ mod tests {
     use AckingMode::*;
 
     async fn run_ifile_source(
-        config: &ifile::IFileConfig,
+        config: &ifile::FileConfig,
         wait_shutdown: bool,
         acking_mode: AckingMode,
         log_namespace: LogNamespace,

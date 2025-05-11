@@ -10,21 +10,21 @@ use tokio::task::spawn_blocking;
 use tracing::error;
 
 use super::PathsProvider;
-use crate::IFileSourceInternalEvents;
+use crate::FileSourceInternalEvents;
 
 /// A glob-based path provider.
 ///
 /// Provides the paths to the files on the file system that match include
 /// patterns and don't match the exclude patterns.
 #[derive(Clone)]
-pub struct Glob<E: IFileSourceInternalEvents + Clone> {
+pub struct Glob<E: FileSourceInternalEvents + Clone> {
     include_patterns: Vec<String>,
     exclude_patterns: Vec<Pattern>,
     glob_match_options: MatchOptions,
     emitter: E,
 }
 
-impl<E: IFileSourceInternalEvents> Glob<E> {
+impl<E: FileSourceInternalEvents> Glob<E> {
     /// Create a new [`Glob`].
     ///
     /// Returns `None` if patterns aren't valid.
@@ -53,7 +53,7 @@ impl<E: IFileSourceInternalEvents> Glob<E> {
     }
 }
 
-impl<E: IFileSourceInternalEvents + Clone + Send + 'static> PathsProvider for Glob<E> {
+impl<E: FileSourceInternalEvents + Clone + Send + 'static> PathsProvider for Glob<E> {
     type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {

@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::{
-    fingerprinter::{Fingerprinter, IFileFingerprint},
-    IFilePosition,
+    fingerprinter::{Fingerprinter, FileFingerprint},
+    FilePosition,
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
@@ -35,8 +35,8 @@ enum State {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
-    fingerprint: IFileFingerprint,
-    position: IFilePosition,
+    fingerprint: FileFingerprint,
+    position: FilePosition,
     modified: DateTime<Utc>,
 }
 
@@ -53,27 +53,27 @@ pub struct Checkpointer {
 /// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
-    checkpoints: DashMap<IFileFingerprint, IFilePosition>,
-    modified_times: DashMap<IFileFingerprint, DateTime<Utc>>,
-    removed_times: DashMap<IFileFingerprint, DateTime<Utc>>,
+    checkpoints: DashMap<FileFingerprint, FilePosition>,
+    modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
 }
 
 impl CheckpointsView {
-    pub fn update(&self, fng: IFileFingerprint, pos: IFilePosition) {
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.insert(fng, pos);
         self.modified_times.insert(fng, Utc::now());
         self.removed_times.remove(&fng);
     }
 
-    pub fn get(&self, fng: IFileFingerprint) -> Option<IFilePosition> {
+    pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
 
-    pub fn set_dead(&self, fng: IFileFingerprint) {
+    pub fn set_dead(&self, fng: FileFingerprint) {
         self.removed_times.insert(fng, Utc::now());
     }
 
-    pub fn update_key(&self, old: IFileFingerprint, new: IFileFingerprint) {
+    pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
         if let Some((_, value)) = self.checkpoints.remove(&old) {
             self.checkpoints.insert(new, value);
         }
@@ -90,7 +90,7 @@ impl CheckpointsView {
     pub fn contains_bytes_checksums(&self) -> bool {
         self.checkpoints
             .iter()
-            .any(|entry| matches!(entry.key(), IFileFingerprint::BytesChecksum(_)))
+            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
     }
 
     pub fn remove_expired(&self) {
@@ -108,7 +108,7 @@ impl CheckpointsView {
                 duration >= chrono::Duration::seconds(60)
             })
             .map(|entry| *entry.key())
-            .collect::<Vec<IFileFingerprint>>();
+            .collect::<Vec<FileFingerprint>>();
 
         for fng in to_remove {
             self.checkpoints.remove(&fng);
@@ -164,7 +164,7 @@ impl CheckpointsView {
     fn maybe_upgrade(
         &self,
         path: &Path,
-        fng: IFileFingerprint,
+        fng: FileFingerprint,
         fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
@@ -174,7 +174,7 @@ impl CheckpointsView {
 
         if let Some((_, pos)) = self
             .checkpoints
-            .remove(&IFileFingerprint::Unknown(fng.as_legacy()))
+            .remove(&FileFingerprint::Unknown(fng.as_legacy()))
         {
             self.update(fng, pos);
         }
@@ -225,8 +225,8 @@ impl Checkpointer {
     /// falls outside of the hex range used by the legacy implementation. This
     /// allows them to be differentiated by simply peeking at the first byte.
     #[cfg(test)]
-    fn encode(&self, fng: IFileFingerprint, pos: IFilePosition) -> PathBuf {
-        use IFileFingerprint::*;
+    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
+        use FileFingerprint::*;
 
         let path = match fng {
             BytesChecksum(c) => format!("g{:x}.{}", c, pos),
@@ -244,39 +244,39 @@ impl Checkpointer {
     /// format. Because hex encoding only allows [0-9a-f], we can use any
     /// character outside of that range as a magic byte identifier for the newer
     /// formats.
-    fn decode(&self, path: &Path) -> (IFileFingerprint, IFilePosition) {
-        use IFileFingerprint::*;
+    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
+        use FileFingerprint::*;
 
         let file_name = &path.file_name().unwrap().to_string_lossy();
         match file_name.chars().next().expect("empty file name") {
             'g' => {
-                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], IFilePosition).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], FilePosition).unwrap();
                 (BytesChecksum(c), pos)
             }
             'h' => {
-                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], IFilePosition).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
                 (FirstLinesChecksum(c), pos)
             }
             'i' => {
                 let (dev, ino, pos) =
-                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], IFilePosition)
+                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], FilePosition)
                         .unwrap();
                 (DevInode(dev, ino), pos)
             }
             _ => {
-                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], IFilePosition).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
                 (Unknown(c), pos)
             }
         }
     }
 
     #[cfg(test)]
-    pub fn update_checkpoint(&mut self, fng: IFileFingerprint, pos: IFilePosition) {
+    pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.update(fng, pos);
     }
 
     #[cfg(test)]
-    pub fn get_checkpoint(&self, fng: IFileFingerprint) -> Option<IFilePosition> {
+    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(fng)
     }
 
@@ -285,7 +285,7 @@ impl Checkpointer {
     pub fn maybe_upgrade(
         &mut self,
         path: &Path,
-        fresh: IFileFingerprint,
+        fresh: FileFingerprint,
         fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
@@ -432,20 +432,20 @@ mod test {
 
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
-        Checkpoint, Checkpointer, IFileFingerprint, IFilePosition, CHECKPOINT_FILE_NAME,
+        Checkpoint, Checkpointer, FileFingerprint, FilePosition, CHECKPOINT_FILE_NAME,
         TMP_FILE_NAME,
     };
 
     #[test]
     fn test_checkpointer_basics() {
         let fingerprints = vec![
-            IFileFingerprint::DevInode(1, 2),
-            IFileFingerprint::BytesChecksum(3456),
-            IFileFingerprint::FirstLinesChecksum(78910),
-            IFileFingerprint::Unknown(1337),
+            FileFingerprint::DevInode(1, 2),
+            FileFingerprint::BytesChecksum(3456),
+            FileFingerprint::FirstLinesChecksum(78910),
+            FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
-            let position: IFilePosition = 1234;
+            let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             let mut chkptr = Checkpointer::new(data_dir.path());
             assert_eq!(
@@ -460,24 +460,24 @@ mod test {
     #[test]
     fn test_checkpointer_ignore_before() {
         let newer = (
-            IFileFingerprint::DevInode(1, 2),
+            FileFingerprint::DevInode(1, 2),
             Utc::now() - Duration::seconds(5),
         );
         let newish = (
-            IFileFingerprint::BytesChecksum(3456),
+            FileFingerprint::BytesChecksum(3456),
             Utc::now() - Duration::seconds(10),
         );
         let oldish = (
-            IFileFingerprint::FirstLinesChecksum(78910),
+            FileFingerprint::FirstLinesChecksum(78910),
             Utc::now() - Duration::seconds(15),
         );
         let older = (
-            IFileFingerprint::Unknown(1337),
+            FileFingerprint::Unknown(1337),
             Utc::now() - Duration::seconds(20),
         );
         let ignore_before = Some(Utc::now() - Duration::seconds(12));
 
-        let position: IFilePosition = 1234;
+        let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
 
         // load and persist the checkpoints
@@ -510,13 +510,13 @@ mod test {
     #[test]
     fn test_checkpointer_restart() {
         let fingerprints = vec![
-            IFileFingerprint::DevInode(1, 2),
-            IFileFingerprint::BytesChecksum(3456),
-            IFileFingerprint::FirstLinesChecksum(78910),
-            IFileFingerprint::Unknown(1337),
+            FileFingerprint::DevInode(1, 2),
+            FileFingerprint::BytesChecksum(3456),
+            FileFingerprint::FirstLinesChecksum(78910),
+            FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
-            let position: IFilePosition = 1234;
+            let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             {
                 let mut chkptr = Checkpointer::new(data_dir.path());
@@ -540,9 +540,9 @@ mod test {
         let data = "hello\n";
         std::fs::write(&path, data).unwrap();
 
-        let new_fingerprint = IFileFingerprint::DevInode(1, 2);
-        let old_fingerprint = IFileFingerprint::Unknown(new_fingerprint.as_legacy());
-        let position: IFilePosition = 1234;
+        let new_fingerprint = FileFingerprint::DevInode(1, 2);
+        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy());
+        let position: FilePosition = 1234;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::DevInode,
             max_line_length: 1000,
@@ -577,9 +577,9 @@ mod test {
         let data = "hello\n";
         std::fs::write(&path, data).unwrap();
 
-        let old_fingerprint = IFileFingerprint::FirstLinesChecksum(18057733963141331840);
-        let new_fingerprint = IFileFingerprint::FirstLinesChecksum(17791311590754645022);
-        let position: IFilePosition = 6;
+        let old_fingerprint = FileFingerprint::FirstLinesChecksum(18057733963141331840);
+        let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
+        let position: FilePosition = 6;
 
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -618,9 +618,9 @@ mod test {
         let data = "hello\n";
         std::fs::write(&path, data).unwrap();
 
-        let old_fingerprint = IFileFingerprint::FirstLinesChecksum(17791311590754645022);
-        let new_fingerprint = IFileFingerprint::FirstLinesChecksum(11081174131906673079);
-        let position: IFilePosition = 6;
+        let old_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
+        let new_fingerprint = FileFingerprint::FirstLinesChecksum(11081174131906673079);
+        let position: FilePosition = 6;
 
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -654,8 +654,8 @@ mod test {
 
     #[test]
     fn test_checkpointer_file_upgrades() {
-        let fingerprint = IFileFingerprint::DevInode(1, 2);
-        let position: IFilePosition = 1234;
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: FilePosition = 1234;
 
         let data_dir = tempdir().unwrap();
 
@@ -699,10 +699,10 @@ mod test {
     fn test_checkpointer_expiration() {
         let cases = vec![
             // (checkpoint, position, seconds since removed)
-            (IFileFingerprint::BytesChecksum(123), 0, 30),
-            (IFileFingerprint::BytesChecksum(456), 1, 60),
-            (IFileFingerprint::BytesChecksum(789), 2, 90),
-            (IFileFingerprint::BytesChecksum(101112), 3, 120),
+            (FileFingerprint::BytesChecksum(123), 0, 30),
+            (FileFingerprint::BytesChecksum(456), 1, 60),
+            (FileFingerprint::BytesChecksum(789), 2, 90),
+            (FileFingerprint::BytesChecksum(101112), 3, 120),
         ];
 
         let data_dir = tempdir().unwrap();
@@ -762,7 +762,7 @@ mod test {
 
         // make sure each is of the expected type and that the inner values are not the same
         match (old, new) {
-            (IFileFingerprint::BytesChecksum(old), IFileFingerprint::FirstLinesChecksum(new)) => {
+            (FileFingerprint::BytesChecksum(old), FileFingerprint::FirstLinesChecksum(new)) => {
                 assert_ne!(old, new)
             }
             _ => panic!("unexpected checksum types"),
@@ -787,26 +787,26 @@ mod test {
     fn test_checkpointer_serialization() {
         let fingerprints = vec![
             (
-                IFileFingerprint::DevInode(1, 2),
+                FileFingerprint::DevInode(1, 2),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"dev_inode":[1,2]},"position":1234}]}"#,
             ),
             (
-                IFileFingerprint::BytesChecksum(3456),
+                FileFingerprint::BytesChecksum(3456),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"checksum":3456},"position":1234}]}"#,
             ),
             (
-                IFileFingerprint::FirstLinesChecksum(78910),
+                FileFingerprint::FirstLinesChecksum(78910),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"first_lines_checksum":78910},"position":1234}]}"#,
             ),
             (
-                IFileFingerprint::Unknown(1337),
+                FileFingerprint::Unknown(1337),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"unknown":1337},"position":1234}]}"#,
             ),
         ];
         for (fingerprint, expected) in fingerprints {
             let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
 
-            let position: IFilePosition = 1234;
+            let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             let mut chkptr = Checkpointer::new(data_dir.path());
 
@@ -864,11 +864,11 @@ mod test {
 }
         "#;
         let fingerprints = vec![
-            IFileFingerprint::DevInode(1, 2),
-            IFileFingerprint::BytesChecksum(3456),
-            IFileFingerprint::FirstLinesChecksum(1234),
-            IFileFingerprint::FirstLinesChecksum(78910),
-            IFileFingerprint::Unknown(1337),
+            FileFingerprint::DevInode(1, 2),
+            FileFingerprint::BytesChecksum(3456),
+            FileFingerprint::FirstLinesChecksum(1234),
+            FileFingerprint::FirstLinesChecksum(78910),
+            FileFingerprint::Unknown(1337),
         ];
 
         let data_dir = tempdir().unwrap();

@@ -14,7 +14,7 @@ use vector_lib::internal_event::{error_stage, error_type};
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
-pub struct IFileInternalMetricsConfig {
+pub struct FileInternalMetricsConfig {
     /// Whether or not to include the "file" tag on the component's corresponding internal metrics.
     ///
     /// This is useful for distinguishing between different files while monitoring. However, the tag's
@@ -107,7 +107,7 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use metrics::counter;
-    use vector_lib::ifile_source::IFileSourceInternalEvents;
+    use vector_lib::ifile_source::FileSourceInternalEvents;
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -497,11 +497,11 @@ mod source {
     }
 
     #[derive(Clone)]
-    pub struct IFileSourceInternalEventsEmitter {
+    pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
     }
 
-    impl IFileSourceInternalEvents for IFileSourceInternalEventsEmitter {
+    impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_added(&self, file: &Path) {
             emit!(FileAdded {
                 file,

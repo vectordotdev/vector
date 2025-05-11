@@ -2,7 +2,7 @@ use std::{io::Error, path::Path, time::Duration};
 
 /// Every internal event in this crate has a corresponding
 /// method in this trait which should emit the event.
-pub trait IFileSourceInternalEvents: Send + Sync + Clone + 'static {
+pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_file_added(&self, path: &Path);
 
     fn emit_file_resumed(&self, path: &Path, file_position: u64);
