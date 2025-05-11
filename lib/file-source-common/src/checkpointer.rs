@@ -15,6 +15,7 @@ use crate::FileFingerprint;
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
+const EXPIRATION_GRACE_DURATION: chrono::Duration = chrono::Duration::seconds(60);
 
 /// This enum represents the file format of checkpoints persisted to disk. Right
 /// now there is only one variant, but any incompatible changes will require and
@@ -102,7 +103,7 @@ impl CheckpointsView {
             .filter(|entry| {
                 let ts = entry.value();
                 let duration = now - *ts;
-                duration >= chrono::Duration::seconds(60)
+                duration >= EXPIRATION_GRACE_DURATION
             })
             .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
