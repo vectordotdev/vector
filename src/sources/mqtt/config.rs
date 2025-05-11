@@ -7,6 +7,7 @@ use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    lookup::lookup_v2::OptionalValuePath,
     lookup::owned_value_path,
     tls::MaybeTlsSettings,
 };
@@ -53,10 +54,23 @@ pub struct MqttSourceConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    /// Overrides the name of the log field used to add the topic to each event.
+    ///
+    /// The value is the topic from which the MQTT message was published to.
+    ///
+    /// By default, `"topic"` is used.
+    #[serde(default = "default_topic_key")]
+    #[configurable(metadata(docs::examples = "topic"))]
+    pub topic_key: OptionalValuePath,
 }
 
 fn default_topic() -> String {
     "vector".to_owned()
+}
+
+fn default_topic_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("topic"))
 }
 
 #[async_trait::async_trait]
@@ -71,12 +85,7 @@ impl SourceConfig for MqttSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(
-            connector.clone(),
-            decoder,
-            log_namespace,
-            self.topic.clone(),
-        )?;
+        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
         Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
     }
 
@@ -123,6 +132,7 @@ impl MqttSourceConfig {
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+
         options.set_clean_session(false);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {

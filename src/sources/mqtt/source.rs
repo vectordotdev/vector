@@ -2,23 +2,26 @@ use itertools::Itertools;
 use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::EventsReceived;
 
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
-
 use crate::{
     codecs::Decoder,
     common::mqtt::MqttConnector,
     event::BatchNotifier,
+    event::Event,
     internal_events::{EndpointBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
+    sources::mqtt::MqttSourceConfig,
     sources::util,
     SourceSender,
 };
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
+use vector_lib::config::LegacyKey;
+use vector_lib::lookup::path;
 
 pub struct MqttSource {
     connector: MqttConnector,
     decoder: Decoder,
     log_namespace: LogNamespace,
-    topic: String,
+    config: MqttSourceConfig,
 }
 
 impl MqttSource {
@@ -26,13 +29,13 @@ impl MqttSource {
         connector: MqttConnector,
         decoder: Decoder,
         log_namespace: LogNamespace,
-        topic: String,
+        config: MqttSourceConfig,
     ) -> crate::Result<Self> {
         Ok(Self {
             connector,
             decoder,
             log_namespace,
-            topic,
+            config,
         })
     }
 
@@ -40,7 +43,7 @@ impl MqttSource {
         let (client, mut connection) = self.connector.connect();
 
         client
-            .subscribe(&self.topic, QoS::AtLeastOnce)
+            .subscribe(&self.config.topic, QoS::AtLeastOnce)
             .await
             .map_err(|_| ())?;
 
@@ -89,6 +92,10 @@ impl MqttSource {
             self.log_namespace,
             &events_received,
         )
+        .map(|mut event| {
+            self.apply_metadata(&publish, &mut event);
+            event
+        })
         .collect_vec();
 
         let count = decoded.len();
@@ -96,6 +103,22 @@ impl MqttSource {
         match out.send_batch(decoded).await {
             Ok(()) => {}
             Err(_) => emit!(StreamClosedError { count }),
+        }
+    }
+
+    fn apply_metadata(&self, publish: &Publish, event: &mut Event) {
+        if let Event::Log(ref mut log) = event {
+            self.log_namespace.insert_source_metadata(
+                MqttSourceConfig::NAME,
+                log,
+                self.config
+                    .topic_key
+                    .path
+                    .as_ref()
+                    .map(LegacyKey::Overwrite),
+                path!("topic"),
+                publish.topic.clone(),
+            );
         }
     }
 }

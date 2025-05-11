@@ -560,6 +560,22 @@ base: components: sources: mqtt: configuration: {
 		required:    false
 		type: string: default: "vector"
 	}
+	topic_key: {
+		description: """
+			Overrides the name of the log field used to add the topic to each event.
+
+			The value is the topic from which the MQTT message was published to.
+
+			By default, `"topic"` is used.
+			"""
+		required: false
+		type: string: {
+			default: "topic"
+			examples: [
+				"topic",
+			]
+		}
+	}
 	user: {
 		description: "MQTT username."
 		required:    false
