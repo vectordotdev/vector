@@ -10,6 +10,7 @@ codecs = { path = "../codecs", default-features = false }
 enrichment = { path = "../enrichment" }
 file-source = { path = "../file-source", optional = true }
 ifile-source = { path = "../ifile-source", optional = true }
+file-source-common = { path = "../file-source-common" }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 prometheus-parser = { path = "../prometheus-parser", optional = true }
 vector-api-client = { path = "../vector-api-client", optional = true }

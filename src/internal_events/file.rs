@@ -107,7 +107,7 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use metrics::counter;
-    use vector_lib::file_source::FileSourceInternalEvents;
+    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;

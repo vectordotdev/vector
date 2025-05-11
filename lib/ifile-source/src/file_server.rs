@@ -18,11 +18,12 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    checkpointer::{Checkpointer, CheckpointsView},
-    fingerprinter::{Fingerprinter, FileFingerprint},
     file_watcher::FileWatcher,
     paths_provider::PathsProvider,
-    FilePosition, FileSourceInternalEvents, ReadFrom,
+    FilePosition, ReadFrom, Checkpointer, CheckpointsView,
+};
+use file_source_common::{
+    FileFingerprint, Fingerprinter, internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents,
 };
 
 /// `FileServer` is a Source which schedules reads over files,
@@ -593,7 +594,7 @@ async fn checkpoint_writer(
         }
 
         let emitter = emitter.clone();
-        let checkpointer = Arc::clone(&checkpointer);
+        let checkpointer: Arc<Checkpointer> = Arc::clone(&checkpointer);
         tokio::task::spawn_blocking(move || {
             let start = time::Instant::now();
             match checkpointer.write_checkpoints() {

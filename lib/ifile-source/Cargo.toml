@@ -17,6 +17,7 @@ notify = "8.0.0"
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
+file-source-common = { path = "../file-source-common" }
 
 [dependencies.bstr]
 version = "1.11"

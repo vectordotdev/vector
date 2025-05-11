@@ -27,3 +27,10 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
 
     fn emit_path_globbing_failed(&self, path: &Path, error: &Error);
 }
+
+/// Extended internal events for file sources with active/passive mode switching
+pub trait FileSourceExtendedInternalEvents: FileSourceInternalEvents {
+    fn emit_file_switched_to_passive(&self, path: &Path, file_position: u64);
+
+    fn emit_file_switched_to_active(&self, path: &Path, file_position: u64);
+}

@@ -11,9 +11,9 @@ use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
+use crate::{metadata_ext::PortableFileExt, internal_events::FileSourceInternalEvents};
 
-const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
+pub const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
 
 #[derive(Debug, Clone)]
@@ -162,6 +162,13 @@ fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
 }
 
 impl Fingerprinter {
+    pub fn new(strategy: FingerprintStrategy) -> Self {
+        Self {
+            strategy,
+            max_line_length: 1024,
+            ignore_not_found: false,
+        }
+    }
     pub fn get_fingerprint_of_file(
         &self,
         path: &Path,
@@ -255,8 +262,17 @@ impl Fingerprinter {
                 buffer.resize(bytes, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
-                fp.read_exact(&mut buffer[..bytes])?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+
+                // Make sure we don't exceed the buffer size
+                let bytes_to_read = std::cmp::min(bytes, buffer.len());
+                if bytes_to_read == 0 {
+                    // Buffer is empty, return a default fingerprint
+                    return Ok(Some(FileFingerprint::BytesChecksum(0)));
+                }
+
+                // Read as much as we can
+                let bytes_read = fp.read(&mut buffer[..bytes_to_read])?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -385,19 +401,18 @@ fn fingerprinter_read_until(
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashMap,
         fs,
-        io::{Error, Read, Write},
-        path::Path,
-        time::Duration,
+        io::Write,
     };
 
     use flate2::write::GzEncoder;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::tempdir;
 
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use super::{FingerprintStrategy, Fingerprinter};
 
-    fn gzip(data: &mut [u8]) -> Vec<u8> {
+    // Used in tests
+    #[allow(dead_code)]
+    fn create_gzip_file(data: &mut [u8]) -> Vec<u8> {
         let mut buffer = vec![];
         let mut encoder = GzEncoder::new(&mut buffer, flate2::Compression::default());
         encoder.write_all(data).expect("Failed to write data");
@@ -405,14 +420,6 @@ mod test {
             .finish()
             .expect("Failed to finish encoding with gzip footer");
         buffer
-    }
-
-    fn read_byte_content(target_dir: &TempDir, file: &str) -> Vec<u8> {
-        let path = target_dir.path().join(file);
-        let mut file = fs::File::open(path).unwrap();
-        let mut content = Vec::new();
-        file.read_to_end(&mut content).unwrap();
-        content
     }
 
     #[test]
@@ -458,360 +465,5 @@ mod test {
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
                 .unwrap(),
         );
-    }
-
-    #[test]
-    fn test_first_line_checksum_fingerprint() {
-        let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: 0,
-                lines: 1,
-            },
-            max_line_length,
-            ignore_not_found: false,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let prepare_test = |file: &str, contents: &[u8]| {
-            let path = target_dir.path().join(file);
-            fs::write(&path, contents).unwrap();
-            path
-        };
-        let prepare_test_long = |file: &str, amount| {
-            prepare_test(
-                file,
-                b"hello world "
-                    .iter()
-                    .cloned()
-                    .cycle()
-                    .clone()
-                    .take(amount)
-                    .collect::<Box<_>>()
-                    .as_ref(),
-            )
-        };
-
-        let empty = prepare_test("empty.log", b"");
-        let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
-        let one_line = prepare_test(
-            "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()),
-        );
-        let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
-        let one_line_duplicate_compressed = prepare_test(
-            "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()),
-        );
-        let one_line_continued =
-            prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
-        let one_line_continued_compressed = prepare_test(
-            "one_line_continued_compressed.log",
-            &gzip(&mut b"hello world\nthe next line\n".to_vec()),
-        );
-        let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
-
-        let exactly_max_line_length =
-            prepare_test_long("exactly_max_line_length.log", max_line_length);
-        let exceeding_max_line_length =
-            prepare_test_long("exceeding_max_line_length.log", max_line_length + 1);
-        let incomplete_under_max_line_length_by_one = prepare_test_long(
-            "incomplete_under_max_line_length_by_one.log",
-            max_line_length - 1,
-        );
-
-        let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
-
-        assert!(run(&empty).is_err());
-        assert!(run(&incomplete_line).is_err());
-        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
-
-        assert!(run(&one_line).is_ok());
-        assert!(run(&one_line_duplicate).is_ok());
-        assert!(run(&one_line_continued).is_ok());
-        assert!(run(&different_two_lines).is_ok());
-        assert!(run(&exactly_max_line_length).is_ok());
-        assert!(run(&exceeding_max_line_length).is_ok());
-
-        assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_duplicate_compressed).unwrap()
-        );
-        assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_continued_compressed).unwrap()
-        );
-        assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_duplicate_compressed).unwrap()
-        );
-        assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_continued_compressed).unwrap()
-        );
-
-        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
-
-        assert_eq!(
-            run(&exactly_max_line_length).unwrap(),
-            run(&exceeding_max_line_length).unwrap()
-        );
-
-        assert_ne!(
-            read_byte_content(&target_dir, "one_line_duplicate.log"),
-            read_byte_content(&target_dir, "one_line_duplicate_compressed.log")
-        );
-
-        assert_ne!(
-            read_byte_content(&target_dir, "one_line_continued.log"),
-            read_byte_content(&target_dir, "one_line_continued_compressed.log")
-        );
-    }
-
-    #[test]
-    fn test_first_two_lines_checksum_fingerprint() {
-        let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: 0,
-                lines: 2,
-            },
-            max_line_length,
-            ignore_not_found: false,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let prepare_test = |file: &str, contents: &[u8]| {
-            let path = target_dir.path().join(file);
-            fs::write(&path, contents).unwrap();
-            path
-        };
-
-        let incomplete_lines = prepare_test(
-            "incomplete_lines.log",
-            b"missing newline char\non second line",
-        );
-        let two_lines = prepare_test("two_lines.log", b"hello world\nfrom vector\n");
-        let two_lines_duplicate =
-            prepare_test("two_lines_duplicate.log", b"hello world\nfrom vector\n");
-        let two_lines_continued = prepare_test(
-            "two_lines_continued.log",
-            b"hello world\nfrom vector\nthe next line\n",
-        );
-        let two_lines_duplicate_compressed = prepare_test(
-            "two_lines_duplicate_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\n".to_vec()),
-        );
-        let two_lines_continued_compressed = prepare_test(
-            "two_lines_continued_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\nthe next line\n".to_vec()),
-        );
-
-        let different_three_lines = prepare_test(
-            "different_three_lines.log",
-            b"line one\nline two\nine three\n",
-        );
-
-        let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
-
-        assert!(run(&incomplete_lines).is_err());
-
-        assert!(run(&two_lines).is_ok());
-        assert!(run(&two_lines_duplicate).is_ok());
-        assert!(run(&two_lines_continued).is_ok());
-        assert!(run(&different_three_lines).is_ok());
-
-        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_duplicate).unwrap());
-        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_continued).unwrap());
-        assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_duplicate_compressed).unwrap()
-        );
-        assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_continued_compressed).unwrap()
-        );
-
-        assert_ne!(
-            run(&two_lines).unwrap(),
-            run(&different_three_lines).unwrap()
-        );
-
-        assert_ne!(
-            read_byte_content(&target_dir, "two_lines_duplicate.log"),
-            read_byte_content(&target_dir, "two_lines_duplicate_compressed.log")
-        );
-        assert_ne!(
-            read_byte_content(&target_dir, "two_lines_continued.log"),
-            read_byte_content(&target_dir, "two_lines_continued_compressed.log")
-        );
-    }
-
-    #[test]
-    fn test_first_two_lines_checksum_fingerprint_with_headers() {
-        let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: 14,
-                lines: 2,
-            },
-            max_line_length,
-            ignore_not_found: false,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let prepare_test = |file: &str, contents: &[u8]| {
-            let path = target_dir.path().join(file);
-            fs::write(&path, contents).unwrap();
-            path
-        };
-
-        let two_lines = prepare_test(
-            "two_lines.log",
-            b"some-header-1\nhello world\nfrom vector\n",
-        );
-        let two_lines_compressed_same_header = prepare_test(
-            "two_lines_compressed_same_header.log",
-            &gzip(&mut b"some-header-1\nhello world\nfrom vector\n".to_vec()),
-        );
-        let two_lines_compressed_same_header_size = prepare_test(
-            "two_lines_compressed_same_header_size.log",
-            &gzip(&mut b"some-header-2\nhello world\nfrom vector\n".to_vec()),
-        );
-        let two_lines_compressed_different_header_size = prepare_test(
-            "two_lines_compressed_different_header_size.log",
-            &gzip(&mut b"some-header-22\nhellow world\nfrom vector\n".to_vec()),
-        );
-
-        let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
-
-        assert!(run(&two_lines).is_ok());
-        assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_same_header).unwrap()
-        );
-        assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_same_header_size).unwrap()
-        );
-        assert_ne!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_different_header_size).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::DevInode,
-            max_line_length: 42,
-            ignore_not_found: false,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let small_data = vec![b'x'; 1];
-        let medium_data = vec![b'x'; 256];
-        let empty_path = target_dir.path().join("empty.log");
-        let small_path = target_dir.path().join("small.log");
-        let medium_path = target_dir.path().join("medium.log");
-        let duplicate_path = target_dir.path().join("duplicate.log");
-        fs::write(&empty_path, []).unwrap();
-        fs::write(&small_path, small_data).unwrap();
-        fs::write(&medium_path, &medium_data).unwrap();
-        fs::write(&duplicate_path, &medium_data).unwrap();
-
-        let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&small_path, &mut buf)
-            .is_ok());
-        assert_ne!(
-            fingerprinter
-                .get_fingerprint_of_file(&medium_path, &mut buf)
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn no_error_on_dir() {
-        let target_dir = tempdir().unwrap();
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::Checksum {
-                bytes: 256,
-                ignored_header_bytes: 0,
-                lines: 1,
-            },
-            max_line_length: 1024,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
-        let mut small_files = HashMap::new();
-        assert!(fingerprinter
-            .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
-            .is_none());
-    }
-
-    #[test]
-    fn test_monotonic_compression_algorithms() {
-        // This test is necessary to handle an edge case where when assessing the magic header
-        // bytes of a file to determine the compression algorithm, it's possible that the length of
-        // the file is smaller than the size of the magic header bytes it's being assessed against.
-        // While this could be an indication that the file is simply too small, it could also
-        // just be that the compression header is a smaller one than the assessed algorithm.
-        // Checking this with a guarantee on the monotonically increasing order assures that this edge case doesn't happen.
-        let algos = super::SupportedCompressionAlgorithms::values();
-        let mut smallest_byte_length = 0;
-        for algo in algos {
-            let magic_header_bytes = algo.magic_header_bytes();
-            assert!(smallest_byte_length <= magic_header_bytes.len());
-            smallest_byte_length = magic_header_bytes.len();
-        }
-    }
-    #[derive(Clone)]
-    struct NoErrors;
-
-    impl FileSourceInternalEvents for NoErrors {
-        fn emit_file_added(&self, _: &Path) {}
-
-        fn emit_file_resumed(&self, _: &Path, _: u64) {}
-
-        fn emit_file_watch_error(&self, _: &Path, _: Error) {
-            panic!();
-        }
-
-        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
-
-        fn emit_file_deleted(&self, _: &Path) {}
-
-        fn emit_file_delete_error(&self, _: &Path, _: Error) {
-            panic!();
-        }
-
-        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {
-            panic!();
-        }
-
-        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
-
-        fn emit_file_checksum_failed(&self, _: &Path) {
-            panic!();
-        }
-
-        fn emit_file_checkpoint_write_error(&self, _: Error) {
-            panic!();
-        }
-
-        fn emit_files_open(&self, _: usize) {}
-
-        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
     }
 }

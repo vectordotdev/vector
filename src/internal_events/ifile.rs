@@ -107,7 +107,7 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use metrics::counter;
-    use vector_lib::ifile_source::FileSourceInternalEvents;
+    use vector_lib::file_source_common::internal_events::{FileSourceInternalEvents, FileSourceExtendedInternalEvents};
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -575,6 +575,12 @@ mod source {
             emit!(FileOpen { count });
         }
 
+        fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
+            emit!(PathGlobbingError { path, error });
+        }
+    }
+
+    impl FileSourceExtendedInternalEvents for FileSourceInternalEventsEmitter {
         fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
             debug!(
                 message = "File switched to passive watching mode.",
@@ -607,10 +613,6 @@ mod source {
                 counter!("files_active_total")
             }
             .increment(1);
-        }
-
-        fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
-            emit!(PathGlobbingError { path, error });
         }
     }
 }

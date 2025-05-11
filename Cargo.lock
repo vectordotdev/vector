@@ -3739,6 +3739,7 @@ dependencies = [
  "crc",
  "criterion",
  "dashmap 6.1.0",
+ "file-source-common",
  "flate2",
  "futures 0.3.31",
  "glob",
@@ -3754,6 +3755,29 @@ dependencies = [
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
+ "winapi",
+]
+
+[[package]]
+name = "file-source-common"
+version = "0.1.0"
+dependencies = [
+ "bstr 1.11.3",
+ "bytes 1.10.1",
+ "chrono",
+ "crc",
+ "dashmap 5.5.3",
+ "flate2",
+ "glob",
+ "libc",
+ "quickcheck",
+ "scan_fmt",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "tempfile",
+ "tracing 0.1.41",
+ "vector-common",
  "winapi",
 ]
 
@@ -5182,10 +5206,11 @@ dependencies = [
  "crc",
  "criterion",
  "dashmap 6.1.0",
+ "file-source-common",
  "flate2",
  "futures 0.3.31",
  "glob",
- "indexmap 2.8.0",
+ "indexmap 2.9.0",
  "libc",
  "notify",
  "quickcheck",
@@ -11847,6 +11872,7 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
+ "file-source-common",
  "ifile-source",
  "opentelemetry-proto",
  "prometheus-parser",
