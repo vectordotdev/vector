@@ -26,10 +26,14 @@ pub enum GelfSerializerError {
     #[snafu(display(r#"LogEvent does not contain required field: "{}""#, field))]
     MissingField { field: KeyString },
     #[snafu(display(
-        r#"LogEvent contains field with invalid character in name: "{}""#,
-        field
+        r#"LogEvent contains field with invalid name not matching pattern '{}': "{}""#,
+        pattern,
+        field,
     ))]
-    BadField { field: KeyString },
+    InvalidField {
+        field: KeyString,
+        pattern: String,
+    },
     #[snafu(display(
         r#"LogEvent contains a value with an invalid type. field = "{}" type = "{}" expected type = "{}""#,
         field,
@@ -195,8 +199,9 @@ fn coerce_field_names_and_values(
                 _ => {
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD_REGEX.is_match(field) {
-                        return BadFieldSnafu {
+                        return InvalidFieldSnafu {
                             field: field.clone(),
+                            pattern: VALID_FIELD_REGEX.to_string(),
                         }
                         .fail()
                         .map_err(|e| e.to_string().into());
