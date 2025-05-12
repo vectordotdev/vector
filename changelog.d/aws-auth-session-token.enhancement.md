@@ -1,5 +1,3 @@
-Adds session token support to the aws auth options. Session token is required with access id and secret keys when using temporary credentials.
-If temporary credentials is created and supplied by another external system.
-Update to these temporary credentials can be done by external system using `SECRET` backend.
+Adds support for session tokens in AWS authentication options. When using temporary credentials (access key, secret key, and session token), the session token is required. Temporary credentials can be provided by an external system and updated using the `SECRET` backend.
 
 authors: anil-db
