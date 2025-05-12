@@ -72,6 +72,7 @@ pub enum AwsAuthentication {
         secret_access_key: SensitiveString,
 
         /// The AWS session token.
+        /// See https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html
         #[configurable(metadata(docs::examples = "AQoDYXdz...AQoDYXdz..."))]
         session_token: Option<SensitiveString>,
 
