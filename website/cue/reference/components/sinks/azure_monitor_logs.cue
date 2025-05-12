@@ -61,7 +61,7 @@ components: sinks: azure_monitor_logs: {
 			"""
 				The upstream Data Collector API [has been deprecated](urls.azure_monitor_data_collector_deprecation),
 				and will stop working in September 2026. Consider migrating to the `azure_logs_ingestion` sink, which
-				requires additional Azure resources.
+				requires creating Data Collection Endpoint and Data Collection Rule resources in Azure.
 			"""
 		]
 		notices: []
