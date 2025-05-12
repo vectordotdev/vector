@@ -1,9 +1,9 @@
 mod config_builder;
 mod interpolation;
 mod loader;
+mod schema_coercion;
 mod secret;
 mod source;
-mod schema_coercion;
 
 use std::{
     collections::HashMap,

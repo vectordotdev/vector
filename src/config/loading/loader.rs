@@ -327,14 +327,23 @@ pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>>
     }
 
     let table = interpolate_toml_table_with_env_vars(&table, &vars)?;
-    println!("Interpolated table: {table:#?}");
-    let mut table_json = serde_json::to_value(table).map_err(|err| err.to_string()).map_err(|err| vec![err])?;
+    // println!("Interpolated table: {table:#?}");
+    let mut table_json = serde_json::to_value(table)
+        .map_err(|err| err.to_string())
+        .map_err(|err| vec![err])?;
 
-    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| { vec![format!("{e:?}")] })?;
+    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
     let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
-    coerce(&mut table_json, &schema_json, schema_json.get("definitions"), &mut Vec::new()).map_err(|err| vec![err.to_string()])?;
+    coerce(
+        &mut table_json,
+        &schema_json,
+        schema_json.get("definitions"),
+        &mut Vec::new(),
+    )
+    .map_err(|err| vec![err.to_string()])?;
 
-    let final_table = serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])?;
-    println!("Final table: {final_table:#?}");
+    let final_table =
+        serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])?;
+    // println!("Final table: {final_table:#?}");
     Ok(final_table)
 }

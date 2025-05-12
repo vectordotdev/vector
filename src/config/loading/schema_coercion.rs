@@ -135,17 +135,17 @@ fn handle_ref(
             path: path_components.join("."),
             reference: ref_str.to_string(),
         }
-            .fail()
+        .fail()
     }
 }
 
-fn handle_bool(schema: &Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn handle_bool(schema: &Value, path_components: &mut [String]) -> Result<(), Error> {
     match schema.as_bool() {
         Some(true) | None => Ok(()),
         Some(false) => DisallowedPropertySnafu {
             path: path_components.join("."),
         }
-            .fail(),
+        .fail(),
     }
 }
 
@@ -153,7 +153,7 @@ fn handle_all_of(
     value: &mut Value,
     schema: &Value,
     definitions: Option<&Value>,
-    path_components: &mut Vec<String>,
+    path_components: &mut Vec<String>
 ) -> Result<(), Error> {
     let Some(all_of) = schema.get("allOf").and_then(|v| v.as_array()) else {
         return Ok(());
@@ -186,7 +186,7 @@ fn handle_one_of_any_of(
 fn handle_enum(
     value: &mut Value,
     schema: &Value,
-    path_components: &mut Vec<String>,
+    path_components: &mut [String],
 ) -> Result<(), Error> {
     let Some(enum_vals) = schema.get("enum").and_then(|v| v.as_array()) else {
         return Ok(());
@@ -227,7 +227,10 @@ fn handle_enum(
     // Number → String
     if let Value::Number(n) = value {
         let val_str = n.to_string();
-        if enum_vals.iter().any(|opt| opt.as_str() == Some(val_str.as_str())) {
+        if enum_vals
+            .iter()
+            .any(|opt| opt.as_str() == Some(val_str.as_str()))
+        {
             *value = Value::String(val_str);
             return Ok(());
         }
@@ -236,10 +239,11 @@ fn handle_enum(
     // Bool → String
     if let Value::Bool(b) = value {
         let val_str = b.to_string();
-        if enum_vals
-            .iter()
-            .any(|opt| opt.as_str().map(|s| s.eq_ignore_ascii_case(val_str.as_str())) == Some(true))
-        {
+        if enum_vals.iter().any(|opt| {
+            opt.as_str()
+                .map(|s| s.eq_ignore_ascii_case(val_str.as_str()))
+                == Some(true)
+        }) {
             *value = Value::String(val_str);
             return Ok(());
         }
@@ -248,13 +252,13 @@ fn handle_enum(
     InvalidEnumValueSnafu {
         path: path_components.join("."),
     }
-        .fail()
+    .fail()
 }
 
 fn handle_const(
     value: &mut Value,
     schema: &Value,
-    path_components: &mut Vec<String>,
+    path_components: &mut [String],
 ) -> Result<(), Error> {
     let Some(const_val) = schema.get("const") else {
         return Ok(());
@@ -314,7 +318,7 @@ fn handle_const(
         path: path_components.join("."),
         expected: const_val.to_string(),
     }
-        .fail()
+    .fail()
 }
 
 /// Ensure `value` matches one of the allowed types in `allowed`.
@@ -351,7 +355,7 @@ fn coerce_multiple_types(
             get_json_type(value)
         ),
     }
-        .fail()
+    .fail()
 }
 
 /// Ensure `value` matches the expected single `expected_type`. Converts the value if possible.
@@ -434,7 +438,7 @@ fn coerce_object(
                     path: path_components.join("."),
                     key: key_str.to_string(),
                 }
-                    .fail();
+                .fail();
             }
 
             coerce(
@@ -451,7 +455,6 @@ fn coerce_object(
     Ok(())
 }
 
-/// Coerce all elements of an array value according to the schema's items definition.
 /// Coerce all elements of an array value according to the schema's items definition.
 fn coerce_array(
     value: &mut Value,
@@ -492,7 +495,7 @@ fn coerce_array(
                             path: path.join("."),
                             index: idx,
                         }
-                            .fail();
+                        .fail();
                     }
 
                     coerce(item_val, item_schema, definitions, path)?;
@@ -530,7 +533,7 @@ fn coerce_one_of(
                 return OneOfMultipleMatchesSnafu {
                     path: path_components.join("."),
                 }
-                    .fail();
+                .fail();
             }
             success_val = Some(candidate);
         }
@@ -544,7 +547,7 @@ fn coerce_one_of(
         None => OneOfNoMatchSnafu {
             path: path_components.join("."),
         }
-            .fail(),
+        .fail(),
     }
 }
 
@@ -566,7 +569,7 @@ fn coerce_any_of(
     OneOfNoMatchSnafu {
         path: path_components.join("."),
     }
-        .fail()
+    .fail()
 }
 
 /// Parse a string into a serde_json Number (integer only). Returns None if not a valid integer.
@@ -592,7 +595,7 @@ fn parse_number(input: &str) -> Option<Number> {
     None
 }
 
-fn coerce_bool(value: &mut Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn coerce_bool(value: &mut Value, path_components: &mut [String]) -> Result<(), Error> {
     match value {
         Value::Bool(_) => Ok(()),
         Value::String(s) => match s.trim().parse::<bool>() {
@@ -606,7 +609,7 @@ fn coerce_bool(value: &mut Value, path_components: &mut Vec<String>) -> Result<(
     }
 }
 
-fn coerce_integer(value: &mut Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn coerce_integer(value: &mut Value, path_components: &mut [String]) -> Result<(), Error> {
     if let Value::Number(n) = value {
         if n.is_i64() || n.is_u64() {
             return Ok(());
@@ -628,7 +631,7 @@ fn coerce_integer(value: &mut Value, path_components: &mut Vec<String>) -> Resul
     fail_expected!(Integer, value, path_components)
 }
 
-fn coerce_number(value: &mut Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn coerce_number(value: &mut Value, path_components: &mut [String]) -> Result<(), Error> {
     if let Value::Number(_) = value {
         return Ok(());
     }
@@ -643,7 +646,7 @@ fn coerce_number(value: &mut Value, path_components: &mut Vec<String>) -> Result
     fail_expected!(Number, value, path_components)
 }
 
-fn coerce_null(value: &mut Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn coerce_null(value: &mut Value, path_components: &mut [String]) -> Result<(), Error> {
     match value {
         Value::Null => Ok(()),
         Value::String(s) if s.trim().eq_ignore_ascii_case("null") => {
@@ -654,7 +657,7 @@ fn coerce_null(value: &mut Value, path_components: &mut Vec<String>) -> Result<(
     }
 }
 
-fn coerce_string(value: &mut Value, path_components: &mut Vec<String>) -> Result<(), Error> {
+fn coerce_string(value: &mut Value, path_components: &mut [String]) -> Result<(), Error> {
     match value {
         Value::String(_) => Ok(()),
         Value::Null => fail_expected!(String, value, path_components),
@@ -666,7 +669,7 @@ fn coerce_string(value: &mut Value, path_components: &mut Vec<String>) -> Result
 }
 
 /// Helper to get a human-readable type name for a JSON value.
-fn get_json_type(val: &Value) -> &'static str {
+const fn get_json_type(val: &Value) -> &'static str {
     match val {
         Value::Null => NULL_JSON_TYPE,
         Value::Bool(_) => BOOL_JSON_TYPE,
@@ -677,10 +680,7 @@ fn get_json_type(val: &Value) -> &'static str {
     }
 }
 
-#[cfg(all(
-    test,
-    feature = "sources-demo_logs",
-))]
+#[cfg(all(test, feature = "sources-demo_logs",))]
 mod test {
     use crate::config::loading::schema_coercion::coerce;
     use crate::config::ConfigBuilder;
@@ -701,25 +701,35 @@ mod test {
             }
         });
 
-        let demo_logs_schema = serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
-        coerce(&mut input, &demo_logs_schema, demo_logs_schema.get("definitions"), &mut Vec::new()).unwrap();
-        assert_eq!(input, json!({
-            "sources": {
-                "source0": {
-                    "type": "demo_logs",
-                    "count": 100,
-                    "format": "shuffle",
-                    "lines": [
-                        "777",
-                        "true",
-                        "false",
-                        "0.1",
-                        "123",
-                        "some string"
-                    ],
-                    "interval": 1
+        let demo_logs_schema =
+            serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
+        coerce(
+            &mut input,
+            &demo_logs_schema,
+            demo_logs_schema.get("definitions"),
+            &mut Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            input,
+            json!({
+                "sources": {
+                    "source0": {
+                        "type": "demo_logs",
+                        "count": 100,
+                        "format": "shuffle",
+                        "lines": [
+                            "777",
+                            "true",
+                            "false",
+                            "0.1",
+                            "123",
+                            "some string"
+                        ],
+                        "interval": 1
+                    }
                 }
-            }
-        }));
+            })
+        );
     }
 }
