@@ -94,7 +94,7 @@ impl DorisSinkClient {
         table: &str,
         payload: &Bytes,
         redirect_url: Option<&str>,
-    ) -> Result<Request<Bytes>, crate::Error> {
+    ) -> Result<Request<Body>, crate::Error> {
         let label = self.generate_label(database, table);
 
         let uri = if let Some(redirect_url) = redirect_url {
@@ -154,7 +154,8 @@ impl DorisSinkClient {
             builder = builder.header(&header[..], &value[..]);
         }
 
-        let mut request = builder.body(payload.clone()).map_err(|error| {
+        let body = Body::from(payload.clone());
+        let mut request = builder.body(body).map_err(|error| {
             debug!(
                 message = "Failed to build HTTP request.",
                 %error,
@@ -197,10 +198,6 @@ impl DorisSinkClient {
         let endpoint = request.uri().to_string();
         let byte_size = payload.len();
 
-        // Convert Request<Bytes> to Request<Body>
-        let (parts, bytes) = request.into_parts();
-        let request = Request::from_parts(parts, Body::from(bytes));
-
         let mut response = self.http_client.send(request).await?;
         let mut status = response.status();
 
@@ -236,9 +233,7 @@ impl DorisSinkClient {
                     let redirect_req = self
                         .build_request(&database, &table, &payload, Some(location_str))
                         .await?;
-                    let (parts, bytes) = redirect_req.into_parts();
-                    let redirect_req = Request::from_parts(parts, Body::from(bytes));
-
+                    
                     response = self.http_client.send(redirect_req).await?;
                     status = response.status();
 
