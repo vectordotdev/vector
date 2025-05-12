@@ -153,7 +153,7 @@ fn handle_all_of(
     value: &mut Value,
     schema: &Value,
     definitions: Option<&Value>,
-    path_components: &mut Vec<String>
+    path_components: &mut Vec<String>,
 ) -> Result<(), Error> {
     let Some(all_of) = schema.get("allOf").and_then(|v| v.as_array()) else {
         return Ok(());
