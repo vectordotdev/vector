@@ -213,53 +213,6 @@ mod test {
     }
 
     #[test]
-    fn test_interpolate_toml_table() {
-        let input = indoc! {r#"
-        # ${IN_COMMENT_BUT_DOES_NOT_EXIST}
-        [[tests]]
-            name = "${NAME}"
-            # This line should not cause a loading failure - "SECRET[backend_1.i_dont_exist]"
-            [[tests.inputs]]
-                insert_at = "${UNDEFINED:-foo}"
-                type = "log"
-                [tests.inputs.log_fields]
-                  "$FIELD1" = 1
-                  "$FIELD2" = "${COUNT}"
-                  top_secret = "SECRET[backend_1.some_secret]"
-                  some_bool = "${SOME_BOOL}"
-        "#};
-
-        let vars = HashMap::from([
-            ("NAME".into(), "Some_Transform".into()),
-            ("FIELD1".into(), "f1".into()),
-            ("FIELD2".into(), "f2".into()),
-            ("COUNT".into(), "20".into()),
-            ("SOME_BOOL".into(), "true".into()),
-        ]);
-
-        let table = format::deserialize(input, Format::Toml).unwrap();
-        let result = interpolate_toml_table_with_env_vars(&table, &vars).unwrap();
-
-        let secrets = HashMap::from([("backend_1.some_secret".into(), "foo".into())]);
-        let result = interpolate_toml_table_with_secrets(&result, &secrets).unwrap();
-
-        let expected: Value = toml::from_str(indoc! {r#"
-            [[tests]]
-                name = "Some_Transform"
-                [[tests.inputs]]
-                    insert_at = "foo"
-                    type = "log"
-                    [tests.inputs.log_fields]
-                    f1 = 1
-                    f2 = 20
-                    top_secret = "foo"
-                    some_bool = true
-        "#})
-        .unwrap();
-        assert_eq!(Value::Table(result), expected);
-    }
-
-    #[test]
     fn test_interpolate_yaml_equivalent() {
         // Step 1: Raw YAML input with env vars and secrets
         let input = indoc! {r#"

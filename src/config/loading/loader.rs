@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use super::{component_name, interpolate_toml_table_with_env_vars, open_file, read_dir, Format};
+use crate::config::loading::schema_coercion::coerce;
+use crate::config::{format, ConfigBuilder};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
-
-use super::{component_name, interpolate_toml_table_with_env_vars, open_file, read_dir, Format};
-use crate::config::format;
+use vector_config::schema::generate_root_schema;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -324,5 +325,16 @@ pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>>
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    interpolate_toml_table_with_env_vars(&table, &vars)
+
+    let table = interpolate_toml_table_with_env_vars(&table, &vars)?;
+    println!("Interpolated table: {table:#?}");
+    let mut table_json = serde_json::to_value(table).map_err(|err| err.to_string()).map_err(|err| vec![err])?;
+
+    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| { vec![format!("{e:?}")] })?;
+    let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
+    coerce(&mut table_json, &schema_json, schema_json.get("definitions"), &mut Vec::new()).map_err(|err| vec![err.to_string()])?;
+
+    let final_table = serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])?;
+    println!("Final table: {final_table:#?}");
+    Ok(final_table)
 }

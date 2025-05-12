@@ -145,8 +145,9 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 indexmap = { version = "2.9.0", default-features = false, features = ["serde", "std"] }
-inventory = { version = "0.3" }
 indoc = { version = "2.0.6" }
+inventory = { version = "0.3" }
+lexical-core = { version = "1.0.5", default-features = false, features = ["parse-integers", "parse-floats"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -180,6 +181,7 @@ vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", featur
 cfg-if.workspace = true
 clap.workspace = true
 indoc.workspace = true
+lexical-core.workspace = true
 paste.workspace = true
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }

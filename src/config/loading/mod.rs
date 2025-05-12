@@ -3,6 +3,7 @@ mod interpolation;
 mod loader;
 mod secret;
 mod source;
+mod schema_coercion;
 
 use std::{
     collections::HashMap,
