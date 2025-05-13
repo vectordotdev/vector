@@ -264,9 +264,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&String>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -283,6 +284,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&String>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -514,8 +516,10 @@ mod tests {
             }],
             select,
             None,
+            None,
         )
         .unwrap()
         .pop()
     }
 }
+
