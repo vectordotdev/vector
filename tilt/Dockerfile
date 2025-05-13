@@ -31,6 +31,8 @@ RUN --mount=type=cache,target=/vector/target \
 #
 # TARGET
 #
+ARG DEBIAN_RELEASE
+
 FROM docker.io/debian:${DEBIAN_RELEASE}-slim
 RUN apt-get update && apt-get -y --no-install-recommends install zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /vector/vector /usr/bin/vector

@@ -1,12 +1,7 @@
 ARG RUST_VERSION
 ARG FEATURES
-ARG DEBIAN_RELEASE=bookworm
 
-
-
-FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE}
-
-RUN echo "RUST_VERSION=${RUST_VERSION}, DEBIAN_RELEASE=${DEBIAN_RELEASE}"
+FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
 
 RUN apt-get update && apt-get -y --no-install-recommends install \
     build-essential \
@@ -32,7 +27,7 @@ RUN git clone https://github.com/rui314/mold.git \
     && cmake --build . -j $(nproc) \
     && cmake --install .
 
-RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.72 --locked
+RUN cargo install cargo-nextest --version 0.9.72 --locked
 
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
