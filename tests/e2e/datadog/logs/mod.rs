@@ -82,14 +82,14 @@ async fn validate() {
     .await
     .payloads;
 
-    info!("pront 1 {payloads:?}");
+    info!("pront 1 {agent_payloads:?}");
     // the logs endpoint receives an empty healthcheck payload in the beginning
     if !agent_payloads.is_empty() {
         agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
     }
 
     let mut agent_payloads = reduce_to_data(agent_payloads);
-    info!("pront 2 {payloads:?}");
+    info!("pront 2 {agent_payloads:?}");
     common_assertions(&mut agent_payloads);
 
     info!("getting log payloads from agent-vector pipeline");
