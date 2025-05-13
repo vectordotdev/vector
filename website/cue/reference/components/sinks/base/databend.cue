@@ -145,8 +145,11 @@ base: components: sinks: databend: configuration: {
 						type: string: examples: ["vector-indexer-role"]
 					}
 					session_token: {
-						description: "The AWS session token."
-						required:    false
+						description: """
+																The AWS session token.
+																See https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html
+																"""
+						required: false
 						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
 					}
 				}
