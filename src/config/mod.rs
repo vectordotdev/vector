@@ -212,7 +212,7 @@ impl Config {
     fn propagate_acks_rec(&mut self, sink_inputs: Vec<(ComponentKey, OutputId)>) {
         for (sink, input) in sink_inputs {
             let component = &input.component;
-            if let Some(source) = self.sources.get_mut(component) {
+            match self.sources.get_mut(component) { Some(source) => {
                 if source.inner.can_acknowledge() {
                     source.sink_acknowledgements = true;
                 } else {
@@ -222,14 +222,14 @@ impl Config {
                         sink = sink.id(),
                     );
                 }
-            } else if let Some(transform) = self.transforms.get(component) {
+            } _ => { match self.transforms.get(component) { Some(transform) => {
                 let inputs = transform
                     .inputs
                     .iter()
                     .map(|input| (sink.clone(), input.clone()))
                     .collect();
                 self.propagate_acks_rec(inputs);
-            }
+            } _ => {}}}}
         }
     }
 }

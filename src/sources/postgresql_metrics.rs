@@ -43,8 +43,8 @@ use crate::{
 };
 
 macro_rules! tags {
-    ($tags:expr) => { $tags.clone() };
-    ($tags:expr, $($key:expr => $value:expr),*) => {
+    ($tags:expr_2021) => { $tags.clone() };
+    ($tags:expr_2021, $($key:expr_2021 => $value:expr_2021),*) => {
         {
             let mut tags = $tags.clone();
             $(
@@ -56,7 +56,7 @@ macro_rules! tags {
 }
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -64,7 +64,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }
@@ -555,7 +555,7 @@ impl PostgresqlMetrics {
         }
     }
 
-    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
+    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric> + use<>, String> {
         let (client, client_version) = self
             .client
             .take()
