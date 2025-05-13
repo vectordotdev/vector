@@ -2,7 +2,11 @@ ARG RUST_VERSION
 ARG FEATURES
 ARG DEBIAN_RELEASE=slim-bookworm
 
+
+
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE}
+
+RUN echo "RUST_VERSION=${RUST_VERSION}, DEBIAN_RELEASE=${DEBIAN_RELEASE}"
 
 RUN apt-get update && apt-get -y --no-install-recommends install \
     build-essential \
