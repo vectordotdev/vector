@@ -10,7 +10,6 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tokio::sync::Mutex;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -26,7 +25,7 @@ pub struct DorisSinkClient {
     auth: Option<Auth>,
     compression: Compression,
     label_prefix: String,
-    headers: Arc<Mutex<HashMap<String, String>>>,
+    headers: Arc<HashMap<String, String>>,
 }
 
 // Explicitly implement Send and Sync for DorisSinkClient
@@ -63,7 +62,7 @@ impl DorisSinkClient {
             auth,
             compression,
             label_prefix,
-            headers: Arc::new(Mutex::new(headers)),
+            headers: Arc::new(headers),
         }
     }
 
@@ -149,8 +148,7 @@ impl DorisSinkClient {
         }
 
         // Add custom headers
-        let headers = self.headers.lock().await;
-        for (header, value) in &*headers {
+        for (header, value) in self.headers.as_ref() {
             builder = builder.header(&header[..], &value[..]);
         }
 
@@ -191,9 +189,11 @@ impl DorisSinkClient {
         let mut redirect_count = 0;
         const MAX_REDIRECTS: u8 = 3;
 
+        let payload_ref = &payload;
+
         // Build and send initial request
         let request = self
-            .build_request(&database, &table, &payload, None)
+            .build_request(&database, &table, payload_ref, None)
             .await?;
         let endpoint = request.uri().to_string();
         let byte_size = payload.len();
@@ -231,7 +231,7 @@ impl DorisSinkClient {
 
                     // Build and send redirect request
                     let redirect_req = self
-                        .build_request(&database, &table, &payload, Some(location_str))
+                        .build_request(&database, &table, payload_ref, Some(location_str))
                         .await?;
                     
                     response = self.http_client.send(redirect_req).await?;
