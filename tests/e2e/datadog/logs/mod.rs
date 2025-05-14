@@ -72,7 +72,7 @@ async fn validate() {
 
     // Even with configuring docker service dependencies, we need a small buffer of time
     // to ensure events flow through to fakeintake before asking for them
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    std::thread::sleep(std::time::Duration::from_secs(10));
 
     info!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
