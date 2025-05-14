@@ -236,7 +236,7 @@ impl DnstapParser {
                 dnstap_message_type_id,
                 dnstap_message.query_message.as_ref(),
                 &DNSTAP_MESSAGE_REQUEST_TYPE_IDS,
-            );
+            )?;
         }
 
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
@@ -248,7 +248,7 @@ impl DnstapParser {
                 dnstap_message_type_id,
                 dnstap_message.response_message.as_ref(),
                 &DNSTAP_MESSAGE_RESPONSE_TYPE_IDS,
-            );
+            )?;
         }
 
         DnstapParser::parse_dnstap_message_type(
@@ -366,10 +366,25 @@ impl DnstapParser {
         dnstap_message_type_id: i32,
         message: Option<&Vec<u8>>,
         type_ids: &HashSet<i32>,
-    ) {
+    ) -> Result<()> {
         let (time_in_nanosec, query_time_nsec) = match time_nsec {
-            Some(nsec) => (time_sec as i64 * 1_000_000_000_i64 + nsec as i64, nsec),
-            None => (time_sec as i64 * 1_000_000_000_i64, 0),
+            Some(nsec) => {
+                if let Some(time_in_ns) = (time_sec as i64)
+                    .checked_mul(1_000_000_000)
+                    .and_then(|v| v.checked_add(nsec as i64))
+                {
+                    (time_in_ns, nsec)
+                } else {
+                    return Err(Error::from("Cannot parse timestamp"));
+                }
+            }
+            None => {
+                if let Some(time_in_ns) = (time_sec as i64).checked_mul(1_000_000_000) {
+                    (time_in_ns, 0)
+                } else {
+                    return Err(Error::from("Cannot parse timestamp"));
+                }
+            }
         };
 
         if type_ids.contains(&dnstap_message_type_id) {
@@ -392,6 +407,7 @@ impl DnstapParser {
                 "ns",
             );
         }
+        Ok(())
     }
 
     fn parse_dnstap_message_socket_family<'a>(
