@@ -500,7 +500,7 @@ mod source {
 
     #[derive(Debug)]
     pub struct FileLineTooBigError<'a> {
-        pub bytes: &'a BytesMut,
+        pub truncated_bytes: &'a BytesMut,
         pub configured_limit: usize,
         pub encountered_size_so_far: usize,
     }
@@ -509,7 +509,7 @@ mod source {
         fn emit(self) {
             error!(
                 message = "Found line that exceeds max_line_bytes; discarding.",
-                bytes = ?self.bytes,
+                truncated_bytes = ?self.truncated_bytes,
                 configured_limit = self.configured_limit,
                 encountered_size_so_far = self.encountered_size_so_far,
                 internal_log_rate_limit = true,
@@ -615,12 +615,12 @@ mod source {
 
         fn emit_file_line_too_long(
             &self,
-            bytes: &bytes::BytesMut,
+            truncated_bytes: &bytes::BytesMut,
             configured_limit: usize,
             encountered_size_so_far: usize,
         ) {
             emit!(FileLineTooBigError {
-                bytes,
+                truncated_bytes,
                 configured_limit,
                 encountered_size_so_far
             });
