@@ -263,6 +263,11 @@ impl DnsMessageParser {
         let mut decoder = BinDecoder::new(raw_rdata);
         let prefix = parse_u8(&mut decoder)?;
         let ipv6_address = {
+            if prefix > 128 {
+                return Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("IPV6 prefix can't be greater than 128."),
+                });
+            }
             let address_length = (128 - prefix) / 8;
             let mut address_vec = parse_vec(&mut decoder, address_length)?;
             if address_vec.len() < 16 {
