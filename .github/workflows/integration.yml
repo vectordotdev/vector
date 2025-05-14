@@ -147,7 +147,7 @@ jobs:
                   "${{ needs.changes.outputs.all-int }}" == "true" || \
                   "$should_run" == "true" ]]; then
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/ci-int-e2e-test.sh int ${{ matrix.service }}
+              bash scripts/int-e2e-test.sh int ${{ matrix.service }}
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
