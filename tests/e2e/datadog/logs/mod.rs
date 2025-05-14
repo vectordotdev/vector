@@ -84,18 +84,8 @@ async fn validate() {
         .await
         .payloads;
 
-        info!("pront 1 {agent_payloads:?}");
-        // We want non-empty payloads, excluding healthcheck payloads.
         if !agent_payloads.is_empty() {
-            // The logs endpoint might receive an empty healthcheck payload initially
-            if agent_payloads
-                .iter()
-                .any(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
-            {
-                agent_payloads
-                    .retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
-                break;
-            }
+            break;
         }
 
         info!("No valid payloads yet, retrying...");
