@@ -30,10 +30,7 @@ pub enum GelfSerializerError {
         pattern,
         field,
     ))]
-    InvalidField {
-        field: KeyString,
-        pattern: String,
-    },
+    InvalidField { field: KeyString, pattern: String },
     #[snafu(display(
         r#"LogEvent contains a value with an invalid type. field = "{}" type = "{}" expected type = "{}""#,
         field,
