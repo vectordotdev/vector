@@ -33,7 +33,7 @@ pub(super) struct RawLine {
 #[derive(Debug)]
 pub struct RawLineResult {
     pub raw_line: Option<RawLine>,
-    pub discarded_for_size: Vec<BytesMut>,
+    pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
@@ -230,7 +230,7 @@ impl FileWatcher {
         ) {
             Ok(ReadResult {
                 successfully_read: Some(_),
-                discarded_for_size,
+                discarded_for_size_and_truncated,
             }) => {
                 self.track_read_success();
                 Ok(RawLineResult {
@@ -238,12 +238,12 @@ impl FileWatcher {
                         offset: initial_position,
                         bytes: self.buf.split().freeze(),
                     }),
-                    discarded_for_size,
+                    discarded_for_size_and_truncated,
                 })
             }
             Ok(ReadResult {
                 successfully_read: None,
-                discarded_for_size,
+                discarded_for_size_and_truncated,
             }) => {
                 if !self.file_findable() {
                     self.set_dead();
@@ -256,7 +256,7 @@ impl FileWatcher {
                         self.reached_eof = true;
                         Ok(RawLineResult {
                             raw_line: None,
-                            discarded_for_size,
+                            discarded_for_size_and_truncated,
                         })
                     } else {
                         Ok(RawLineResult {
@@ -264,14 +264,14 @@ impl FileWatcher {
                                 offset: initial_position,
                                 bytes: buf,
                             }),
-                            discarded_for_size,
+                            discarded_for_size_and_truncated,
                         })
                     }
                 } else {
                     self.reached_eof = true;
                     Ok(RawLineResult {
                         raw_line: None,
-                        discarded_for_size,
+                        discarded_for_size_and_truncated,
                     })
                 }
             }

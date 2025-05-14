@@ -31,7 +31,7 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
 
     fn emit_file_line_too_long(
         &self,
-        bytes: &BytesMut,
+        truncated_bytes: &BytesMut,
         configured_limit: usize,
         encountered_size_so_far: usize,
     );

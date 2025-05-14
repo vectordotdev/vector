@@ -7,7 +7,7 @@ use crate::FilePosition;
 
 pub struct ReadResult {
     pub successfully_read: Option<usize>,
-    pub discarded_for_size: Vec<BytesMut>,
+    pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
@@ -44,7 +44,7 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
     let mut discarding = false;
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
-    let mut discarded_for_size = Vec::new();
+    let mut discarded_for_size_and_truncated = Vec::new();
     loop {
         let available: &[u8] = match reader.fill_buf() {
             Ok(n) => n,
@@ -73,7 +73,10 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
         total_read += used;
 
         if !discarding && buf.len() > max_size {
-            discarded_for_size.push(buf.clone());
+            // keep only the first 1k bytes to make sure we can actually emit a usable error
+            let mut to_truncate = buf.clone();
+            to_truncate.truncate(1000);
+            discarded_for_size_and_truncated.push(to_truncate);
             discarding = true;
         }
 
@@ -81,7 +84,7 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
             if !discarding {
                 return Ok(ReadResult {
                     successfully_read: Some(total_read),
-                    discarded_for_size,
+                    discarded_for_size_and_truncated,
                 });
             } else {
                 discarding = false;
@@ -94,7 +97,7 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
             // FileWatcher.
             return Ok(ReadResult {
                 successfully_read: None,
-                discarded_for_size,
+                discarded_for_size_and_truncated,
             });
         }
     }
@@ -193,7 +196,7 @@ mod test {
             {
                 ReadResult {
                     successfully_read: None,
-                    discarded_for_size: _,
+                    discarded_for_size_and_truncated: _,
                 } => {
                     // Subject only returns None if this is the last chunk _and_
                     // the chunk did not contain a delimiter _or_ the delimiter
@@ -205,7 +208,7 @@ mod test {
                 }
                 ReadResult {
                     successfully_read: Some(total_read),
-                    discarded_for_size: _,
+                    discarded_for_size_and_truncated: _,
                 } => {
                     // Now that the function has returned we confirm that the
                     // returned details match our `first_delim` and also that

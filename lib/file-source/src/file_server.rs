@@ -265,10 +265,10 @@ where
                 let mut bytes_read: usize = 0;
                 while let Ok(RawLineResult {
                     raw_line: Some(line),
-                    discarded_for_size,
+                    discarded_for_size_and_truncated,
                 }) = watcher.read_line()
                 {
-                    discarded_for_size.iter().for_each(|buf| {
+                    discarded_for_size_and_truncated.iter().for_each(|buf| {
                         self.emitter.emit_file_line_too_long(
                             &buf.clone(),
                             self.max_line_bytes,
