@@ -62,7 +62,6 @@ where
     R: FakeIntakeResponseT + DeserializeOwned,
 {
     let url = &R::build_url(base, endpoint);
-    println!("pront 3 Fetching payloads from {}", url);
     Client::new()
         .request(Method::GET, url)
         .send()

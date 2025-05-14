@@ -74,9 +74,9 @@ async fn validate() {
 
     // Retry until we have log payloads or hit max retries.
     // This is to ensure events flow through to fakeintake before asking for them.
+    info!("getting log payloads from agent-only pipeline");
     let mut agent_payloads = Vec::new();
     for _ in 0..MAX_RETRIES {
-        info!("getting log payloads from agent-only pipeline");
         agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
             &fake_intake_agent_address(),
             LOGS_ENDPOINT,
@@ -93,17 +93,15 @@ async fn validate() {
     }
 
     // If we still don't have valid payloads after retries, fail the test
-    if agent_payloads.is_empty() {
-        panic!("Failed to get valid log payloads from agent pipeline after {MAX_RETRIES} retries");
-    }
+    assert!(
+        !agent_payloads.is_empty(),
+        "Failed to get valid log payloads from agent pipeline after {MAX_RETRIES} retries"
+    );
 
-    // the logs endpoint receives an empty healthcheck payload in the beginning
-    if !agent_payloads.is_empty() {
-        agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
-    }
+    // The logs endpoint receives an empty healthcheck payload in the beginning
+    agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
 
     let mut agent_payloads = reduce_to_data(agent_payloads);
-    info!("pront 2 {agent_payloads:?}");
     common_assertions(&mut agent_payloads);
 
     info!("getting log payloads from agent-vector pipeline");
