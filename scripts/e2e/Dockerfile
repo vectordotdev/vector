@@ -27,7 +27,7 @@ RUN git clone https://github.com/rui314/mold.git \
     && cmake --build . -j $(nproc) \
     && cmake --install .
 
-RUN cargo install cargo-nextest --version 0.9.72 --locked
+RUN cargo install cargo-nextest --version 0.9.95 --locked
 
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
