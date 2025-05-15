@@ -313,14 +313,16 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 }
 
 #[derive(Debug, Clone)]
-pub struct S3RetryLogic;
+pub struct S3RetryLogic {
+    pub retry_all_errors: bool,
+}
 
 impl RetryLogic for S3RetryLogic {
     type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+        self.retry_all_errors || is_retriable_error(error)
     }
 }
 

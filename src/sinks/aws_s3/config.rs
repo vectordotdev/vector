@@ -145,6 +145,12 @@ pub struct S3SinkConfig {
     /// This controls if the bucket name is in the hostname or part of the URL.
     #[serde(default = "crate::serde::default_true")]
     pub force_path_style: bool,
+
+    /// Whether or not to always retry every error
+    ///
+    /// By default, the sink will only retry attempts it deems to be "retriable", this setting overrides that behavior
+    #[serde(default = "crate::serde::default_false")]
+    pub retry_all_errors: bool,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -174,6 +180,7 @@ impl GenerateConfig for S3SinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
+            retry_all_errors: Default::default(),
         })
         .unwrap()
     }
@@ -210,7 +217,12 @@ impl S3SinkConfig {
         // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
-            .settings(request_limits, S3RetryLogic)
+            .settings(
+                request_limits,
+                S3RetryLogic {
+                    retry_all_errors: self.retry_all_errors,
+                },
+            )
             .service(service);
 
         let offset = self
