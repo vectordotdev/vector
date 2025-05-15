@@ -367,6 +367,10 @@ impl DnstapParser {
         message: Option<&Vec<u8>>,
         type_ids: &HashSet<i32>,
     ) -> Result<()> {
+        if time_sec > i64::MAX as u64 {
+            return Err(Error::from("Cannot parse timestamp"));
+        }
+
         let (time_in_nanosec, query_time_nsec) = match time_nsec {
             Some(nsec) => {
                 if let Some(time_in_ns) = (time_sec as i64)
@@ -1335,6 +1339,30 @@ mod tests {
         )
         .expect_err("Expected TrustDnsError.");
         assert!(e.to_string().contains("Protobuf message"));
+    }
+
+    #[test]
+    fn test_parse_dnstap_data_with_invalid_timestamp() {
+        fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
+            let mut event = LogEvent::default();
+            let root = owned_value_path!();
+            let type_ids = HashSet::new();
+            DnstapParser::parse_dnstap_message_time(
+                &mut event, &root, time_sec, time_nsec, 0, None, &type_ids,
+            )
+        }
+        // okay case
+        assert!(test_one_timestamp_parse(1337, Some(42)).is_ok());
+        // overflow in cast (u64 -> i64)
+        assert!(test_one_timestamp_parse(u64::MAX, Some(42)).is_err());
+        assert!(test_one_timestamp_parse(u64::MAX, None).is_err());
+        // overflow in multiplication
+        assert!(test_one_timestamp_parse(i64::MAX as u64, Some(42)).is_err());
+        assert!(test_one_timestamp_parse(i64::MAX as u64, None).is_err());
+        // overflow in add
+        assert!(
+            test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
+        )
     }
 
     #[test]
