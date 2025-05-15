@@ -543,7 +543,7 @@ impl SplunkSource {
                         .as_ref()
                         .and_then(|v| v.to_str().ok())
                         .map(|h| h.to_ascii_lowercase().contains("application/json"))
-                        .unwrap_or(false);
+                        .unwrap_or(true);
 
                     if !ok {
                         return Err(warp::reject::custom(ApiError::UnsupportedContentType));
@@ -2522,6 +2522,51 @@ mod tests {
         .await
         .unwrap();
         assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn ack_service_accepts_parameterized_content_type() {
+        let ack_config = HecAcknowledgementsConfig {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+
+        let event_res = send_with_response(
+            address,
+            "services/collector/event",
+            r#"{"event":"param-test"}"#,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        let _ = collect_n(source, 1).await;
+
+        let body = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+
+        let res = reqwest::Client::new()
+            .post(format!("http://{}/services/collector/ack", address))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .header("x-splunk-request-channel", "guid")
+            .header("Content-Type", "application/json; some-random-text; hello")
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let _parsed: HecAckStatusResponse = res.json().await.unwrap();
     }
 
     #[tokio::test]
