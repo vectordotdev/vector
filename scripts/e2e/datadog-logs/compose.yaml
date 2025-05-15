@@ -3,19 +3,10 @@ version: '3'
 services:
   # Generates random log data for consumption by the custom Agent check
   log_generator:
-    image: docker.io/mingrammer/flog
+    image: ghcr.io/vectordotdev/log-generator:v1.0
     depends_on:
       - datadog-agent-vector
       - datadog-agent
-    command:
-      - "-f"
-      - "json"
-      - "-n"
-      - "1000"
-      - "-t"
-      - "log"
-      - "-o"
-      - "/var/log/a_custom.log"
     volumes:
       - log_path:/var/log/
 
