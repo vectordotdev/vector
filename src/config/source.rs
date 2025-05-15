@@ -78,6 +78,7 @@ impl SourceOuter {
 
 /// Generalized interface for describing and building source components.
 #[async_trait]
+#[cfg(any(test, feature = "all-integration-tests"))]
 pub trait SourceConfigTest<Client>:
     DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 {
