@@ -1540,6 +1540,18 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_bad_prefix_value() {
+        // this testcase have prefix value of 160,
+        let raw_dns_message = "oAAAMgABAAAAAAABAAABAAAAACYAAC8BAAAAAaAAAAAAAA==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        assert!(DnsMessageParser::new(raw_query_message)
+            .parse_as_query_message()
+            .is_err());
+    }
+
+    #[test]
     fn test_parse_as_update_message() {
         let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
         let raw_update_message = BASE64
