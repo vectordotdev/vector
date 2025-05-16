@@ -12,13 +12,23 @@ then
   exit 1
 fi
 
-set -x
+#set -x
 
 TEST_TYPE=$1 # either "int" or "e2e"
 TEST_NAME=$2
 
+pwd
+ls -ltrR "${PWD}"/tests/data/e2e/datadog/
+docker --version
+docker compose version
+
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 sleep 30
+
+docker compose ls
+
+docker compose exec datadog-agent-1 ls -ltrR /etc/datadog-agent/
+
 cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
 
@@ -28,8 +38,8 @@ cd /home/runner/work/vector/vector/scripts/e2e/datadog-logs/
 docker compose logs > docker_logs.txt
 cat docker_logs.txt
 ls -ltr
-
 cd -
+
 cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
 
 # Only upload test results if CI is defined
