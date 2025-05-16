@@ -7,9 +7,10 @@ use std::{
 };
 
 use axum::{
+    error_handling::HandleErrorLayer,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
-    Router,
+    BoxError, Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
@@ -19,6 +20,8 @@ use tokio::{
     sync::{mpsc, oneshot, Mutex, Notify},
 };
 use tokio_util::codec::Decoder;
+use tower::ServiceBuilder;
+use tower_http::decompression::RequestDecompressionLayer;
 
 use crate::components::validation::{
     sync::{Configuring, TaskCoordinator},
@@ -485,12 +488,22 @@ where
                 }
             });
 
-        let router = Router::new().route(&request_path, method_router).fallback(
-            |req: Request<Body>| async move {
+        let router = Router::new()
+            .layer(
+                ServiceBuilder::new()
+                    .layer(HandleErrorLayer::new(|error: BoxError| async move {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Unhandled server error: {}", error),
+                        )
+                    }))
+                    .layer(RequestDecompressionLayer::new()),
+            )
+            .route(&request_path, method_router)
+            .fallback(|req: Request<Body>| async move {
                 error!(?req, "Component sent request the server could not route.");
                 StatusCode::NOT_FOUND
-            },
-        );
+            });
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();
