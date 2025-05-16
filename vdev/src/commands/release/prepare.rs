@@ -115,12 +115,12 @@ impl Prepare {
         git::run_and_check_output(&["fetch"])?;
         git::checkout_main_branch()?;
 
-        git::create_branch(self.release_branch.as_str())?;
+        git::checkout_or_create_branch(self.release_branch.as_str())?;
         git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
-        git::create_branch(self.release_preparation_branch.as_str())?;
+        git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
         git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         Ok(())
     }
