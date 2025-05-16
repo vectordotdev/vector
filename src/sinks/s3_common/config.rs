@@ -314,7 +314,8 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 
 #[derive(Debug, Clone)]
 pub struct S3RetryLogic {
-    pub retry_all_errors: bool,
+    pub retry_all_errors: Option<bool>,
+    pub errors_to_retry: Option<Vec<String>>,
 }
 
 impl RetryLogic for S3RetryLogic {
@@ -322,7 +323,9 @@ impl RetryLogic for S3RetryLogic {
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.retry_all_errors || is_retriable_error(error)
+        let retry_all_errors = self.retry_all_errors.unwrap_or(false);
+
+        retry_all_errors || is_retriable_error(error)
     }
 }
 

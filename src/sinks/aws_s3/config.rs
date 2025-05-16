@@ -149,8 +149,14 @@ pub struct S3SinkConfig {
     /// Whether or not to always retry every error
     ///
     /// By default, the sink will only retry attempts it deems to be "retriable", this setting overrides that behavior
-    #[serde(default = "crate::serde::default_false")]
-    pub retry_all_errors: bool,
+    #[serde(default)]
+    pub retry_all_errors: Option<bool>,
+
+    /// A list of specific error types to retry.
+    ///
+    /// By default, the sink will only retry attempts it deems to be "retriable", this setting supports specifying specific error types to retry.
+    #[configurable(metadata(docs::examples = "h2"))]
+    pub errors_to_retry: Option<Vec<String>>,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -180,7 +186,8 @@ impl GenerateConfig for S3SinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
-            retry_all_errors: Default::default(),
+            retry_all_errors: None,
+            errors_to_retry: Some(<Vec<String>>::new()),
         })
         .unwrap()
     }
@@ -221,6 +228,7 @@ impl S3SinkConfig {
                 request_limits,
                 S3RetryLogic {
                     retry_all_errors: self.retry_all_errors,
+                    errors_to_retry: self.errors_to_retry.clone(),
                 },
             )
             .service(service);
