@@ -32,23 +32,11 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
       # The Agent config file
-      - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/agent_only.yaml
-        target: /etc/datadog-agent/datadog.yaml
-        bind:
-          create_host_path: false
+      - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
       # The custom logs check
-      - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
-        target: /conf.d
-        read_only: true
-        bind:
-          create_host_path: false
+      - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
       # The custom log to tail, created by the `log_generator` service
-      - type: volume
-        source: log_path
-        target: /var/log/
-
+      - log_path:/var/log/
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `vector` service
