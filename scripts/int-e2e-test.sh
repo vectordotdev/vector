@@ -21,11 +21,21 @@ cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 sleep 30
 cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
+
+pwd
+ls -ltr
+cd /home/runner/work/vector/vector/scripts/e2e/datadog-logs/
+docker compose logs > docker_logs.txt
+cat docker_logs.txt
+ls -ltr
+
+cd -
 cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
 
 # Only upload test results if CI is defined
 if [[ -n "${CI:-}" ]]; then
   ./scripts/upload-test-results.sh
 fi
+
 
 exit $RET

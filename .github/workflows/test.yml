@@ -38,6 +38,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 60
     needs: changes
+    if: "!contains(github.event.pull_request.title, 'Do not merge')"
     env:
       CARGO_INCREMENTAL: 0
     steps:

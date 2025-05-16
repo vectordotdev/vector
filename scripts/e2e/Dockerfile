@@ -16,16 +16,8 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     libxxhash-dev \
     unzip \
     zlib1g-dev \
-    zlib1g
-
-RUN git clone https://github.com/rui314/mold.git \
-    && mkdir mold/build \
-    && cd mold/build \
-    && git checkout v2.0.0 \
-    && ../install-build-deps.sh \
-    && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=c++ .. \
-    && cmake --build . -j $(nproc) \
-    && cmake --install .
+    zlib1g \
+    mold
 
 RUN cargo install cargo-nextest --version 0.9.95 --locked
 
@@ -40,6 +32,6 @@ ARG FEATURES
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    /usr/local/bin/mold -run cargo build --tests --lib --bin vector \
+    /usr/bin/mold -run cargo build --tests --lib --bin vector \
     --no-default-features --features $FEATURES && \
     cp target/debug/vector /usr/bin/vector

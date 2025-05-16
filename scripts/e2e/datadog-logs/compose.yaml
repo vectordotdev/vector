@@ -16,6 +16,7 @@ services:
       - "log"
       - "-o"
       - "/var/log/a_custom.log"
+      - "-w"
     volumes:
       - log_path:/var/log/
 

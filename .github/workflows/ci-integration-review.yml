@@ -135,8 +135,18 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+          max_attempts: 1
+          command: |
+            bash scripts/int-e2e-test.sh e2e datadog-logs
+
+      - if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
+          || startsWith(github.event.review.body, '/ci-run-integration-all')
+          || startsWith(github.event.review.body, '/ci-run-all') }}
+        name: Upload Docker Logs as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: /home/runner/work/vector/vector/scripts/e2e/datadog-logs/docker_logs.txt
 
       - name: datadog-e2e-metrics
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
