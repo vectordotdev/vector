@@ -32,12 +32,12 @@ services:
     - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
-    # The Agent config file
-    - ${PWD}/tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
-    # The custom logs check
-    - ${PWD}/tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
-    # The custom log to tail, created by the `log_generator` service
-    - log_path:/var/log/
+      # The Agent config file
+      - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+      # The custom logs check
+      - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+      # The custom log to tail, created by the `log_generator` service
+      - log_path:/var/log/
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `vector` service
@@ -52,12 +52,12 @@ services:
     - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
-    # The Agent config file
-    - ${PWD}/tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
-    # The custom logs check
-    - ${PWD}/tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
-    # The custom log to tail, created by the `log_generator` service
-    - log_path:/var/log/
+      # The Agent config file
+      - ../../../tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+      # The custom logs check
+      - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+      # The custom log to tail, created by the `log_generator` service
+      - log_path:/var/log/
 
   # Receives log data from the `datadog-agent-vector` service and sends
   # to the `fakeintake-vector` service.
@@ -65,7 +65,7 @@ services:
     depends_on:
       - fakeintake-vector
     build:
-      context: ${PWD}
+      context: ../../..
     # re-using the integration test runner image since it already has
     # compiled vector on it.
     image: ${CONFIG_VECTOR_IMAGE}
@@ -79,7 +79,7 @@ services:
       - "-c"
       - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
     volumes:
-      - ${PWD}:/home/vector
+      - ../../..:/home/vector
 
   # Receives log data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
