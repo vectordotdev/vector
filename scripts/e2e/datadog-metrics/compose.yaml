@@ -27,7 +27,7 @@ services:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent
     volumes:
-    # The Agent config file
+      # The Agent config file
       - ../../../tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
 
   # Sends metric data received from the Emitter to the `vector` service
@@ -39,7 +39,7 @@ services:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent-vector
     volumes:
-    # The Agent config file
+      # The Agent config file
       - ../../../tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
 
   # Receives metric data from the `datadog-agent-vector` service and sends
