@@ -178,6 +178,7 @@ pub struct RootOpts {
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
     /// Set the internal log rate limit
+    /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(
         short,
         long,
