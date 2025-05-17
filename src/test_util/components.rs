@@ -49,6 +49,21 @@ pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
 /// The standard set of tags for all sources that read a file.
 pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
+/// The standard set of tags for the improved file source.
+pub const IFILE_SOURCE_TAGS: [&str; 1] = ["ifile"];
+
+/// The component test specification for the ifile source.
+pub static IFILE_SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
+    events: &["EventsSent"],
+    tagged_counters: &["component_received_bytes_total"],
+    untagged_counters: &[
+        "component_received_events_total",
+        "component_received_event_bytes_total",
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+});
+
 /// The most basic set of tags for sinks, regardless of whether or not they push data or have it pulled out.
 pub const SINK_TAGS: [&str; 1] = ["protocol"];
 
