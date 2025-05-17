@@ -12,5 +12,4 @@ services:
       - RABBITMQ_SSL_CACERTFILE=/code/tests/data/ca/intermediate_server/certs/ca-chain.cert.pem
       - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=false
     volumes:
-      - ${PWD}:/code
-
+      - ../../..:/code

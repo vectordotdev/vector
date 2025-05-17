@@ -111,6 +111,10 @@ pub fn check_git_repository_clean() -> Result<bool> {
         .map(|status| status.success())?)
 }
 
+pub fn add_files_in_current_dir() -> Result<String> {
+    Command::new("git").args(["add", "."]).check_output()
+}
+
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
@@ -145,7 +149,7 @@ pub fn checkout_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn checkout_main_branch() -> Result<()> {
-    let _output = run_and_check_output(&["checkout", "origin/master"])?;
+    let _output = run_and_check_output(&["switch", "master"])?;
     Ok(())
 }
 
@@ -160,4 +164,15 @@ pub fn run_and_check_output(args: &[&str]) -> Result<String> {
 
 fn is_warning_line(line: &str) -> bool {
     line.starts_with("warning: ") || line.contains("original line endings")
+}
+
+/// Returns a list of tracked files. If `pattern` is specified, it filters using that pattern.
+pub fn git_ls_files(pattern: Option<&str>) -> Result<Vec<String>> {
+    let args = match pattern {
+        Some(p) => vec!["ls-files", p],
+        None => vec!["ls-files"],
+    };
+
+    let output = run_and_check_output(&args)?;
+    Ok(output.lines().map(str::to_owned).collect())
 }

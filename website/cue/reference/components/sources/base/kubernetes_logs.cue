@@ -100,7 +100,7 @@ base: components: sources: kubernetes_logs: configuration: {
 
 			If your files share a common header that is not always a fixed size,
 
-			If the file has less than this amount of lines, it won’t be read at all.
+			If the file has less than this amount of lines, it won't be read at all.
 			"""
 		required: false
 		type: uint: {
