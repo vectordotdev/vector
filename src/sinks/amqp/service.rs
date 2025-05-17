@@ -10,6 +10,8 @@ use std::{
     task::{Context, Poll},
 };
 
+use super::channel::AmqpChannel;
+
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.
 pub(super) struct AmqpRequest {
@@ -79,7 +81,7 @@ impl DriverResponse for AmqpResponse {
 
 /// The tower service that handles the actual sending of data to `AMQP`.
 pub(super) struct AmqpService {
-    pub(super) channel: Arc<lapin::Channel>,
+    pub(super) channel: Arc<AmqpChannel>,
 }
 
 #[derive(Debug, Snafu)]
@@ -92,6 +94,9 @@ pub(super) enum AmqpError {
 
     #[snafu(display("Received Negative Acknowledgement from AMQP broker."))]
     Nack,
+
+    #[snafu(display("Failed to open AMQP channel: {}", error))]
+    ConnectFailed { error: vector_common::Error },
 }
 
 impl Service<AmqpRequest> for AmqpService {
@@ -109,6 +114,8 @@ impl Service<AmqpRequest> for AmqpService {
         let channel = Arc::clone(&self.channel);
 
         Box::pin(async move {
+            let channel = channel.channel().await?;
+
             let byte_size = req.body.len();
             let fut = channel
                 .basic_publish(
