@@ -205,9 +205,9 @@ mod tests {
         SinkDescription, SourceDescription, TransformDescription,
     };
 
-    use crate::config::Format;
+    use crate::config::{interpolate, Format};
     use crate::{
-        config::{cmd::serialize_to_json, vars, ConfigBuilder},
+        config::{cmd::serialize_to_json, ConfigBuilder},
         generate,
         generate::{generate_example, TransformInputsStrategy},
     };
@@ -250,7 +250,7 @@ mod tests {
         "#,
             env_var, env_var_in_arr
         );
-        let interpolated_config_source = vars::interpolate(
+        let interpolated_config_source = interpolate(
             config_source.as_ref(),
             &HashMap::from([
                 (env_var.to_string(), "syslog".to_string()),
