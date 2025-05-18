@@ -368,11 +368,11 @@ pub trait ComponentContainer {
         enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
     ) -> Result<Option<TransformOutput>, ()> {
-        if let Some(outputs) = self.transform_outputs(key, enrichment_tables, input_definitions) {
+        match self.transform_outputs(key, enrichment_tables, input_definitions) { Some(outputs) => {
             Ok(get_output_for_port(outputs, port))
-        } else {
+        } _ => {
             Err(())
-        }
+        }}
     }
 
     /// Gets the source output for the given port.
