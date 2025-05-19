@@ -899,6 +899,37 @@ mod tests {
     }
 
     #[test]
+    fn finds_row_with_index_and_wildcard() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let wildcard = "zip".to_string();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("nonexistent"),
+        };
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
+            ])),
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), Some(handle))
+        );
+    }
+
+    #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
             Default::default(),
@@ -1059,6 +1090,70 @@ mod tests {
                 }],
                 None,
                 None,
+                Some(handle)
+            )
+        );
+    }
+
+    #[test]
+    fn finds_rows_with_index_case_insensitive_and_wildcard() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
+        
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("nonexistent"),
+                }],
+                None,
+                Some(&"zip".to_string()),
+                Some(handle)
+            )
+        );
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("ZiP"),
+                }],
+                None,
+                Some(&"ZiP".to_string()),
                 Some(handle)
             )
         );
@@ -1306,6 +1401,34 @@ mod tests {
         assert_eq!(
             Err("no rows found in index".to_string()),
             file.find_table_row(Case::Sensitive, &[condition], None, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn doesnt_find_row_with_index_and_wildcard() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let wildcard = "nonexistent".to_string();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zorp"),
+        };
+
+        assert_eq!(
+            Err("no rows found in index".to_string()),
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), Some(handle))
         );
     }
 }
