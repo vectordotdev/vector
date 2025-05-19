@@ -29,11 +29,6 @@ fn find_enrichment_table_records(
         })
         .transpose()?;
 
-    let wildcard = wildcard
-        .map(|value| -> Result<String, ValueError> {
-            Ok(value.try_bytes_utf8_lossy()?.to_string())
-        })
-        .transpose()?;
     let data = enrichment_tables
         .find_table_rows(
             table,

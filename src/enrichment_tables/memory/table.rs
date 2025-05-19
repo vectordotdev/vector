@@ -243,7 +243,7 @@ impl Table for Memory {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
@@ -260,7 +260,7 @@ impl Table for Memory {
         _case: Case,
         condition: &'a [Condition<'a>],
         _select: Option<&'a [String]>,
-        _wildcard: Option<&String>,
+        _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {

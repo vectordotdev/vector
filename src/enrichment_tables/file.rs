@@ -300,7 +300,7 @@ impl File {
         case: Case,
         condition: &[Condition],
         row: &[Value],
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
     ) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
@@ -309,10 +309,22 @@ impl File {
                     (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
                             (Ok(s1), Ok(s2)) => {
+                                let field_matches_condition = s1.to_lowercase() == s2.to_lowercase();
+                                
                                 if let Some(wildcard_val) = wildcard {
-                                    s1.to_lowercase().to_string() == wildcard_val.to_lowercase().to_string() || s1.to_lowercase() == s2.to_lowercase()
+                                    match wildcard_val {
+                                        Value::Bytes(wc_bytes) => {
+                                            if let Ok(wc_str) = std::str::from_utf8(wc_bytes) {
+                                                field_matches_condition || s1.to_lowercase() == wc_str.to_lowercase()
+                                            } else {
+                                                // If wildcard isn't valid UTF-8, compare raw bytes
+                                                field_matches_condition || bytes1 == wc_bytes
+                                            }
+                                        }
+                                        _ => field_matches_condition || &row[idx] == wildcard_val
+                                    }
                                 } else {
-                                    s1.to_lowercase() == s2.to_lowercase()
+                                    field_matches_condition
                                 }
                             }
                             (Err(_), Err(_)) => bytes1 == bytes2,
@@ -320,10 +332,12 @@ impl File {
                         }
                     }
                     (_, value1, value2) => {
+                        let field_matches_condition = value1 == value2;
+                        
                         if let Some(wildcard_val) = wildcard {
-                            value1.to_string() == wildcard_val.to_string() || value1 == value2
+                            field_matches_condition || value1 == wildcard_val
                         } else {
-                            value1 == value2
+                            field_matches_condition
                         }
                     }
                 },
@@ -440,7 +454,7 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-        wildcard: Option<&'a String>,
+        wildcard: Option<&'a Value>,
     ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
@@ -525,7 +539,7 @@ impl Table for File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         match index {
@@ -551,7 +565,7 @@ impl Table for File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match index {
@@ -844,7 +858,7 @@ mod tests {
             },
         );
 
-        let wildcard = "zirp".to_string();
+        let wildcard = Value::from("zirp");
 
         let condition = Condition::Equals {
             field: "field1",
@@ -955,7 +969,7 @@ mod tests {
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
-        let wildcard = "zip".to_string();
+        let wildcard = Value::from("zip");
 
         let condition = Condition::Equals {
             field: "field1",
@@ -1178,7 +1192,7 @@ mod tests {
                     value: Value::from("nonexistent"),
                 }],
                 None,
-                Some(&"zip".to_string()),
+                Some(&Value::from("zip")),
                 Some(handle)
             )
         );
@@ -1201,7 +1215,7 @@ mod tests {
                     value: Value::from("ZiP"),
                 }],
                 None,
-                Some(&"ZiP".to_string()),
+                Some(&Value::from("ZiP")),
                 Some(handle)
             )
         );
@@ -1467,7 +1481,7 @@ mod tests {
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
-        let wildcard = "nonexistent".to_string();
+        let wildcard = Value::from("nonexistent");
 
         let condition = Condition::Equals {
             field: "field1",

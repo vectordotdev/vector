@@ -10,7 +10,7 @@ impl enrichment::Table for TestEnrichmentTable {
         _case: enrichment::Case,
         _condition: &'a [enrichment::Condition<'a>],
         _select: Option<&[String]>,
-        _wildcard: Option<&String>,
+        _wildcard: Option<&Value>,
         _index: Option<enrichment::IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let mut result = ObjectMap::new();
@@ -26,7 +26,7 @@ impl enrichment::Table for TestEnrichmentTable {
         _case: enrichment::Case,
         _condition: &'a [enrichment::Condition<'a>],
         _select: Option<&[String]>,
-        _wildcard: Option<&String>,
+        _wildcard: Option<&Value>,
         _index: Option<enrichment::IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         let mut result1 = ObjectMap::new();

@@ -264,7 +264,7 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
@@ -284,7 +284,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
-        _wildcard: Option<&String>,
+        _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {

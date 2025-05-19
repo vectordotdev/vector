@@ -35,7 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use vrl::value::ObjectMap;
+use vrl::value::{ObjectMap, Value};
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -216,7 +216,7 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
@@ -239,7 +239,7 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
-        wildcard: Option<&String>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
