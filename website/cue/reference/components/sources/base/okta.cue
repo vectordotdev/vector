@@ -29,7 +29,7 @@ base: components: sources: okta: configuration: {
 	since: {
 		description: """
 			The time to look back for logs. This is used to determine the start time of the first request
-			(ie, the earliest log to fetch)
+			(that is, the earliest log to fetch)
 			"""
 		required: false
 		type: uint: {}
