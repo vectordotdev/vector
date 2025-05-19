@@ -1190,7 +1190,7 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &conditions, None, None, Some(handle))
         );
     }
 
@@ -1253,7 +1253,7 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &conditions, None, None, Some(handle))
         );
     }
 
