@@ -394,10 +394,7 @@ impl DnstapParser {
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
             let timestamp = Utc
-                .timestamp_opt(
-                    time_sec.try_into().map_err(|_| "Cannot parse timestamp")?,
-                    query_time_nsec,
-                )
+                .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
                 .ok_or_else(|| "Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
