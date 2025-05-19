@@ -12,7 +12,7 @@ releases: "0.47.0": {
 		Release highlights:
 
 		- The `opentelemetry` source now supports metrics ingestion.
-		- A new `window` transform has been introduced which enables log noise reduction by filtering out events when the system is healthy.
+		- A new `window` transform has been introduced which enables log noise reduction by filtering out events when the system is in a healthy state.
 		- A new `mqtt` source is now available, enabling ingestion from MQTT brokers.
 		- The `datadog_logs` sink now supports a new `conforms_as_agent` option to format logs like the Datadog Agent, ensuring compatibility with reserved fields.
 		"""
@@ -159,7 +159,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Increas the max event size for `aws_cloudwatch_logs` sink to ~1MB.
+				Increase the max event size for `aws_cloudwatch_logs` sink to ~1MB.
 				"""
 			contributors: ["cahartma"]
 		},
