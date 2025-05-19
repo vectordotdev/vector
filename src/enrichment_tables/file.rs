@@ -310,7 +310,7 @@ impl File {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
                             (Ok(s1), Ok(s2)) => {
                                 if let Some(wildcard_val) = wildcard {
-                                    s2 == wildcard_val || s1.to_lowercase() == s2.to_lowercase()
+                                    s1.to_lowercase().to_string() == wildcard_val.to_lowercase().to_string() || s1.to_lowercase() == s2.to_lowercase()
                                 } else {
                                     s1.to_lowercase() == s2.to_lowercase()
                                 }
@@ -321,7 +321,7 @@ impl File {
                     }
                     (_, value1, value2) => {
                         if let Some(wildcard_val) = wildcard {
-                            value2.to_string() == *wildcard_val || value1 == value2
+                            value1.to_string() == wildcard_val.to_string() || value1 == value2
                         } else {
                             value1 == value2
                         }
@@ -827,6 +827,42 @@ mod tests {
                 ("field2".into(), Value::from("zurp")),
             ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None, None)
+        );
+    }
+
+    #[test]
+    fn finds_row_with_wildcard() {
+        let file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let wildcard = "zirp".to_string();
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("nonexistent"),
+        };
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
+            ])),
+            file.find_table_row(
+                Case::Sensitive,
+                &[condition],
+                None,
+                Some(&wildcard),
+                None
+            )
         );
     }
 
