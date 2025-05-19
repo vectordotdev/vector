@@ -477,6 +477,7 @@ impl File {
     fn indexed<'a>(
         &'a self,
         case: Case,
+        wildcard: Option<&'a Value>,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
     ) -> Result<Option<&'a Vec<usize>>, String> {
@@ -555,7 +556,7 @@ impl Table for File {
             }
             Some(handle) => {
                 let result = self
-                    .indexed(case, condition, handle)?
+                    .indexed(case, wildcard, condition, handle)?
                     .ok_or_else(|| "no rows found in index".to_string())?
                     .iter()
                     .map(|idx| &self.data[*idx]);
@@ -585,7 +586,7 @@ impl Table for File {
                 // Perform a sequential scan over the indexed result.
                 Ok(self
                     .sequential(
-                        self.indexed(case, condition, handle)?
+                        self.indexed(case, wildcard, condition, handle)?
                             .iter()
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                         case,
