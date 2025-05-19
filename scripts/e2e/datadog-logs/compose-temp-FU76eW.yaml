@@ -1,0 +1,72 @@
+services:
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    volumes:
+    - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+    - log_path:/var/log/
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+    - DD_CONTAINER_EXCLUDE="name:.*"
+    depends_on:
+    - fakeintake-agent
+  datadog-agent-vector:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    volumes:
+    - ../../../tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+    - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+    - log_path:/var/log/
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent-vector
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+    - DD_CONTAINER_EXCLUDE="name:.*"
+    depends_on:
+    - vector
+  fakeintake-agent:
+    image: docker.io/datadog/fakeintake:ved764626
+  fakeintake-vector:
+    image: docker.io/datadog/fakeintake:ved764626
+  log_generator:
+    image: docker.io/mingrammer/flog
+    command:
+    - -f
+    - json
+    - -n
+    - '1000'
+    - -t
+    - log
+    - -o
+    - /var/log/a_custom.log
+    - -w
+    volumes:
+    - log_path:/var/log/
+    depends_on:
+    - datadog-agent-vector
+    - datadog-agent
+  vector:
+    image: ${CONFIG_VECTOR_IMAGE}
+    build:
+      context: ../../..
+    command:
+    - /usr/bin/vector
+    - -vvv
+    - -c
+    - /home/vector/tests/data/e2e/datadog/logs/vector.toml
+    volumes:
+    - ../../..:/home/vector
+    environment:
+    - FEATURES=e2e-tests-datadog
+    depends_on:
+    - fakeintake-vector
+volumes:
+  log_path: {}
+  target: {}
+networks:
+  default:
+    external: 'true'
+    name: vector-integration-tests-datadog-logs
