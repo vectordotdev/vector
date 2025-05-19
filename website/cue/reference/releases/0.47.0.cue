@@ -145,21 +145,21 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed `file` source bug where known small files were not deleted after the specified `remove_after_secs`.
+				Fix `file` source bug where known small files were not deleted after the specified `remove_after_secs`.
 				"""
 			contributors: ["linw1995"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed a AWS authentication bug where `region` was missing from the `STS` authentication endpoint.
+				Fix an AWS authentication bug where `region` was missing from the `STS` authentication endpoint.
 				"""
 			contributors: ["cahartma"]
 		},
 		{
 			type: "fix"
 			description: """
-				Increased the max event size for `aws_cloudwatch_logs` sink to ~ 1MB.
+				Increas the max event size for `aws_cloudwatch_logs` sink to ~1MB.
 				"""
 			contributors: ["cahartma"]
 		},
@@ -173,14 +173,14 @@ releases: "0.47.0": {
 		{
 			type: "feat"
 			description: """
-				Added support for the `Sec-WebSocket-Protocol` header in the `websocket_server` sink to better accommodate clients that require it.
+				Add support for the `Sec-WebSocket-Protocol` header in the `websocket_server` sink to better accommodate clients that require it.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "enhancement"
 			description: """
-				Reduced unnecessary buffer reallocation when using `framing.method = length_delimited` in sinks for significantly improved performance with large (more than 10MB) batches.
+				Reduce unnecessary buffer reallocation when using `framing.method = length_delimited` in sinks for significantly improved performance with large (more than 10MB) batches.
 				"""
 			contributors: ["Ilmarii"]
 		},
@@ -201,7 +201,7 @@ releases: "0.47.0": {
 		{
 			type: "feat"
 			description: """
-				Added `timeout` config option to the `healthcheck` sink configuration. Previously it was hardcoded to 10 seconds across all components, but now it can be configured per component.
+				Add `timeout` config option to the `healthcheck` sink configuration. Previously it was hardcoded to 10 seconds across all components, but now it can be configured per component.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -243,7 +243,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a bug that allowed DNS records with an IPv6 prefix length greater than 128 to be transmitted; invalid prefixes are now rejected during parsing.
+				Fix a bug that allows DNS records with an IPv6 prefix length greater than 128 to be transmitted; invalid prefixes are now rejected during parsing.
 				"""
 			contributors: ["wooffie"]
 		},
