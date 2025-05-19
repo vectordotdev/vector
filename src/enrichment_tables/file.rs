@@ -295,7 +295,13 @@ impl File {
     }
 
     /// Does the given row match all the conditions specified?
-    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Value], wildcard: Option<&String>) -> bool {
+    fn row_equals(
+        &self,
+        case: Case,
+        condition: &[Condition],
+        row: &[Value],
+        wildcard: Option<&String>,
+    ) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
@@ -925,7 +931,13 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), Some(handle))
+            file.find_table_row(
+                Case::Sensitive,
+                &[condition],
+                None,
+                Some(&wildcard),
+                Some(handle)
+            )
         );
     }
 
@@ -1111,7 +1123,7 @@ mod tests {
         );
 
         let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
-        
+
         assert_eq!(
             Ok(vec![
                 ObjectMap::from([
@@ -1428,7 +1440,13 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), Some(handle))
+            file.find_table_row(
+                Case::Sensitive,
+                &[condition],
+                None,
+                Some(&wildcard),
+                Some(handle)
+            )
         );
     }
 }

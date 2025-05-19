@@ -887,4 +887,3 @@ mod tests {
         assert!(!log.value().is_empty());
     }
 }
-

@@ -173,7 +173,9 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
         let table = &self.table;
         let case_sensitive = self.case_sensitive;
-        let wildcard = self.wildcard.as_ref()
+        let wildcard = self
+            .wildcard
+            .as_ref()
             .map(|array| array.resolve(ctx))
             .transpose()?;
         let index = self.index;
