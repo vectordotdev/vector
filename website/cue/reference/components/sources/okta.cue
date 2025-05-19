@@ -164,7 +164,7 @@ components: sources: okta: {
 			title: "API Token"
 			body: """
 				The `okta` source uses the Okta HTTP API, you will need to generate an API token in the
-				Okta admin console with sufficient permissions
+				Okta admin console with sufficient permissions.
 				"""
 		}
 		lookback: {
