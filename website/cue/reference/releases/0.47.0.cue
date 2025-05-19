@@ -215,7 +215,7 @@ releases: "0.47.0": {
 		{
 			type: "feat"
 			description: """
-				Added `wildcard_matching` global config option to set wildcard matching mode for inputs. Relaxed mode allows configurations with wildcards that do not match any inputs to be accepted without causing an error.
+				Add `wildcard_matching` global config option to set wildcard matching mode for inputs. Relaxed mode allows configurations with wildcards that do not match any inputs to be accepted without causing an error.
 				
 				Example config:
 				
@@ -250,7 +250,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Added checks to prevent invalid timestamps operations during DNS tap parsing; such operations are now validated to ensure correctness.
+				Add checks to prevent invalid timestamps operations during DNS tap parsing; such operations are now validated to ensure correctness.
 				"""
 			contributors: ["wooffie"]
 		},
@@ -264,20 +264,18 @@ releases: "0.47.0": {
 		{
 			type: "enhancement"
 			description: """
-				The `amqp` sink now supports setting the `priority` for messages. The priority value can be templated to an integer between 0 and 255 (inclusive). Also, this new field is template-able and Vector templates can now render numerical values.
+				The `amqp` sink now supports setting the `priority` for messages. The value can be templated to an integer 0-255 (inclusive).
 				"""
 			contributors: ["aramperes"]
 		},
 		{
 			type: "fix"
 			description: """
-				Added an option in the `datadog_logs` sink to allow Vector to mutate the record to conform to the
-				protocol used by the Datadog Agent itself. To enable use the `conforms_as_agent` option or have the
+				Add an option in the `datadog_logs` sink to allow Vector to mutate the record to conform to the
+				protocol used by the Datadog Agent itself. To enable, use the `conforms_as_agent` option or have the
 				appropriate agent header (`DD-PROTOCOL: agent-json`) within the additional HTTP Headers list.
 				
-				The log will be mutated so that any data that is a reserved keyword that exists at the root will be
-				moved under a new object keyed at the field 'message'. One will be created if it already does not
-				exist. As an example:
+				Any top-level fields that use Datadog-reserved keywords are moved into a new object named `message`. If `message` doesn’t exist, it is created first. For example:
 				
 				```json
 				{
@@ -306,22 +304,22 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a bug in the `datadog_logs` sink where the content of the log message is dropped when logs namespacing is enabled.
+				Fix a bug in the `datadog_logs` sink where the content of the log message is dropped when logs namespacing is enabled.
 				"""
 			contributors: ["graphcareful"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed misleading error message for invalid field name in gelf encoder.
+				Fix misleading error message for invalid field name in gelf encoder.
 				"""
 			contributors: ["mprasil"]
 		},
 		{
 			type: "enhancement"
 			description: """
-				Added deferred.max_age_secs and deferred.queue_url options to the aws_s3 and aws_sqs sinks to automatically
-				route older event notifications to a separate queue, allowing prioritized processing of recent files.
+				Add `deferred.max_age_secs` and `deferred.queue_url` options to the `aws_s3` and `aws_sqs` sinks to automatically.
+				Route older event notifications to a separate queue, allowing prioritized processing of recent files.
 				"""
 			contributors: ["akutta"]
 		},
