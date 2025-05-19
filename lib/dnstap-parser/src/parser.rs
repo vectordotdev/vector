@@ -396,7 +396,7 @@ impl DnstapParser {
             let timestamp = Utc
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
-                .ok_or_else(|| "Invalid timestamp")?;
+                .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 DnstapParser::insert(event, prefix.clone(), timestamp_key, timestamp);
             }
