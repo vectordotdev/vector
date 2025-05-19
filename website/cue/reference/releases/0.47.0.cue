@@ -12,7 +12,7 @@ releases: "0.47.0": {
 		Release highlights:
 
 		- The `opentelemetry` source now supports metrics ingestion.
-		- A new `window` transform has been introduced which enables log noise reduction by filtering out events during healthy state.
+		- A new `window` transform has been introduced which enables log noise reduction by filtering out events when the system is healthy.
 		- A new `mqtt` source is now available, enabling ingestion from MQTT brokers.
 		- The `datadog_logs` sink now supports a new `conforms_as_agent` option to format logs like the Datadog Agent, ensuring compatibility with reserved fields.
 		"""
@@ -22,10 +22,10 @@ releases: "0.47.0": {
 
 		#### Enhancements
 
-		- The `encode_gzip`, `decode_gzip`, `encode_zlib` and `decode_zlib` methods now uses the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend
+		- The `encode_gzip`, `decode_gzip`, `encode_zlib`, and `decode_zlib` methods now use the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend.
 			which is much faster than the previous backend `miniz_oxide`.
 
-		- The `decode_base64`, `encode_base64` and `decode_mime_q` functions now use the SIMD backend
+		- The `decode_base64`, `encode_base64`, and `decode_mime_q` functions now use the SIMD backend.
 			which is faster than the previous backend.
 
 		#### Fixes
@@ -53,7 +53,7 @@ releases: "0.47.0": {
 		{
 			type: "feat"
 			description: """
-				Adds a new `mqtt` source enabling Vector to receive logs from a MQTT broker.
+				Add a new `mqtt` source enabling Vector to receive logs from a MQTT broker.
 				"""
 			contributors: ["mladedav", "pront", "StormStake"]
 		},
@@ -67,21 +67,21 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a Vector crash that occurred when the internal metrics generated a lot of groups by increasing groups max limit from 128 to 256.
+				Fix a Vector crash that occurred when the internal metrics generated too many groups by increasing groups max limit from 128 to 256.
 				"""
 			contributors: ["triggerhappy17"]
 		},
 		{
 			type: "feat"
 			description: """
-				Allows users to specify AWS authentication and the AWS service name for HTTP sinks to support AWS API endpoints that require SigV4.
+				Allow users to specify AWS authentication and the AWS service name for HTTP sinks to support AWS API endpoints that require SigV4.
 				"""
 			contributors: ["johannesfloriangeiger"]
 		},
 		{
 			type: "feat"
 			description: """
-				Add support for fluentd forwarding over a unix socket
+				Add support for fluentd forwarding over a Unix socket
 				"""
 			contributors: ["tustvold"]
 		},
@@ -102,10 +102,10 @@ releases: "0.47.0": {
 		{
 			type: "chore"
 			description: """
-				Added a new `extra_headers` option to `greptimedb_logs` sink configuration to set additional headers for outgoing requests.
+				Add a new `extra_headers` option to `greptimedb_logs` sink configuration to set additional headers for outgoing requests.
 				
-				change `greptimedb_logs` sink default content type to `application/x-ndjson` to match the default content type of `greptimedb` sink
-				if you use the greptimedb version v0.12 or earlier, you need to set the content type to `application/json` in the sink configuration
+				Change `greptimedb_logs` sink default content type to `application/x-ndjson` to match the default content type of `greptimedb` sink.
+				If you use the greptimedb version v0.12 or earlier, you need to set the content type to `application/json` in the sink configuration.
 				
 				Example:
 				
@@ -138,7 +138,7 @@ releases: "0.47.0": {
 		{
 			type: "feat"
 			description: """
-				This change introduces a new configuration option in the StatsD source: `convert_to` of type `ConversionUnit`. By default, timing values in milliseconds (`ms`) are converted to seconds (`s`). Users can set `convert_to` to `"milliseconds"` to preserve the original millisecond values.
+				Introduce a configuration option in the StatsD source: `convert_to` of type `ConversionUnit`. By default, timing values in milliseconds (`ms`) are converted to seconds (`s`). Users can set `convert_to` to `milliseconds` to preserve the original millisecond values.
 				"""
 			contributors: ["devkoriel"]
 		},
