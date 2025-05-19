@@ -6,34 +6,57 @@ releases: "0.47.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.47.0`!
+
+		Release highlights:
+
+		- The `opentelemetry` source now supports metrics ingestion.
+		- A new `window` transform has been introduced which enables log noise reduction by filtering out events during healthy state.
+		- A new `mqtt` source is now available, enabling ingestion from MQTT brokers.
+		- The `datadog_logs` sink now supports a new `conforms_as_agent` option to format logs like the Datadog Agent, ensuring compatibility with reserved fields.
+		"""
+
+	vrl_changelog: """
+		VRL was updated to `v0.24.0`. This includes the following changes:
+
+		#### Enhancements
+
+		- The `encode_gzip`, `decode_gzip`, `encode_zlib` and `decode_zlib` methods now uses the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend
+			which is much faster than the previous backend `miniz_oxide`.
+
+		- The `decode_base64`, `encode_base64` and `decode_mime_q` functions now use the SIMD backend
+			which is faster than the previous backend.
+
+		#### Fixes
+
+		- Add BOM stripping logic to the parse_json function.
+		"""
+
 	changelog: [
 		{
 			type: "feat"
 			description: """
-					### [0.24.0 (2025-05-19)]
-					
-					#### Enhancements
-					
-					- The `encode_gzip`, `decode_gzip`, `encode_zlib` and `decode_zlib` methods now uses the [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs) backend
-					which is much faster than the previous backend `miniz_oxide`.
-					
-					authors: JakubOnderka (https://github.com/vectordotdev/vrl/pull/1301)
-					- The `decode_base64`, `encode_base64` and `decode_mime_q` functions now use the SIMD backend
-					which is faster than the previous backend.
-					
-					authors: JakubOnderka (https://github.com/vectordotdev/vrl/pull/1379)
-					
-					#### Fixes
-					
-					- Add BOM stripping logic to the parse_json function.
-					
-					authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1370)
-					
-					
-					### [0.23.0 (2025-04-03)]
-        """
+				The `opentelemetry` source now supports metrics ingestion.
+				"""
+			contributors: ["cmcmacs"]
 		},
-
+		{
+			type: "feat"
+			description: """
+				Add a new `window` transform, a variant of ring buffer or backtrace logging implemented as a sliding window.
+				Allows for reduction of log volume by filtering out logs when the system is healthy, but preserving detailed
+				logs when they are most relevant.
+				"""
+			contributors: ["ilinas"]
+		},
+		{
+			type: "feat"
+			description: """
+				Adds a new `mqtt` source enabling Vector to receive logs from a MQTT broker.
+				"""
+			contributors: ["mladedav", "pront", "StormStake"]
+		},
 		{
 			type: "feat"
 			description: """
@@ -44,16 +67,9 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fix a Vector crash that occurred when the internal metrics generated a lot of  groups by increasing groups max limit from 128 to 256.
+				Fix a Vector crash that occurred when the internal metrics generated a lot of groups by increasing groups max limit from 128 to 256.
 				"""
 			contributors: ["triggerhappy17"]
-		},
-		{
-			type: "feat"
-			description: """
-				Adds a new `mqtt` source enabling Vector to receive logs from a MQTT broker.
-				"""
-			contributors: ["mladedav", "pront", "StormStake"]
 		},
 		{
 			type: "feat"
@@ -262,7 +278,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Adding an option in the `datadog_logs` sink to allow Vector to mutate the record to conform to the
+				Added an option in the `datadog_logs` sink to allow Vector to mutate the record to conform to the
 				protocol used by the Datadog Agent itself. To enable use the `conforms_as_agent` option or have the
 				appropriate agent header (`DD-PROTOCOL: agent-json`) within the additional HTTP Headers list.
 				
@@ -309,27 +325,11 @@ releases: "0.47.0": {
 			contributors: ["mprasil"]
 		},
 		{
-			type: "feat"
-			description: """
-				The `opentelemetry` source now supports metrics ingestion.
-				"""
-			contributors: ["cmcmacs"]
-		},
-		{
 			type: "enhancement"
 			description: """
 				Add deferred processing options (`deferred.max_age_secs`, `deferred.queue_url`) to automatically route older event notifications to a separate queue, enabling prioritized processing of recent files
 				"""
 			contributors: ["akutta"]
-		},
-		{
-			type: "feat"
-			description: """
-				Add a new `window` transform, a variant of ring buffer or backtrace logging implemented as a sliding window.
-				Allows for reduction of log volume by filtering out logs when the system is healthy, but preserving detailed
-				logs when they are most relevant.
-				"""
-			contributors: ["ilinas"]
 		},
 	]
 
