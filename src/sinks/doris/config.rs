@@ -86,6 +86,13 @@ pub struct DorisConfig {
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
+    /// Buffer size for controlling the number of concurrent stream load requests.
+    /// A value of 1 ensures only one request is processed at a time.
+    #[configurable(metadata(docs::examples = 1))]
+    #[configurable(metadata(docs::human_name = "Concurrent Stream Load Requests"))]
+    #[serde(default = "default_buffer_bound")]
+    pub buffer_bound: usize,
+
     #[configurable(derived)]
     pub auth: Option<Auth>,
 
@@ -129,6 +136,10 @@ fn default_log_progress_interval() -> u64 {
 
 fn default_max_retries() -> isize {
     -1
+}
+
+fn default_buffer_bound() -> usize {
+    1
 }
 
 impl_generate_config_from_default!(DorisConfig);
@@ -214,7 +225,7 @@ impl SinkConfig for DorisConfig {
             services,
             health_config,
             DorisHealthLogic,
-            1,
+            self.buffer_bound,
         );
 
         // Create DorisSink with the configured service
