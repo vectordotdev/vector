@@ -318,8 +318,8 @@ releases: "0.47.0": {
 		{
 			type: "enhancement"
 			description: """
-				Add `deferred.max_age_secs` and `deferred.queue_url` options to the `aws_s3` and `aws_sqs` sinks to automatically.
-				Route older event notifications to a separate queue, allowing prioritized processing of recent files.
+				Add `deferred.max_age_secs` and `deferred.queue_url` options to the `aws_s3` and `aws_sqs` sinks, to automatically
+				route older event notifications to a separate queue, allowing prioritized processing of recent files.
 				"""
 			contributors: ["akutta"]
 		},
