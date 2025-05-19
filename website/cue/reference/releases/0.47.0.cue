@@ -67,7 +67,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fix a Vector crash that occurred when the internal metrics generated a lot of groups by increasing groups max limit from 128 to 256.
+				Fixed a Vector crash that occurred when the internal metrics generated a lot of groups by increasing groups max limit from 128 to 256.
 				"""
 			contributors: ["triggerhappy17"]
 		},
@@ -88,7 +88,7 @@ releases: "0.47.0": {
 		{
 			type: "enhancement"
 			description: """
-				Replaced miniz_oxide backend for zlib compression with zlib-rs for significantly improved compression performance. zlib-rs provides 2-3x performance improvements for compression, and ~20% improvements for decompression than miniz_oxide.
+				Zlib compression and decompression are now more efficient by using [zlib-rs](https://github.com/trifectatechfoundation/zlib-rs).
 				"""
 			contributors: ["JakubOnderka"]
 		},
@@ -152,21 +152,21 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a `AwsAuthentication::File` bug where `region` was missing from the `STS` authentication endpoint.
+				Fixed a AWS authentication bug where `region` was missing from the `STS` authentication endpoint.
 				"""
 			contributors: ["cahartma"]
 		},
 		{
 			type: "fix"
 			description: """
-				Increase the max event size for `aws_cloudwatch_logs` sink based on newly increased limit from `AWS`
+				Increased the max event size for `aws_cloudwatch_logs` sink to ~ 1MB.
 				"""
 			contributors: ["cahartma"]
 		},
 		{
 			type: "feat"
 			description: """
-				Enabled IP address access in VRL scripts of custom auth strategy for server components.
+				The `address` field is now available within VRL scripts when using the `auth.strategy.custom` authentication method.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -176,13 +176,6 @@ releases: "0.47.0": {
 				Added support for the `Sec-WebSocket-Protocol` header in the `websocket_server` sink to better accommodate clients that require it.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
-		},
-		{
-			type: "feat"
-			description: """
-				Added the ability to generate JUnit reports for unit tests.
-				"""
-			contributors: ["simplepad"]
 		},
 		{
 			type: "enhancement"
@@ -250,14 +243,14 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a bug that allowed a record to be transmitted with an IPv6 prefix larger than allowed (128) in `dnsmsg_parser::DnsMessageParser` parse functions.
+				Fixed a bug that allowed DNS records with an IPv6 prefix length greater than 128 to be transmitted; invalid prefixes are now rejected during parsing.
 				"""
 			contributors: ["wooffie"]
 		},
 		{
 			type: "fix"
 			description: """
-				Added checks for integer operations with timestamps which used in `dnstap-parser::DnstapParser::parse`.
+				Added checks to prevent invalid timestamps operations during DNS tap parsing; such operations are now validated to ensure correctness.
 				"""
 			contributors: ["wooffie"]
 		},
@@ -313,7 +306,7 @@ releases: "0.47.0": {
 		{
 			type: "fix"
 			description: """
-				Fix bug in the `datadog_logs` sink where the content of the log message is dropped when logs namespacing is enabled.
+				Fixed a bug in the `datadog_logs` sink where the content of the log message is dropped when logs namespacing is enabled.
 				"""
 			contributors: ["graphcareful"]
 		},
@@ -327,7 +320,8 @@ releases: "0.47.0": {
 		{
 			type: "enhancement"
 			description: """
-				Add deferred processing options (`deferred.max_age_secs`, `deferred.queue_url`) to automatically route older event notifications to a separate queue, enabling prioritized processing of recent files
+				Added deferred.max_age_secs and deferred.queue_url options to the aws_s3 and aws_sqs sinks to automatically
+				route older event notifications to a separate queue, allowing prioritized processing of recent files.
 				"""
 			contributors: ["akutta"]
 		},
