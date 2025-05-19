@@ -233,7 +233,7 @@ impl DorisSinkClient {
                     let redirect_req = self
                         .build_request(&database, &table, payload_ref, Some(location_str))
                         .await?;
-                    
+
                     response = self.http_client.send(redirect_req).await?;
                     status = response.status();
 
