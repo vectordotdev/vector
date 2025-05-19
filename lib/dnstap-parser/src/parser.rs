@@ -1387,24 +1387,32 @@ mod tests {
         }
         // all bad cases which can panic
         {
-            let mut message = DnstapMessage::default();
-            message.query_address = Some(vec![]);
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
             assert!(test_one_input(1, message).is_err());
         }
         {
-            let mut message = DnstapMessage::default();
-            message.query_address = Some(vec![]);
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
             assert!(test_one_input(2, message).is_err());
         }
 
         {
-            let mut message = DnstapMessage::default();
-            message.response_address = Some(vec![]);
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
             assert!(test_one_input(1, message).is_err());
         }
         {
-            let mut message = DnstapMessage::default();
-            message.response_address = Some(vec![]);
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
             assert!(test_one_input(2, message).is_err());
         }
     }
