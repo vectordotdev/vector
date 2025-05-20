@@ -11,18 +11,23 @@ labels: "domain: releasing"
 Note the preparation steps are now automated. You can run:
 
 ```shell
-export NEW_VERSION=0.47.0
+export NEW_VERSION=0.47.0 # replace this with the actual new version
 export MINOR_VERSION=$(echo "$NEW_VERSION" | cut -d. -f2)
 export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
-vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version 0.24.0
+export NEW_VRL_VERSION=0.42.0 # replace this the actual new VRL version
 ```
 
 A new release CUE file will be created in `website/cue/reference/releases/"${NEW_VERSION_NUMBER}".cue`. This will require editing and careful review.
 
 # The week before the release
 
-> This is the old manual process. You can validate that all these steps were performed by the automation above.
+The following steps are now automated. Run the following:
+
+```shell
+vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VERSION
+```
+
 
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
 - [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
