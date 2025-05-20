@@ -20,12 +20,12 @@ export NEW_VRL_VERSION=0.42.0 # replace this the actual new VRL version
 
 # The week before the release
 
-## Manual Steps 1
+## 1. Manual Steps
 
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 
-## Automated Steps
+## 2. Automated Steps
 
 Run the following:
 
@@ -53,7 +53,7 @@ Automated steps include:
 - [ ] Commit these changes
 - [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
 
-## Manual Steps 3
+## 3. Manual Steps
 
 - [ ] Edit `website/cue/reference/releases/"${NEW_VERSION_NUMBER}".cue`
   - [ ] Add description key to the generated cue file with a description of the release (see
