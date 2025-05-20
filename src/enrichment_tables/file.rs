@@ -305,16 +305,48 @@ impl File {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match (case, &row[idx], value) {
-                    (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
-                        match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
-                            (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
-                            (Err(_), Err(_)) => bytes1 == bytes2,
-                            _ => false,
+                Some(idx) => {
+                    let current_row_value = &row[idx];
+
+                    // Helper closure for comparing current_row_value with another value,
+                    // respecting the specified case for Value::Bytes.
+                    let compare_values = |val_to_compare: &Value| -> bool {
+                        match (case, current_row_value, val_to_compare) {
+                            (
+                                Case::Insensitive,
+                                Value::Bytes(bytes_row),
+                                Value::Bytes(bytes_cmp),
+                            ) => {
+                                // Perform case-insensitive comparison for byte strings.
+                                // If both are valid UTF-8, compare their lowercase versions.
+                                // If both are non-UTF-8 bytes, compare them directly.
+                                // If one is UTF-8 and the other is not, they are considered not equal.
+                                match (
+                                    std::str::from_utf8(bytes_row),
+                                    std::str::from_utf8(bytes_cmp),
+                                ) {
+                                    (Ok(s_row), Ok(s_cmp)) => s_row.to_lowercase() == s_cmp.to_lowercase(),
+                                    (Err(_), Err(_)) => bytes_row == bytes_cmp,
+                                    _ => false,
+                                }
+                            }
+                            // For Case::Sensitive, or for Case::Insensitive with non-Bytes types,
+                            // perform a direct equality check.
+                            _ => current_row_value == val_to_compare,
                         }
+                    };
+
+                    // First, check if the row value matches the condition's value.
+                    if compare_values(value) {
+                        true
+                    } else if let Some(wc_val) = wildcard {
+                        // If not, and a wildcard is provided, check if the row value matches the wildcard.
+                        compare_values(wc_val)
+                    } else {
+                        // Otherwise, no match.
+                        false
                     }
-                    (_, value1, value2) => value1 == value2,
-                },
+                }
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
                 None => false,
