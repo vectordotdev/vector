@@ -18,20 +18,22 @@ export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 export NEW_VRL_VERSION=0.42.0 # replace this the actual new VRL version
 ```
 
-A new release CUE file will be created in `website/cue/reference/releases/"${NEW_VERSION_NUMBER}".cue`. This will require editing and careful review.
-
 # The week before the release
 
-The following steps are now automated. Run the following:
+## Manual Steps 1
+
+- [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
+  - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
+
+## Automated Steps 
+
+Run the following:
 
 ```shell
 vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VERSION
 ```
 
-
-- [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
-- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
-      take them (or have someone help you take them)
+Automated steps include:
 - [ ] Create a new release branch from master to freeze commits
   - `git fetch && git checkout origin/master && git checkout -b "{RELEASE_BRANCH}" && git push -u`
 - [ ] Create a new release preparation branch from `master`
@@ -41,11 +43,6 @@ vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VER
       [Debian](https://www.debian.org/releases/) available to update the release images in
       `distribution/docker/`. Update if so.
 - [ ] Run `cargo vdev build release-cue` to generate a new cue file for the release
-  - [ ] Add description key to the generated cue file with a description of the release (see
-        previous releases for examples).
-  - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
-  - [ ] Ensure any deprecations are highlighted in the release upgrade guide
-  - [ ] Review generated changelog entries to ensure they are understandable to end-users
   - [ ] Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
 - [ ] Update version number in `website/cue/reference/administration/interfaces/kubectl.cue`
@@ -55,7 +52,18 @@ vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VER
       updating version number
 - [ ] Commit these changes
 - [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
-- [ ] PR approval
+
+## Manual Steps 3
+
+- [ ] Edit `website/cue/reference/releases/"${NEW_VERSION_NUMBER}".cue`
+  - [ ] Add description key to the generated cue file with a description of the release (see
+        previous releases for examples).
+  - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
+  - [ ] Ensure any deprecations are highlighted in the release upgrade guide
+  - [ ] Review generated changelog entries to ensure they are understandable to end-users
+- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
+    take them (or have someone help you take them)
+- [ ] PR review & approval
 
 # On the day of release
 
