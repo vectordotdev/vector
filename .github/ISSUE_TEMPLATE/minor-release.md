@@ -25,7 +25,7 @@ export NEW_VRL_VERSION=0.42.0 # replace this the actual new VRL version
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
 
-## Automated Steps 
+## Automated Steps
 
 Run the following:
 
