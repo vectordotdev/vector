@@ -103,6 +103,15 @@ pub struct AwsS3Config {
     #[serde(default)]
     auth: AwsAuthentication,
 
+
+    /// AWS Authentication for only the S3 client.
+    ///
+    /// This is used when the S3 client needs to use different credentials than the SQS client.
+    /// This is useful when eg, the S3 bucket is in a different account than the SQS queue.
+    #[configurable(derived)]
+    #[serde(default)]
+    s3_auth: Option<AwsAuthentication>,
+
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
@@ -242,11 +251,16 @@ impl AwsS3Config {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
 
+        let auth = match self.s3_auth {
+            Some(ref auth) => auth,
+            None => &self.auth,
+        };
+
         let s3_client = create_client::<S3ClientBuilder>(
             &S3ClientBuilder {
                 force_path_style: Some(self.force_path_style),
             },
-            &self.auth,
+            auth,
             region.clone(),
             endpoint.clone(),
             proxy,
