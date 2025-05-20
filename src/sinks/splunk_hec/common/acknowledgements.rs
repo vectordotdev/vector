@@ -44,6 +44,14 @@ pub struct HecClientAcknowledgementsConfig {
     /// Once reached, the sink begins applying backpressure.
     pub max_pending_acks: NonZeroU64,
 
+    /// The name of a cookie to extract from the Splunk HEC response to use when querying for acknowledgements.
+    ///
+    /// This is useful when using a load balancer in front of multiple Splunk indexers in a cluster because the
+    /// request to check for acknowledgements needs to go to the same indexer that originally received the data.
+    ///
+    /// If empty, no cookie will be extracted.
+    pub cookie_name: String,
+
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -60,6 +68,7 @@ impl Default for HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
             max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
+            cookie_name: String::new(),
             inner: Default::default(),
         }
     }
@@ -84,7 +93,8 @@ pub enum HecAckApiError {
 }
 
 struct HecAckClient {
-    acks: HashMap<u64, (u8, Sender<EventStatus>)>,
+    // Maps (ack_id, cookie_string) to (retry_count, status_sender)
+    acks: HashMap<(u64, String), (u8, Sender<EventStatus>)>,
     retry_limit: u8,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
@@ -104,69 +114,94 @@ impl HecAckClient {
         }
     }
 
-    /// Adds an ack id to be queried
-    fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
-        self.acks
-            .insert(ack_id, (self.retry_limit, ack_event_status_sender));
+    /// Adds an ack id to be queried with a cookie string
+    fn add(&mut self, ack_id: u64, cookie: String, ack_event_status_sender: Sender<EventStatus>) {
+        self.acks.insert(
+            (ack_id, cookie),
+            (self.retry_limit, ack_event_status_sender),
+        );
         emit!(SplunkIndexerAcknowledgementAckAdded);
     }
 
     /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
     async fn run(&mut self) {
-        let ack_query_body = self.get_ack_query_body();
-        if !ack_query_body.acks.is_empty() {
-            let ack_query_response = self.send_ack_query_request(&ack_query_body).await;
+        // Group ack IDs by cookie string (cookie may be an empty string for single-indexer clusters)
+        let ack_groups = self.get_ack_groups_by_cookie();
+        let mut any_error = false;
 
-            match ack_query_response {
-                Ok(ack_query_response) => {
-                    debug!(message = "Received ack statuses.", ?ack_query_response);
-                    let acked_ack_ids = ack_query_response
-                        .acks
-                        .iter()
-                        .filter(|&(_ack_id, ack_status)| *ack_status)
-                        .map(|(ack_id, _ack_status)| *ack_id)
-                        .collect::<Vec<u64>>();
-                    self.finalize_delivered_ack_ids(acked_ack_ids.as_slice());
-                    self.expire_ack_ids_with_status(EventStatus::Rejected);
-                }
-                Err(error) => {
-                    match error {
-                        HecAckApiError::ClientParseResponse | HecAckApiError::ClientSendQuery => {
-                            // If we are permanently unable to interact with
-                            // Splunk HEC indexer acknowledgements (e.g. due to
-                            // request/response format changes in future
-                            // versions), log an error and fall back to default
-                            // behavior.
-                            emit!(SplunkIndexerAcknowledgementAPIError {
-                                message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
-                                error,
-                            });
-                            self.finalize_delivered_ack_ids(
-                                self.acks.keys().copied().collect::<Vec<_>>().as_slice(),
-                            );
-                        }
-                        _ => {
-                            emit!(SplunkIndexerAcknowledgementAPIError {
-                                message:
-                                    "Unable to send acknowledgement query request. Will retry.",
-                                error,
-                            });
-                            self.expire_ack_ids_with_status(EventStatus::Errored);
+        // Decrement retries once every loop through all acks
+        self.decrement_retries();
+
+        for (cookie, ack_ids) in ack_groups {
+            if !ack_ids.is_empty() {
+                let ack_query_body = HecAckStatusRequest {
+                    acks: ack_ids.clone(),
+                };
+                let ack_query_response =
+                    self.send_ack_query_request(&ack_query_body, &cookie).await;
+
+                match ack_query_response {
+                    Ok(ack_query_response) => {
+                        debug!(
+                            message = "Received ack statuses for cookie.",
+                            ?ack_query_response,
+                            ?cookie
+                        );
+                        let acked_ack_ids = ack_query_response
+                            .acks
+                            .iter()
+                            .filter(|&(_ack_id, ack_status)| *ack_status)
+                            .map(|(ack_id, _ack_status)| *ack_id)
+                            .collect::<Vec<u64>>();
+                        self.finalize_delivered_ack_ids(cookie, acked_ack_ids.as_slice());
+                    }
+                    Err(error) => {
+                        match error {
+                            HecAckApiError::ClientParseResponse
+                            | HecAckApiError::ClientSendQuery => {
+                                // If we are permanently unable to interact with
+                                // Splunk HEC indexer acknowledgements (e.g. due to
+                                // request/response format changes in future
+                                // versions), log an error and fall back to default
+                                // behavior.
+                                emit!(SplunkIndexerAcknowledgementAPIError {
+                                    message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
+                                    error,
+                                });
+                                // Only finalize the ack IDs for this cookie group
+                                self.finalize_delivered_ack_ids(cookie, &ack_ids);
+                            }
+                            _ => {
+                                emit!(SplunkIndexerAcknowledgementAPIError {
+                                    message:
+                                        "Unable to send acknowledgement query request. Will retry.",
+                                    error,
+                                });
+                                any_error = true;
+                            }
                         }
                     }
-                }
-            };
+                };
+            }
+        }
+
+        // Only expire ack IDs after all cookie groups have been processed
+        if any_error {
+            self.expire_ack_ids_with_status(EventStatus::Errored);
+        } else {
+            self.expire_ack_ids_with_status(EventStatus::Rejected);
         }
     }
 
     /// Removes successfully acked ack ids and finalizes associated events
-    fn finalize_delivered_ack_ids(&mut self, ack_ids: &[u64]) {
+    fn finalize_delivered_ack_ids(&mut self, cookie: String, ack_ids: &[u64]) {
         let mut removed_count = 0.0;
         for ack_id in ack_ids {
-            if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
+            if let Some((_, ack_event_status_sender)) = self.acks.remove(&(*ack_id, cookie.clone()))
+            {
                 _ = ack_event_status_sender.send(EventStatus::Delivered);
                 removed_count += 1.0;
-                debug!(message = "Finalized ack id.", ?ack_id);
+                debug!(message = "Finalized ack id.", ?ack_id, ?cookie);
             }
         }
         emit!(SplunkIndexerAcknowledgementAcksRemoved {
@@ -174,11 +209,15 @@ impl HecAckClient {
         });
     }
 
-    /// Builds an ack query body with stored ack ids
-    fn get_ack_query_body(&mut self) -> HecAckStatusRequest {
-        HecAckStatusRequest {
-            acks: self.acks.keys().copied().collect::<Vec<u64>>(),
+    /// Groups ack IDs by cookie string
+    fn get_ack_groups_by_cookie(&self) -> HashMap<String, Vec<u64>> {
+        let mut groups: HashMap<String, Vec<u64>> = HashMap::new();
+
+        for (ack_id, cookie) in self.acks.keys() {
+            groups.entry(cookie.clone()).or_default().push(*ack_id);
         }
+
+        groups
     }
 
     /// Decrements retry count on all stored ack ids by 1
@@ -191,14 +230,17 @@ impl HecAckClient {
     /// Removes all expired ack ids (those with a retry count of 0) and
     /// finalizes associated events with the given status
     fn expire_ack_ids_with_status(&mut self, status: EventStatus) {
-        let expired_ack_ids = self
+        let expired_ack_keys = self
             .acks
             .iter()
-            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then_some(*ack_id))
+            .filter_map(|((ack_id, cookie), (retries, _))| {
+                (*retries == 0).then_some((*ack_id, cookie.clone()))
+            })
             .collect::<Vec<_>>();
         let mut removed_count = 0.0;
-        for ack_id in expired_ack_ids {
-            if let Some((_, ack_event_status_sender)) = self.acks.remove(&ack_id) {
+        for key in expired_ack_keys {
+            debug!(message = "Expired ack with status.", ?key, ?status);
+            if let Some((_, ack_event_status_sender)) = self.acks.remove(&key) {
                 _ = ack_event_status_sender.send(status);
                 removed_count += 1.0;
             }
@@ -208,16 +250,17 @@ impl HecAckClient {
         });
     }
 
-    // Sends an ack status query request to Splunk HEC
+    // Sends an ack status query request to Splunk HEC with the specified cookie
     async fn send_ack_query_request(
         &mut self,
         request_body: &HecAckStatusRequest,
+        cookie: &str,
     ) -> Result<HecAckStatusResponse, HecAckApiError> {
-        self.decrement_retries();
         let request_body_bytes = crate::serde::json::to_bytes(request_body)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?
             .freeze();
-        let request = self
+
+        let mut request = self
             .http_request_builder
             .build_request(
                 request_body_bytes,
@@ -227,6 +270,15 @@ impl HecAckClient {
                 false,
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
+
+        // Add the cookie header if it's not empty
+        if !cookie.is_empty() {
+            request.headers_mut().insert(
+                http::header::COOKIE,
+                http::header::HeaderValue::from_str(cookie)
+                    .map_err(|_| HecAckApiError::ClientBuildRequest)?,
+            );
+        }
 
         let response = self
             .client
@@ -250,7 +302,7 @@ impl HecAckClient {
 }
 
 pub async fn run_acknowledgements(
-    mut receiver: Receiver<(u64, Sender<EventStatus>)>,
+    mut receiver: Receiver<(u64, String, Sender<EventStatus>)>,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
@@ -271,9 +323,10 @@ pub async fn run_acknowledgements(
             },
             ack_info = receiver.recv() => {
                 match ack_info {
-                    Some((ack_id, tx)) => {
-                        ack_client.add(ack_id, tx);
-                        debug!(message = "Stored ack id.", ?ack_id);
+                    Some((ack_id, cookie, tx)) => {
+                        let cookie_str = cookie.clone();
+                        ack_client.add(ack_id, cookie_str, tx);
+                        debug!(message = "Stored ack id with cookie.", ?ack_id, ?cookie);
                     },
                     None => break,
                 }
@@ -294,9 +347,7 @@ mod tests {
     use crate::{
         http::HttpClient,
         sinks::{
-            splunk_hec::common::{
-                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder, EndpointTarget,
-            },
+            splunk_hec::common::{service::HttpRequestBuilder, EndpointTarget},
             util::Compression,
         },
     };
@@ -319,10 +370,37 @@ mod tests {
         let mut ack_status_rxs = Vec::new();
         for ack_id in ack_ids {
             let (tx, rx) = oneshot::channel();
-            ack_client.add(*ack_id, tx);
+            ack_client.add(*ack_id, String::new(), tx);
             ack_status_rxs.push(rx);
         }
         ack_status_rxs
+    }
+
+    #[test]
+    fn test_get_ack_groups_by_cookie() {
+        let mut ack_client = get_ack_client(1);
+
+        // Add acks with different cookies
+        let (tx1, _) = oneshot::channel();
+        ack_client.add(1, "cookie1".to_string(), tx1);
+
+        let (tx2, _) = oneshot::channel();
+        ack_client.add(2, "cookie1".to_string(), tx2);
+
+        let (tx3, _) = oneshot::channel();
+        ack_client.add(3, "cookie2".to_string(), tx3);
+
+        let groups = ack_client.get_ack_groups_by_cookie();
+
+        assert_eq!(groups.len(), 2);
+        assert!(groups.contains_key("cookie1"));
+        assert!(groups.contains_key("cookie2"));
+
+        let mut cookie1_acks = groups.get("cookie1").unwrap().clone();
+        cookie1_acks.sort_unstable();
+        assert_eq!(cookie1_acks, vec![1, 2]);
+
+        assert_eq!(groups.get("cookie2").unwrap(), &vec![3]);
     }
 
     #[test]
@@ -330,11 +408,20 @@ mod tests {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
         _ = populate_ack_client(&mut ack_client, &ack_ids);
-        let expected_ack_body = HecAckStatusRequest { acks: ack_ids };
 
-        let mut ack_request_body = ack_client.get_ack_query_body();
-        ack_request_body.acks.sort_unstable();
-        assert_eq!(expected_ack_body, ack_request_body);
+        // Get all ack IDs from all cookie groups
+        let groups = ack_client.get_ack_groups_by_cookie();
+        let mut all_ack_ids = Vec::new();
+        for (_, ids) in groups {
+            all_ack_ids.extend(ids);
+        }
+        all_ack_ids.sort_unstable();
+
+        // This should match the original behavior of get_ack_query_body
+        let mut expected_ack_ids = ack_ids.clone();
+        expected_ack_ids.sort_unstable();
+
+        assert_eq!(expected_ack_ids, all_ack_ids);
     }
 
     #[test]
@@ -343,14 +430,26 @@ mod tests {
         let ack_ids = (0..100).collect::<Vec<u64>>();
         _ = populate_ack_client(&mut ack_client, &ack_ids);
 
-        let mut ack_request_body = ack_client.get_ack_query_body();
-        ack_request_body.acks.sort_unstable();
-        assert_eq!(ack_ids, ack_request_body.acks);
+        // Check that all ack IDs are present initially
+        let groups = ack_client.get_ack_groups_by_cookie();
+        let mut all_ack_ids = Vec::new();
+        for (_, ids) in groups {
+            all_ack_ids.extend(ids);
+        }
+        all_ack_ids.sort_unstable();
+        assert_eq!(ack_ids, all_ack_ids);
+
+        // Decrement retries and expire
         ack_client.decrement_retries();
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
-        let ack_request_body = ack_client.get_ack_query_body();
-        assert!(ack_request_body.acks.is_empty())
+        // Check that all ack IDs are gone
+        let groups = ack_client.get_ack_groups_by_cookie();
+        let all_ack_ids: Vec<u64> = groups
+            .values()
+            .flat_map(|ids| ids.iter().copied())
+            .collect();
+        assert!(all_ack_ids.is_empty())
     }
 
     #[tokio::test]
@@ -359,7 +458,7 @@ mod tests {
         let ack_ids = (0..100).collect::<Vec<u64>>();
         let ack_status_rxs = populate_ack_client(&mut ack_client, &ack_ids);
 
-        ack_client.finalize_delivered_ack_ids(ack_ids.as_slice());
+        ack_client.finalize_delivered_ack_ids(String::new(), ack_ids.as_slice());
         let mut statuses = ack_status_rxs.into_iter().collect::<FuturesUnordered<_>>();
         while let Some(status) = statuses.next().await {
             assert_eq!(EventStatus::Delivered, status.unwrap());
@@ -378,5 +477,138 @@ mod tests {
         while let Some(status) = statuses.next().await {
             assert_eq!(EventStatus::Rejected, status.unwrap());
         }
+    }
+
+    #[tokio::test]
+    async fn test_run_with_cookies() {
+        use super::{HecAckStatusRequest, HecAckStatusResponse};
+        use std::collections::HashMap;
+        use wiremock::{
+            matchers::{header, method, path},
+            Mock, MockServer, Request, ResponseTemplate,
+        };
+
+        // Start a mock server
+        let mock_server = MockServer::start().await;
+
+        // Set up the mock to respond to requests with different cookies
+        Mock::given(method("POST"))
+            .and(path("/services/collector/ack"))
+            .and(header("Cookie", "cookie1"))
+            .respond_with(|req: &Request| {
+                let req_body =
+                    serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+                ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
+                    acks: req_body
+                        .acks
+                        .into_iter()
+                        .map(|ack_id| (ack_id, true))
+                        .collect::<HashMap<_, _>>(),
+                })
+            })
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/services/collector/ack"))
+            .and(header("Cookie", "cookie2"))
+            .respond_with(|req: &Request| {
+                let req_body =
+                    serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+                ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
+                    acks: req_body
+                        .acks
+                        .into_iter()
+                        .map(|ack_id| (ack_id, true))
+                        .collect::<HashMap<_, _>>(),
+                })
+            })
+            .mount(&mock_server)
+            .await;
+
+        // Create an HecAckClient
+        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let http_request_builder = HttpRequestBuilder::new(
+            mock_server.uri(),
+            EndpointTarget::default(),
+            String::from("token"),
+            Compression::default(),
+        );
+        let mut ack_client = HecAckClient::new(1, client, Arc::new(http_request_builder));
+
+        // Add acks with different cookies
+        let (tx1, rx1) = oneshot::channel();
+        ack_client.add(1, "cookie1".to_string(), tx1);
+
+        let (tx2, rx2) = oneshot::channel();
+        ack_client.add(2, "cookie1".to_string(), tx2);
+
+        let (tx3, rx3) = oneshot::channel();
+        ack_client.add(3, "cookie2".to_string(), tx3);
+
+        // Run the client to process the acks
+        ack_client.run().await;
+
+        // Verify that all acks were processed correctly
+        // The mock server returns true for all ack IDs, so they should be marked as Delivered
+        let status1 = rx1.await.unwrap();
+        let status2 = rx2.await.unwrap();
+        let status3 = rx3.await.unwrap();
+
+        assert_eq!(EventStatus::Delivered, status1);
+        assert_eq!(EventStatus::Delivered, status2);
+        assert_eq!(EventStatus::Delivered, status3);
+    }
+
+    #[tokio::test]
+    async fn test_run_with_single_cookie() {
+        use super::{HecAckStatusRequest, HecAckStatusResponse};
+        use std::collections::HashMap;
+        use wiremock::{
+            matchers::{header, method, path},
+            Mock, MockServer, Request, ResponseTemplate,
+        };
+
+        // Start a mock server
+        let mock_server = MockServer::start().await;
+
+        // Set up the mock to respond to requests with a cookie
+        Mock::given(method("POST"))
+            .and(path("/services/collector/ack"))
+            .and(header("Cookie", "cookie1"))
+            .respond_with(|req: &Request| {
+                let req_body =
+                    serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+                ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
+                    acks: req_body
+                        .acks
+                        .into_iter()
+                        .map(|ack_id| (ack_id, true))
+                        .collect::<HashMap<_, _>>(),
+                })
+            })
+            .mount(&mock_server)
+            .await;
+
+        // Create an HecAckClient
+        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let http_request_builder = HttpRequestBuilder::new(
+            mock_server.uri(),
+            EndpointTarget::default(),
+            String::from("token"),
+            Compression::default(),
+        );
+        let mut ack_client = HecAckClient::new(1, client, Arc::new(http_request_builder));
+
+        // Add a single ack with a cookie
+        let (tx, rx) = oneshot::channel();
+        ack_client.add(1, "cookie1".to_string(), tx);
+
+        // Run the client to process the ack
+        ack_client.run().await;
+
+        // Verify that the ack was processed correctly
+        let status = rx.await.unwrap();
+        assert_eq!(EventStatus::Delivered, status);
     }
 }

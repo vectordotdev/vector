@@ -5,6 +5,18 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: "Splunk HEC acknowledgement configuration."
 		required:    false
 		type: object: options: {
+			cookie_name: {
+				description: """
+					The name of a cookie to extract from the Splunk HEC response to use when querying for acknowledgements.
+
+					This is useful when using a load balancer in front of multiple Splunk indexers in a cluster because the
+					request to check for acknowledgements needs to go to the same indexer that originally received the data.
+
+					If empty, no cookie will be extracted.
+					"""
+				required: false
+				type: string: default: ""
+			}
 			enabled: {
 				description: """
 					Whether or not end-to-end acknowledgements are enabled.
