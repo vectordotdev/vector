@@ -308,38 +308,12 @@ impl File {
                 Some(idx) => match (case, &row[idx], value) {
                     (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
-                            (Ok(s1), Ok(s2)) => {
-                                let field_matches_condition = s1.to_lowercase() == s2.to_lowercase();
-                                
-                                if let Some(wildcard_val) = wildcard {
-                                    match wildcard_val {
-                                        Value::Bytes(wc_bytes) => {
-                                            if let Ok(wc_str) = std::str::from_utf8(wc_bytes) {
-                                                field_matches_condition || s1.to_lowercase() == wc_str.to_lowercase()
-                                            } else {
-                                                // If wildcard isn't valid UTF-8, compare raw bytes
-                                                field_matches_condition || bytes1 == wc_bytes
-                                            }
-                                        }
-                                        _ => field_matches_condition || &row[idx] == wildcard_val
-                                    }
-                                } else {
-                                    field_matches_condition
-                                }
-                            }
+                            (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
                             (Err(_), Err(_)) => bytes1 == bytes2,
                             _ => false,
                         }
                     }
-                    (_, value1, value2) => {
-                        let field_matches_condition = value1 == value2;
-                        
-                        if let Some(wildcard_val) = wildcard {
-                            field_matches_condition || value1 == wildcard_val
-                        } else {
-                            field_matches_condition
-                        }
-                    }
+                    (_, value1, value2) => value1 == value2,
                 },
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
