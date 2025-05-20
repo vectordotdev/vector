@@ -11434,7 +11434,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.47.0"
+version = "0.48.0"
 dependencies = [
  "apache-avro",
  "approx",
