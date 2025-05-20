@@ -11,9 +11,9 @@ labels: "domain: releasing"
 Note the preparation steps are now automated. You can run:
 
 ```shell
-export MINOR_VERSION=<current minor version> # e.g. 47
-export NEW_VERSION_NUMBER=<new version number> # e.g. 0.47.0
-export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION_NUMBER}"-website
+export NEW_VERSION=0.47.0
+export MINOR_VERSION=$(echo "$NEW_VERSION" | cut -d. -f2)
+export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version 0.24.0
 ```
