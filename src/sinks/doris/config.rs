@@ -175,34 +175,34 @@ impl SinkConfig for DorisConfig {
         // Wrap reporter in Arc for sharing
         let reporter_arc = Arc::new(reporter);
 
-        // Create a shared client instance to avoid repeated creation
-        let shared_doris_client = {
-            let doris_client = DorisSinkClient::new(
-                client.clone(),
-                common.base_url.clone(),
-                common.auth.clone(),
-                self.compression.clone(),
-                self.label_prefix.clone(),
-                self.headers.clone(),
-            )
-            .await;
-            doris_client.into_thread_safe()
-        };
-
         let services_futures = commons
             .iter()
             .cloned()
             .map(|common| {
-                let client_for_service = shared_doris_client.clone(); // Use cloned client
+                let client_clone = client.clone();
                 let reporter_arc_clone = Arc::clone(&reporter_arc);
+                let compression = self.compression.clone();
+                let label_prefix = self.label_prefix.clone();
+                let headers = self.headers.clone();
+                let log_request = self.log_request;
 
                 async move {
                     let endpoint = common.base_url.clone();
-
-                    // Directly use the shared client, no need to create a new instance
+                    
+                    let doris_client = DorisSinkClient::new(
+                        client_clone,
+                        common.base_url.clone(),
+                        common.auth.clone(),
+                        compression,
+                        label_prefix,
+                        headers,
+                    ).await;
+                    
+                    let doris_client_safe = doris_client.into_thread_safe();
+                    
                     let service = DorisService::new(
-                        client_for_service,
-                        self.log_request.clone(),
+                        doris_client_safe,
+                        log_request,
                         reporter_arc_clone,
                     );
 
@@ -233,9 +233,23 @@ impl SinkConfig for DorisConfig {
 
         let sink = VectorSink::from_event_streamsink(sink);
 
+        // Create a shared client instance to avoid repeated creation
+        let healthcheck_doris_client = {
+            let doris_client = DorisSinkClient::new(
+                client.clone(),
+                common.base_url.clone(),
+                common.auth.clone(),
+                self.compression.clone(),
+                self.label_prefix.clone(),
+                self.headers.clone(),
+            )
+                .await;
+            doris_client.into_thread_safe()
+        };
+
         // Use the previously saved client for health check, no need to create a new instance
         let healthcheck = futures::future::select_ok(commons.into_iter().map(move |common| {
-            let client = shared_doris_client.clone();
+            let client = healthcheck_doris_client.clone();
             async move { common.healthcheck(client).await }.boxed()
         }))
         .map_ok(|((), _)| ())
@@ -253,38 +267,6 @@ impl SinkConfig for DorisConfig {
     }
 }
 
-impl DorisConfig {
-    /// Helper function to create HTTP headers for Doris Stream Load.
-    ///
-    /// Note: This functionality is now directly implemented in HttpRequestBuilder::new in service,
-    /// but this function is kept for potential future uses or other implementations.
-    #[allow(dead_code)]
-    fn create_headers(&self) -> HashMap<String, String> {
-        let mut headers = HashMap::new();
-        // Always add these basic headers
-        headers.insert("Expect".to_string(), "100-continue".to_string());
-        headers.insert(
-            "Content-Type".to_string(),
-            "text/plain;charset=utf-8".to_string(),
-        );
-
-        // Add line delimiter header if not default
-        if !self.line_delimiter.is_empty() && self.line_delimiter != "\n" {
-            headers.insert("line_delimiter".to_string(), self.line_delimiter.clone());
-        }
-
-        // Add custom headers
-        for (k, v) in &self.headers {
-            if k == "line_delimiter" {
-                // Store line_delimiter for internal use
-                // (this would be done in go by setting config.LineDelimiter = v)
-            }
-            headers.insert(k.clone(), v.clone());
-        }
-
-        headers
-    }
-}
 
 #[cfg(test)]
 mod tests {
