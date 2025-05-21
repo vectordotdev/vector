@@ -325,7 +325,9 @@ impl File {
                                     std::str::from_utf8(bytes_row),
                                     std::str::from_utf8(bytes_cmp),
                                 ) {
-                                    (Ok(s_row), Ok(s_cmp)) => s_row.to_lowercase() == s_cmp.to_lowercase(),
+                                    (Ok(s_row), Ok(s_cmp)) => {
+                                        s_row.to_lowercase() == s_cmp.to_lowercase()
+                                    }
                                     (Err(_), Err(_)) => bytes_row == bytes_cmp,
                                     _ => false,
                                 }
@@ -900,13 +902,7 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(
-                Case::Sensitive,
-                &[condition],
-                None,
-                Some(&wildcard),
-                None
-            )
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), None)
         );
     }
 
