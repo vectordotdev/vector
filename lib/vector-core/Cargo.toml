@@ -23,7 +23,7 @@ futures.workspace = true
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 headers = { version = "0.3.9", default-features = false }
 http = { version = "0.2.9", default-features = false }
-hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
+hyper-proxy = { version = "0.9.1", default-features = false }
 indexmap.workspace = true
 inventory.workspace = true
 ipnet = { version = "2", default-features = false, features = ["serde", "std"] }
@@ -34,7 +34,7 @@ metrics-util.workspace = true
 mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float = { version = "4.6.0", default-features = false }
-openssl = { version = "0.10.72", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.72", default-features = false, features = ["vendored"], optional = true }
 parking_lot = { version = "0.12.3", default-features = false }
 pin-project.workspace = true
 proptest = { version = "1.6", optional = true }
@@ -50,7 +50,7 @@ smallvec = { version = "1", default-features = false, features = ["serde", "cons
 snafu.workspace = true
 socket2 = { version = "0.5.9", default-features = false }
 tokio = { version = "1.44.2", default-features = false, features = ["net"] }
-tokio-openssl = { version = "0.6.5", default-features = false }
+tokio-openssl = { version = "0.6.5", default-features = false, optional = true }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml.workspace = true
@@ -100,6 +100,7 @@ default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 vrl = []
 test = ["vector-common/test", "proptest"]
+tcp-tls = ["dep:openssl", "dep:tokio-openssl", "hyper-proxy/openssl-tls"]
 
 [[bench]]
 name = "event"
