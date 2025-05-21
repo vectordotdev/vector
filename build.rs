@@ -162,7 +162,7 @@ fn main() {
     // We keep track of which environment variables we slurp in, and then emit stanzas at the end to
     // inform Cargo when it needs to rerun this build script.  This allows us to avoid rerunning it
     // every single time unless something _actually_ changes.
-    // let mut tracker = TrackedEnv::new();
+    let mut tracker = TrackedEnv::new();
     // let pkg_name = tracker
     //     .get_env_var("CARGO_PKG_NAME")
     //     .expect("Cargo-provided environment variables should always exist!");
@@ -187,9 +187,9 @@ fn main() {
     // let debug = tracker
     //     .get_env_var("DEBUG")
     //     .expect("Cargo-provided environment variables should always exist!");
-    // let rust_version = tracker
-    //     .get_env_var("CARGO_PKG_RUST_VERSION")
-    //     .expect("Cargo-provided environment variables should always exist!");
+    let rust_version = tracker
+        .get_env_var("CARGO_PKG_RUST_VERSION")
+        .expect("Cargo-provided environment variables should always exist!");
     // let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
     //
     // // Get the git short hash of the HEAD.
@@ -211,12 +211,12 @@ fn main() {
     //     .expect("git hash detection failed");
     //
     // // Gather up the constants and write them out to our build constants file.
-    // let mut constants = BuildConstants::new();
-    // constants.add_required_constant(
-    //     "RUST_VERSION",
-    //     "The rust version from the package manifest.",
-    //     rust_version,
-    // );
+    let mut constants = BuildConstants::new();
+    constants.add_required_constant(
+        "RUST_VERSION",
+        "The rust version from the package manifest.",
+        rust_version,
+    );
     // constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
     // constants.add_required_constant(
     //     "PKG_VERSION",
@@ -259,10 +259,10 @@ fn main() {
     //     "The short hash of the Git HEAD",
     //     git_short_hash,
     // );
-    // constants
-    //     .write_to_file("built.rs")
-    //     .expect("Failed to write build-time constants file!");
-    //
+    constants
+        .write_to_file("built.rs")
+        .expect("Failed to write build-time constants file!");
+
     // // Emit the aforementioned stanzas.
-    // tracker.emit_rerun_stanzas();
+    tracker.emit_rerun_stanzas();
 }
