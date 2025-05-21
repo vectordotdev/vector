@@ -162,107 +162,107 @@ fn main() {
     // We keep track of which environment variables we slurp in, and then emit stanzas at the end to
     // inform Cargo when it needs to rerun this build script.  This allows us to avoid rerunning it
     // every single time unless something _actually_ changes.
-    let mut tracker = TrackedEnv::new();
-    let pkg_name = tracker
-        .get_env_var("CARGO_PKG_NAME")
-        .expect("Cargo-provided environment variables should always exist!");
-    let pkg_version = tracker
-        .get_env_var("CARGO_PKG_VERSION")
-        .expect("Cargo-provided environment variables should always exist!");
-    let pkg_description = tracker
-        .get_env_var("CARGO_PKG_DESCRIPTION")
-        .expect("Cargo-provided environment variables should always exist!");
-    let target = tracker
-        .get_env_var("TARGET")
-        .expect("Cargo-provided environment variables should always exist!");
-    let target_arch = tracker
-        .get_env_var("CARGO_CFG_TARGET_ARCH")
-        .expect("Cargo-provided environment variables should always exist!");
-    let target_os = tracker
-        .get_env_var("CARGO_CFG_TARGET_OS")
-        .expect("Cargo-provided environment variables should always exist!");
-    let target_vendor = tracker
-        .get_env_var("CARGO_CFG_TARGET_VENDOR")
-        .expect("Cargo-provided environment variables should always exist!");
-    let debug = tracker
-        .get_env_var("DEBUG")
-        .expect("Cargo-provided environment variables should always exist!");
-    let rust_version = tracker
-        .get_env_var("CARGO_PKG_RUST_VERSION")
-        .expect("Cargo-provided environment variables should always exist!");
-    let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
-
-    // Get the git short hash of the HEAD.
-    // Note that if Vector is compiled within a container, proper git permissions must be set for
-    // the repo directory.
-    // In CI build workflows this will have been pre-configured by running the command
-    // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
-    // subcommands.
-    let git_short_hash = git_short_hash()
-        .map_err(|e| {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!(
-                    "Unable to determine git short hash from rev-parse command: {}",
-                    e
-                );
-            }
-        })
-        .expect("git hash detection failed");
-
-    // Gather up the constants and write them out to our build constants file.
-    let mut constants = BuildConstants::new();
-    constants.add_required_constant(
-        "RUST_VERSION",
-        "The rust version from the package manifest.",
-        rust_version,
-    );
-    constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
-    constants.add_required_constant(
-        "PKG_VERSION",
-        "The full version of this package.",
-        pkg_version,
-    );
-    constants.add_required_constant(
-        "PKG_DESCRIPTION",
-        "The description of this package.",
-        pkg_description,
-    );
-    constants.add_required_constant(
-        "TARGET",
-        "The target triple being compiled for. (e.g. x86_64-pc-windows-msvc)",
-        target,
-    );
-    constants.add_required_constant(
-        "TARGET_ARCH",
-        "The target architecture being compiled for. (e.g. x86_64)",
-        target_arch,
-    );
-    constants.add_required_constant(
-        "TARGET_OS",
-        "The target OS being compiled for. (e.g. macos)",
-        target_os,
-    );
-    constants.add_required_constant(
-        "TARGET_VENDOR",
-        "The target vendor being compiled for. (e.g. apple)",
-        target_vendor,
-    );
-    constants.add_required_constant("DEBUG", "Level of debug info for Vector.", debug);
-    constants.add_optional_constant(
-        "VECTOR_BUILD_DESC",
-        "Special build description, related to versioned releases.",
-        build_desc,
-    );
-    constants.add_required_constant(
-        "GIT_SHORT_HASH",
-        "The short hash of the Git HEAD",
-        git_short_hash,
-    );
-    constants
-        .write_to_file("built.rs")
-        .expect("Failed to write build-time constants file!");
-
-    // Emit the aforementioned stanzas.
-    tracker.emit_rerun_stanzas();
+    // let mut tracker = TrackedEnv::new();
+    // let pkg_name = tracker
+    //     .get_env_var("CARGO_PKG_NAME")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let pkg_version = tracker
+    //     .get_env_var("CARGO_PKG_VERSION")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let pkg_description = tracker
+    //     .get_env_var("CARGO_PKG_DESCRIPTION")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let target = tracker
+    //     .get_env_var("TARGET")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let target_arch = tracker
+    //     .get_env_var("CARGO_CFG_TARGET_ARCH")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let target_os = tracker
+    //     .get_env_var("CARGO_CFG_TARGET_OS")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let target_vendor = tracker
+    //     .get_env_var("CARGO_CFG_TARGET_VENDOR")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let debug = tracker
+    //     .get_env_var("DEBUG")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let rust_version = tracker
+    //     .get_env_var("CARGO_PKG_RUST_VERSION")
+    //     .expect("Cargo-provided environment variables should always exist!");
+    // let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
+    //
+    // // Get the git short hash of the HEAD.
+    // // Note that if Vector is compiled within a container, proper git permissions must be set for
+    // // the repo directory.
+    // // In CI build workflows this will have been pre-configured by running the command
+    // // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
+    // // subcommands.
+    // let git_short_hash = git_short_hash()
+    //     .map_err(|e| {
+    //         #[allow(clippy::print_stderr)]
+    //         {
+    //             eprintln!(
+    //                 "Unable to determine git short hash from rev-parse command: {}",
+    //                 e
+    //             );
+    //         }
+    //     })
+    //     .expect("git hash detection failed");
+    //
+    // // Gather up the constants and write them out to our build constants file.
+    // let mut constants = BuildConstants::new();
+    // constants.add_required_constant(
+    //     "RUST_VERSION",
+    //     "The rust version from the package manifest.",
+    //     rust_version,
+    // );
+    // constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
+    // constants.add_required_constant(
+    //     "PKG_VERSION",
+    //     "The full version of this package.",
+    //     pkg_version,
+    // );
+    // constants.add_required_constant(
+    //     "PKG_DESCRIPTION",
+    //     "The description of this package.",
+    //     pkg_description,
+    // );
+    // constants.add_required_constant(
+    //     "TARGET",
+    //     "The target triple being compiled for. (e.g. x86_64-pc-windows-msvc)",
+    //     target,
+    // );
+    // constants.add_required_constant(
+    //     "TARGET_ARCH",
+    //     "The target architecture being compiled for. (e.g. x86_64)",
+    //     target_arch,
+    // );
+    // constants.add_required_constant(
+    //     "TARGET_OS",
+    //     "The target OS being compiled for. (e.g. macos)",
+    //     target_os,
+    // );
+    // constants.add_required_constant(
+    //     "TARGET_VENDOR",
+    //     "The target vendor being compiled for. (e.g. apple)",
+    //     target_vendor,
+    // );
+    // constants.add_required_constant("DEBUG", "Level of debug info for Vector.", debug);
+    // constants.add_optional_constant(
+    //     "VECTOR_BUILD_DESC",
+    //     "Special build description, related to versioned releases.",
+    //     build_desc,
+    // );
+    // constants.add_required_constant(
+    //     "GIT_SHORT_HASH",
+    //     "The short hash of the Git HEAD",
+    //     git_short_hash,
+    // );
+    // constants
+    //     .write_to_file("built.rs")
+    //     .expect("Failed to write build-time constants file!");
+    //
+    // // Emit the aforementioned stanzas.
+    // tracker.emit_rerun_stanzas();
 }
