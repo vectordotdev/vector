@@ -1,3 +1,4 @@
+use super::status::Status;
 use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
@@ -1105,6 +1106,150 @@ async fn receive_summary_metric() {
 }
 
 #[tokio::test]
+async fn unsupported_content_type() {
+    // If the content-type is invalid (i.e. not application/x-protobuf or application/json)
+    // reject with a 415.
+    // Response is not a Status object, as the encoding cannot be determined without content-type
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(LOGS, None).await;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!("http://{}/v1/logs", env.config.http.address))
+            .header("Content-Type", "bad")
+            .body(create_logs_service_request("test body").encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(res.status() == hyper::StatusCode::UNSUPPORTED_MEDIA_TYPE);
+        assert!(res
+            .headers()
+            .get("Content-Type")
+            .expect("Content-Type header not found")
+            .eq("text/plain"));
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unknown_route() {
+    // 404 with Status object indicating unknown route
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(LOGS, None).await;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!("http://{}/x", env.config.http.address))
+            .header("Content-Type", "application/x-protobuf")
+            .body(create_logs_service_request("test body").encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(res.status() == hyper::StatusCode::NOT_FOUND);
+
+        let body = res.bytes().await.expect("Failed to read response body");
+        let status = Status::decode(&mut body.as_ref()).expect("Failed to decode as Status");
+
+        assert!(status.code == 2);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unuspported_method() {
+    // 405 with Status object
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(LOGS, None).await;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .get(format!("http://{}/x", env.config.http.address))
+            .header("Content-Type", "application/x-protobuf")
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(res.status() == hyper::StatusCode::METHOD_NOT_ALLOWED);
+
+        let body = res.bytes().await.expect("Failed to read response body");
+        let status = Status::decode(&mut body.as_ref()).expect("Failed to decode as Status");
+
+        assert!(status.code == 2);
+    })
+    .await;
+}
+
+async fn invalid_payload_inner(ty: &'static str) {
+    // Content that cannot be deserialized needs to 400
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(ty, None).await;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!("http://{}/v1/{}", env.config.http.address, ty))
+            .header("Content-Type", "application/x-protobuf")
+            .body(b"{}".as_ref())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(res.status() == hyper::StatusCode::BAD_REQUEST);
+
+        let body = res.bytes().await.expect("Failed to read response body");
+        let status = Status::decode(&mut body.as_ref()).expect("Failed to decode as Status");
+
+        assert!(status.code == 2);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn invalid_payload_logs() {
+    invalid_payload_inner("logs").await;
+}
+
+#[tokio::test]
+async fn invalid_payload_traces() {
+    invalid_payload_inner("traces").await;
+}
+
+#[tokio::test]
+async fn invalid_payload_metrics() {
+    invalid_payload_inner("metrics").await;
+}
+
+#[tokio::test]
+async fn delivery_error() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env_status(LOGS, None, EventStatus::Rejected, false).await;
+
+        let client = reqwest::Client::new();
+        let res = client
+            .post(format!("http://{}/v1/logs", env.config.http.address,))
+            .header("Content-Type", "application/x-protobuf")
+            .body(create_logs_service_request("log body").encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        assert!(
+            res.status() == hyper::StatusCode::INTERNAL_SERVER_ERROR,
+            "Unexpected Status: {}",
+            res.status()
+        );
+
+        let body = res.bytes().await.expect("Failed to read response body");
+        let status = Status::decode(&mut body.as_ref()).expect("Failed to decode as Status");
+
+        assert!(status.code == 2);
+        assert!(status.message.contains("not decode"));
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn http_headers() {
     assert_source_compliance(&SOURCE_TAGS, async {
         let grpc_addr = next_addr();
@@ -1147,36 +1292,11 @@ async fn http_headers() {
         test_util::wait_for_tcp(http_addr).await;
 
         let client = reqwest::Client::new();
-        let req = ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                resource: None,
-                scope_logs: vec![ScopeLogs {
-                    scope: None,
-                    log_records: vec![LogRecord {
-                        time_unix_nano: 1,
-                        observed_time_unix_nano: 2,
-                        severity_number: 9,
-                        severity_text: "info".into(),
-                        body: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("log body".into())),
-                        }),
-                        attributes: vec![],
-                        dropped_attributes_count: 0,
-                        flags: 4,
-                        // opentelemetry sdk will hex::decode the given trace_id and span_id
-                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
-                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
-                    }],
-                    schema_url: "v1".into(),
-                }],
-                schema_url: "v1".into(),
-            }],
-        };
         let _res = client
             .post(format!("http://{}/v1/logs", http_addr))
             .header("Content-Type", "application/x-protobuf")
             .header("User-Agent", "Test")
-            .body(req.encode_to_vec())
+            .body(create_logs_service_request("log body").encode_to_vec())
             .send()
             .await
             .expect("Failed to send log to Opentelemetry Collector.");
@@ -1217,9 +1337,46 @@ pub struct OTelTestEnv {
     pub output: Box<dyn Stream<Item = Event> + Unpin + Send>,
 }
 
+fn create_logs_service_request(body: &str) -> ExportLogsServiceRequest {
+    ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            resource: None,
+            scope_logs: vec![ScopeLogs {
+                scope: None,
+                log_records: vec![LogRecord {
+                    time_unix_nano: 1,
+                    observed_time_unix_nano: 2,
+                    severity_number: 9,
+                    severity_text: "info".into(),
+                    body: Some(AnyValue {
+                        value: Some(any_value::Value::StringValue(body.into())),
+                    }),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                    flags: 4,
+                    // opentelemetry sdk will hex::decode the given trace_id and span_id
+                    trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                    span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                }],
+                schema_url: "v1".into(),
+            }],
+            schema_url: "v1".into(),
+        }],
+    }
+}
+
 pub async fn build_otlp_test_env(
     event_name: &'static str,
     log_namespace: Option<bool>,
+) -> OTelTestEnv {
+    build_otlp_test_env_status(event_name, log_namespace, EventStatus::Delivered, false).await
+}
+
+pub async fn build_otlp_test_env_status(
+    event_name: &'static str,
+    log_namespace: Option<bool>,
+    event_status: EventStatus,
+    acks: bool,
 ) -> OTelTestEnv {
     let grpc_addr = next_addr();
     let http_addr = next_addr();
@@ -1235,11 +1392,11 @@ pub async fn build_otlp_test_env(
             keepalive: Default::default(),
             headers: Default::default(),
         },
-        acknowledgements: Default::default(),
+        acknowledgements: acks.into(),
         log_namespace,
     };
 
-    let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
+    let (sender, output, _) = new_source(event_status, event_name.to_string());
 
     let server = config
         .build(SourceContext::new_test(sender.clone(), None))
