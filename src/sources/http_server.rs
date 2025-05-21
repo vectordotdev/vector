@@ -35,6 +35,7 @@ use crate::{
         Encoding, HttpSource,
     },
     tls::TlsEnableableConfig,
+    SourceOutputMode,
 };
 
 /// Configuration for the `http` source.
@@ -66,6 +67,10 @@ impl SourceConfig for HttpConfig {
 
     fn can_acknowledge(&self) -> bool {
         self.0.can_acknowledge()
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 
@@ -410,6 +415,10 @@ impl SourceConfig for SimpleHttpConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

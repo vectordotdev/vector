@@ -61,7 +61,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
+    SourceOutputMode, SourceSender,
 };
 
 pub const LOGS: &str = "logs";
@@ -318,6 +318,13 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        // Datadog Agent will resend in the event of a non-fatal error, so we
+        // don't need to track if we dropped the connection. This is also the default,
+        // this override is just to make explicit the reasoning.
+        SourceOutputMode::Simple
     }
 }
 

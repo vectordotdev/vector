@@ -24,6 +24,7 @@ use crate::{
     http::build_http_trace_layer,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
+    SourceOutputMode,
 };
 
 pub mod errors;
@@ -244,6 +245,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

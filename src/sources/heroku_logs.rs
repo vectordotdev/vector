@@ -42,6 +42,7 @@ use crate::{
         },
     },
     tls::TlsEnableableConfig,
+    SourceOutputMode,
 };
 
 /// Configuration for `heroku_logs` source.
@@ -222,6 +223,10 @@ impl SourceConfig for LogplexConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

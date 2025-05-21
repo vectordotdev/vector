@@ -54,7 +54,7 @@ use crate::{
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
+    SourceOutputMode, SourceSender,
 };
 
 mod acknowledgements;
@@ -283,6 +283,10 @@ impl SourceConfig for SplunkConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

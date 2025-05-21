@@ -45,6 +45,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server_with_routes, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
+    SourceOutputMode,
 };
 
 use super::http_server::{build_param_matcher, remove_duplicates};
@@ -336,5 +337,9 @@ impl SourceConfig for OpentelemetryConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }

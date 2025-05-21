@@ -36,6 +36,7 @@ use crate::{
         util::{http::HttpMethod, HttpSource},
     },
     tls::TlsEnableableConfig,
+    SourceOutputMode,
 };
 
 /// Configuration for the `prometheus_pushgateway` source.
@@ -115,6 +116,10 @@ impl SourceConfig for PrometheusPushgatewayConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

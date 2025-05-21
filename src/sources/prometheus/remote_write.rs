@@ -22,6 +22,7 @@ use crate::{
         util::{decode, http::HttpMethod, HttpSource},
     },
     tls::TlsEnableableConfig,
+    SourceOutputMode,
 };
 
 /// Configuration for the `prometheus_remote_write` source.
@@ -104,6 +105,10 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 
     fn can_acknowledge(&self) -> bool {
         true
+    }
+
+    fn output_mode(&self) -> SourceOutputMode {
+        SourceOutputMode::Counting
     }
 }
 

@@ -124,8 +124,8 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
 
     /// What output mode should be used for the `SourceSender` created for this source.
     fn output_mode(&self) -> SourceOutputMode {
-        // By default, keep the old standard behavior.
-        SourceOutputMode::Counting
+        // By default, use `Simple` mode. Only sources that use warp need `Counting` mode.
+        SourceOutputMode::Simple
     }
 }
 
