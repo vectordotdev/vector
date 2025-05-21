@@ -37,10 +37,12 @@ pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
+// #[cfg(feature = "tcp-tls")]
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
 pub mod time;
+// #[cfg(feature = "tcp-tls")]
 pub mod tls;
 pub mod transform;
 #[cfg(feature = "vrl")]
