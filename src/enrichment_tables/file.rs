@@ -486,6 +486,7 @@ impl File {
         // being passed in the condition.
         let mut hash = seahash::SeaHasher::default();
 
+        // Compute hash for the condition value
         for header in self.headers.iter() {
             if let Some(Condition::Equals { value, .. }) = condition.iter().find(
                 |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
@@ -497,7 +498,29 @@ impl File {
         let key = hash.finish();
 
         let IndexHandle(handle) = handle;
-        Ok(self.indexes[handle].2.get(&key))
+
+        // Attempt lookup with the condition value's hash
+        if let Some(result) = self.indexes[handle].2.get(&key) {
+            return Ok(Some(result));
+        }
+
+        // If lookup fails and a wildcard is provided, compute hash for the wildcard
+        if let Some(wildcard_value) = wildcard {
+            let mut wildcard_hash = seahash::SeaHasher::default();
+            for header in self.headers.iter() {
+                if condition.iter().any(|condition| matches!(condition, Condition::Equals { field, .. } if field == header)) {
+                    hash_value(&mut wildcard_hash, case, wildcard_value)?;
+                }
+            }
+
+            let wildcard_key = wildcard_hash.finish();
+            if let Some(result) = self.indexes[handle].2.get(&wildcard_key) {
+                return Ok(Some(result));
+            }
+        }
+
+        // Return None if neither lookup succeeds
+        Ok(None)
     }
 }
 
@@ -962,7 +985,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_row_with_index_and_wildcard() {
+    fn finds_row_with_index_case_sensitive_and_wildcard() {
         let mut file = File::new(
             Default::default(),
             FileData {
@@ -976,7 +999,7 @@ mod tests {
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
-        let wildcard = Value::from("zip");
+        let wildcard = Value::from("zirp");
 
         let condition = Condition::Equals {
             field: "field1",
