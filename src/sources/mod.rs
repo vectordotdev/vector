@@ -64,6 +64,8 @@ pub mod mqtt;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-okta")]
+pub mod okta;
 #[cfg(feature = "sources-opentelemetry")]
 pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
