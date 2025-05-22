@@ -46,7 +46,6 @@ mod source;
 mod transform;
 pub mod unit_test;
 mod validation;
-mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
@@ -55,9 +54,10 @@ pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
-    CONFIG_PATHS,
+    interpolate, load, load_builder_from_paths, load_from_paths,
+    load_from_paths_with_provider_and_secrets, load_from_str, load_source_from_paths,
+    merge_path_lists, process_paths, COLLECTOR, CONFIG_PATHS,
+    ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -68,7 +68,7 @@ pub use transform::{
 };
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
+
 pub use vector_lib::{
     config::{
         init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, ComponentKey,
@@ -628,6 +628,30 @@ mod tests {
                 "Input \"asdf\" for sink \"out\" doesn't match any components.",
             ],
             err,
+        );
+    }
+
+    #[tokio::test]
+    async fn misplaced_env_var() {
+        let errors = load(
+            r#"
+            ${DEMO_SOURCE}
+
+            sinks:
+              s0:
+                type: consloe
+                inputs: [ "t0" ]
+                encoding:
+                  codec: json
+            "#,
+            Format::Yaml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            vec!["mapping values are not allowed in this context at line 4 column 18"],
+            errors,
         );
     }
 
