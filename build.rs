@@ -169,9 +169,9 @@ fn main() {
     let pkg_version = tracker
         .get_env_var("CARGO_PKG_VERSION")
         .expect("Cargo-provided environment variables should always exist! - CARGO_PKG_VERSION");
-    let pkg_description = tracker
-        .get_env_var("CARGO_PKG_DESCRIPTION")
-        .expect("Cargo-provided environment variables should always exist! - CARGO_PKG_DESCRIPTION");
+    // let pkg_description = tracker
+    //     .get_env_var("CARGO_PKG_DESCRIPTION")
+    //     .expect("Cargo-provided environment variables should always exist! - CARGO_PKG_DESCRIPTION");
     let target = tracker
         .get_env_var("TARGET")
         .expect("Cargo-provided environment variables should always exist! - TARGET");
@@ -187,9 +187,9 @@ fn main() {
     let debug = tracker
         .get_env_var("DEBUG")
         .expect("Cargo-provided environment variables should always exist! - DEBUG");
-    let rust_version = tracker
-        .get_env_var("CARGO_PKG_RUST_VERSION")
-        .expect("Cargo-provided environment variables should always exist! - CARGO_PKG_RUST_VERSION");
+    // let rust_version = tracker
+    //     .get_env_var("CARGO_PKG_RUST_VERSION")
+    //     .expect("Cargo-provided environment variables should always exist! - CARGO_PKG_RUST_VERSION");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
     // Get the git short hash of the HEAD.
@@ -215,7 +215,7 @@ fn main() {
     constants.add_required_constant(
         "RUST_VERSION",
         "The rust version from the package manifest.",
-        rust_version,
+        "1.83".to_string(),
     );
     constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
     constants.add_required_constant(
@@ -226,7 +226,7 @@ fn main() {
     constants.add_required_constant(
         "PKG_DESCRIPTION",
         "The description of this package.",
-        pkg_description,
+        "A lightweight and ultra-fast tool for building observability pipelines".to_string(),
     );
     constants.add_required_constant(
         "TARGET",
