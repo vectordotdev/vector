@@ -1,3 +1,4 @@
+use super::config::AmqpSinkConfig;
 use super::service::AmqpError;
 use crate::amqp::AmqpConfig;
 use deadpool::managed::Pool;
@@ -5,8 +6,8 @@ use lapin::options::ConfirmSelectOptions;
 
 pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 
-pub(super) fn new_channel_pool(config: &AmqpConfig) -> crate::Result<AmqpSinkChannels> {
-    let channel_manager = AmqpSinkChannelManager::new(config);
+pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSinkChannels> {
+    let channel_manager = AmqpSinkChannelManager::new(&config.connection);
     let channels = Pool::builder(channel_manager)
         .max_size(4)
         .runtime(deadpool::Runtime::Tokio1)
