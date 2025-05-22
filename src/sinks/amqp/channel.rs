@@ -1,13 +1,27 @@
 use super::service::AmqpError;
 use crate::amqp::AmqpConfig;
+use deadpool::managed::Pool;
 use lapin::options::ConfirmSelectOptions;
 
-/// A wrapper around the AMQP channel that handles reconnections.
-pub(crate) struct AmqpChannel {
+pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
+
+pub(super) fn new_channel_pool(config: &AmqpConfig) -> crate::Result<AmqpSinkChannels> {
+    let channel_manager = AmqpSinkChannelManager::new(config);
+    let channels = Pool::builder(channel_manager)
+        .max_size(4)
+        .runtime(deadpool::Runtime::Tokio1)
+        .build()?;
+    Ok(channels)
+}
+
+/// A channel pool manager for the AMQP sink.
+/// This manager is responsible for creating and recycling AMQP channels.
+/// It uses the `deadpool` crate to manage the channels.
+pub(crate) struct AmqpSinkChannelManager {
     config: AmqpConfig,
 }
 
-impl deadpool::managed::Manager for AmqpChannel {
+impl deadpool::managed::Manager for AmqpSinkChannelManager {
     type Type = lapin::Channel;
     type Error = AmqpError;
 
@@ -25,22 +39,24 @@ impl deadpool::managed::Manager for AmqpChannel {
         channel: &mut Self::Type,
         _: &deadpool::managed::Metrics,
     ) -> deadpool::managed::RecycleResult<Self::Error> {
-        if channel.status().state() == lapin::ChannelState::Connected {
+        let state = channel.status().state();
+        if state == lapin::ChannelState::Connected {
             Ok(())
         } else {
-            Err((AmqpError::ChannelClosed {}).into())
+            Err((AmqpError::ChannelClosed { state }).into())
         }
     }
 }
 
-impl AmqpChannel {
-    /// Creates a new AMQP channel.
+impl AmqpSinkChannelManager {
+    /// Creates a new channel pool manager for the AMQP sink.
     pub fn new(config: &AmqpConfig) -> Self {
         Self {
             config: config.clone(),
         }
     }
 
+    /// Creates a new AMQP channel using the configuration of this sink.
     async fn new_channel(config: &AmqpConfig) -> Result<lapin::Channel, AmqpError> {
         let (_, channel) = config
             .connect()

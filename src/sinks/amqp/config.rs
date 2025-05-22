@@ -1,5 +1,5 @@
 //! Configuration functionality for the `AMQP` sink.
-use super::channel::AmqpChannel;
+use super::channel::AmqpSinkChannels;
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{types::ShortString, BasicProperties};
 use vector_lib::{
@@ -122,7 +122,7 @@ impl GenerateConfig for AmqpSinkConfig {
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = AmqpSink::new(self.clone()).await?;
-        let hc = healthcheck(sink.channel_pool.clone()).boxed();
+        let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
@@ -135,12 +135,10 @@ impl SinkConfig for AmqpSinkConfig {
     }
 }
 
-pub(super) async fn healthcheck(
-    channel: deadpool::managed::Pool<AmqpChannel>,
-) -> crate::Result<()> {
+pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()> {
     trace!("Healthcheck started.");
 
-    let channel = channel.get().await?;
+    let channel = channels.get().await?;
 
     if !channel.status().connected() {
         return Err(Box::new(std::io::Error::new(

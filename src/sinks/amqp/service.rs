@@ -7,7 +7,7 @@ use lapin::{options::BasicPublishOptions, BasicProperties};
 use snafu::Snafu;
 use std::task::{Context, Poll};
 
-use super::channel::AmqpChannel;
+use super::channel::AmqpSinkChannels;
 
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.
@@ -78,7 +78,7 @@ impl DriverResponse for AmqpResponse {
 
 /// The tower service that handles the actual sending of data to `AMQP`.
 pub(super) struct AmqpService {
-    pub(super) channel_pool: deadpool::managed::Pool<AmqpChannel>,
+    pub(super) channels: AmqpSinkChannels,
 }
 
 #[derive(Debug, Snafu)]
@@ -95,8 +95,8 @@ pub enum AmqpError {
     #[snafu(display("Failed to open AMQP channel: {}", error))]
     ConnectFailed { error: vector_common::Error },
 
-    #[snafu(display("Channel is closed."))]
-    ChannelClosed,
+    #[snafu(display("Channel is not writeable: {:?}", state))]
+    ChannelClosed { state: lapin::ChannelState },
 
     #[snafu(display("Channel pool error: {}", error))]
     PoolError { error: vector_common::Error },
@@ -114,7 +114,7 @@ impl Service<AmqpRequest> for AmqpService {
     }
 
     fn call(&mut self, req: AmqpRequest) -> Self::Future {
-        let channel = self.channel_pool.clone();
+        let channel = self.channels.clone();
 
         Box::pin(async move {
             let channel = channel.get().await.map_err(|error| AmqpError::PoolError {
