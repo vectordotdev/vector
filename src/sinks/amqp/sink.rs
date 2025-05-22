@@ -37,11 +37,8 @@ pub(super) struct AmqpSink {
 
 impl AmqpSink {
     pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
-        let channels = super::channel::new_channel_pool(&config.connection).map_err(|e| {
-            BuildError::AmqpCreateFailed {
-                source: e,
-            }
-        })?;
+        let channels = super::channel::new_channel_pool(&config)
+            .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
