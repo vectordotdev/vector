@@ -113,7 +113,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int ${{ matrix.service }}
+          command: bash scripts/int-e2e-test.sh int ${{ matrix.service }}
 
   e2e-tests:
     needs: prep-pr
@@ -136,7 +136,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/int-e2e-test.sh e2e datadog-logs
 
       - name: datadog-e2e-metrics
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
@@ -146,7 +146,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
+          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
 
   update-pr-status:
     name: Signal result to PR

@@ -263,6 +263,11 @@ impl DnsMessageParser {
         let mut decoder = BinDecoder::new(raw_rdata);
         let prefix = parse_u8(&mut decoder)?;
         let ipv6_address = {
+            if prefix > 128 {
+                return Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("IPV6 prefix can't be greater than 128."),
+                });
+            }
             let address_length = (128 - prefix) / 8;
             let mut address_vec = parse_vec(&mut decoder, address_length)?;
             if address_vec.len() < 16 {
@@ -1531,6 +1536,18 @@ mod tests {
             .expect("Invalid base64 encoded data.");
         assert!(DnsMessageParser::new(raw_update_message)
             .parse_as_update_message()
+            .is_err());
+    }
+
+    #[test]
+    fn test_parse_bad_prefix_value() {
+        // this testcase have prefix value of 160,
+        let raw_dns_message = "oAAAMgABAAAAAAABAAABAAAAACYAAC8BAAAAAaAAAAAAAA==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        assert!(DnsMessageParser::new(raw_query_message)
+            .parse_as_query_message()
             .is_err());
     }
 

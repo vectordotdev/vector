@@ -27,3 +27,6 @@ logs_config:
   logs_no_ssl: true
   force_use_http: true
   batch_wait: 1
+
+# Required per https://github.com/DataDog/datadog-agent/tree/main/test/fakeintake#docker
+dd_url: 'http://fakeintake-agent:80'

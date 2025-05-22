@@ -419,7 +419,7 @@ base: components: sinks: mqtt: configuration: {
 		type: bool: default: false
 	}
 	tls: {
-		description: "Configures the TLS options for incoming/outgoing connections."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

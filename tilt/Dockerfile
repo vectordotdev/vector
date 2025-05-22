@@ -1,4 +1,4 @@
-ARG RUST_VERSION
+ARG RUST_VERSION=1.85
 ARG DEBIAN_RELEASE=bookworm
 # Features required for both Agent and Aggregator Helm chart configurations
 ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_metrics,sources-internal_metrics,sources-kubernetes_logs,sources-logstash,sources-splunk_hec,sources-statsd,sources-syslog,sources-vector,sinks-console,sinks-prometheus,sinks-vector
@@ -31,6 +31,7 @@ RUN --mount=type=cache,target=/vector/target \
 #
 # TARGET
 #
+ARG DEBIAN_RELEASE
 FROM docker.io/debian:${DEBIAN_RELEASE}-slim
 RUN apt-get update && apt-get -y --no-install-recommends install zlib1g && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /vector/vector /usr/bin/vector

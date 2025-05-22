@@ -4,7 +4,7 @@ short: Transforming
 description: Use Vector to parse, structure, shape, and transform observability data
 author_github: lucperkins
 domain: processing
-weight: 1
+weight: 2
 tags: ["transform", "observability", "level up", "guides", "guide"]
 ---
 

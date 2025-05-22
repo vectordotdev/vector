@@ -1,3 +1,4 @@
+use crate::common::mqtt::MqttCommonConfig;
 use crate::config::{SinkConfig, SinkContext};
 use crate::sinks::mqtt::config::MqttQoS;
 use crate::sinks::mqtt::MqttSinkConfig;
@@ -25,16 +26,21 @@ async fn mqtt_happy() {
     trace_init();
 
     let topic = "test";
-    let cnf = MqttSinkConfig {
+    let common = MqttCommonConfig {
         host: mqtt_broker_address(),
         port: mqtt_broker_port(),
+        ..Default::default()
+    };
+
+    let config = MqttSinkConfig {
+        common,
         topic: Template::try_from(topic).expect("Cannot parse the topic template"),
         quality_of_service: MqttQoS::AtLeastOnce,
         ..Default::default()
     };
 
     let cx = SinkContext::default();
-    let (sink, healthcheck) = cnf.build(cx).await.expect("Cannot build the sink");
+    let (sink, healthcheck) = config.build(cx).await.expect("Cannot build the sink");
     healthcheck.await.expect("Health check failed");
 
     // prepare consumer
