@@ -3,7 +3,6 @@
 use crate::sinks::prelude::*;
 use lapin::BasicProperties;
 use serde::Serialize;
-use std::sync::Arc;
 
 use super::channel::AmqpChannel;
 use super::{
@@ -28,7 +27,7 @@ pub(super) struct AmqpEvent {
 }
 
 pub(super) struct AmqpSink {
-    pub(super) channel: Arc<AmqpChannel>,
+    pub(super) channel_pool: deadpool::managed::Pool<AmqpChannel>,
     exchange: Template,
     routing_key: Option<Template>,
     properties: Option<AmqpPropertiesConfig>,
@@ -38,18 +37,21 @@ pub(super) struct AmqpSink {
 
 impl AmqpSink {
     pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
-        let channel = AmqpChannel::new(&config.connection).await.map_err(|e| {
-            BuildError::AmqpCreateFailed {
+        let channel_manager = AmqpChannel::new(&config.connection);
+        let channel_pool = deadpool::managed::Pool::builder(channel_manager)
+            .max_size(4)
+            .runtime(deadpool::Runtime::Tokio1)
+            .build()
+            .map_err(|e| BuildError::AmqpCreateFailed {
                 source: Box::new(e),
-            }
-        })?;
+            })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
 
         Ok(AmqpSink {
-            channel: Arc::new(channel),
+            channel_pool,
             exchange: config.exchange,
             routing_key: config.routing_key,
             properties: config.properties,
@@ -108,7 +110,7 @@ impl AmqpSink {
             },
         };
         let service = ServiceBuilder::new().service(AmqpService {
-            channel: Arc::clone(&self.channel),
+            channel_pool: self.channel_pool.clone(),
         });
 
         input
