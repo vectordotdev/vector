@@ -1,3 +1,3 @@
-Fixed possible integer overflows in timestamp parsing for `prometheus_parser::line::Metric::parse_timestamp`.
+Fix a bug that allow parse invalid timestamps in Prometheus metrics; invalid timestamps are now rejected during parsing.
 
 authors: wooffie
