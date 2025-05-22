@@ -5,10 +5,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use lapin::{options::BasicPublishOptions, BasicProperties};
 use snafu::Snafu;
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 
 use super::channel::AmqpChannel;
 
@@ -81,11 +78,11 @@ impl DriverResponse for AmqpResponse {
 
 /// The tower service that handles the actual sending of data to `AMQP`.
 pub(super) struct AmqpService {
-    pub(super) channel: Arc<AmqpChannel>,
+    pub(super) channel_pool: deadpool::managed::Pool<AmqpChannel>,
 }
 
 #[derive(Debug, Snafu)]
-pub(super) enum AmqpError {
+pub enum AmqpError {
     #[snafu(display("Failed retrieving Acknowledgement: {}", error))]
     AcknowledgementFailed { error: lapin::Error },
 
@@ -97,6 +94,12 @@ pub(super) enum AmqpError {
 
     #[snafu(display("Failed to open AMQP channel: {}", error))]
     ConnectFailed { error: vector_common::Error },
+
+    #[snafu(display("Channel is closed."))]
+    ChannelClosed,
+
+    #[snafu(display("Channel pool error: {}", error))]
+    PoolError { error: vector_common::Error },
 }
 
 impl Service<AmqpRequest> for AmqpService {
@@ -111,10 +114,12 @@ impl Service<AmqpRequest> for AmqpService {
     }
 
     fn call(&mut self, req: AmqpRequest) -> Self::Future {
-        let channel = Arc::clone(&self.channel);
+        let channel = self.channel_pool.clone();
 
         Box::pin(async move {
-            let channel = channel.channel().await?;
+            let channel = channel.get().await.map_err(|error| AmqpError::PoolError {
+                error: Box::new(error),
+            })?;
 
             let byte_size = req.body.len();
             let fut = channel

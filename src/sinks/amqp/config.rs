@@ -2,7 +2,6 @@
 use super::channel::AmqpChannel;
 use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{types::ShortString, BasicProperties};
-use std::sync::Arc;
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},
@@ -123,7 +122,7 @@ impl GenerateConfig for AmqpSinkConfig {
 impl SinkConfig for AmqpSinkConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = AmqpSink::new(self.clone()).await?;
-        let hc = healthcheck(Arc::clone(&sink.channel)).boxed();
+        let hc = healthcheck(sink.channel_pool.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 
@@ -136,10 +135,12 @@ impl SinkConfig for AmqpSinkConfig {
     }
 }
 
-pub(super) async fn healthcheck(channel: Arc<AmqpChannel>) -> crate::Result<()> {
+pub(super) async fn healthcheck(
+    channel: deadpool::managed::Pool<AmqpChannel>,
+) -> crate::Result<()> {
     trace!("Healthcheck started.");
 
-    let channel = channel.channel().await?;
+    let channel = channel.get().await?;
 
     if !channel.status().connected() {
         return Err(Box::new(std::io::Error::new(
