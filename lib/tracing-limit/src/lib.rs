@@ -264,11 +264,8 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-        } else {
-            let values = [(
-                &fields.field(RATE_LIMIT_FIELD).unwrap(),
-                Some(&rate_limit as &dyn Value),
-            )];
+        } else if let Some(ratelimit_field) = fields.field(RATE_LIMIT_FIELD) {
+            let values = [(&ratelimit_field, Some(&rate_limit as &dyn Value))];
 
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
