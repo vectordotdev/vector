@@ -312,10 +312,35 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
     }
 }
 
+fn check_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
+    println!("############# checking response : {:#?} #############", res);
+    let status_code = res.status();
+
+    let allow_retry = match errors_to_retry {
+        Some(error_codes) => error_codes.contains(&status_code.as_u16()),
+        None => false,
+    };
+
+    return allow_retry;
+}
+
+fn configured_to_retry(
+    errors_to_retry: Option<Vec<u16>>,
+    error: &SdkError<PutObjectError, HttpResponse>,
+) -> bool {
+    let allow_retry = match error {
+        SdkError::ResponseError(err) => check_response(err.raw(), errors_to_retry),
+        SdkError::ServiceError(err) => check_response(err.raw(), errors_to_retry),
+        _ => false,
+    };
+
+    return allow_retry;
+}
+
 #[derive(Debug, Clone)]
 pub struct S3RetryLogic {
     pub retry_all_errors: Option<bool>,
-    pub errors_to_retry: Option<Vec<String>>,
+    pub errors_to_retry: Option<Vec<u16>>,
 }
 
 impl RetryLogic for S3RetryLogic {
@@ -325,7 +350,9 @@ impl RetryLogic for S3RetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         let retry_all_errors = self.retry_all_errors.unwrap_or(false);
 
-        retry_all_errors || is_retriable_error(error)
+        retry_all_errors
+            || is_retriable_error(error)
+            || configured_to_retry(self.errors_to_retry.clone(), error)
     }
 }
 

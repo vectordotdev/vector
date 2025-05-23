@@ -156,7 +156,7 @@ pub struct S3SinkConfig {
     ///
     /// By default, the sink will only retry attempts it deems to be "retriable", this setting supports specifying specific error types to retry.
     #[configurable(metadata(docs::examples = "h2"))]
-    pub errors_to_retry: Option<Vec<String>>,
+    pub errors_to_retry: Option<Vec<u16>>,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -187,7 +187,7 @@ impl GenerateConfig for S3SinkConfig {
             timezone: Default::default(),
             force_path_style: Default::default(),
             retry_all_errors: None,
-            errors_to_retry: Some(<Vec<String>>::new()),
+            errors_to_retry: Some(<Vec<u16>>::new()),
         })
         .unwrap()
     }
