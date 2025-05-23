@@ -408,10 +408,15 @@ impl DatadogAgentSource {
 
     fn build_warp_filters(
         &self,
-        out: SourceSender,
+        mut out: SourceSender,
         acknowledgements: bool,
         config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
+        // Silence the "Source send cancelled." error log and error metric because we know that the
+        // sending Datadog Agent source will always resend after it drops the connection following a
+        // send timeout.
+        out.silence_unsent_events();
+
         let mut filters = (!config.disable_logs).then(|| {
             logs::build_warp_filter(
                 acknowledgements,
