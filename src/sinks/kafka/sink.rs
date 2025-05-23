@@ -4,15 +4,17 @@ use rdkafka::{
     ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::time::Duration;
 use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
 use super::config::KafkaSinkConfig;
 use crate::{
+    config::SinkHealthcheckOptions,
     kafka::KafkaStatisticsContext,
-    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
-    sinks::prelude::*,
+    sinks::{
+        kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
+        prelude::*,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -102,7 +104,10 @@ impl KafkaSink {
     }
 }
 
-pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
+pub(crate) async fn healthcheck(
+    config: KafkaSinkConfig,
+    healthcheck_options: SinkHealthcheckOptions,
+) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client_config = config.to_rdkafka().unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
@@ -125,7 +130,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 
         producer
             .client()
-            .fetch_metadata(topic, Duration::from_secs(3))
+            .fetch_metadata(topic, healthcheck_options.timeout)
             .map(|_| ())
     })
     .await??;

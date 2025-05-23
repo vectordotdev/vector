@@ -3,16 +3,17 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
-    template::Template,
+    template::{Template, UnsignedIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string,
     },
     SourceSender,
 };
+use config::AmqpPropertiesConfig;
 use futures::StreamExt;
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use vector_lib::config::LogNamespace;
+use vector_lib::{config::LogNamespace, event::LogEvent};
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {
@@ -21,9 +22,10 @@ pub fn make_config() -> AmqpSinkConfig {
     };
     let user = std::env::var("AMQP_USER").unwrap_or_else(|_| "guest".to_string());
     let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
+    let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
     let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
     config.connection.connection_string =
-        format!("amqp://{}:{}@rabbitmq:5672/{}", user, pass, vhost);
+        format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
     config
 }
 
@@ -124,6 +126,10 @@ async fn amqp_happy_path() {
         {
             let msg = try_msg.unwrap();
             let s = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
+
+            let msg_priority = *msg.properties.priority();
+            assert_eq!(msg_priority, None);
+
             out.push(s);
         } else {
             failures += 1;
@@ -217,4 +223,125 @@ async fn amqp_round_trip() {
     let output = crate::test_util::collect_n(rx, 1000).await;
 
     assert_eq!(output.len(), nb_events_published);
+}
+
+async fn amqp_priority_with_template(
+    template: &str,
+    event_field_priority: Option<u8>,
+    expected_priority: Option<u8>,
+) {
+    let mut config = make_config();
+    let exchange = format!("test-{}-exchange", random_string(10));
+    config.exchange = Template::try_from(exchange.as_str()).unwrap();
+    config.properties = Some(AmqpPropertiesConfig {
+        priority: Some(UnsignedIntTemplate::try_from(template).unwrap()),
+        ..Default::default()
+    });
+
+    await_connection(&config.connection).await;
+    let (_conn, channel) = config.connection.connect().await.unwrap();
+    let exchange_opts = lapin::options::ExchangeDeclareOptions {
+        auto_delete: true,
+        ..Default::default()
+    };
+    channel
+        .exchange_declare(
+            &exchange,
+            lapin::ExchangeKind::Fanout,
+            exchange_opts,
+            lapin::types::FieldTable::default(),
+        )
+        .await
+        .unwrap();
+
+    let cx = SinkContext::default();
+    let (sink, healthcheck) = config.build(cx).await.unwrap();
+    healthcheck.await.expect("Health check failed");
+
+    // prepare consumer
+    let queue = format!("test-{}-queue", random_string(10));
+    let queue_opts = lapin::options::QueueDeclareOptions {
+        auto_delete: true,
+        ..Default::default()
+    };
+    let queue_args = {
+        let mut args = lapin::types::FieldTable::default();
+        args.insert(
+            lapin::types::ShortString::from("x-max-priority"),
+            lapin::types::AMQPValue::ShortInt(10), // Maximum priority value
+        );
+        args
+    };
+    channel
+        .queue_declare(&queue, queue_opts, queue_args)
+        .await
+        .unwrap();
+
+    channel
+        .queue_bind(
+            &queue,
+            &exchange,
+            "",
+            lapin::options::QueueBindOptions::default(),
+            lapin::types::FieldTable::default(),
+        )
+        .await
+        .unwrap();
+
+    let consumer = format!("test-{}-consumer", random_string(10));
+    let mut consumer = channel
+        .basic_consume(
+            &queue,
+            &consumer,
+            lapin::options::BasicConsumeOptions::default(),
+            lapin::types::FieldTable::default(),
+        )
+        .await
+        .unwrap();
+
+    // Send a single event with a priority defined in the event
+    let input = random_string(100);
+    let event = {
+        let mut event = LogEvent::from_str_legacy(&input);
+        if let Some(priority) = event_field_priority {
+            event.insert("priority", priority);
+        }
+        event
+    };
+
+    let events = futures::stream::iter(vec![event]);
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    if let Ok(Some(try_msg)) = tokio::time::timeout(Duration::from_secs(10), consumer.next()).await
+    {
+        let msg = try_msg.unwrap();
+        let msg_priority = *msg.properties.priority();
+        let output = String::from_utf8_lossy(msg.data.as_slice()).into_owned();
+
+        assert_eq!(msg_priority, expected_priority);
+        assert_eq!(output, input);
+    } else {
+        panic!("Did not consume message in time.");
+    }
+}
+
+#[tokio::test]
+async fn amqp_priority_template_variable() {
+    crate::test_util::trace_init();
+
+    amqp_priority_with_template("{{ priority }}", Some(5), Some(5)).await;
+}
+
+#[tokio::test]
+async fn amqp_priority_template_constant() {
+    crate::test_util::trace_init();
+
+    amqp_priority_with_template("5", None, Some(5)).await;
+}
+
+#[tokio::test]
+async fn amqp_priority_template_out_of_bounds() {
+    crate::test_util::trace_init();
+
+    amqp_priority_with_template("100000", None, Some(u8::MAX)).await;
 }

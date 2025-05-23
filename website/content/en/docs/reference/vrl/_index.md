@@ -148,7 +148,7 @@ these references as you write your VRL programs:
 VRL is designed to minimize the learning curve. These resources can help you get
 acquainted with Vector and VRL:
 
-{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
+{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/getting-started/transformation"
 >}}
 
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),

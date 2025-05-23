@@ -32,3 +32,6 @@ vector:
   logs:
     enabled: true
     url: "http://vector:8181"
+
+# Required per https://github.com/DataDog/datadog-agent/tree/main/test/fakeintake#docker
+dd_url: 'http://fakeintake-agent:80'

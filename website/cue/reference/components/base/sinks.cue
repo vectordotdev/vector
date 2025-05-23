@@ -113,6 +113,14 @@ base: components: sinks: configuration: {
 				required:    false
 				type: bool: default: true
 			}
+			timeout: {
+				description: "Timeout duration for healthcheck in seconds."
+				required:    false
+				type: float: {
+					default: 10.0
+					unit:    "seconds"
+				}
+			}
 			uri: {
 				description: """
 					The full URI to make HTTP healthcheck requests to.

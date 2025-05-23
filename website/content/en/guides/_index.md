@@ -4,5 +4,5 @@ description: Thoughtful guides to help you get the most out of Vector. Created a
 short: Guides
 tags: ["guides", "guide"]
 aliases: ["/docs/setup/guides"]
-weight: 2
+weight: 1
 ---

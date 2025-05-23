@@ -1,6 +1,6 @@
 use std::{
     cmp,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap},
     fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
@@ -100,7 +100,7 @@ where
 
         checkpointer.read_checkpoints(self.ignore_before);
 
-        let mut known_small_files = HashSet::new();
+        let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
@@ -228,6 +228,29 @@ where
                     }
                 }
                 stats.record("discovery", start.elapsed());
+            }
+
+            // Cleanup the known_small_files
+            if let Some(grace_period) = self.remove_after {
+                known_small_files.retain(|path, last_time_open| {
+                    // Should the file be removed
+                    if last_time_open.elapsed() >= grace_period {
+                        // Try to remove
+                        match remove_file(path) {
+                            Ok(()) => {
+                                self.emitter.emit_file_deleted(path);
+                                false
+                            }
+                            Err(error) => {
+                                // We will try again after some time.
+                                self.emitter.emit_file_delete_error(path, error);
+                                true
+                            }
+                        }
+                    } else {
+                        true
+                    }
+                });
             }
 
             // Collect lines by polling files.

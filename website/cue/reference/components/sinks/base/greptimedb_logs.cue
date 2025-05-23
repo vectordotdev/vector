@@ -36,7 +36,7 @@ base: components: sinks: greptimedb_logs: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: unit: "bytes"
@@ -145,6 +145,21 @@ base: components: sinks: greptimedb_logs: configuration: {
 		description: "The endpoint of the GreptimeDB server."
 		required:    true
 		type: string: examples: ["http://localhost:4000"]
+	}
+	extra_headers: {
+		description: """
+			Custom headers to add to the HTTP request sent to GreptimeDB.
+			Note that these headers will override the existing headers.
+			"""
+		required: false
+		type: object: {
+			examples: [{}]
+			options: "*": {
+				description: "Extra header key-value pairs."
+				required:    true
+				type: string: {}
+			}
+		}
 	}
 	extra_params: {
 		description: "Custom parameters to add to the query string for each HTTP request sent to GreptimeDB."
