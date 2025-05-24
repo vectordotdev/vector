@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Args;
 
 use crate::app::CommandExt as _;
+use crate::util;
 
 /// Execute a command within the repository
 #[derive(Args, Debug)]
@@ -15,6 +16,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        util::catch_sigs();
         let status = Command::new(&self.args[0])
             .in_repo()
             .args(&self.args[1..])
