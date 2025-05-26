@@ -1405,8 +1405,11 @@ mod test {
                 "test".into()
             );
 
+            // Windows does not support connecting to `0.0.0.0`,
+            // therefore we connect to `127.0.0.1` instead (the socket is listening at `0.0.0.0`)
+            let to = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), socket_address.port());
             // Send packet to unicast address
-            send_lines_udp_from(from, socket_address, ["test".to_string()]);
+            send_lines_udp_from(from, to, ["test".to_string()]);
             let event = rx.next().await.expect("must receive an event");
             assert_eq!(
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
