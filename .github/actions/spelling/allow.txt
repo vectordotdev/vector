@@ -50,6 +50,7 @@ Comcast
 Consolas
 Coolpad
 BADDCAFE
+BADVERS
 DEBHELPER
 Danew
 dkr
