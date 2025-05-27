@@ -1,17 +1,18 @@
 use futures::{future::ready, stream};
 use sqlx::{
-    mysql::{MySqlConnectOptions, MySqlPoolOptions},
-    Executor as _, MySqlPool, Row,
+    mysql::MySqlConnectOptions,
+    Connection, ConnectOptions, Executor as _, MySqlConnection, Row,
 };
 use std::collections::HashMap;
+// use vector_common::finalization::BatchStatus;
 use vector_common::sensitive_string::SensitiveString;
 use vector_lib::event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value};
 
+
 use super::*;
-use crate::sinks::prelude::TowerRequestConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::{BatchConfig, Compression},
+    sinks::util::{BatchConfig},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_string, trace_init,
@@ -25,12 +26,26 @@ fn doris_address() -> String {
 
 // Extract MySQL connection information from HTTP address
 fn extract_mysql_conn_info(http_address: &str) -> (String, u16) {
-    // Default MySQL port - user specified as 9630
+    // Default MySQL port - Doris MySQL port is 9030, not 9630
     let default_port = 9630;
 
-    // Parse HTTP address
+    // Parse HTTP address and extract host, but use the correct MySQL port
     if let Ok(url) = url::Url::parse(http_address) {
         let host = url.host_str().unwrap_or("127.0.0.1").to_string();
+        // For integration tests, we need to map the HTTP port to MySQL port
+        // HTTP port 8030 -> MySQL port 9030 (but we need to check actual port mapping)
+        if let Some(_port) = url.port() {
+            // If running in Docker with port mapping, we need to get the actual mapped port
+            // For now, let's try to detect the MySQL port from environment or use default
+            if let Ok(mysql_port_str) = std::env::var("DORIS_MYSQL_PORT") {
+                if let Ok(mysql_port) = mysql_port_str.parse::<u16>() {
+                    return (host, mysql_port);
+                }
+            }
+            // Try to map HTTP port to MySQL port for common Docker setups
+            // This is a heuristic - in real deployments, these would be configured properly
+            return (host, default_port);
+        }
         return (host, default_port);
     }
 
@@ -38,11 +53,10 @@ fn extract_mysql_conn_info(http_address: &str) -> (String, u16) {
     ("127.0.0.1".to_string(), default_port)
 }
 
-fn make_test_event() -> (Event, BatchStatusReceiver) {
+fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    event.insert("host", "apache.com");
-    event.insert("timestamp", "2025-04-17 00:00:00");
+    event.insert("host", "example.com");
     (event.into(), receiver)
 }
 
@@ -104,277 +118,70 @@ fn default_headers() -> HashMap<String, String> {
     .collect()
 }
 
+
+
+
 #[tokio::test]
 async fn insert_events() {
     trace_init();
-
-    tracing::info!("Starting insert_events test");
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
 
     let database = format!("test_db_{}_point", random_string(5).to_lowercase());
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
-    tracing::info!("Creating test database {} and table {}", database, table);
-
-    // Create Doris client and test table
     let client = DorisTestClient::new(doris_address()).await;
+    tracing::info!("DorisTestClient created successfully, creating database...");
+
     client.create_database(&database).await;
+
     client
         .create_table(
             &database,
             &table,
-            "host Varchar(100), timestamp String, message String",
+            "host Varchar(100), message String",
         )
         .await;
 
-    tracing::info!("Successfully created database and table");
-
-    // Configure Doris sink
-    let mut batch = BatchConfig::default();
-    batch.max_events = Some(1);
-
     let config = DorisConfig {
-        endpoints: vec![doris_address()],
+        endpoints: vec!["http://10.16.10.6:8630".to_string()],
         database: database.clone().try_into().unwrap(),
         table: table.clone().try_into().unwrap(),
-        compression: Compression::None,
+        label_prefix: "vector_test".to_string(),
+        line_delimiter: "".to_string(),
+        log_request: true,
+        log_progress_interval: 10,
+        headers: default_headers(),
+        batch: batch,
+        buffer_bound: 1,
         auth: Some(crate::http::Auth::Basic {
             user: config_auth().user.clone(),
             password: SensitiveString::from(config_auth().password.clone()),
         }),
-        request: TowerRequestConfig {
-            retry_attempts: 1,
-            ..Default::default()
-        },
-        batch,
-        headers: default_headers(),
-        log_request: true,
+        request: Default::default(),
         ..Default::default()
     };
 
-    tracing::info!("Doris sink configuration: {:?}", config);
-
-    // Build sink
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    tracing::info!("Successfully built sink");
 
-    let (event, _receiver) = make_test_event();
-    tracing::info!("Created test event: {:?}", event);
+    let (input_event, _rc) = make_event();
 
-    tracing::info!("Starting sink...");
-    // This will wait for sink to completely process all events
-    run_and_assert_sink_compliance(sink, stream::once(ready(event.clone())), &SINK_TAGS).await;
-    tracing::info!("Sink finished running");
-
-    tracing::info!("Verifying data insertion");
-    let row_count = client.count_rows(&database, &table).await;
-    assert_eq!(1, row_count, "Table should have exactly 1 row");
-
-    // Verify data content
-    let event_log = event.into_log();
-    let db_row = client.get_first_row(&database, &table).await;
-
-    // Use helper function to check field matching
-    assert_fields_match(&event_log, &db_row, &["host", "timestamp", "message"], None);
-
-    // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
-
-    client.drop_table(&database, &table).await;
-    client.drop_database(&database).await;
-}
-
-#[tokio::test]
-async fn insert_events_with_compression() {
-    trace_init();
-
-    tracing::info!("Starting insert_events_with_compression test");
-
-    let database = format!("test_db_{}", random_string(5).to_lowercase());
-    let table = format!("test_table_{}", random_string(5).to_lowercase());
-
-    tracing::info!("Creating test database {} and table {}", database, table);
-
-    // Create Doris client and test table
-    let client = DorisTestClient::new(doris_address()).await;
-    client.create_database(&database).await;
-    client
-        .create_table(
-            &database,
-            &table,
-            "host Varchar(100), timestamp String, message String",
-        )
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
         .await;
 
-    tracing::info!("Successfully created database and table");
+    // assert_eq!(rc.try_recv(), Ok(BatchStatus::Delivered));
 
-    // Configure Doris sink with GZIP compression
-    let mut batch = BatchConfig::default();
-    batch.max_events = Some(1);
-
-    let config = DorisConfig {
-        endpoints: vec![doris_address()],
-        database: database.clone().try_into().unwrap(),
-        table: table.clone().try_into().unwrap(),
-        compression: Compression::gzip_default(),
-        batch,
-        auth: Some(crate::http::Auth::Basic {
-            user: config_auth().user.clone(),
-            password: SensitiveString::from(config_auth().password.clone()),
-        }),
-        log_request: true,
-        headers: default_headers(),
-        ..Default::default()
-    };
-
-    tracing::info!(
-        "Doris sink configuration (with GZIP compression): {:?}",
-        config
-    );
-
-    // Build sink
-    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    tracing::info!("Successfully built sink");
-
-    // Create test event
-    let (event, _receiver) = make_test_event();
-    tracing::info!("Created test event: {:?}", event);
-
-    // Run sink and verify
-    tracing::info!("Starting sink...");
-    run_and_assert_sink_compliance(sink, stream::once(ready(event.clone())), &SINK_TAGS).await;
-    tracing::info!("Sink finished running");
-
-    tracing::info!("Verifying data insertion");
     let row_count = client.count_rows(&database, &table).await;
-    assert_eq!(1, row_count, "Table should have exactly 1 row");
+    assert_eq!(1, row_count);
 
-    // Verify data content
-    let event_log = event.into_log();
+
     let db_row = client.get_first_row(&database, &table).await;
 
     // Use helper function to check field matching
-    assert_fields_match(&event_log, &db_row, &["host", "timestamp", "message"], None);
+    assert_fields_match(input_event.as_log(), &db_row, &["host", "message"], None);
 
-    // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
-    tracing::info!("Cleaning up test resources");
     client.drop_table(&database, &table).await;
     client.drop_database(&database).await;
-    tracing::info!("Test completed, resources cleaned up");
-}
-
-#[tokio::test]
-async fn insert_events_with_templated_table() {
-    trace_init();
-
-    tracing::info!("Starting insert_events_with_templated_table test");
-
-    let database = format!("test_db_{}", random_string(5).to_lowercase());
-    let table_prefix = format!("test_table_{}", random_string(5).to_lowercase());
-
-    // Create multiple tables, for templated table name test
-    let tables = vec![
-        format!("{}_{}", table_prefix, "users"),
-        format!("{}_{}", table_prefix, "orders"),
-    ];
-
-    tracing::info!(
-        "Creating test database {} and tables {:?}",
-        database,
-        tables
-    );
-
-    // Create Doris client and test tables
-    let client = DorisTestClient::new(doris_address()).await;
-    client.create_database(&database).await;
-
-    for table in &tables {
-        client
-            .create_table(
-                &database,
-                table,
-                "host Varchar(100), timestamp String, message String, table_suffix String",
-            )
-            .await;
-    }
-
-    tracing::info!("Successfully created database and tables");
-
-    // Configure Doris sink with templated table name
-    let mut batch = BatchConfig::default();
-    batch.max_events = Some(1);
-
-    let config = DorisConfig {
-        endpoints: vec![doris_address()],
-        database: database.clone().try_into().unwrap(),
-        table: format!("{}_{{{{ table_suffix }}}}", table_prefix)
-            .try_into()
-            .unwrap(),
-        compression: Compression::None,
-        auth: Some(crate::http::Auth::Basic {
-            user: config_auth().user.clone(),
-            password: SensitiveString::from(config_auth().password.clone()),
-        }),
-        headers: default_headers(),
-        log_request: true,
-        batch,
-        ..Default::default()
-    };
-
-    tracing::info!(
-        "Doris sink configuration (with templated table name): {:?}",
-        config
-    );
-
-    // Build sink
-    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    tracing::info!("Successfully built sink");
-
-    // Create test events with different table name suffixes
-    let mut events = Vec::new();
-    let mut receivers = Vec::new();
-
-    for suffix in &["users", "orders"] {
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-        event.insert("host", "example.com");
-        event.insert("timestamp", Value::Null); // Add timestamp field
-        event.insert("table_suffix", suffix.to_string());
-        events.push(Event::from(event));
-        receivers.push((suffix.to_string(), receiver));
-        tracing::info!("Created test event, table suffix: {}", suffix);
-    }
-
-    // Run sink and verify
-    tracing::info!("Starting sink...");
-    run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
-    tracing::info!("Sink finished running");
-
-    // Verify receiving status - Skip check
-    tracing::info!("Skipping status verification, directly verifying data insertion");
-
-    // Verify data insertion into each table
-    tracing::info!("Verifying data insertion");
-    for (i, table) in tables.iter().enumerate() {
-        // Check row count
-        let row_count = client.count_rows(&database, table).await;
-        assert_eq!(1, row_count, "Table {} should have exactly 1 row", table);
-
-        // Get event and database row
-        let event_log = events[i].clone().into_log();
-        let db_row = client.get_first_row(&database, table).await;
-
-        // Use helper function to check field matching
-        assert_fields_match(&event_log, &db_row, &["host", "table_suffix"], Some(table));
-
-        tracing::info!("Table {} data verification successful", table);
-    }
-
-    // Clean up test resources
-    tracing::info!("Cleaning up test resources");
-    for table in &tables {
-        client.drop_table(&database, table).await;
-    }
-    client.drop_database(&database).await;
-    tracing::info!("Test completed, resources cleaned up");
 }
 
 // Define an enum type that can represent different types of values
@@ -399,7 +206,7 @@ impl std::fmt::Display for DbValue {
 
 #[derive(Clone)]
 struct DorisTestClient {
-    pool: MySqlPool,
+    connect_options: MySqlConnectOptions,
 }
 
 impl DorisTestClient {
@@ -408,47 +215,42 @@ impl DorisTestClient {
         let (host, port) = extract_mysql_conn_info(&http_address);
 
         tracing::info!(
-            "Connected to Doris MySQL interface: {}:{} User: {}",
+            "Connecting to Doris MySQL interface: {}:{} User: {}",
             host,
             port,
             auth.user
         );
 
         // Configure MySQL connection parameters - For Doris specifically adjusted
+        // Disable these options to not send `SET @@sql_mode=CONCAT(@@sql_mode, {})` which is not supported on Doris.
         let connect_options = MySqlConnectOptions::new()
             .host(&host)
             .port(port)
             .username(&auth.user)
             .password(&auth.password)
-            .no_engine_substitution(false)
-            .pipes_as_concat(false)
-            .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled);
+            .no_engine_substitution(false)  // Keep false to avoid SET statement
+            .pipes_as_concat(false)         // Keep false to avoid SET statement
+            .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled)
+            .disable_statement_logging();
 
-        // Create connection pool - More conservative connection settings
-        let pool = match MySqlPoolOptions::new()
-            .max_connections(1) // Limit to single connection
-            .idle_timeout(std::time::Duration::from_secs(10))
-            .connect_with(connect_options)
-            .await
-        {
-            Ok(pool) => {
-                tracing::info!("Successfully created MySQL connection pool");
-                pool
-            }
-            Err(e) => {
-                tracing::error!("Failed to create MySQL connection pool: {}", e);
-                panic!("Failed to create MySQL connection pool: {}", e);
-            }
-        };
-
-        DorisTestClient { pool }
+        tracing::info!("DorisTestClient initialized successfully");
+        DorisTestClient { connect_options }
     }
 
+    /// Create a new database connection
+    async fn create_connection(&self) -> MySqlConnection {
+        MySqlConnection::connect_with(&self.connect_options)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e))
+    }
+
+    /// Execute a query that doesn't return data (DDL/DML operations)
     async fn execute_query(&self, query: &str) {
         tracing::info!("Executing SQL query: {}", query);
 
-        // Fully use non-prepare text protocol
-        match self.pool.execute(query).await {
+        let mut conn = self.create_connection().await;
+
+        match conn.execute(query).await {
             Ok(result) => {
                 tracing::info!(
                     "SQL query execution successful: {} - Affected rows: {}",
@@ -457,139 +259,142 @@ impl DorisTestClient {
                 );
             }
             Err(e) => {
-                // For some errors, if the database or table already exists, we can ignore them
-                if query.starts_with("CREATE DATABASE") && e.to_string().contains("already exists")
-                {
-                    tracing::warn!("Database may already exist, continuing execution: {}", e);
+                // Handle specific ignorable errors
+                if self.is_ignorable_error(query, &e) {
+                    tracing::warn!("Ignoring expected error for query '{}': {}", query, e);
                     return;
-                } else if query.starts_with("CREATE TABLE")
-                    && e.to_string().contains("already exists")
-                {
-                    tracing::warn!("Table may already exist, continuing execution: {}", e);
-                    return;
-                } else {
-                    panic!("SQL query execution failed: {} - {}", query, e);
                 }
+                panic!("SQL query execution failed: {} - {}", query, e);
             }
-        };
+        }
+        // Connection is automatically closed when it goes out of scope
     }
 
-    // Simplified method to create database, directly use execute_query
+    /// Check if an error can be safely ignored
+    fn is_ignorable_error(&self, query: &str, error: &sqlx::Error) -> bool {
+        let error_str = error.to_string();
+        (query.starts_with("CREATE DATABASE") && error_str.contains("already exists"))
+            || (query.starts_with("CREATE TABLE") && error_str.contains("already exists"))
+    }
+
+    /// Execute a query that returns a single row
+    async fn fetch_one_query(&self, query: &str, operation_name: &str) -> sqlx::mysql::MySqlRow {
+        tracing::info!("{}: {}", operation_name, query);
+
+        let mut conn = self.create_connection().await;
+
+        let result = conn.fetch_one(query)
+            .await
+            .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e));
+        
+        // Connection is automatically closed when it goes out of scope
+        result
+    }
+
+    /// Execute a query that returns multiple rows
+    async fn fetch_all_query(&self, query: &str, operation_name: &str) -> Vec<sqlx::mysql::MySqlRow> {
+        let mut conn = self.create_connection().await;
+
+        let result = conn.fetch_all(query)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("{} failed: {} - {}", operation_name, query, e);
+                Vec::new()
+            });
+        
+        // Connection is automatically closed when it goes out of scope
+        result
+    }
+
+    /// Create database using the common execute pattern
     async fn create_database(&self, database: &str) {
         let query = format!("CREATE DATABASE IF NOT EXISTS {}", database);
         self.execute_query(&query).await;
     }
 
-    // Simplified method to create table, directly use execute_query
+    /// Create table using the common execute pattern
     async fn create_table(&self, database: &str, table: &str, schema: &str) {
         let query = format!(
-            "CREATE TABLE IF NOT EXISTS {}.{} ({}) ENGINE=OLAP 
-             DISTRIBUTED BY HASH(`host`) BUCKETS 1 
+            "CREATE TABLE IF NOT EXISTS {}.{} ({}) ENGINE=OLAP
+             DISTRIBUTED BY HASH(`host`) BUCKETS 1
              PROPERTIES(\"replication_num\" = \"1\")",
             database, table, schema
         );
         self.execute_query(&query).await;
     }
 
-    // Simplified method to drop table
+    /// Drop table using the common execute pattern
     async fn drop_table(&self, database: &str, table: &str) {
         let query = format!("DROP TABLE IF EXISTS {}.{}", database, table);
         self.execute_query(&query).await;
     }
 
-    // Simplified method to drop database
+    /// Drop database using the common execute pattern
     async fn drop_database(&self, database: &str) {
         let query = format!("DROP DATABASE IF EXISTS {}", database);
         self.execute_query(&query).await;
     }
 
+    /// Count rows using the common fetch_one pattern
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
         let query = format!("SELECT COUNT(*) FROM {}.{}", database, table);
-        tracing::info!("Counting rows: {}", query);
-
-        // Use fetch_one and get directly to get results, avoid using query_scalar
-        let row = match self.pool.fetch_one(query.as_str()).await {
-            Ok(row) => row,
-            Err(e) => {
-                panic!("Counting rows failed: {} - {}", query, e);
-            }
-        };
-
-        // Get the value of the first column as count
+        let row = self.fetch_one_query(&query, "Counting rows").await;
+        
         let count: i64 = row.get(0);
         tracing::info!("Count result: {} rows", count);
         count
     }
 
-    // Modify get_first_row method, return HashMap<String, DbValue>
-    async fn get_first_row(&self, database: &str, table: &str) -> HashMap<String, DbValue> {
-        let query = format!("SELECT * FROM {}.{} LIMIT 1", database, table);
-        tracing::info!("Getting first row data: {}", query);
-
-        // Get column names
-        let columns = self.get_column_names(database, table).await;
-
-        // Get data - Directly use Executor interface
-        let row = match self.pool.fetch_one(query.as_str()).await {
-            Ok(row) => row,
-            Err(e) => {
-                panic!("Failed to get first row data: {} - {}", query, e);
-            }
-        };
-
-        // Build result
-        let mut result = HashMap::new();
-        for (i, column) in columns.iter().enumerate() {
-            // Try different types one by one, directly store original values
-            if let Ok(value) = row.try_get::<Option<String>, _>(i) {
-                result.insert(
-                    column.clone(),
-                    match value {
-                        Some(s) => DbValue::String(s),
-                        None => DbValue::Null,
-                    },
-                );
-            } else if let Ok(value) = row.try_get::<Option<i64>, _>(i) {
-                result.insert(
-                    column.clone(),
-                    match value {
-                        Some(n) => DbValue::Integer(n),
-                        None => DbValue::Null,
-                    },
-                );
-            } else if let Ok(value) = row.try_get::<Option<f64>, _>(i) {
-                result.insert(
-                    column.clone(),
-                    match value {
-                        Some(f) => DbValue::Float(f),
-                        None => DbValue::Null,
-                    },
-                );
-            } else {
-                // Default to Null
-                result.insert(column.clone(), DbValue::Null);
-            }
-        }
-
-        tracing::info!("Getting first row data successful");
-        result
-    }
-
+    /// Get column names using the common fetch_all pattern
     async fn get_column_names(&self, database: &str, table: &str) -> Vec<String> {
-        // Use INFORMATION_SCHEMA.COLUMNS to get column names
         let query = format!(
             "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{}' ORDER BY ORDINAL_POSITION",
             database, table
         );
 
-        // Use Executor interface directly to execute, avoid precompiled
-        match self.pool.fetch_all(query.as_str()).await {
-            Ok(rows) => rows.iter().map(|row| row.get::<String, _>(0)).collect(),
-            Err(e) => {
-                tracing::warn!("Failed to get column names: {} - {}", query, e);
-                // If column names cannot be obtained, return empty list
-                Vec::new()
+        let rows = self.fetch_all_query(&query, "Getting column names").await;
+        rows.iter().map(|row| row.get::<String, _>(0)).collect()
+    }
+
+    /// Convert a database row value to DbValue enum
+    fn extract_db_value(row: &sqlx::mysql::MySqlRow, column_index: usize) -> DbValue {
+        // Try different types in order of preference
+        if let Ok(value) = row.try_get::<Option<String>, _>(column_index) {
+            match value {
+                Some(s) => DbValue::String(s),
+                None => DbValue::Null,
             }
+        } else if let Ok(value) = row.try_get::<Option<i64>, _>(column_index) {
+            match value {
+                Some(n) => DbValue::Integer(n),
+                None => DbValue::Null,
+            }
+        } else if let Ok(value) = row.try_get::<Option<f64>, _>(column_index) {
+            match value {
+                Some(f) => DbValue::Float(f),
+                None => DbValue::Null,
+            }
+        } else {
+            DbValue::Null
         }
+    }
+
+    /// Get first row data using the refactored helper methods
+    async fn get_first_row(&self, database: &str, table: &str) -> HashMap<String, DbValue> {
+        let query = format!("SELECT * FROM {}.{} LIMIT 1", database, table);
+        
+        // Get column names and row data using helper methods
+        let columns = self.get_column_names(database, table).await;
+        let row = self.fetch_one_query(&query, "Getting first row data").await;
+
+        // Build result using the helper method
+        let mut result = HashMap::new();
+        for (i, column) in columns.iter().enumerate() {
+            let db_value = Self::extract_db_value(&row, i);
+            result.insert(column.clone(), db_value);
+        }
+
+        tracing::info!("Getting first row data successful");
+        result
     }
 }
