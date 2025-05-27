@@ -371,6 +371,15 @@ impl TransformOutputsBuf {
         .push(event);
     }
 
+    /// Takes the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
+    pub fn take_primary(&mut self) -> OutputBuffer {
+        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
+    }
+
     /// Drains the default output buffer.
     ///
     /// # Panics
@@ -395,16 +404,6 @@ impl TransformOutputsBuf {
             .get_mut(name)
             .expect("unknown output")
             .drain()
-    }
-
-    /// Takes the default output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no default output.
-    #[cfg(any(feature = "test", test))]
-    pub fn take_primary(&mut self) -> OutputBuffer {
-        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
     #[cfg(any(feature = "test", test))]
