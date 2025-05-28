@@ -371,21 +371,11 @@ impl TransformOutputsBuf {
         .push(event);
     }
 
-    /// Takes the default output buffer.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there is no default output.
-    pub fn take_primary(&mut self) -> OutputBuffer {
-        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
-    }
-
     /// Drains the default output buffer.
     ///
     /// # Panics
     ///
     /// Panics if there is no default output.
-    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
@@ -398,7 +388,6 @@ impl TransformOutputsBuf {
     /// # Panics
     ///
     /// Panics if there is no output with the given name.
-    #[cfg(any(feature = "test", test))]
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
@@ -406,7 +395,15 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    #[cfg(any(feature = "test", test))]
+    /// Takes the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
+    pub fn take_primary(&mut self) -> OutputBuffer {
+        std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
+    }
+
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
