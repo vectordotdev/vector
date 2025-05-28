@@ -478,7 +478,6 @@ impl OutputBuffer {
         })
     }
 
-    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
