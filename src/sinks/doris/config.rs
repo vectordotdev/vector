@@ -189,7 +189,7 @@ impl SinkConfig for DorisConfig {
 
                 async move {
                     let endpoint = common.base_url.clone();
-                    
+
                     let doris_client = DorisSinkClient::new(
                         client_clone,
                         common.base_url.clone(),
@@ -197,15 +197,13 @@ impl SinkConfig for DorisConfig {
                         compression,
                         label_prefix,
                         headers,
-                    ).await;
-                    
+                    )
+                    .await;
+
                     let doris_client_safe = doris_client.into_thread_safe();
-                    
-                    let service = DorisService::new(
-                        doris_client_safe,
-                        log_request,
-                        reporter_arc_clone,
-                    );
+
+                    let service =
+                        DorisService::new(doris_client_safe, log_request, reporter_arc_clone);
 
                     Ok::<_, crate::Error>((endpoint, service))
                 }
@@ -244,7 +242,7 @@ impl SinkConfig for DorisConfig {
                 self.label_prefix.clone(),
                 self.headers.clone(),
             )
-                .await;
+            .await;
             doris_client.into_thread_safe()
         };
 
@@ -267,7 +265,6 @@ impl SinkConfig for DorisConfig {
         &self.acknowledgements
     }
 }
-
 
 #[cfg(test)]
 mod tests {

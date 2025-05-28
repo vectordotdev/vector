@@ -17,7 +17,6 @@ mod retry;
 mod service;
 mod sink;
 
-
 #[cfg(all(test, feature = "doris-integration-tests"))]
 mod integration_test;
 
