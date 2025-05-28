@@ -64,6 +64,7 @@ pub struct DorisConfig {
 
     /// Custom HTTP headers to add to the request.
     #[serde(default)]
+    #[configurable(metadata(docs::additional_props_description = "An HTTP header value."))]
     pub headers: HashMap<String, String>,
 
     /// The codec configuration. This configures how events are encoded before being sent to Doris.
