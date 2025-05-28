@@ -39,6 +39,15 @@ components: sources: ifile: {
 				for these files. Please see [File
 				permissions](#file-permissions) for more details.
 				""",
+			"""
+				The `vector` process must run on the system where the block
+				device (that stores the files in `include`) is locally connected.
+				Unlike the `file` source, the `ifile` source will not work for
+				network file systems like NFS and SMB if Vector runs on the
+				client rather than the server, as the kernel of the Operating
+				System is then not aware of changes happening at the block
+				device level at the remote end.
+				""",
 		]
 		warnings: []
 		notices: []
