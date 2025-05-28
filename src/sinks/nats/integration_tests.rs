@@ -28,7 +28,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     let subject = conf.subject.clone();
     let consumer = conf
         .clone()
-        .connect()
+        .connect(false)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
