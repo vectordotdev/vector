@@ -1,56 +1,33 @@
 use futures::{future::ready, stream};
+use http::Uri;
 use sqlx::{
-    mysql::MySqlConnectOptions,
-    Connection, ConnectOptions, Executor as _, MySqlConnection, Row,
+    mysql::MySqlConnectOptions, ConnectOptions, Connection, Executor as _, MySqlConnection, Row,
 };
 use std::collections::HashMap;
 // use vector_common::finalization::BatchStatus;
 use vector_common::sensitive_string::SensitiveString;
 use vector_lib::event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value};
 
-
 use super::*;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::{BatchConfig},
+    sinks::util::BatchConfig,
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_string, trace_init,
     },
 };
 
+fn doris_mysql_address_port() -> (String, u16) {
+    let host_port = doris_address();
+    let uri = host_port.parse::<Uri>().expect("invalid uri");
+    let host = uri.host().unwrap_or("localhost").to_string();
+    (host, 9630)
+}
+
 // Set up Doris connection information
 fn doris_address() -> String {
     std::env::var("DORIS_ADDRESS").unwrap_or_else(|_| "http://10.16.10.6:8630".into())
-}
-
-// Extract MySQL connection information from HTTP address
-fn extract_mysql_conn_info(http_address: &str) -> (String, u16) {
-    // Default MySQL port - Doris MySQL port is 9030, not 9630
-    let default_port = 9630;
-
-    // Parse HTTP address and extract host, but use the correct MySQL port
-    if let Ok(url) = url::Url::parse(http_address) {
-        let host = url.host_str().unwrap_or("127.0.0.1").to_string();
-        // For integration tests, we need to map the HTTP port to MySQL port
-        // HTTP port 8030 -> MySQL port 9030 (but we need to check actual port mapping)
-        if let Some(_port) = url.port() {
-            // If running in Docker with port mapping, we need to get the actual mapped port
-            // For now, let's try to detect the MySQL port from environment or use default
-            if let Ok(mysql_port_str) = std::env::var("DORIS_MYSQL_PORT") {
-                if let Ok(mysql_port) = mysql_port_str.parse::<u16>() {
-                    return (host, mysql_port);
-                }
-            }
-            // Try to map HTTP port to MySQL port for common Docker setups
-            // This is a heuristic - in real deployments, these would be configured properly
-            return (host, default_port);
-        }
-        return (host, default_port);
-    }
-
-    // If parsing fails, return default values
-    ("127.0.0.1".to_string(), default_port)
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
@@ -79,7 +56,6 @@ fn assert_fields_match(
             Value::Bytes(bytes) => String::from_utf8_lossy(bytes).to_string(),
             other => other.to_string(),
         };
-
         // Database value already has Display implementation, use directly
         let db_str = db_value.to_string();
 
@@ -118,33 +94,27 @@ fn default_headers() -> HashMap<String, String> {
     .collect()
 }
 
-
-
-
 #[tokio::test]
 async fn insert_events() {
     trace_init();
-    let mut batch = BatchConfig::default();
-    batch.max_events = Some(1);
 
     let database = format!("test_db_{}_point", random_string(5).to_lowercase());
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
-    let client = DorisTestClient::new(doris_address()).await;
+    let client = DorisTestClient::new(doris_mysql_address_port()).await;
     tracing::info!("DorisTestClient created successfully, creating database...");
 
     client.create_database(&database).await;
 
     client
-        .create_table(
-            &database,
-            &table,
-            "host Varchar(100), message String",
-        )
+        .create_table(&database, &table, "host Varchar(100), message String")
         .await;
 
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
     let config = DorisConfig {
-        endpoints: vec!["http://10.16.10.6:8630".to_string()],
+        endpoints: vec![doris_address()],
         database: database.clone().try_into().unwrap(),
         table: table.clone().try_into().unwrap(),
         label_prefix: "vector_test".to_string(),
@@ -173,7 +143,6 @@ async fn insert_events() {
 
     let row_count = client.count_rows(&database, &table).await;
     assert_eq!(1, row_count);
-
 
     let db_row = client.get_first_row(&database, &table).await;
 
@@ -210,9 +179,9 @@ struct DorisTestClient {
 }
 
 impl DorisTestClient {
-    async fn new(http_address: String) -> Self {
+    async fn new(query_address_port: (String, u16)) -> Self {
         let auth = config_auth();
-        let (host, port) = extract_mysql_conn_info(&http_address);
+        let (host, port) = query_address_port;
 
         tracing::info!(
             "Connecting to Doris MySQL interface: {}:{} User: {}",
@@ -228,8 +197,8 @@ impl DorisTestClient {
             .port(port)
             .username(&auth.user)
             .password(&auth.password)
-            .no_engine_substitution(false)  // Keep false to avoid SET statement
-            .pipes_as_concat(false)         // Keep false to avoid SET statement
+            .no_engine_substitution(false) // Keep false to avoid SET statement
+            .pipes_as_concat(false) // Keep false to avoid SET statement
             .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled)
             .disable_statement_logging();
 
@@ -283,25 +252,28 @@ impl DorisTestClient {
 
         let mut conn = self.create_connection().await;
 
-        let result = conn.fetch_one(query)
+        let result = conn
+            .fetch_one(query)
             .await
             .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e));
-        
+
         // Connection is automatically closed when it goes out of scope
         result
     }
 
     /// Execute a query that returns multiple rows
-    async fn fetch_all_query(&self, query: &str, operation_name: &str) -> Vec<sqlx::mysql::MySqlRow> {
+    async fn fetch_all_query(
+        &self,
+        query: &str,
+        operation_name: &str,
+    ) -> Vec<sqlx::mysql::MySqlRow> {
         let mut conn = self.create_connection().await;
 
-        let result = conn.fetch_all(query)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("{} failed: {} - {}", operation_name, query, e);
-                Vec::new()
-            });
-        
+        let result = conn.fetch_all(query).await.unwrap_or_else(|e| {
+            tracing::warn!("{} failed: {} - {}", operation_name, query, e);
+            Vec::new()
+        });
+
         // Connection is automatically closed when it goes out of scope
         result
     }
@@ -339,7 +311,7 @@ impl DorisTestClient {
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
         let query = format!("SELECT COUNT(*) FROM {}.{}", database, table);
         let row = self.fetch_one_query(&query, "Counting rows").await;
-        
+
         let count: i64 = row.get(0);
         tracing::info!("Count result: {} rows", count);
         count
@@ -382,7 +354,7 @@ impl DorisTestClient {
     /// Get first row data using the refactored helper methods
     async fn get_first_row(&self, database: &str, table: &str) -> HashMap<String, DbValue> {
         let query = format!("SELECT * FROM {}.{} LIMIT 1", database, table);
-        
+
         // Get column names and row data using helper methods
         let columns = self.get_column_names(database, table).await;
         let row = self.fetch_one_query(&query, "Getting first row data").await;
