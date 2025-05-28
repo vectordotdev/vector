@@ -124,6 +124,8 @@ urls: {
 	databend:                                   "https://databend.rs"
 	databend_rest:                              "https://databend.rs/doc/integrations/api/rest"
 	databend_cloud:                             "https://www.databend.com"
+	doris:                                      "https://doris.apache.org"
+	doris_stream_load:                          "https://doris.apache.org/docs/data-operate/import/import-way/stream-load-manual"
 	datadog:                                    "https://www.datadoghq.com"
 	datadog_agent:                              "https://docs.datadoghq.com/agent/"
 	datadog_agent_vector_config_template:       "https://github.com/DataDog/datadog-agent/blob/7.64.1/pkg/config/config_template.yaml#L594-L650"
