@@ -22,12 +22,12 @@ fn doris_mysql_address_port() -> (String, u16) {
     let host_port = doris_address();
     let uri = host_port.parse::<Uri>().expect("invalid uri");
     let host = uri.host().unwrap_or("localhost").to_string();
-    (host, 9630)
+    (host, 9030)
 }
 
 // Set up Doris connection information
 fn doris_address() -> String {
-    std::env::var("DORIS_ADDRESS").unwrap_or_else(|_| "http://10.16.10.6:8630".into())
+    std::env::var("DORIS_ADDRESS").unwrap_or_else(|_| "http://localhost:8030".into())
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {

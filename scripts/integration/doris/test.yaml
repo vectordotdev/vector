@@ -4,7 +4,7 @@ features:
 test_filter: '::doris::integration_test::'
 
 env:
-  DORIS_ADDRESS: http://10.16.10.6:8630
+  DORIS_ADDRESS: http://doris:8030
 
 matrix:
   version: ['2.1.7']
