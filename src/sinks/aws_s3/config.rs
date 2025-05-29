@@ -146,17 +146,13 @@ pub struct S3SinkConfig {
     #[serde(default = "crate::serde::default_true")]
     pub force_path_style: bool,
 
-    /// Whether or not to always retry every error
+    /// Specifies errors to retry
     ///
-    /// By default, the sink will only retry attempts it deems to be "retriable", this setting overrides that behavior
+    /// By default, the sink will only retry attempts it deems to be "retriable,"
+    /// these settings override that behavior.
+    #[configurable(derived)]
     #[serde(default)]
-    pub retry_all_errors: Option<bool>,
-
-    /// A list of specific error types to retry.
-    ///
-    /// By default, the sink will only retry attempts it deems to be "retriable", this setting supports specifying specific error types to retry.
-    #[configurable(metadata(docs::examples = "h2"))]
-    pub errors_to_retry: Option<Vec<u16>>,
+    pub retry_logic: Option<S3RetryLogic>,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -186,8 +182,7 @@ impl GenerateConfig for S3SinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
-            retry_all_errors: None,
-            errors_to_retry: Some(<Vec<u16>>::new()),
+            retry_logic: Default::default(),
         })
         .unwrap()
     }
@@ -223,14 +218,9 @@ impl S3SinkConfig {
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.into_settings();
+        let retry_logic = self.retry_logic.clone();
         let service = ServiceBuilder::new()
-            .settings(
-                request_limits,
-                S3RetryLogic {
-                    retry_all_errors: self.retry_all_errors,
-                    errors_to_retry: self.errors_to_retry.clone(),
-                },
-            )
+            .settings(request_limits, retry_logic.unwrap())
             .service(service);
 
         let offset = self

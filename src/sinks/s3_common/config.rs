@@ -313,7 +313,6 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 }
 
 fn check_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
-    println!("############# checking response : {:#?} #############", res);
     let status_code = res.status();
 
     let allow_retry = match errors_to_retry {
@@ -337,10 +336,35 @@ fn configured_to_retry(
     return allow_retry;
 }
 
+// TODO: verify documentation paths
+
+/// S3 Error retry logic.
+///
+/// For more information, see [Retry Logic][retry_logic].
+///
+/// [retry_logic]: https://docs.aws.amazon.com/AmazonS3/latest/dev/retry-logic-overview.html#retry-logic
+#[configurable_component]
 #[derive(Debug, Clone)]
 pub struct S3RetryLogic {
+    /// Retry all errors.
+    ///
+    /// All failed service calls will be retried.
     pub retry_all_errors: Option<bool>,
+
+    /// Retry specific errors.
+    ///
+    /// A vector list of status codes matching specific error types that will trigger
+    /// failed service retry attempts. The list is ignored if `retry_all_errors` is ignored.
     pub errors_to_retry: Option<Vec<u16>>,
+}
+
+impl S3RetryLogic {
+    pub fn new() -> Self {
+        Self {
+            retry_all_errors: None,
+            errors_to_retry: Some(Vec::new()),
+        }
+    }
 }
 
 impl RetryLogic for S3RetryLogic {
