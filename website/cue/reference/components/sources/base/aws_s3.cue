@@ -137,7 +137,7 @@ base: components: sources: aws_s3: configuration: {
 			session_token: {
 				description: """
 					The AWS session token.
-					See https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
 					"""
 				required: false
 				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
