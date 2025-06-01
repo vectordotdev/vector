@@ -156,19 +156,19 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     let message: String;
     let code: StatusCode;
 
-    if let Some(e) = err.find::<RequestError>() {
+    match err.find::<RequestError>() { Some(e) => {
         message = e.to_string();
         code = e.status();
         request_id = e.request_id();
-    } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
+    } _ => { match err.find::<warp::reject::MissingHeader>() { Some(e) => {
         code = StatusCode::BAD_REQUEST;
         message = format!("Required header missing: {}", e.name());
         request_id = None;
-    } else {
+    } _ => {
         code = StatusCode::INTERNAL_SERVER_ERROR;
         message = format!("{:?}", err);
         request_id = None;
-    }
+    }}}}
 
     emit!(AwsKinesisFirehoseRequestError::new(
         code,

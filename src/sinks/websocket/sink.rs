@@ -214,8 +214,8 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = WsError>,
-        impl Stream<Item = Result<Message, WsError>>,
+        impl Sink<Message, Error = WsError> + use<>,
+        impl Stream<Item = Result<Message, WsError>> + use<>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
@@ -294,11 +294,11 @@ impl WebSocketSink {
                 },
 
                 event = input.next() => {
-                    let mut event = if let Some(event) = event {
+                    let mut event = match event { Some(event) => {
                         event
-                    } else {
+                    } _ => {
                         break;
-                    };
+                    }};
 
                     let finalizers = event.take_finalizers();
 
