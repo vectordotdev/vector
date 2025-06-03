@@ -12,11 +12,11 @@ base: components: sinks: doris: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Whether end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
-				acknowledgements that is connected to that sink waits for events
-				to be acknowledged by **all connected sinks** before acknowledging them at the source.
+                acknowledgements and is connected to that sink waits for events
+                to be acknowledged by **all connected sinks**, before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -49,7 +49,7 @@ base: components: sinks: doris: configuration: {
 					basic: """
 						Basic authentication.
 
-						The username and password are concatenated and encoded via [base64][base64].
+						The username and password are concatenated and encoded using [base64][base64].
 
 						[base64]: https://en.wikipedia.org/wiki/Base64
 						"""
@@ -108,8 +108,13 @@ base: components: sinks: doris: configuration: {
 	}
 	buffer_bound: {
 		description: """
-			Buffer size for controlling the number of concurrent stream load requests.
-			A value of 1 ensures only one request is processed at a time.
+			Controls the buffer size for requests sent to Doris endpoints.
+			
+			This sets the maximum number of stream load requests that can be queued for sending to 
+			Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent 
+			sequentially to the endpoint. Higher values allow more requests to be buffered, enabling 
+			better throughput but requiring careful consideration of your Doris endpoint's capacity 
+			and processing capabilities.
 			"""
 		required: false
 		type: uint: {
@@ -120,7 +125,7 @@ base: components: sinks: doris: configuration: {
 		}
 	}
 	codec: {
-		description: "The codec configuration. This configures how events are encoded before being sent to Doris."
+		description: "The codec configuration. This configures how events are encoded before they are sent to Doris."
 		required:    false
 		type: object: options: {
 			json: {
@@ -146,7 +151,7 @@ base: components: sinks: doris: configuration: {
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
-															option. Tags with multiple values show the last assigned value, and null values
+															option. Tags with multiple values show the last assigned value and null values
 															are ignored.
 															"""
 					}
@@ -185,7 +190,7 @@ base: components: sinks: doris: configuration: {
 		}
 	}
 	database: {
-		description: "The database that contains the table data will be inserted into."
+		description: "The database that contains the table that data is inserted into."
 		required:    true
 		type: string: {
 			examples: ["mydatabase"]
@@ -290,7 +295,7 @@ base: components: sinks: doris: configuration: {
 	log_progress_interval: {
 		description: """
 			Progress reporting interval in seconds.
-			Set to 0 to disable progress reporting.
+			Set to `0` to disable progress reporting.
 			"""
 		required: false
 		type: uint: default: 10
@@ -301,7 +306,7 @@ base: components: sinks: doris: configuration: {
 		type: bool: default: true
 	}
 	max_retries: {
-		description: "Number of retries that will be attempted before give up."
+		description: "Number of retries attempted before failing."
 		required:    false
 		type: int: default: -1
 	}
@@ -311,7 +316,7 @@ base: components: sinks: doris: configuration: {
 
 			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 
-			Note that the retry backoff policy follows the Fibonacci sequence.
+			**Note**: The retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -351,7 +356,7 @@ base: components: sinks: doris: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is `1` (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
@@ -375,7 +380,7 @@ base: components: sinks: doris: configuration: {
 
 																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
+																When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable
 																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
@@ -403,7 +408,7 @@ base: components: sinks: doris: configuration: {
 															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
 															"""
 							none: """
-															A fixed concurrency of 1.
+															A fixed concurrency of `1`.
 
 															Only one request can be outstanding at any given time.
 															"""
@@ -440,7 +445,7 @@ base: components: sinks: doris: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -457,7 +462,7 @@ base: components: sinks: doris: configuration: {
 						Full: """
 															Full jitter.
 
-															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															The random delay is anywhere from `0` up to the maximum current delay calculated by the backoff
 															strategy.
 
 															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood

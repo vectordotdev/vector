@@ -87,10 +87,13 @@ pub struct DorisConfig {
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    /// Buffer size for controlling the number of concurrent stream load requests.
-    /// A value of 1 ensures only one request is processed at a time.
+    /// Controls the buffer size for requests sent to Doris endpoints.
+    ///
+    /// This sets the maximum number of stream load requests that can be queued for sending to 
+    /// Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent 
+    /// sequentially to the endpoint.
     #[configurable(metadata(docs::examples = 1))]
-    #[configurable(metadata(docs::human_name = "Concurrent Stream Load Requests"))]
+    #[configurable(metadata(docs::human_name = "Request Buffer Size"))]
     #[serde(default = "default_buffer_bound")]
     pub buffer_bound: usize,
 
