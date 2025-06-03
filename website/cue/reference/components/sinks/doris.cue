@@ -127,7 +127,7 @@ components: sinks: doris: {
 				Vector implements comprehensive error handling for Doris Stream Load operations:
 
 				- **Retries**: Failed requests are automatically retried based on the
-				  `max_retries` configuration. Set to -1 for unlimited retries.
+				  `max_retries` configuration. Set to `-1` for unlimited retries.
 				- **Backoff**: Exponential backoff is used between retry attempts to avoid
 				  overwhelming the Doris cluster.
 				- **Partial Failures**: If a Stream Load request fails due to data format
