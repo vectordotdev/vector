@@ -113,7 +113,7 @@ components: sinks: doris: {
 		authentication: {
 			title: "Authentication"
 			body: """
-				Vector supports HTTP Basic Authentication for connecting to Doris. The
+				Vector supports HTTP basic authentication for connecting to Doris. The
 				credentials are configured using the `auth.user` and `auth.password` options.
 
 				The authentication is performed on each Stream Load request to the Doris
