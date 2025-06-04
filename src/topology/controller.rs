@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use futures_util::FutureExt as _;
-
-use tokio::sync::{Mutex, MutexGuard};
-
 #[cfg(feature = "api")]
 use crate::api;
 use crate::extra_context::ExtraContext;
 use crate::internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded};
+use futures_util::FutureExt as _;
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{config, signal::ShutdownError, topology::RunningTopology};
 
@@ -59,11 +57,7 @@ pub enum ReloadOutcome {
 }
 
 impl TopologyController {
-    pub async fn reload(
-        &mut self,
-        mut new_config: config::Config,
-        components_to_reload: Option<Vec<&config::ComponentKey>>,
-    ) -> ReloadOutcome {
+    pub async fn reload(&mut self, mut new_config: config::Config) -> ReloadOutcome {
         new_config
             .healthchecks
             .set_require_healthy(self.require_healthy);
@@ -107,7 +101,7 @@ impl TopologyController {
 
         match self
             .topology
-            .reload_config_and_respawn(new_config, self.extra_context.clone(), components_to_reload)
+            .reload_config_and_respawn(new_config, self.extra_context.clone())
             .await
         {
             Ok(true) => {

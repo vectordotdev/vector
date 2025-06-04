@@ -94,6 +94,7 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
     pub(super) encoder: (Transformer, Encoder<Framer>),
     pub(super) compression: Compression,
     pub(super) extra_params: Option<HashMap<String, String>>,
+    pub(super) extra_headers: Option<HashMap<String, String>>,
 }
 
 fn prepare_log_ingester_url(
@@ -143,8 +144,14 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let payload = request.take_payload();
 
         let mut builder = Request::post(&url)
-            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_TYPE, "application/x-ndjson")
             .header(CONTENT_LENGTH, payload.len());
+
+        if let Some(extra_headers) = self.extra_headers.as_ref() {
+            for (key, value) in extra_headers.iter() {
+                builder = builder.header(key, value);
+            }
+        }
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
