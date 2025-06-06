@@ -115,7 +115,7 @@ impl InternalEvent for BufferReadError {
             error_code = self.error_code,
             error_type = error_type::READER_FAILED,
             stage = "processing",
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "buffer_errors_total", "error_code" => self.error_code,
