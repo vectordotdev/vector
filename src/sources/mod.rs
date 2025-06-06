@@ -58,6 +58,8 @@ pub mod kubernetes_logs;
 pub mod logstash;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
+#[cfg(feature = "sources-mqtt")]
+pub mod mqtt;
 #[cfg(feature = "sources-nats")]
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
