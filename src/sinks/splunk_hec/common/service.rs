@@ -132,8 +132,7 @@ where
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
 
-                                // Extract cookies from response headers if available
-                                // For HTTP responses, we can access headers directly
+                                // Extract a single cookie from response headers if available
                                 let cookie_string = if let Some(headers) = response.headers() {
                                     if cookie_name.is_empty() {
                                         String::new()
@@ -143,11 +142,12 @@ where
                                             .iter()
                                             .filter_map(|v| v.to_str().ok())
                                             .find_map(|cookie_header| {
-                                                // Check if this header contains our target cookie
                                                 if cookie_header
                                                     .starts_with(&format!("{}=", cookie_name))
                                                 {
                                                     // Extract just the name + value part (before any semicolon)
+                                                    // We don't want any attributes like `Path` or `Expires`
+                                                    // that may be present in the header alongside the value
                                                     let value = cookie_header
                                                         .split(';')
                                                         .next()
@@ -161,6 +161,8 @@ where
                                     }
                                 } else {
                                     // For other response types, use an empty cookie string
+                                    // This effectively groups together all the acks into a single bucket,
+                                    // which is the same as the previous behavior without any cookies
                                     String::new()
                                 };
 
@@ -644,5 +646,25 @@ mod tests {
             poll!(poll_fn(|cx| service.poll_ready(cx))),
             Poll::Ready(Ok(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_with_cookie_tracking_successful() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            cookie_name: "splunkd_cookie".to_string(),
+            ..Default::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let mut responses = FuturesUnordered::new();
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        while let Some(response) = responses.next().await {
+            assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
+        }
     }
 }

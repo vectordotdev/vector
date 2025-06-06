@@ -128,7 +128,7 @@ impl HecAckClient {
     async fn run(&mut self) {
         // Group ack IDs by cookie string (cookie may be an empty string for single-indexer clusters)
         let ack_groups = self.get_ack_groups_by_cookie();
-        let mut any_error = false;
+        let mut error_sending_ack = false;
 
         // Decrement retries once every loop through all acks
         self.decrement_retries();
@@ -146,7 +146,7 @@ impl HecAckClient {
                         debug!(
                             message = "Received ack statuses for cookie.",
                             ?ack_query_response,
-                            ?cookie
+                            ?cookie,
                         );
                         let acked_ack_ids = ack_query_response
                             .acks
@@ -169,7 +169,6 @@ impl HecAckClient {
                                     message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
                                     error,
                                 });
-                                // Only finalize the ack IDs for this cookie group
                                 self.finalize_delivered_ack_ids(cookie, &ack_ids);
                             }
                             _ => {
@@ -178,7 +177,7 @@ impl HecAckClient {
                                         "Unable to send acknowledgement query request. Will retry.",
                                     error,
                                 });
-                                any_error = true;
+                                error_sending_ack = true;
                             }
                         }
                     }
@@ -186,12 +185,10 @@ impl HecAckClient {
             }
         }
 
-        // Only expire ack IDs after all cookie groups have been processed
-        if any_error {
+        if error_sending_ack {
             self.expire_ack_ids_with_status(EventStatus::Errored);
-        } else {
-            self.expire_ack_ids_with_status(EventStatus::Rejected);
         }
+        self.expire_ack_ids_with_status(EventStatus::Rejected);
     }
 
     /// Removes successfully acked ack ids and finalizes associated events
@@ -378,10 +375,9 @@ mod tests {
     }
 
     #[test]
-    fn test_get_ack_groups_by_cookie() {
+    fn test_get_ack_groups_by_cookie_multiple_groups() {
         let mut ack_client = get_ack_client(1);
 
-        // Add acks with different cookies
         let (tx1, _) = oneshot::channel();
         ack_client.add(1, "cookie1".to_string(), tx1);
 
@@ -405,24 +401,20 @@ mod tests {
     }
 
     #[test]
-    fn test_get_ack_query_body() {
+    fn test_get_ack_groups_by_cookie_single_group() {
         let mut ack_client = get_ack_client(1);
-        let ack_ids = (0..100).collect::<Vec<u64>>();
-        _ = populate_ack_client(&mut ack_client, &ack_ids);
+        let expected_ack_ids = (0..100).collect::<Vec<u64>>();
+        _ = populate_ack_client(&mut ack_client, &expected_ack_ids);
 
-        // Get all ack IDs from all cookie groups
         let groups = ack_client.get_ack_groups_by_cookie();
-        let mut all_ack_ids = Vec::new();
+        assert_eq!(groups.len(), 1);
+        let mut ack_ids = Vec::new();
         for (_, ids) in groups {
-            all_ack_ids.extend(ids);
+            ack_ids.extend(ids);
         }
-        all_ack_ids.sort_unstable();
+        ack_ids.sort_unstable();
 
-        // This should match the original behavior of get_ack_query_body
-        let mut expected_ack_ids = ack_ids.clone();
-        expected_ack_ids.sort_unstable();
-
-        assert_eq!(expected_ack_ids, all_ack_ids);
+        assert_eq!(expected_ack_ids, ack_ids);
     }
 
     #[test]
@@ -431,26 +423,23 @@ mod tests {
         let ack_ids = (0..100).collect::<Vec<u64>>();
         _ = populate_ack_client(&mut ack_client, &ack_ids);
 
-        // Check that all ack IDs are present initially
         let groups = ack_client.get_ack_groups_by_cookie();
-        let mut all_ack_ids = Vec::new();
+        let mut initial_ack_ids = Vec::new();
         for (_, ids) in groups {
-            all_ack_ids.extend(ids);
+            initial_ack_ids.extend(ids);
         }
-        all_ack_ids.sort_unstable();
-        assert_eq!(ack_ids, all_ack_ids);
+        initial_ack_ids.sort_unstable();
+        assert_eq!(ack_ids, initial_ack_ids);
 
-        // Decrement retries and expire
         ack_client.decrement_retries();
         ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
-        // Check that all ack IDs are gone
         let groups = ack_client.get_ack_groups_by_cookie();
-        let all_ack_ids: Vec<u64> = groups
-            .values()
-            .flat_map(|ids| ids.iter().copied())
-            .collect();
-        assert!(all_ack_ids.is_empty())
+        let mut final_ack_ids = Vec::new();
+        for (_, ids) in groups {
+            final_ack_ids.extend(ids);
+        }
+        assert!(final_ack_ids.is_empty())
     }
 
     #[tokio::test]
@@ -489,10 +478,8 @@ mod tests {
             Mock, MockServer, Request, ResponseTemplate,
         };
 
-        // Start a mock server
         let mock_server = MockServer::start().await;
 
-        // Set up the mock to respond to requests with different cookies
         Mock::given(method("POST"))
             .and(path("/services/collector/ack"))
             .and(header("Cookie", "cookie1"))
@@ -516,18 +503,19 @@ mod tests {
             .respond_with(|req: &Request| {
                 let req_body =
                     serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+
+                // Set this to false for cookie2 to simulate the indexer not processing this ack yet
                 ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
                     acks: req_body
                         .acks
                         .into_iter()
-                        .map(|ack_id| (ack_id, true))
+                        .map(|ack_id| (ack_id, false))
                         .collect::<HashMap<_, _>>(),
                 })
             })
             .mount(&mock_server)
             .await;
 
-        // Create an HecAckClient
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = HttpRequestBuilder::new(
             mock_server.uri(),
@@ -537,79 +525,22 @@ mod tests {
         );
         let mut ack_client = HecAckClient::new(1, client, Arc::new(http_request_builder));
 
-        // Add acks with different cookies
         let (tx1, rx1) = oneshot::channel();
         ack_client.add(1, "cookie1".to_string(), tx1);
-
         let (tx2, rx2) = oneshot::channel();
         ack_client.add(2, "cookie1".to_string(), tx2);
-
         let (tx3, rx3) = oneshot::channel();
         ack_client.add(3, "cookie2".to_string(), tx3);
 
-        // Run the client to process the acks
         ack_client.run().await;
 
-        // Verify that all acks were processed correctly
-        // The mock server returns true for all ack IDs, so they should be marked as Delivered
-        let status1 = rx1.await.unwrap();
-        let status2 = rx2.await.unwrap();
-        let status3 = rx3.await.unwrap();
+        // Verify that all acks with cookie1 were marked as delivered, but cookie2 was not
+        let cookie1_status1 = rx1.await.unwrap();
+        let cookie1_status2 = rx2.await.unwrap();
+        let cookie2_status = rx3.await.unwrap();
 
-        assert_eq!(EventStatus::Delivered, status1);
-        assert_eq!(EventStatus::Delivered, status2);
-        assert_eq!(EventStatus::Delivered, status3);
-    }
-
-    #[tokio::test]
-    async fn test_run_with_single_cookie() {
-        use super::{HecAckStatusRequest, HecAckStatusResponse};
-        use std::collections::HashMap;
-        use wiremock::{
-            matchers::{header, method, path},
-            Mock, MockServer, Request, ResponseTemplate,
-        };
-
-        // Start a mock server
-        let mock_server = MockServer::start().await;
-
-        // Set up the mock to respond to requests with a cookie
-        Mock::given(method("POST"))
-            .and(path("/services/collector/ack"))
-            .and(header("Cookie", "cookie1"))
-            .respond_with(|req: &Request| {
-                let req_body =
-                    serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
-                ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
-                    acks: req_body
-                        .acks
-                        .into_iter()
-                        .map(|ack_id| (ack_id, true))
-                        .collect::<HashMap<_, _>>(),
-                })
-            })
-            .mount(&mock_server)
-            .await;
-
-        // Create an HecAckClient
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
-        let http_request_builder = HttpRequestBuilder::new(
-            mock_server.uri(),
-            EndpointTarget::default(),
-            String::from("token"),
-            Compression::default(),
-        );
-        let mut ack_client = HecAckClient::new(1, client, Arc::new(http_request_builder));
-
-        // Add a single ack with a cookie
-        let (tx, rx) = oneshot::channel();
-        ack_client.add(1, "cookie1".to_string(), tx);
-
-        // Run the client to process the ack
-        ack_client.run().await;
-
-        // Verify that the ack was processed correctly
-        let status = rx.await.unwrap();
-        assert_eq!(EventStatus::Delivered, status);
+        assert_eq!(EventStatus::Delivered, cookie1_status1);
+        assert_eq!(EventStatus::Delivered, cookie1_status2);
+        assert_eq!(EventStatus::Rejected, cookie2_status);
     }
 }
