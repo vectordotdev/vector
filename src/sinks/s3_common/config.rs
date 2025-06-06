@@ -315,25 +315,21 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
 fn check_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
     let status_code = res.status();
 
-    let allow_retry = match errors_to_retry {
+    match errors_to_retry {
         Some(error_codes) => error_codes.contains(&status_code.as_u16()),
         None => false,
-    };
-
-    return allow_retry;
+    }
 }
 
 fn configured_to_retry(
     errors_to_retry: Option<Vec<u16>>,
     error: &SdkError<PutObjectError, HttpResponse>,
 ) -> bool {
-    let allow_retry = match error {
+    match error {
         SdkError::ResponseError(err) => check_response(err.raw(), errors_to_retry),
         SdkError::ServiceError(err) => check_response(err.raw(), errors_to_retry),
         _ => false,
-    };
-
-    return allow_retry;
+    }
 }
 
 // TODO: verify documentation paths
@@ -359,11 +355,17 @@ pub struct S3RetryLogic {
 }
 
 impl S3RetryLogic {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             retry_all_errors: None,
             errors_to_retry: Some(Vec::new()),
         }
+    }
+}
+
+impl Default for S3RetryLogic {
+    fn default() -> Self {
+        S3RetryLogic::new()
     }
 }
 
