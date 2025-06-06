@@ -658,6 +658,7 @@ components: sources: dnstap: {
 									NXRRSet:   "RR Set that should exist does not"
 									NotAuth:   "Server Not Authoritative for zone"
 									NotZone:   "Name not contained in zone"
+									BADVERS:   "Bad OPT Version"
 									BADSIG:    "TSIG Signature Failure"
 									BADKEY:    "Key not recognized"
 									BADTIME:   "Signature out of time window"
