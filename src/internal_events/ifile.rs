@@ -107,7 +107,9 @@ mod source {
     use std::{io::Error, path::Path, time::Duration};
 
     use metrics::counter;
-    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
+    use vector_lib::file_source_common::internal_events::{
+        FileSourceExtendedInternalEvents, FileSourceInternalEvents,
+    };
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -128,19 +130,19 @@ mod source {
             trace!(
                 message = "Bytes received.",
                 byte_size = %self.byte_size,
-                protocol = "file",
+                protocol = "ifile",
                 file = %self.file,
             );
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                     "file" => self.file.to_owned()
                 )
             } else {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                 )
             }
             .increment(self.byte_size as u64);
@@ -166,12 +168,12 @@ mod source {
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_events_total",
-                    "file" => self.file.to_owned(),
+                    "ifile" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
                     "component_received_event_bytes_total",
-                    "file" => self.file.to_owned(),
+                    "ifile" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
@@ -577,6 +579,42 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+    }
+
+    impl FileSourceExtendedInternalEvents for FileSourceInternalEventsEmitter {
+        fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to passive watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_passive_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_passive_total")
+            }
+            .increment(1);
+        }
+
+        fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to active watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_active_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_active_total")
+            }
+            .increment(1);
         }
     }
 }
