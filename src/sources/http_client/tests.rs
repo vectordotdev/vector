@@ -248,6 +248,7 @@ async fn request_query_vrl_applied() {
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::from([
+            // Test a single VRL parameter with concatenation
             (
                 "key1".to_string(),
                 QueryParameterValue::SingleParam(ParameterValue::Typed {
@@ -255,9 +256,11 @@ async fn request_query_vrl_applied() {
                     param_type: ParamType::Vrl,
                 }),
             ),
+            // Test multiple parameters with a mixture of string and VRL types
             (
                 "key2".to_string(),
                 QueryParameterValue::MultiParams(vec![
+                    // Check that nested quotes are not stripped
                     ParameterValue::String("\"bob ross\"".to_string()),
                     ParameterValue::Typed {
                         value: "mod(5, 2)".to_string(),
@@ -265,6 +268,37 @@ async fn request_query_vrl_applied() {
                     },
                     ParameterValue::Typed {
                         value: "camelcase(\"input-string\")".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
+                ]),
+            ),
+            // Test if VRL timestamps are correctly formatted as a raw ISO 8601 string
+            (
+                "key3".to_string(),
+                QueryParameterValue::SingleParam(ParameterValue::Typed {
+                    value: "parse_timestamp!(\"10-Oct-2020 16:00+00:00\", format: \"%v %R %:z\")"
+                        .to_string(),
+                    param_type: ParamType::Vrl,
+                }),
+            ),
+            // Test if other types are formatted correctly
+            (
+                "key4".to_string(),
+                QueryParameterValue::MultiParams(vec![
+                    ParameterValue::Typed {
+                        value: "to_int!(\"123\")".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_bool!(\"yes\")".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_float!(\"-99.9\")".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_string!(false)".to_string(),
                         param_type: ParamType::Vrl,
                     },
                 ]),
@@ -282,7 +316,7 @@ async fn request_query_vrl_applied() {
 
     let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
 
-    let expected = HashMap::from([
+    let mut expected = HashMap::from([
         (
             "key1".to_string(),
             vec!["BAR-73feffa4b7f6bb68e44cf984c85f6e88".to_string()],
@@ -295,7 +329,21 @@ async fn request_query_vrl_applied() {
                 "inputString".to_string(),
             ],
         ),
+        ("key3".to_string(), vec!["2020-10-10T16:00:00Z".to_string()]),
+        (
+            "key4".to_string(),
+            vec![
+                "123".to_string(),
+                "true".to_string(),
+                "-99.9".to_string(),
+                "false".to_string(),
+            ],
+        ),
     ]);
+
+    for v in expected.values_mut() {
+        v.sort();
+    }
 
     for log in logs {
         let query = log.get("data").expect("data must be available");

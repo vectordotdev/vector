@@ -41,7 +41,6 @@ use vector_lib::{
 };
 use vrl::{
     compiler::{runtime::Runtime, CompileConfig, Function, Program},
-    core::Value,
     prelude::TypeState,
 };
 
@@ -424,25 +423,28 @@ impl HttpClientBuilder for HttpClientContext {
 }
 
 fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
-    let mut target = VrlTarget::new(
-        Event::Log(LogEvent::from(Value::from(value))),
-        program.info(),
-        false,
-    );
-
+    let mut target = VrlTarget::new(Event::Log(LogEvent::default()), program.info(), false);
     let timezone = TimeZone::default();
 
-    match Runtime::default().resolve(&mut target, program, &timezone) {
-        Ok(value) => {
-            // Trim quotes from the string, so that key1: `upcase("foo")` will resolve
+    Runtime::default()
+        .resolve(&mut target, program, &timezone)
+        .map_err(|error| {
+            warn!(message = "VRL runtime error.", source = %value, %error);
+        })
+        .ok()
+        .and_then(|vrl_value| {
+            let json_value = serde_json::to_value(vrl_value).ok()?;
+
+            // Properly handle VRL values, so that key1: `upcase("foo")` will resolve
             // properly as endpoint.com/key1=FOO and not endpoint.com/key1="FOO"
-            return Some(value.to_string().trim_matches('"').to_string());
-        }
-        Err(error) => {
-            warn!(message = "VRL runtime error.", %error);
-        }
-    }
-    None
+            // similarly, `now()` should resolve to endpoint.com/key1=2025-06-07T10:39:08.662735Z
+            // and not endpoint.com/key1=t'2025-06-07T10:39:08.662735Z'
+            let resolved_string = match json_value {
+                serde_json::Value::String(s) => s,
+                value => value.to_string(),
+            };
+            Some(resolved_string)
+        })
 }
 
 impl http_client::HttpClientContext for HttpClientContext {
