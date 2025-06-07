@@ -310,6 +310,24 @@ impl SourceSender {
             .send_batch(events)
             .await
     }
+
+    /// Disable counting of unsent events when the send future is dropped.
+    ///
+    /// As described in `Output::send_event` below, it's possible that the caller drops this future
+    /// while it is blocked waiting on sending into its channel. This currently only happens for
+    /// sources that use the `warp` framework for their HTTP server when it detects that the remote
+    /// has dropped the connection. When that happens, we use `UnsentEventCount` to correctly emit
+    /// `ComponentEventsDropped` events. This method disables that behavior, eliminating the error
+    /// log and metric.
+    ///
+    /// The whole unsent event count metric can go away when we drop the use of the `warp` framework
+    /// for HTTP server sources.
+    pub fn silence_unsent_events(&mut self) {
+        self.default_output.disable_count_unsent();
+        for output in self.named_outputs.values_mut() {
+            output.disable_count_unsent();
+        }
+    }
 }
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
@@ -320,35 +338,39 @@ impl SourceSender {
 /// If its internal count is greater than 0 when dropped, the appropriate [ComponentEventsDropped]
 /// event is emitted.
 struct UnsentEventCount {
-    count: usize,
+    count: Option<usize>,
     span: Span,
 }
 
 impl UnsentEventCount {
-    fn new(count: usize) -> Self {
+    fn new(count: usize, enabled: bool) -> Self {
         Self {
-            count,
+            count: enabled.then_some(count),
             span: Span::current(),
         }
     }
 
     fn decr(&mut self, count: usize) {
-        self.count = self.count.saturating_sub(count);
+        if let Some(ref mut current_count) = self.count {
+            *current_count = current_count.saturating_sub(count);
+        }
     }
 
     fn discard(&mut self) {
-        self.count = 0;
+        self.count = None;
     }
 }
 
 impl Drop for UnsentEventCount {
     fn drop(&mut self) {
-        if self.count > 0 {
-            let _enter = self.span.enter();
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: self.count,
-                reason: "Source send cancelled."
-            });
+        if let Some(count) = self.count {
+            if count > 0 {
+                let _enter = self.span.enter();
+                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    count,
+                    reason: "Source send cancelled."
+                });
+            }
         }
     }
 }
@@ -363,6 +385,8 @@ struct Output {
     /// The OutputId related to this source sender. This is set as the `upstream_id` in
     /// `EventMetadata` for all event sent through here.
     output_id: Arc<OutputId>,
+    /// Whether to count unsent events when dropped
+    count_unsent: bool,
 }
 
 impl fmt::Debug for Output {
@@ -370,6 +394,7 @@ impl fmt::Debug for Output {
         fmt.debug_struct("Output")
             .field("sender", &self.sender)
             .field("output_id", &self.output_id)
+            .field("count_unsent", &self.count_unsent)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
@@ -393,9 +418,14 @@ impl Output {
                 )))),
                 log_definition,
                 output_id: Arc::new(output_id),
+                count_unsent: true,
             },
             rx,
         )
+    }
+
+    fn disable_count_unsent(&mut self) {
+        self.count_unsent = false;
     }
 
     async fn send(
@@ -438,7 +468,7 @@ impl Output {
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
-        let mut unsent_event_count = UnsentEventCount::new(event.len());
+        let mut unsent_event_count = UnsentEventCount::new(event.len(), self.count_unsent);
         self.send(event, &mut unsent_event_count).await
     }
 
@@ -464,7 +494,7 @@ impl Output {
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let events = events.into_iter().map(Into::into);
-        let mut unsent_event_count = UnsentEventCount::new(events.len());
+        let mut unsent_event_count = UnsentEventCount::new(events.len(), self.count_unsent);
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send(events, &mut unsent_event_count)
                 .await
