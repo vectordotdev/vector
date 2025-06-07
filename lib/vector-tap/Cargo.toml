@@ -10,7 +10,7 @@ license = "MPL-2.0"
 api = ["dep:async-graphql"]
 
 [dependencies]
-async-graphql = { version = "7.0.16", default-features = false, features = ["playground"], optional = true}
+async-graphql = { version = "7.0.17", default-features = false, features = ["playground"], optional = true}
 colored = { version = "3.0.0", default-features = false }
 futures.workspace = true
 glob.workspace = true
