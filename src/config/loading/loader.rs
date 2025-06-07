@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use super::{component_name, interpolate_toml_table_with_env_vars, open_file, read_dir, Format};
+use crate::config::loading::schema_coercion::coerce;
+use crate::config::{format, ConfigBuilder};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
-
-use super::{component_name, open_file, read_dir, Format};
-use crate::config::format;
+use vector_config::schema::generate_root_schema;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -44,26 +47,25 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use std::io::Read;
-
     use super::*;
+    use std::io::Read;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
     /// this is nested in a private mod.
     pub trait Process {
-        /// Prepares input for serialization. This can be a useful step to interpolate
-        /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>>;
+        /// This is invoked after input deserialization. This can be a useful step to interpolate
+        /// environment variables or perform some other post-processing on the table.
+        fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>>;
 
-        /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
-        fn load<R: std::io::Read, T>(&mut self, input: R, format: Format) -> Result<T, Vec<String>>
-        where
-            T: serde::de::DeserializeOwned,
-        {
-            let value = self.prepare(input)?;
-
-            format::deserialize(&value, format)
+        /// Deserializes the input using the given format and runs postprocessing on the result.
+        ///
+        /// This reads the input into a string, deserializes it into a `Table`, and then
+        /// applies `postprocess` to the resulting table.
+        fn load<R: Read>(&mut self, input: R, format: Format) -> Result<Table, Vec<String>> {
+            let value = string_from_input(input)?;
+            let table: Table = format::deserialize(&value, format)?;
+            self.postprocess(table)
         }
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
@@ -296,4 +298,52 @@ pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     Value::Table(table)
         .try_into()
         .map_err(|e| vec![e.to_string()])
+}
+
+fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
+    let mut source_string = String::new();
+    input
+        .read_to_string(&mut source_string)
+        .map_err(|e| vec![e.to_string()])?;
+    Ok(source_string)
+}
+
+pub fn load<R: Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let value = string_from_input(input)?;
+    let table = format::deserialize(&value, format)?;
+    let table = resolve_environment_variables(table)?;
+    deserialize_table(table)
+}
+
+pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>> {
+    let mut vars = std::env::vars().collect::<HashMap<_, _>>();
+    if !vars.contains_key("HOSTNAME") {
+        if let Ok(hostname) = crate::get_hostname() {
+            vars.insert("HOSTNAME".into(), hostname);
+        }
+    }
+
+    let table = interpolate_toml_table_with_env_vars(&table, &vars)?;
+    // println!("Interpolated table: {table:#?}");
+    let mut table_json = serde_json::to_value(table)
+        .map_err(|err| err.to_string())
+        .map_err(|err| vec![err])?;
+
+    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
+    let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
+    coerce(
+        &mut table_json,
+        &schema_json,
+        schema_json.get("definitions"),
+        &mut Vec::new(),
+    )
+    .map_err(|err| vec![err.to_string()])?;
+
+    let final_table =
+        serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])?;
+    // println!("Final table: {final_table:#?}");
+    Ok(final_table)
 }
