@@ -5,7 +5,7 @@ use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
 use crate::components::validation::prelude::*;
-use crate::http::QueryParameterValue;
+use crate::http::{ParamType, ParameterValue, QueryParameterValue};
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use vector_lib::codecs::decoding::{
@@ -183,11 +183,14 @@ async fn request_query_applied() {
         query: HashMap::from([
             (
                 "key1".to_string(),
-                QueryParameterValue::MultiParams(vec!["val2".to_string()]),
+                QueryParameterValue::MultiParams(vec![ParameterValue::String("val2".to_string())]),
             ),
             (
                 "key2".to_string(),
-                QueryParameterValue::MultiParams(vec!["val1".to_string(), "val2".to_string()]),
+                QueryParameterValue::MultiParams(vec![
+                    ParameterValue::String("val1".to_string()),
+                    ParameterValue::String("val2".to_string()),
+                ]),
             ),
         ]),
         decoding: DeserializerConfig::Json(Default::default()),
@@ -247,16 +250,23 @@ async fn request_query_vrl_applied() {
         query: HashMap::from([
             (
                 "key1".to_string(),
-                QueryParameterValue::SingleParam(
-                    "{{ upcase(\"bar\") + \"-\" + md5(\"baz\") }}".to_string(),
-                ),
+                QueryParameterValue::SingleParam(ParameterValue::Typed {
+                    value: "upcase(\"bar\") + \"-\" + md5(\"baz\")".to_string(),
+                    param_type: ParamType::Vrl,
+                }),
             ),
             (
                 "key2".to_string(),
                 QueryParameterValue::MultiParams(vec![
-                    "\"bob ross\"".to_string(),
-                    "{{ mod(5, 2) }}".to_string(),
-                    "{{ camelcase(\"input-string\") }}".to_string(),
+                    ParameterValue::String("\"bob ross\"".to_string()),
+                    ParameterValue::Typed {
+                        value: "mod(5, 2)".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "camelcase(\"input-string\")".to_string(),
+                        param_type: ParamType::Vrl,
+                    },
                 ]),
             ),
         ]),
@@ -322,9 +332,10 @@ async fn request_query_vrl_dynamic_updates() {
         timeout: TIMEOUT,
         query: HashMap::from([(
             "timestamp".to_string(),
-            QueryParameterValue::SingleParam(
-                "{{ to_unix_timestamp(now(), unit: \"milliseconds\") }}".to_string(),
-            ),
+            QueryParameterValue::SingleParam(ParameterValue::Typed {
+                value: "to_unix_timestamp(now(), unit: \"milliseconds\")".to_string(),
+                param_type: ParamType::Vrl,
+            }),
         )]),
         decoding: DeserializerConfig::Json(Default::default()),
         framing: default_framing_message_based(),

@@ -17,7 +17,7 @@ use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
 
-use crate::http::QueryParameters;
+use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
@@ -95,10 +95,17 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
     };
-    for (k, l) in query {
-        for v in l {
-            serializer.append_pair(k, v);
-        }
+    for (k, query_value) in query {
+        match query_value {
+            QueryParameterValue::SingleParam(param) => {
+                serializer.append_pair(k, param.value());
+            }
+            QueryParameterValue::MultiParams(params) => {
+                for v in params {
+                    serializer.append_pair(k, v.value());
+                }
+            }
+        };
     }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {

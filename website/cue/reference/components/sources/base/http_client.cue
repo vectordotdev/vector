@@ -647,12 +647,35 @@ base: components: sources: http_client: configuration: {
 			examples: [{
 				field: "value"
 				fruit: ["mango", "papaya", "kiwi"]
-				start_time: "\"{{ now() }}\""
+				start_time: {
+					type:  "vrl"
+					value: "now()"
+				}
 			}]
 			options: "*": {
 				description: "A query string parameter and its value(s)."
 				required:    true
-				type: string: {}
+				type: {
+					object: options: {
+						type: {
+							description: "The type of the parameter, indicating how the `value` should be treated."
+							required:    false
+							type: string: {
+								default: "string"
+								enum: {
+									string: "The parameter value is a plain string."
+									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								}
+							}
+						}
+						value: {
+							description: "The raw value of the parameter."
+							required:    true
+							type: string: {}
+						}
+					}
+					string: {}
+				}
 			}
 		}
 	}

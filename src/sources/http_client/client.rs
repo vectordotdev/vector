@@ -5,14 +5,13 @@ use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
-use regex::Regex;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
 use vrl::diagnostic::Formatter;
 
-use crate::http::{QueryParameterValue, QueryParameters};
+use crate::http::{ParamType, ParameterValue, QueryParameterValue, QueryParameters};
 use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -28,7 +27,6 @@ use crate::{
         },
     },
     tls::{TlsConfig, TlsSettings},
-    Result,
 };
 use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
@@ -86,8 +84,7 @@ pub struct HttpClientConfig {
     ///
     /// VRL functions are supported within query parameters. You can
     /// use functions like `now()` to dynamically modify query
-    /// parameter values. The VRL function must be wrapped in `{{ ... }}`
-    /// e.g. {{ now() }}
+    /// parameter values.
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "A query string parameter and its value(s)."
@@ -141,19 +138,22 @@ fn query_examples() -> QueryParameters {
     HashMap::<_, _>::from_iter([
         (
             "field".to_owned(),
-            QueryParameterValue::SingleParam("value".to_owned()),
+            QueryParameterValue::SingleParam(ParameterValue::String("value".to_owned())),
         ),
         (
             "fruit".to_owned(),
             QueryParameterValue::MultiParams(vec![
-                "mango".to_owned(),
-                "papaya".to_owned(),
-                "kiwi".to_owned(),
+                ParameterValue::String("mango".to_owned()),
+                ParameterValue::String("papaya".to_owned()),
+                ParameterValue::String("kiwi".to_owned()),
             ]),
         ),
         (
             "start_time".to_owned(),
-            QueryParameterValue::SingleParam("\"{{ now() }}\"".to_owned()),
+            QueryParameterValue::SingleParam(ParameterValue::Typed {
+                value: "now()".to_owned(),
+                param_type: ParamType::Vrl,
+            }),
         ),
     ])
 }
@@ -197,51 +197,26 @@ impl Default for HttpClientConfig {
 impl_generate_config_from_default!(HttpClientConfig);
 
 #[derive(Clone)]
+pub struct CompiledParam {
+    value: String,
+    program: Option<Program>,
+}
+
+#[derive(Clone)]
+pub enum CompiledQueryParameterValue {
+    SingleParam(CompiledParam),
+    MultiParams(Vec<CompiledParam>),
+}
+
+#[derive(Clone)]
 pub struct Query {
     original: HashMap<String, QueryParameterValue>,
     compiled: HashMap<String, CompiledQueryParameterValue>,
     has_vrl: bool,
 }
 
-#[derive(Clone)]
-pub enum CompiledQueryParameterValue {
-    SingleParam {
-        value: String,
-        program: Option<Program>,
-    },
-    MultiParams {
-        value: Vec<String>,
-        programs: Vec<Option<Program>>,
-    },
-}
-
-fn try_compile_vrl(param: &str, re: &Regex, functions: &Vec<Box<dyn Function>>) -> Option<Program> {
-    if !re.is_match(param) {
-        return None;
-    }
-
-    let raw = re.replace_all(param, |caps: &regex::Captures| {
-        let expr = &caps[1];
-        expr.to_string()
-    });
-
-    let state = TypeState::default();
-    let mut config = CompileConfig::default();
-    config.set_read_only();
-
-    match compile_vrl(&raw, functions, &state, config) {
-        Ok(result) => Some(result.program),
-        Err(e) => {
-            let error = Formatter::new(&raw, e).colored().to_string();
-            warn!(message = "VRL compilation failed.", %error);
-            None
-        }
-    }
-}
-
 impl Query {
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Self {
-        let re = Regex::new(r"\{\{(?P<key>.+)\}\}").unwrap();
         let functions = vrl::stdlib::all()
             .into_iter()
             .chain(vector_lib::enrichment::vrl_functions())
@@ -250,13 +225,13 @@ impl Query {
 
         let compiled: HashMap<String, CompiledQueryParameterValue> = params
             .iter()
-            .map(|(k, v)| (k.clone(), Self::compile_param(v, &re, &functions)))
+            .map(|(k, v)| (k.clone(), Self::compile_param(v, &functions)))
             .collect();
 
         let has_vrl = compiled.values().any(|compiled| match compiled {
-            CompiledQueryParameterValue::SingleParam { program, .. } => program.is_some(),
-            CompiledQueryParameterValue::MultiParams { programs, .. } => {
-                programs.iter().any(|p| p.is_some())
+            CompiledQueryParameterValue::SingleParam(param) => param.program.is_some(),
+            CompiledQueryParameterValue::MultiParams(params) => {
+                params.iter().any(|p| p.program.is_some())
             }
         });
 
@@ -267,28 +242,53 @@ impl Query {
         }
     }
 
+    fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> CompiledParam {
+        let program = if param.is_vrl() {
+            let state = TypeState::default();
+            let config = CompileConfig::default();
+
+            match compile_vrl(param.value(), functions, &state, config) {
+                Ok(compilation_result) => {
+                    if !compilation_result.warnings.is_empty() {
+                        let warnings = Formatter::new(param.value(), compilation_result.warnings)
+                            .colored()
+                            .to_string();
+                        warn!(message = "VRL compilation warnings.", %warnings);
+                    }
+                    Some(compilation_result.program)
+                }
+                Err(diagnostics) => {
+                    let error = Formatter::new(param.value(), diagnostics)
+                        .colored()
+                        .to_string();
+                    warn!(message = "VRL compilation failed.", %error);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        CompiledParam {
+            value: param.value().to_string(),
+            program,
+        }
+    }
+
     fn compile_param(
         value: &QueryParameterValue,
-        re: &Regex,
-        functions: &Vec<Box<dyn Function>>,
+        functions: &[Box<dyn Function>],
     ) -> CompiledQueryParameterValue {
         match value {
             QueryParameterValue::SingleParam(param) => {
-                let program = try_compile_vrl(param, re, functions);
-                CompiledQueryParameterValue::SingleParam {
-                    value: param.clone(),
-                    program,
-                }
+                CompiledQueryParameterValue::SingleParam(Self::compile_value(param, functions))
             }
             QueryParameterValue::MultiParams(params) => {
-                let programs = params
+                let compiled = params
                     .iter()
-                    .map(|p| try_compile_vrl(p, re, functions))
+                    .map(|p| Self::compile_value(p, functions))
                     .collect();
-                CompiledQueryParameterValue::MultiParams {
-                    value: params.clone(),
-                    programs,
-                }
+                CompiledQueryParameterValue::MultiParams(compiled)
             }
         }
     }
@@ -297,7 +297,7 @@ impl Query {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
-    async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let query = Query::new(&self.query.clone());
 
         // Build the base URLs
@@ -434,7 +434,7 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
 
     match Runtime::default().resolve(&mut target, program, &timezone) {
         Ok(value) => {
-            // Trim quotes from the string, so that key1: {{ upcase("foo")}} will resolve
+            // Trim quotes from the string, so that key1: `upcase("foo")` will resolve
             // properly as endpoint.com/key1=FOO and not endpoint.com/key1="FOO"
             return Some(value.to_string().trim_matches('"').to_string());
         }
@@ -460,7 +460,7 @@ impl http_client::HttpClientContext for HttpClientContext {
     /// Process the URL dynamically before each request
     fn process_url(&self, url: &Uri) -> Option<Uri> {
         // Early exit if there is no VRL to process
-        let query: Query = self.query.clone();
+        let query: &Query = &self.query;
         if !query.has_vrl {
             return None;
         }
@@ -469,24 +469,26 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         for (param_name, compiled_value) in &query.compiled {
             match compiled_value {
-                CompiledQueryParameterValue::SingleParam { value, program } => {
-                    let result = match program {
-                        Some(prog) => resolve_vrl(value, prog)?,
-                        None => value.clone(),
+                CompiledQueryParameterValue::SingleParam(compiled_param) => {
+                    let result = match &compiled_param.program {
+                        Some(prog) => resolve_vrl(&compiled_param.value, prog)?,
+                        None => compiled_param.value.clone(),
                     };
 
-                    processed_query
-                        .insert(param_name.clone(), QueryParameterValue::SingleParam(result));
+                    processed_query.insert(
+                        param_name.clone(),
+                        QueryParameterValue::SingleParam(ParameterValue::String(result)),
+                    );
                 }
-                CompiledQueryParameterValue::MultiParams { value, programs } => {
+                CompiledQueryParameterValue::MultiParams(compiled_params) => {
                     let mut results = Vec::new();
 
-                    for (val, prog) in value.iter().zip(programs.iter()) {
-                        let result = match prog {
-                            Some(p) => resolve_vrl(val, p)?,
-                            None => val.clone(),
+                    for param in compiled_params {
+                        let result = match &param.program {
+                            Some(p) => resolve_vrl(&param.value, p)?,
+                            None => param.value.clone(),
                         };
-                        results.push(result);
+                        results.push(ParameterValue::String(result));
                     }
 
                     processed_query.insert(

@@ -11,7 +11,7 @@ use super::{
     InvalidHostSnafu, Request, VersionType,
 };
 use crate::{
-    http::{HttpClient, MaybeAuth, QueryParameterValue, QueryParameters},
+    http::{HttpClient, MaybeAuth, ParameterValue, QueryParameterValue, QueryParameters},
     sinks::{
         elasticsearch::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
@@ -120,14 +120,17 @@ impl ElasticsearchCommon {
         let mut query_params = config.query.clone().unwrap_or_default();
         query_params.insert(
             "timeout".into(),
-            QueryParameterValue::SingleParam(format!("{}s", tower_request.timeout.as_secs())),
+            QueryParameterValue::SingleParam(ParameterValue::String(format!(
+                "{}s",
+                tower_request.timeout.as_secs()
+            ))),
         );
 
         if let Some(pipeline) = &config.pipeline {
             if !pipeline.is_empty() {
                 query_params.insert(
                     "pipeline".into(),
-                    QueryParameterValue::SingleParam(pipeline.into()),
+                    QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
                 );
             }
         }
@@ -139,12 +142,12 @@ impl ElasticsearchCommon {
                 match param_value {
                     QueryParameterValue::SingleParam(param) => {
                         // For single parameter, just append one pair
-                        query.append_pair(param_name, param);
+                        query.append_pair(param_name, param.value());
                     }
                     QueryParameterValue::MultiParams(params) => {
                         // For multiple parameters, append the same key multiple times
                         for value in params {
-                            query.append_pair(param_name, value);
+                            query.append_pair(param_name, value.value());
                         }
                     }
                 }
