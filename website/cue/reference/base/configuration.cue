@@ -364,6 +364,14 @@ base: configuration: configuration: {
 														"""
 						required: false
 					}
+					session_token: {
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						description: """
+														The AWS session token.
+														See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+														"""
+						required: false
+					}
 					credentials_file: {
 						type: string: examples: ["/my/aws/credentials"]
 						description: "Path to the credentials file."
