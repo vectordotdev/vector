@@ -103,14 +103,14 @@ pub(crate) fn process_log(
     partition_key_field: Option<&ConfigValuePath>,
 ) -> Option<KinesisProcessedEvent> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
-        if let Some(v) = log.get((PathPrefix::Event, partition_key_field)) {
+        match log.get((PathPrefix::Event, partition_key_field)) { Some(v) => {
             v.to_string_lossy()
-        } else {
+        } _ => {
             emit!(AwsKinesisStreamNoPartitionKeyError {
                 partition_key_field: partition_key_field.0.to_string().as_str()
             });
             return None;
-        }
+        }}
     } else {
         Cow::Owned(gen_partition_key())
     };

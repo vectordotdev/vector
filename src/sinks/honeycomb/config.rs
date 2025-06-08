@@ -176,15 +176,15 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     } else if status == StatusCode::UNAUTHORIZED {
         let json: serde_json::Value = serde_json::from_slice(&body[..])?;
 
-        let message = if let Some(s) = json
+        let message = match json
             .as_object()
             .and_then(|o| o.get("error"))
             .and_then(|s| s.as_str())
-        {
+        { Some(s) => {
             s.to_string()
-        } else {
+        } _ => {
             "Token is not valid, 401 returned.".to_string()
-        };
+        }};
 
         Err(message.into())
     } else {

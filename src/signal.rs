@@ -173,7 +173,7 @@ impl SignalHandler {
 
 /// Signals from OS/user.
 #[cfg(unix)]
-fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> {
+fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> + use<> {
     use tokio::signal::unix::{signal, SignalKind};
 
     // The `signal` function must be run within the context of a Tokio runtime.

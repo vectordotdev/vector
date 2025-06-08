@@ -292,21 +292,21 @@ impl DatadogMetricsEncoder {
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
-                        if let Some(sketch_proto) = sketch_to_proto_message(
+                        match sketch_to_proto_message(
                             &metric,
                             ddsketch,
                             &self.default_namespace,
                             self.log_schema,
                             self.origin_product_value,
-                        ) {
+                        ) { Some(sketch_proto) => {
                             encode_proto_key_and_message(
                                 sketch_proto,
                                 get_sketch_payload_sketches_field_number(),
                                 &mut self.state.buf,
                             )?;
-                        } else {
+                        } _ => {
                             // If the sketch was empty, that's fine too
-                        }
+                        }}
                     }
                 },
                 value => {
