@@ -887,7 +887,7 @@ impl FunctionTransform for LogToMetric {
                                 kind: &kind.to_string(),
                             })
                         }
-                        TransformError::MetricDetailsNotFound {} => {
+                        TransformError::MetricDetailsNotFound => {
                             emit!(MetricMetadataMetricDetailsNotFoundError {})
                         }
                         _ => {}

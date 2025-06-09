@@ -1163,10 +1163,7 @@ where
     pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
         self.try_write_record_inner(record)
             .await
-            .map(|result| match result {
-                Ok(_) => None,
-                Err(record) => Some(record),
-            })
+            .map(Result::err)
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -1219,8 +1216,6 @@ where
                             last_attempted_write_size = serialized_len,
                             "Current data file reached maximum size. Rolling to the next data file."
                         );
-
-                        continue;
                     }
                     e => return Err(e),
                 },
@@ -1294,7 +1289,6 @@ where
                 Err(old_record) => {
                     record = old_record;
                     self.ledger.wait_for_reader().await;
-                    continue;
                 }
             }
         }

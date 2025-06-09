@@ -332,11 +332,11 @@ impl UnsentEventCount {
         }
     }
 
-    fn decr(&mut self, count: usize) {
+    const fn decr(&mut self, count: usize) {
         self.count = self.count.saturating_sub(count);
     }
 
-    fn discard(&mut self) {
+    const fn discard(&mut self) {
         self.count = 0;
     }
 }
