@@ -6353,7 +6353,7 @@ checksum = "72724faf704479d67b388da142b186f916188505e7e0b26719019c525882eda4"
 dependencies = [
  "anyhow",
  "byteorder",
- "netlink-packet-utils",
+ "netlink-packet-utils 0.5.2",
 ]
 
 [[package]]
@@ -6367,7 +6367,7 @@ dependencies = [
  "byteorder",
  "libc",
  "netlink-packet-core",
- "netlink-packet-utils",
+ "netlink-packet-utils 0.5.2",
  "smallvec",
 ]
 
@@ -6381,6 +6381,17 @@ dependencies = [
  "byteorder",
  "paste",
  "thiserror 1.0.68",
+]
+
+[[package]]
+name = "netlink-packet-utils"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3176f18d11a1ae46053e59ec89d46ba318ae1343615bd3f8c908bfc84edae35c"
+dependencies = [
+ "byteorder",
+ "pastey",
+ "thiserror 2.0.3",
 ]
 
 [[package]]
@@ -7144,6 +7155,12 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pastey"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3a8cb46bdc156b1c90460339ae6bfd45ba0394e5effbaa640badb4987fdc261"
 
 [[package]]
 name = "pbkdf2"
@@ -11542,7 +11559,7 @@ dependencies = [
  "mongodb",
  "netlink-packet-core",
  "netlink-packet-sock-diag",
- "netlink-packet-utils",
+ "netlink-packet-utils 0.6.0",
  "netlink-sys",
  "nix 0.26.2",
  "nkeys 0.4.4",
