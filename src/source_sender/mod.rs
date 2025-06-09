@@ -94,26 +94,21 @@ impl From<SourceSenderItem> for EventArray {
 
 pub struct Builder {
     buf_size: usize,
-    default_output: Option<Output>,
-    named_outputs: HashMap<String, Output>,
+    inner: Option<Inner>,
+    named_inners: HashMap<String, Inner>,
     lag_time: Option<Histogram>,
 }
 
-impl Default for Builder {
-    fn default() -> Self {
-        Self {
-            buf_size: CHUNK_SIZE,
-            default_output: None,
-            named_outputs: Default::default(),
-            lag_time: Some(histogram!(LAG_TIME_NAME)),
-        }
-    }
-}
-
 impl Builder {
-    pub const fn with_buffer(mut self, n: usize) -> Self {
-        self.buf_size = n;
-        self
+    // https://github.com/rust-lang/rust/issues/73255
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn with_buffer(self, n: usize) -> Self {
+        Self {
+            buf_size: n,
+            inner: self.inner,
+            named_inners: self.named_inners,
+            lag_time: self.lag_time,
+        }
     }
 
     pub fn add_source_output(
@@ -129,47 +124,54 @@ impl Builder {
         };
         match output.port {
             None => {
-                let (output, rx) = Output::new_with_buffer(
+                let (inner, rx) = Inner::new_with_buffer(
                     self.buf_size,
                     DEFAULT_OUTPUT.to_owned(),
                     lag_time,
                     log_definition,
                     output_id,
                 );
-                self.default_output = Some(output);
+                self.inner = Some(inner);
                 rx
             }
             Some(name) => {
-                let (output, rx) = Output::new_with_buffer(
+                let (inner, rx) = Inner::new_with_buffer(
                     self.buf_size,
                     name.clone(),
                     lag_time,
                     log_definition,
                     output_id,
                 );
-                self.named_outputs.insert(name, output);
+                self.named_inners.insert(name, inner);
                 rx
             }
         }
     }
 
+    // https://github.com/rust-lang/rust/issues/73255
+    #[allow(clippy::missing_const_for_fn)]
     pub fn build(self) -> SourceSender {
         SourceSender {
-            default_output: self.default_output.expect("no default output"),
-            named_outputs: self.named_outputs,
+            inner: self.inner,
+            named_inners: self.named_inners,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SourceSender {
-    default_output: Output,
-    named_outputs: HashMap<String, Output>,
+    inner: Option<Inner>,
+    named_inners: HashMap<String, Inner>,
 }
 
 impl SourceSender {
     pub fn builder() -> Builder {
-        Builder::default()
+        Builder {
+            buf_size: CHUNK_SIZE,
+            inner: None,
+            named_inners: Default::default(),
+            lag_time: Some(histogram!(LAG_TIME_NAME)),
+        }
     }
 
     #[cfg(any(test, feature = "test-utils"))]
@@ -179,12 +181,12 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: None,
         };
-        let (default_output, rx) =
-            Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
+        let (inner, rx) =
+            Inner::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
-                default_output,
-                named_outputs: Default::default(),
+                inner: Some(inner),
+                named_inners: Default::default(),
             },
             rx,
         )
@@ -252,7 +254,7 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: Some(name.clone()),
         };
-        let (output, recv) = Output::new_with_buffer(100, name.clone(), None, None, output_id);
+        let (inner, recv) = Inner::new_with_buffer(100, name.clone(), None, None, output_id);
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -261,7 +263,7 @@ impl SourceSender {
             });
             item
         });
-        self.named_outputs.insert(name, output);
+        self.named_inners.insert(name, inner);
         recv
     }
 
@@ -269,7 +271,11 @@ impl SourceSender {
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
-        self.default_output.send_event(event).await
+        self.inner
+            .as_mut()
+            .expect("no default output")
+            .send_event(event)
+            .await
     }
 
     /// Send a stream of events to the default output.
@@ -280,7 +286,11 @@ impl SourceSender {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        self.default_output.send_event_stream(events).await
+        self.inner
+            .as_mut()
+            .expect("no default output")
+            .send_event_stream(events)
+            .await
     }
 
     /// Send a batch of events to the default output.
@@ -292,7 +302,11 @@ impl SourceSender {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
-        self.default_output.send_batch(events).await
+        self.inner
+            .as_mut()
+            .expect("no default output")
+            .send_batch(events)
+            .await
     }
 
     /// Send a batch of events event to a named output.
@@ -304,7 +318,7 @@ impl SourceSender {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
-        self.named_outputs
+        self.named_inners
             .get_mut(name)
             .expect("unknown output")
             .send_batch(events)
@@ -354,8 +368,9 @@ impl Drop for UnsentEventCount {
 }
 
 #[derive(Clone)]
-struct Output {
-    sender: LimitedSender<SourceSenderItem>,
+struct Inner {
+    inner: LimitedSender<SourceSenderItem>,
+    output: String,
     lag_time: Option<Histogram>,
     events_sent: Registered<EventsSent>,
     /// The schema definition that will be attached to Log events sent through here
@@ -365,17 +380,17 @@ struct Output {
     output_id: Arc<OutputId>,
 }
 
-impl fmt::Debug for Output {
+impl fmt::Debug for Inner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("Output")
-            .field("sender", &self.sender)
-            .field("output_id", &self.output_id)
+        fmt.debug_struct("Inner")
+            .field("inner", &self.inner)
+            .field("output", &self.output)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
 }
 
-impl Output {
+impl Inner {
     fn new_with_buffer(
         n: usize,
         output: String,
@@ -386,7 +401,8 @@ impl Output {
         let (tx, rx) = channel::limited(n);
         (
             Self {
-                sender: tx,
+                inner: tx,
+                output: output.clone(),
                 lag_time,
                 events_sent: register!(EventsSent::from(internal_event::Output(Some(
                     output.into()
@@ -398,11 +414,7 @@ impl Output {
         )
     }
 
-    async fn send(
-        &mut self,
-        mut events: EventArray,
-        unsent_event_count: &mut UnsentEventCount,
-    ) -> Result<(), ClosedError> {
+    async fn send(&mut self, mut events: EventArray) -> Result<(), ClosedError> {
         let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
         events
@@ -421,7 +433,7 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.sender
+        self.inner
             .send(SourceSenderItem {
                 events,
                 send_reference,
@@ -429,7 +441,6 @@ impl Output {
             .await
             .map_err(|_| ClosedError)?;
         self.events_sent.emit(CountByteSize(count, byte_size));
-        unsent_event_count.decr(count);
         Ok(())
     }
 
@@ -438,8 +449,11 @@ impl Output {
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
-        let mut unsent_event_count = UnsentEventCount::new(event.len());
-        self.send(event, &mut unsent_event_count).await
+        let count = event.len();
+        let mut unsent_event_count = UnsentEventCount::new(count);
+        let res = self.send(event).await;
+        unsent_event_count.discard();
+        res
     }
 
     async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
@@ -466,13 +480,13 @@ impl Output {
         let events = events.into_iter().map(Into::into);
         let mut unsent_event_count = UnsentEventCount::new(events.len());
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
-            self.send(events, &mut unsent_event_count)
-                .await
-                .inspect_err(|_| {
-                    // The unsent event count is discarded here because the callee emits the
-                    // `StreamClosedError`.
-                    unsent_event_count.discard();
-                })?;
+            let count = events.len();
+            self.send(events).await.inspect_err(|_| {
+                // The unsent event count is discarded here because the caller emits the
+                // `StreamClosedError`.
+                unsent_event_count.discard();
+            })?;
+            unsent_event_count.decr(count);
         }
         Ok(())
     }
