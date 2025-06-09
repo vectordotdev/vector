@@ -198,9 +198,12 @@ mod test {
             batch_settings.timeout,
         );
 
-        let input = std::iter::repeat_n(BytesMut::from(
-            "It's going down, I'm yelling timber, You better move, you better dance",
-        ), 100_000);
+        let input = std::iter::repeat_n(
+            BytesMut::from(
+                "It's going down, I'm yelling timber, You better move, you better dance",
+            ),
+            100_000,
+        );
 
         buffered
             .sink_map_err(drop)
@@ -227,7 +230,10 @@ mod test {
             decompressed
         });
 
-        assert!(decompressed.eq(std::iter::repeat_n(b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(), 100_000)
+        assert!(decompressed.eq(std::iter::repeat_n(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
+            100_000
+        )
         .flatten()));
     }
 }
