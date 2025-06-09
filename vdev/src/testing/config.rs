@@ -56,7 +56,7 @@ pub enum VolumeMount {
         r#type: Option<String>,
         source: String,
         target: String,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         read_only: Option<bool>,
     },
 }

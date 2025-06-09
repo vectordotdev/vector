@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Generates random log data for consumption by the custom Agent check
   log_generator:
