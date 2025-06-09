@@ -468,6 +468,7 @@ impl LokiSink {
                 config.endpoint,
                 config.path,
                 config.auth,
+                config.keep_alive_requests,
             )?);
 
         let transformer = config.encoding.transformer();

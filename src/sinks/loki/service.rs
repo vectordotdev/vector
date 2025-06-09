@@ -4,6 +4,7 @@ use bytes::Bytes;
 use http::StatusCode;
 use snafu::Snafu;
 use tracing::Instrument;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use crate::{
     http::{Auth, HttpClient},
@@ -82,10 +83,12 @@ impl MetaDescriptive for LokiRequest {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LokiService {
     endpoint: UriSerde,
     client: HttpClient,
+    keep_alive_requests: i64,
+    request_count: AtomicI64,
 }
 
 impl LokiService {
@@ -94,12 +97,24 @@ impl LokiService {
         endpoint: UriSerde,
         path: String,
         auth: Option<Auth>,
+        keep_alive_requests: Option<i64>,
     ) -> crate::Result<Self> {
         let endpoint = endpoint.append_path(&path)?.with_auth(auth);
-
-        Ok(Self { client, endpoint })
+        let request_count = AtomicI64::new(0);
+        Ok(Self { client, endpoint, keep_alive_requests: keep_alive_requests.unwrap_or(0), request_count })
     }
 }
+
+impl Clone for LokiService {
+    fn clone(&self) -> Self {
+        Self {
+            endpoint: self.endpoint.clone(),
+            client: self.client.clone(),
+            keep_alive_requests: self.keep_alive_requests.clone(),
+            request_count: AtomicI64::new(self.request_count.load(Ordering::SeqCst)),
+        }
+     }
+ }
 
 impl Service<LokiRequest> for LokiService {
     type Response = LokiResponse;
@@ -125,6 +140,14 @@ impl Service<LokiRequest> for LokiService {
 
         if let Some(ce) = request.compression.content_encoding() {
             req = req.header("Content-Encoding", ce);
+        }
+
+        if self.keep_alive_requests > 0 {
+            let request_count = self.request_count.fetch_add(1, Ordering::Relaxed);
+            if request_count >= self.keep_alive_requests {
+                self.request_count.store(0, Ordering::Relaxed);
+                req = req.header("Connection", "close");
+            }
         }
 
         let body = hyper::Body::from(request.payload);
