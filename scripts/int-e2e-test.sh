@@ -22,10 +22,10 @@ sleep 30
 cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
 
-# Output docker compose logs when debug logging is enabled
-SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-COMPOSE_DIR="${SCRIPT_DIR}/${TEST_TYPE}/${TEST_NAME}"
-if [[ "${RUNNER_DEBUG:-}" == "true" ]]; then
+# Output docker compose logs on failure
+if [[ $RET -ne 0 ]]; then
+  SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+  COMPOSE_DIR="${SCRIPT_DIR}/${TEST_TYPE}/${TEST_NAME}"
   (cd "${COMPOSE_DIR}" && docker compose logs)
 fi
 

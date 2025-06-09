@@ -68,7 +68,6 @@ pub enum VolumeDefinition {
     WithOptions(BTreeMap<String, Value>),
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,

@@ -354,11 +354,9 @@ mod unix {
                 for volume in volumes {
                     let source = match volume {
                         VolumeMount::Short(s) => {
-                            s.split_once(':')
-                                .map(|(s, _)| s)
-                                .ok_or_else(|| {
-                                    anyhow::anyhow!("Invalid short volume mount format: {s}")
-                                })?
+                            s.split_once(':').map(|(s, _)| s).ok_or_else(|| {
+                                anyhow::anyhow!("Invalid short volume mount format: {s}")
+                            })?
                         }
                         VolumeMount::Long { source, .. } => source,
                     };
@@ -375,7 +373,6 @@ mod unix {
         }
         Ok(())
     }
-
 
     /// Recursively add read permissions to the
     fn add_read_permission(path: &Path) -> Result<()> {
