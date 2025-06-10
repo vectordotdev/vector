@@ -635,15 +635,16 @@ impl DnsMessageParser {
                     caa.tag().as_str(),
                     match caa.tag() {
                         Property::Iodef => {
-                            let url = caa
-                                .value_as_iodef()
-                                .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
+                            let url = caa.value_as_iodef().map_err(|source| {
+                                DnsMessageParserError::TrustDnsError { source }
+                            })?;
                             url.as_str().to_string()
-                        },
+                        }
                         Property::Issue | Property::IssueWild => {
-                            let (option_name, vec_keyvalue) = caa
-                                .value_as_issue()
-                                .map_err(|source| DnsMessageParserError::TrustDnsError { source })?;
+                            let (option_name, vec_keyvalue) =
+                                caa.value_as_issue().map_err(|source| {
+                                    DnsMessageParserError::TrustDnsError { source }
+                                })?;
 
                             let mut final_issuer = String::new();
                             if let Some(name) = option_name {
@@ -656,11 +657,13 @@ impl DnsMessageParser {
                                 }
                             }
                             final_issuer.trim_end().to_string()
-                        },
+                        }
                         Property::Unknown(_) => {
                             let unknown = caa.raw_value();
                             std::str::from_utf8(unknown)
-                                .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
+                                .map_err(|source| DnsMessageParserError::Utf8ParsingError {
+                                    source,
+                                })?
                                 .to_string()
                         }
                     }
