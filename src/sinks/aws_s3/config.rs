@@ -220,10 +220,7 @@ impl S3SinkConfig {
         let request_limits = self.request.into_settings();
         let retry_logic = self.retry_logic.clone();
         let service = ServiceBuilder::new()
-            .settings(
-                request_limits,
-                retry_logic.unwrap_or_default()
-            )
+            .settings(request_limits, retry_logic.unwrap_or_default())
             .service(service);
 
         let offset = self
