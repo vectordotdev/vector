@@ -945,8 +945,8 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
         9 => Some("NotAuth"),  // 9    NotAuth    Server Not Authoritative for zone    [RFC2136]
         10 => Some("NotZone"), // 10   NotZone    Name not contained in zone           [RFC2136]
         // backwards compat for 4 bit ResponseCodes so far.
-        // 16    BADVERS    Bad OPT Version    [RFC6891]
-        16 => Some("BADSIG"), // 16    BADSIG    TSIG Signature Failure               [RFC2845]
+        16 => Some("BADVERS"), // 16    BADVERS    Bad OPT Version    [RFC6891]
+        // 16    BADSIG    TSIG Signature Failure               [RFC2845]
         17 => Some("BADKEY"), // 17    BADKEY    Key not recognized                   [RFC2845]
         18 => Some("BADTIME"), // 18    BADTIME   Signature out of time window         [RFC2845]
         19 => Some("BADMODE"), // 19    BADMODE   Bad TKEY Mode                        [RFC2930]

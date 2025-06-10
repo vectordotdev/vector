@@ -370,7 +370,7 @@ impl TlsConfig {
                     |der| X509::from_der(&der).map(|x509| vec![x509]),
                     |pem| {
                         pem.match_indices(PEM_START_MARKER)
-                            .map(|(start, _)| X509::from_pem(pem[start..].as_bytes()))
+                            .map(|(start, _)| X509::from_pem(&pem.as_bytes()[start..]))
                             .collect()
                     },
                 )
