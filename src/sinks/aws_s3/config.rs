@@ -222,7 +222,7 @@ impl S3SinkConfig {
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                retry_logic.unwrap_or(S3RetryLogic::default()),
+                retry_logic.unwrap_or_default()
             )
             .service(service);
 
