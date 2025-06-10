@@ -901,4 +901,18 @@ base: configuration: configuration: {
 		required: false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
+	wildcard_matching: {
+		common: false
+		description: """
+			Set wildcard matching mode for inputs
+
+			Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
+			to be accepted without causing an error.
+			"""
+		required: false
+		type: string: enum: {
+			relaxed: "Relaxed matching (must match 0 or more inputs)"
+			strict:  "Strict matching (must match at least one existing input)"
+		}
+	}
 }
