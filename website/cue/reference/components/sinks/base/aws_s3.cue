@@ -1036,6 +1036,36 @@ base: components: sinks: aws_s3: configuration: {
 			}
 		}
 	}
+	retry_logic: {
+		description: """
+			Specifies errors to retry
+
+			By default, the sink will only retry attempts it deems to be "retriable,"
+			these settings override that behavior.
+			"""
+		required: false
+		type: object: options: {
+			errors_to_retry: {
+				description: """
+					Retry specific errors.
+
+					A vector list of status codes matching specific error types that will trigger
+					failed service retry attempts. The list is ignored if `retry_all_errors` is ignored.
+					"""
+				required: false
+				type: array: items: type: uint: {}
+			}
+			retry_all_errors: {
+				description: """
+					Retry all errors.
+
+					All failed service calls will be retried.
+					"""
+				required: false
+				type: bool: {}
+			}
+		}
+	}
 	server_side_encryption: {
 		description: """
 			AWS S3 Server-Side Encryption algorithms.
