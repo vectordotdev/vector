@@ -268,7 +268,7 @@ impl SourceSender {
     }
 
     /// Get a mutable reference to the default output, panicking if none exists.
-    fn default_output_mut(&mut self) -> &mut Output {
+    const fn default_output_mut(&mut self) -> &mut Output {
         self.default_output.as_mut().expect("no default output")
     }
 
