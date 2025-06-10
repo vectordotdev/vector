@@ -14,8 +14,8 @@ fi
 if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.95" ]] ; then
   rustup run stable cargo install cargo-nextest --version 0.9.95 --force --locked
 fi
-if [[ "$(cargo-deny --version)" != "cargo-deny 0.16.1" ]] ; then
-  rustup run stable cargo install cargo-deny --version 0.16.1 --force --locked
+if [[ "$(cargo-deny --version)" != "cargo-deny 0.16.2" ]] ; then
+  rustup run stable cargo install cargo-deny --version 0.16.2 --force --locked
 fi
 if ! dd-rust-license-tool --help >& /dev/null ; then
   rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked
