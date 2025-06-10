@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.47.0"
+version = "0.48.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -165,16 +165,16 @@ serde_json = { version = "1.0.140", default-features = false, features = ["raw_v
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
 tempfile = "3.19.1"
-tokio = { version = "1.44.2", default-features = false, features = ["full"] }
+tokio = { version = "1.45.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.22", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-uuid = { version = "1.16.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vrl = { git = "https://github.com/vectordotdev/vrl", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { features = ["arbitrary", "cli", "test", "test_framework"], version = "0.24.0" }
 
 [dependencies]
 cfg-if.workspace = true
@@ -207,7 +207,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.88", default-features = false }
 futures.workspace = true
-tokio = { version = "1.44.2", default-features = false, features = ["full"] }
+tokio = { version = "1.45.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -256,10 +256,10 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.21", default-features = false, features = ["hmac_rust", "enable_reqwest"], optional = true }
-azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.21", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
+azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { version = "0.17", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
 
 # OpenDAL
 opendal = { version = "0.53", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -407,7 +407,7 @@ sysinfo = "0.34.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.7.0"
+windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
@@ -428,10 +428,10 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.21", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.21", default-features = false }
+azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
+azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
+azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
@@ -443,7 +443,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.25.0" }
 tempfile.workspace = true
 test-generator = "0.3.1"
-tokio = { version = "1.44.2", features = ["test-util"] }
+tokio = { version = "1.45.1", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
@@ -580,6 +580,7 @@ sources-logs = [
   "sources-kafka",
   "sources-kubernetes_logs",
   "sources-logstash",
+  "sources-mqtt",
   "sources-nats",
   "sources-opentelemetry",
   "sources-pulsar",
@@ -635,6 +636,7 @@ sources-kafka = ["dep:rdkafka"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
+sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-utils-http-headers", "sources-vector"]
@@ -934,7 +936,7 @@ kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
-mqtt-integration-tests = ["sinks-mqtt"]
+mqtt-integration-tests = ["sinks-mqtt", "sources-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
