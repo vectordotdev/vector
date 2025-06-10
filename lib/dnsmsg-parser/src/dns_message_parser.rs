@@ -5,11 +5,11 @@ use std::str::Utf8Error;
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use hickory_proto::dnssec::rdata::{DNSSECRData, CDNSKEY, CDS, DNSKEY, DS};
 use hickory_proto::dnssec::SupportedAlgorithms;
+use hickory_proto::rr::rdata::caa::Property;
 use hickory_proto::{
     op::{message::Message as TrustDnsMessage, Query},
     rr::{
         rdata::{
-            caa::Value,
             opt::{EdnsCode, EdnsOption},
             A, AAAA, NULL, OPT, SVCB,
         },
@@ -633,11 +633,19 @@ impl DnsMessageParser {
                     "{} {} \"{}\"",
                     caa.issuer_critical() as u8,
                     caa.tag().as_str(),
-                    match caa.value() {
-                        Value::Url(url) => {
+                    match caa.tag() {
+                        Property::Iodef => {
+                            let url = caa.value_as_iodef().map_err(|source| {
+                                DnsMessageParserError::TrustDnsError { source }
+                            })?;
                             url.as_str().to_string()
                         }
-                        Value::Issuer(option_name, vec_keyvalue) => {
+                        Property::Issue | Property::IssueWild => {
+                            let (option_name, vec_keyvalue) =
+                                caa.value_as_issue().map_err(|source| {
+                                    DnsMessageParserError::TrustDnsError { source }
+                                })?;
+
                             let mut final_issuer = String::new();
                             if let Some(name) = option_name {
                                 final_issuer.push_str(&name.to_string_with_options(&self.options));
@@ -650,9 +658,14 @@ impl DnsMessageParser {
                             }
                             final_issuer.trim_end().to_string()
                         }
-                        Value::Unknown(unknown) => std::str::from_utf8(unknown)
-                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                            .to_string(),
+                        Property::Unknown(_) => {
+                            let unknown = caa.raw_value();
+                            std::str::from_utf8(unknown)
+                                .map_err(|source| DnsMessageParserError::Utf8ParsingError {
+                                    source,
+                                })?
+                                .to_string()
+                        }
                     }
                 );
                 Ok((Some(caa_rdata), None))
