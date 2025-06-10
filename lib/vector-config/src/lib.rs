@@ -123,7 +123,7 @@ pub use self::metadata::Metadata;
 mod named;
 pub use self::named::NamedComponent;
 mod num;
-pub use self::num::ConfigurableNumber;
+pub use self::num::{ConfigurableNumber, NumberClass};
 pub mod schema;
 pub mod ser;
 mod stdlib;

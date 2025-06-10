@@ -131,6 +131,8 @@ impl SinkConfig for DatabendConfig {
                 return Err("Bearer authentication is not supported currently".into());
             }
             None => {}
+            #[cfg(feature = "aws-core")]
+            _ => {}
         }
         if let Some(database) = &self.database {
             endpoint.set_path(&format!("/{}", database));

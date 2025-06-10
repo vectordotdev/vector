@@ -50,6 +50,7 @@ Comcast
 Consolas
 Coolpad
 BADDCAFE
+BADVERS
 DEBHELPER
 Danew
 dkr
@@ -527,3 +528,4 @@ gifs
 meme
 simdutf
 vhosts
+miniz

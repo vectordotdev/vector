@@ -14,10 +14,7 @@ use super::{
     BuiltBuffer, TaskHandle,
 };
 use crate::{
-    config::{
-        ComponentKey, Config, ConfigDiff, EnrichmentTableOuter, HealthcheckOptions, Inputs,
-        OutputId, Resource,
-    },
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -54,6 +51,7 @@ pub struct RunningTopology {
     graceful_shutdown_duration: Option<Duration>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
+    pending_reload: Option<HashSet<ComponentKey>>,
 }
 
 impl RunningTopology {
@@ -74,12 +72,22 @@ impl RunningTopology {
             config,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
+            pending_reload: None,
         }
     }
 
     /// Gets the configuration that represents this running topology.
     pub const fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Adds a set of component keys to the pending reload set if one exists. Otherwise, it
+    /// initializes the pending reload set.
+    pub fn extend_reload_set(&mut self, new_set: HashSet<ComponentKey>) {
+        match &mut self.pending_reload {
+            None => self.pending_reload = Some(new_set.clone()),
+            Some(existing) => existing.extend(new_set),
+        }
     }
 
     /// Creates a subscription to topology changes.
@@ -256,7 +264,11 @@ impl RunningTopology {
         // spawning the new version of the component.
         //
         // We also shutdown any component that is simply being removed entirely.
-        let diff = ConfigDiff::new(&self.config, &new_config);
+        let diff = if let Some(components) = &self.pending_reload {
+            ConfigDiff::new(&self.config, &new_config, components.clone())
+        } else {
+            ConfigDiff::new(&self.config, &new_config, HashSet::new())
+        };
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -432,6 +444,16 @@ impl RunningTopology {
         // At this point both the old and the new config don't have conflicts in their resource
         // usage. So if we combine their resources, all found conflicts are between to be removed
         // and to be added components.
+        let removed_table_sinks = diff
+            .enrichment_tables
+            .removed_and_changed()
+            .filter_map(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key))
+                    .map(|(key, s)| (key.clone(), s.resources(&key)))
+            })
+            .collect::<Vec<_>>();
         let remove_sink = diff
             .sinks
             .removed_and_changed()
@@ -444,20 +466,21 @@ impl RunningTopology {
                         .unwrap_or_default(),
                 )
             })
-            .chain(
-                diff.enrichment_tables
-                    .removed_and_changed()
-                    .filter_map(|key| {
-                        self.config
-                            .enrichment_table(key)
-                            .and_then(|t| t.as_sink())
-                            .map(|s| (key, s.resources(key)))
-                    }),
-            );
+            .chain(removed_table_sinks.iter().map(|(k, s)| (k, s.clone())));
         let add_source = diff
             .sources
             .changed_and_added()
             .map(|key| (key, new_config.source(key).unwrap().inner.resources()));
+        let added_table_sinks = diff
+            .enrichment_tables
+            .changed_and_added()
+            .filter_map(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_sink(key))
+                    .map(|(key, s)| (key.clone(), s.resources(&key)))
+            })
+            .collect::<Vec<_>>();
         let add_sink = diff
             .sinks
             .changed_and_added()
@@ -470,16 +493,7 @@ impl RunningTopology {
                         .unwrap_or_default(),
                 )
             })
-            .chain(
-                diff.enrichment_tables
-                    .changed_and_added()
-                    .filter_map(|key| {
-                        self.config
-                            .enrichment_table(key)
-                            .and_then(|t| t.as_sink())
-                            .map(|s| (key, s.resources(key)))
-                    }),
-            );
+            .chain(added_table_sinks.iter().map(|(k, s)| (k, s.clone())));
         let conflicts = Resource::conflicts(
             remove_sink.map(|(key, value)| ((true, key), value)).chain(
                 add_sink
@@ -502,16 +516,19 @@ impl RunningTopology {
             .to_change
             .iter()
             .filter(|&key| {
+                if diff.components_to_reload.contains(key) {
+                    return false;
+                }
                 self.config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
                     self.config
                         .enrichment_table(key)
-                        .and_then(EnrichmentTableOuter::as_sink)
-                        .map(|s| s.buffer)
+                        .and_then(|t| t.as_sink(key))
+                        .map(|(_, s)| s.buffer)
                 }) == new_config.sink(key).map(|s| s.buffer.clone()).or_else(|| {
                     self.config
                         .enrichment_table(key)
-                        .and_then(EnrichmentTableOuter::as_sink)
-                        .map(|s| s.buffer)
+                        .and_then(|t| t.as_sink(key))
+                        .map(|(_, s)| s.buffer)
                 })
             })
             .cloned()
@@ -532,7 +549,7 @@ impl RunningTopology {
             .chain(diff.enrichment_tables.to_remove.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .and_then(EnrichmentTableOuter::as_sink)
+                    .and_then(|t| t.as_sink(key))
                     .is_some()
             }))
             .collect::<Vec<_>>();
@@ -552,10 +569,11 @@ impl RunningTopology {
             .chain(diff.enrichment_tables.to_change.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .and_then(EnrichmentTableOuter::as_sink)
+                    .and_then(|t| t.as_sink(key))
                     .is_some()
             }))
             .collect::<Vec<_>>();
+
         for key in &sinks_to_change {
             debug!(component = %key, "Changing sink.");
             if reuse_buffers.contains(key) {
@@ -654,7 +672,7 @@ impl RunningTopology {
             let removed_sinks = diff.enrichment_tables.to_remove.iter().filter(|key| {
                 self.config
                     .enrichment_table(key)
-                    .and_then(EnrichmentTableOuter::as_sink)
+                    .and_then(|t| t.as_sink(key))
                     .is_some()
             });
             for key in removed_sinks {
@@ -686,6 +704,16 @@ impl RunningTopology {
         // transforms and sinks that come afterwards.
         for key in diff.sources.changed_and_added() {
             debug!(component = %key, "Configuring outputs for source.");
+            self.setup_outputs(key, new_pieces).await;
+        }
+
+        let added_changed_table_sources: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .changed_and_added()
+            .filter(|k| new_pieces.source_tasks.contains_key(k))
+            .collect();
+        for key in added_changed_table_sources {
+            debug!(component = %key, "Connecting outputs for enrichment table source.");
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -932,6 +960,30 @@ impl RunningTopology {
             self.spawn_source(key, &mut new_pieces);
         }
 
+        let changed_table_sources: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_change
+            .iter()
+            .filter(|k| new_pieces.source_tasks.contains_key(k))
+            .collect();
+
+        let added_table_sources: Vec<&ComponentKey> = diff
+            .enrichment_tables
+            .to_add
+            .iter()
+            .filter(|k| new_pieces.source_tasks.contains_key(k))
+            .collect();
+
+        for key in changed_table_sources {
+            debug!(message = "Spawning changed enrichment table source.", key = %key);
+            self.spawn_source(key, &mut new_pieces);
+        }
+
+        for key in added_table_sources {
+            debug!(message = "Spawning new enrichment table source.", key = %key);
+            self.spawn_source(key, &mut new_pieces);
+        }
+
         for key in &diff.transforms.to_change {
             debug!(message = "Spawning changed transform.", key = %key);
             self.spawn_transform(key, &mut new_pieces);
@@ -956,14 +1008,18 @@ impl RunningTopology {
             .enrichment_tables
             .to_change
             .iter()
-            .filter(|k| new_pieces.tasks.contains_key(k))
+            .filter(|k| {
+                new_pieces.tasks.contains_key(k) && !new_pieces.source_tasks.contains_key(k)
+            })
             .collect();
 
         let added_tables: Vec<&ComponentKey> = diff
             .enrichment_tables
             .to_add
             .iter()
-            .filter(|k| new_pieces.tasks.contains_key(k))
+            .filter(|k| {
+                new_pieces.tasks.contains_key(k) && !new_pieces.source_tasks.contains_key(k)
+            })
             .collect();
 
         for key in changed_tables {
@@ -1164,7 +1220,14 @@ impl RunningTopology {
 
         if let Err(error) = crate::metrics::Controller::get()
             .expect("Metrics must be initialized")
-            .set_expiry(expire_metrics)
+            .set_expiry(
+                expire_metrics,
+                config
+                    .global
+                    .expire_metrics_per_metric_set
+                    .clone()
+                    .unwrap_or_default(),
+            )
         {
             error!(message = "Invalid metrics expiry.", %error);
             return None;

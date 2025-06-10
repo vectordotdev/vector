@@ -29,3 +29,6 @@ service:
     traces:
       receivers: [otlp]
       exporters: [otlp,otlphttp]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp,otlphttp]

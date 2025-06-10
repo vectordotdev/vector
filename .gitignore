@@ -22,3 +22,6 @@ tilt_modules/
 
 # Jetbrains
 .idea/
+
+# Ignore generated temporary Docker Compose files
+**/compose-temp-*.yaml

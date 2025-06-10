@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use futures_util::FutureExt as _;
-
-use tokio::sync::{Mutex, MutexGuard};
-
 #[cfg(feature = "api")]
 use crate::api;
 use crate::extra_context::ExtraContext;
 use crate::internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded};
+use futures_util::FutureExt as _;
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{config, signal::ShutdownError, topology::RunningTopology};
 

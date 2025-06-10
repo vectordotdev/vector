@@ -51,13 +51,13 @@ ignore = [
   # idna accepts Punycode labels that do not produce any non-ASCII when decoded
   # Need to update some direct dependencies before we can upgrade idna to fix
   "RUSTSEC-2024-0421",
-  # unmaintained dependencies
-  "RUSTSEC-2021-0139", # ansi_term
-  "RUSTSEC-2024-0388", # derivative
-  "RUSTSEC-2024-0384", # instant`
-  "RUSTSEC-2020-0168", # mach
-  "RUSTSEC-2024-0370", # proc-macro-error
-  "RUSTSEC-2024-0320", # yaml-rust
-  "RUSTSEC-2024-0436", # paste
-  "RUSTSEC-2025-0012", # backoff
+  { id = "RUSTSEC-2021-0139", reason = " ansi_term is unmaintained" },
+  { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained" },
+  { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained" },
+  { id = "RUSTSEC-2020-0168", reason = "mach is unmaintained" },
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained" },
+  { id = "RUSTSEC-2024-0320", reason = "yaml-rust is unmaintained" },
+  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained" },
+  { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained" },
+  { id = "RUSTSEC-2025-0014", reason = "humantime is unmaintained" },
 ]

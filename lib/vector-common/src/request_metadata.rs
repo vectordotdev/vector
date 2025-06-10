@@ -196,7 +196,7 @@ impl AddAssign for GroupedCountByteSize {
                 }
             }
             (Self::Untagged { .. }, Self::Tagged { .. }) => unreachable!(),
-        };
+        }
     }
 }
 

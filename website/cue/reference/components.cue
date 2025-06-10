@@ -204,6 +204,7 @@ components: {
 			exclusive_route?: #FeaturesExclusiveRoute
 			sanitize?:        #FeaturesSanitize
 			shape?:           #FeaturesShape
+			window?:          #FeaturesWindow
 		}
 
 		if Args.kind == "sink" {
@@ -334,6 +335,8 @@ components: {
 	#FeaturesSanitize: {}
 
 	#FeaturesShape: {}
+
+	#FeaturesWindow: {}
 
 	#FeaturesSend: {
 		_args: {
@@ -1285,6 +1288,9 @@ components: {
 					Custom authorization provides a greater flexibility. It supports writing custom
 					authorization code using VRL. Here is an example that looks up the token in an
 					enrichment table backed by a CSV file.
+
+					Currently custom VRL auth has access to `headers` and `address` (IP address of the
+					client).
 
 					```yaml
 					\(kind)s:

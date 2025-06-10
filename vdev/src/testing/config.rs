@@ -48,10 +48,31 @@ pub fn get_rust_version() -> String {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum VolumeMount {
+    Short(String),
+    Long {
+        #[serde(default)]
+        r#type: Option<String>,
+        source: String,
+        target: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        read_only: Option<bool>,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum VolumeDefinition {
+    Empty,
+    WithOptions(BTreeMap<String, Value>),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub volumes: BTreeMap<String, Value>,
+    pub volumes: BTreeMap<String, VolumeDefinition>,
     #[serde(default)]
     pub networks: BTreeMap<String, BTreeMap<String, String>>,
 }
@@ -73,7 +94,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env_file: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volumes: Option<Vec<String>>,
+    pub volumes: Option<Vec<VolumeMount>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
