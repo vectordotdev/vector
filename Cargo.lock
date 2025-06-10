@@ -3696,7 +3696,7 @@ dependencies = [
 name = "file-source-common"
 version = "0.1.0"
 dependencies = [
- "bstr 1.11.3",
+ "bstr 1.12.0",
  "bytes 1.10.1",
  "chrono",
  "crc",
@@ -5133,7 +5133,7 @@ dependencies = [
 name = "ifile-source"
 version = "0.1.0"
 dependencies = [
- "bstr 1.11.3",
+ "bstr 1.12.0",
  "bytes 1.10.1",
  "chrono",
  "crc",
