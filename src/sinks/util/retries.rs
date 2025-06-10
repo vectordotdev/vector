@@ -283,7 +283,7 @@ impl ExponentialBackoff {
     }
 
     /// Resents the exponential back-off strategy to its initial state.
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.current = self.base;
     }
 }
