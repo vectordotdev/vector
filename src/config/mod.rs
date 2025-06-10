@@ -265,7 +265,7 @@ impl HealthcheckOptions {
         }
     }
 
-    fn merge(&mut self, other: Self) {
+    const fn merge(&mut self, other: Self) {
         self.enabled &= other.enabled;
         self.require_healthy |= other.require_healthy;
     }
