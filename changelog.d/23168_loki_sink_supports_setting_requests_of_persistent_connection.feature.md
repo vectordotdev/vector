@@ -1,3 +1,3 @@
-Add keep_alive_requests option for Loki sink to support release persistent connection. This can help load balancing of downstream Loki cluster scaling.
+Introduce the `keep_alive_requests` option in the Loki sink to enable releasing persistent connections, thereby enhancing load balancing during downstream Loki cluster scaling.
 
 authors: tiantangkuohai
