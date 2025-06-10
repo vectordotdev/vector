@@ -144,7 +144,7 @@ impl<'a> FieldsIter<'a> {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
                     if self.quote_invalid_fields && !IS_VALID_PATH_SEGMENT.is_match(key) {
-                        res.push_str(&format!("\"{key}\""));
+                        write!(res, "\"{key}\"").expect("write to String never fails");
                     } else {
                         res.push_str(key);
                     }
@@ -191,7 +191,7 @@ impl<'a> Iterator for FieldsIter<'a> {
                     *visited = true;
                     break result;
                 }
-            };
+            }
         }
     }
 }
