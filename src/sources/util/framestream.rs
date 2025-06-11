@@ -584,7 +584,6 @@ async fn handle_stream(
     )
     .split();
     let mut reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
-    let frame_handler_copy = frame_handler.clone();
     let mut frames = sock_stream
         .map_err(move |error| {
             emit!(TcpSocketError {
@@ -635,20 +634,7 @@ async fn handle_stream(
                             // but it should always contain all events from each request.
                             permit.decoding_finished(1);
                         };
-                        if frame_handler.multithreaded() {
-                            spawn_event_handling_tasks(
-                                frame,
-                                frame_handler_copy.clone(),
-                                event_sink.clone(),
-                                received_from.clone(),
-                                Arc::clone(&active_parsing_task_nums),
-                                frame_handler_copy.max_frame_handling_tasks(),
-                            ).await;
-                        } else if let Some(event) = frame_handler_copy.handle_event(received_from.clone(), frame) {
-                            if let Err(e) = event_sink.send_event(event).await {
-                                error!("Error sending event: {e:?}.");
-                            }
-                        }
+                        handle_tcp_frame(&mut frame_handler, frame, &mut event_sink, received_from.clone(), Arc::clone(&active_parsing_task_nums)).await;
                     }
                     None => {
                         debug!("Connection closed.");
@@ -660,6 +646,32 @@ async fn handle_stream(
         }
 
         drop(permit);
+    }
+}
+
+async fn handle_tcp_frame<T>(
+    frame_handler: &mut T,
+    frame: Bytes,
+    event_sink: &mut SourceSender,
+    received_from: Option<Bytes>,
+    active_parsing_task_nums: Arc<AtomicU32>,
+) where
+    T: TcpFrameHandler + Send + Sync + Clone + 'static,
+{
+    if frame_handler.multithreaded() {
+        spawn_event_handling_tasks(
+            frame,
+            frame_handler.clone(),
+            event_sink.clone(),
+            received_from,
+            active_parsing_task_nums,
+            frame_handler.max_frame_handling_tasks(),
+        )
+        .await;
+    } else if let Some(event) = frame_handler.handle_event(received_from, frame) {
+        if let Err(e) = event_sink.send_event(event).await {
+            error!("Error sending event: {e:?}.");
+        }
     }
 }
 
