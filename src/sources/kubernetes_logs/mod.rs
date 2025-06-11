@@ -793,11 +793,7 @@ impl Source {
         if auto_partial_merge {
             resolved_max_line_bytes = min(
                 max_line_bytes,
-                if let Some(configured_max_merged_line_bytes) = max_merged_line_bytes {
-                    configured_max_merged_line_bytes
-                } else {
-                    max_line_bytes
-                },
+                max_merged_line_bytes.unwrap_or(max_line_bytes),
             );
         }
 
