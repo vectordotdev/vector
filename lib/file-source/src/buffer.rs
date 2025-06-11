@@ -75,7 +75,7 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
         if !discarding && buf.len() > max_size {
             // keep only the first <1k bytes to make sure we can actually emit a usable error
             let length_to_keep = min(1000, max_size);
-            let mut truncated: BytesMut = BytesMut::with_capacity(length_to_keep);
+            let mut truncated: BytesMut = BytesMut::zeroed(length_to_keep);
             truncated.copy_from_slice(&buf[0..length_to_keep]);
             discarded_for_size_and_truncated.push(truncated);
             discarding = true;
