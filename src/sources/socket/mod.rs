@@ -1457,7 +1457,7 @@ mod test {
         config: Option<UnixConfig>,
     ) -> PathBuf {
         let mut config = config.unwrap_or_else(|| {
-            UnixConfig::new(tempfile::tempdir().unwrap().into_path().join("unix_test"))
+            UnixConfig::new(tempfile::tempdir().unwrap().keep().join("unix_test"))
         });
 
         let in_path = config.path.clone();
@@ -1648,7 +1648,7 @@ mod test {
     async fn unix_datagram_chunked_gelf_messages() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
             let mut config = UnixConfig::new(in_path.clone());
             config.decoding = GelfDeserializerConfig::default().into();
             let path = init_unix_with_config(tx, false, false, config).await;
@@ -1749,7 +1749,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_permissions() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
         let (tx, _) = SourceSender::new_test();
 
         let mut config = UnixConfig::new(in_path.clone());
@@ -1894,7 +1894,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_permissions() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
         let (tx, _) = SourceSender::new_test();
 
         let mut config = UnixConfig::new(in_path.clone());
