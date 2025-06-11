@@ -138,13 +138,10 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
 }
 
 impl NatsSinkConfig {
-    pub(super) async fn connect(&self, with_retry: bool) -> Result<async_nats::Client, NatsError> {
-        let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
-        options = match with_retry {
-            false => options,
-            true => options.retry_on_initial_connect(),
-        };
-
+    pub(super) async fn connect(
+        &self,
+        options: async_nats::ConnectOptions,
+    ) -> Result<async_nats::Client, NatsError> {
         let urls = self.parse_server_addresses()?;
         options.connect(urls).await.context(ConnectSnafu)
     }
@@ -162,7 +159,9 @@ impl NatsSinkConfig {
     }
 
     pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
-        let connection = self.connect(true).await?;
+        let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+        options = options.retry_on_initial_connect();
+        let connection = self.connect(options).await?;
 
         if self.jetstream {
             Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
@@ -175,8 +174,9 @@ impl NatsSinkConfig {
 }
 
 async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
+    let options: async_nats::ConnectOptions = (&config).try_into().context(ConfigSnafu)?;
     config
-        .connect(false)
+        .connect(options)
         .map_ok(|_| ())
         .map_err(|e| e.into())
         .await
