@@ -62,6 +62,12 @@ use super::net::{RequestLimiter, SocketListenAddr};
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
 
+/// If a connection does not receive any data during this short timeout,
+/// it should release its permit (and try to obtain a new one) allowing other connections to read.
+/// It is very short because any incoming data will avoid this timeout,
+/// so it mainly prevents holding permits without consuming any data
+const PERMIT_HOLD_TIMEOUT_MS: usize = 10;
+
 pub type FrameStreamSink = Box<dyn Sink<Bytes, Error = std::io::Error> + Send + Unpin>;
 
 pub struct FrameStreamReader {
@@ -614,7 +620,7 @@ async fn handle_stream(
             else => break,
         };
 
-        let timeout = tokio::time::sleep(Duration::from_millis(10));
+        let timeout = tokio::time::sleep(Duration::from_millis(PERMIT_HOLD_TIMEOUT_MS));
         tokio::pin!(timeout);
 
         tokio::select! {
