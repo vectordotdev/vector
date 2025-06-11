@@ -20,6 +20,7 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
+
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
 #[derive(Clone, Debug, Default)]
@@ -37,6 +38,11 @@ pub struct AggregateConfig {
     #[serde(default = "default_mode")]
     #[configurable(derived)]
     pub mode: AggregationMode,
+
+    // Whether metrics with an interval_ms field should instead use the aggregators hardcoded interval
+    #[serde(default = "default_force_aggregation_interval")]
+    #[configurable(derived)]
+    pub force_aggregation_interval: bool,
 }
 
 #[configurable_component]
@@ -80,6 +86,10 @@ const fn default_interval_ms() -> u64 {
     10 * 1000
 }
 
+const fn default_force_aggregation_interval() -> bool {
+    false
+}
+
 impl_generate_config_from_default!(AggregateConfig);
 
 #[async_trait::async_trait]
@@ -112,6 +122,7 @@ pub struct Aggregate {
     prev_map: HashMap<MetricSeries, MetricEntry>,
     multi_map: HashMap<MetricSeries, Vec<MetricEntry>>,
     mode: AggregationMode,
+    force_aggregation_interval: bool,
 }
 
 impl Aggregate {
@@ -122,6 +133,7 @@ impl Aggregate {
             prev_map: Default::default(),
             multi_map: Default::default(),
             mode: config.mode.clone(),
+            force_aggregation_interval: config.force_aggregation_interval,
         })
     }
 
@@ -193,6 +205,11 @@ impl Aggregate {
                     let existing = entry.get_mut();
                     // In order to update (add) the new and old kind's must match
                     if existing.0.kind == data.kind && existing.0.update(&data) {
+                        if self.force_aggregation_interval {
+                            if let Ok(millis) = u32::try_from(self.interval.as_millis()) {
+                                existing.0.time.interval_ms = std::num::NonZero::new(millis);
+                            }
+                        }
                         existing.1.merge(metadata);
                     } else {
                         emit!(AggregateUpdateFailed);
@@ -365,6 +382,8 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::ComponentKey;
     use vrl::value::Kind;
+    use std::num::NonZeroU32;
+    use chrono::{DateTime, Utc};
 
     use super::*;
     use crate::schema::Definition;
@@ -382,8 +401,8 @@ mod tests {
         crate::test_util::test_generate_config::<AggregateConfig>();
     }
 
-    fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
-        let mut event = Event::Metric(Metric::new(name, kind, value))
+    fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue, interval_ms: Option<NonZeroU32>, timestamp: Option<DateTime<Utc>>) -> Event {
+        let mut event = Event::Metric(Metric::new(name, kind, value).with_interval_ms(interval_ms).with_timestamp(timestamp))
             .with_source_id(Arc::new(ComponentKey::from("in")))
             .with_upstream_id(Arc::new(OutputId::from("transform")));
         event.metadata_mut().set_schema_definition(&Arc::new(
@@ -400,6 +419,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -407,16 +427,22 @@ mod tests {
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
+            None,
+            None,
         );
         let counter_a_2 = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 43.0 },
+            None,
+            None,
         );
         let counter_a_summed = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 85.0 },
+            None,
+            None,
         );
 
         // Single item, just stored regardless of kind
@@ -449,6 +475,88 @@ mod tests {
             "counter_b",
             MetricKind::Incremental,
             MetricValue::Counter { value: 44.0 },
+            None,
+            None,
+        );
+        // Two increments with the different series, should get each back as-is
+        agg.record(counter_a_1.clone());
+        agg.record(counter_b_1.clone());
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(2, out.len());
+        // B/c we don't know the order they'll come back
+        for event in out {
+            match event.as_metric().series().name.name.as_str() {
+                "counter_a" => assert_eq!(counter_a_1, event),
+                "counter_b" => assert_eq!(counter_b_1, event),
+                _ => panic!("Unexpected metric name in aggregate output"),
+            }
+        }
+    }
+
+    #[test]
+    fn incremental_auto_force_interval() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Auto,
+            force_aggregation_interval: false,
+        })
+        .unwrap();
+
+        let counter_a_1 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 42.0 },
+            None,
+            None,
+        );
+        let counter_a_2 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 43.0 },
+            None,
+            None,
+        );
+        let counter_a_summed = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 85.0 },
+            None,
+            None,
+        );
+
+        // Single item, just stored regardless of kind
+        agg.record(counter_a_1.clone());
+        let mut out = vec![];
+        // We should flush 1 item counter_a_1
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_a_1, &out[0]);
+
+        // A subsequent flush doesn't send out anything
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // One more just to make sure that we don't re-see from the other buffer
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(0, out.len());
+
+        // Two increments with the same series, should sum into 1
+        agg.record(counter_a_1.clone());
+        agg.record(counter_a_2);
+        out.clear();
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+        assert_eq!(&counter_a_summed, &out[0]);
+
+        let counter_b_1 = make_metric(
+            "counter_b",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 44.0 },
+            None,
+            None,
         );
         // Two increments with the different series, should get each back as-is
         agg.record(counter_a_1.clone());
@@ -471,6 +579,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -478,11 +587,15 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 42.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 43.0 },
+            None,
+            None,
         );
 
         // Single item, just stored regardless of kind
@@ -515,6 +628,8 @@ mod tests {
             "gauge_b",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 44.0 },
+            None,
+            None,
         );
         // Two increments with the different series, should get each back as-is
         agg.record(gauge_a_1.clone());
@@ -537,6 +652,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Count,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -544,21 +660,29 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 42.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 43.0 },
+            None,
+            None,
         );
         let result_count = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
+            None,
+            None,
         );
         let result_count_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Counter { value: 2.0 },
+            None,
+            None,
         );
 
         // Single item, counter should be 1
@@ -593,6 +717,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Max,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -600,11 +725,15 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 112.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 89.0 },
+            None,
+            None,
         );
 
         // Single item, it should be returned as is
@@ -639,6 +768,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Min,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -646,11 +776,15 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 32.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 89.0 },
+            None,
+            None,
         );
 
         // Single item, it should be returned as is
@@ -685,6 +819,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Diff,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -692,16 +827,22 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 32.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 82.0 },
+            None,
+            None,
         );
         let result = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 50.0 },
+            None,
+            None,
         );
 
         // Single item, it should be returned as is
@@ -741,6 +882,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Diff,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -748,11 +890,15 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 32.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
+            None,
+            None,
         );
 
         let mut out = vec![];
@@ -776,6 +922,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Mean,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -783,21 +930,29 @@ mod tests {
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 32.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 82.0 },
+            None,
+            None,
         );
         let gauge_a_3 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 51.0 },
+            None,
+            None,
         );
         let mean_result = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 55.0 },
+            None,
+            None,
         );
 
         // Single item, it should be returned as is
@@ -833,6 +988,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Stdev,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -841,42 +997,58 @@ mod tests {
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 25.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 30.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 35.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 40.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 45.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 50.0 },
+                None,
+                None,
             ),
             make_metric(
                 "gauge_a",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 55.0 },
+                None,
+                None,
             ),
         ];
         let stdev_result = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
+            None,
+            None,
         );
 
         for gauge in gauges {
@@ -893,6 +1065,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -900,6 +1073,8 @@ mod tests {
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
+            None,
+            None,
         );
         let mut values = BTreeSet::<String>::new();
         values.insert("a".into());
@@ -908,11 +1083,15 @@ mod tests {
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Set { values },
+            None,
+            None,
         );
         let summed = make_metric(
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Counter { value: 84.0 },
+            None,
+            None,
         );
 
         // when types conflict the new values replaces whatever is there
@@ -951,6 +1130,7 @@ mod tests {
         let mut agg = Aggregate::new(&AggregateConfig {
             interval_ms: 1000_u64,
             mode: AggregationMode::Auto,
+            force_aggregation_interval: false,
         })
         .unwrap();
 
@@ -958,16 +1138,22 @@ mod tests {
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
+            None,
+            None,
         );
         let absolute = make_metric(
             "the-thing",
             MetricKind::Absolute,
             MetricValue::Counter { value: 43.0 },
+            None,
+            None,
         );
         let summed = make_metric(
             "the-thing",
             MetricKind::Incremental,
             MetricValue::Counter { value: 84.0 },
+            None,
+            None,
         );
 
         // when types conflict the new values replaces whatever is there
@@ -1019,26 +1205,36 @@ interval_ms = 999999
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
+            None,
+            None,
         );
         let counter_a_2 = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 43.0 },
+            None,
+            None,
         );
         let counter_a_summed = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 85.0 },
+            None,
+            None,
         );
         let gauge_a_1 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 42.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 43.0 },
+            None,
+            None,
         );
         let inputs = vec![counter_a_1, counter_a_2, gauge_a_1, gauge_a_2.clone()];
 
@@ -1071,26 +1267,36 @@ interval_ms = 999999
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
+            None,
+            None,
         );
         let counter_a_2 = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 43.0 },
+            None,
+            None,
         );
         let counter_a_summed = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 85.0 },
+            None,
+            None,
         );
         let gauge_a_1 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 42.0 },
+            None,
+            None,
         );
         let gauge_a_2 = make_metric(
             "gauge_a",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 43.0 },
+            None,
+            None,
         );
 
         assert_transform_compliance(async {
