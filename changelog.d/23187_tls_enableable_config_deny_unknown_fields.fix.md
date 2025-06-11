@@ -1,3 +1,3 @@
-Add deny_unknown_fields to TlsEnableableConfig so vector will not run when unused/invalid args are supplied
+Unknown fields in the `tls` config are now rejected so these fields now need to be removed  for Vector to start successfully.
 
 authors: thomasqueirozb
