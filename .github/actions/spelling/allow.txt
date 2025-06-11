@@ -50,6 +50,7 @@ Comcast
 Consolas
 Coolpad
 BADDCAFE
+BADVERS
 DEBHELPER
 Danew
 dkr
@@ -511,6 +512,7 @@ NRSC
 OPENPGP
 OPENSAFETY
 PROFIBUS
+QA'd
 RFID
 riello
 ROHC
