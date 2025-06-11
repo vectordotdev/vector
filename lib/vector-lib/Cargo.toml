@@ -27,6 +27,7 @@ vrl = { workspace = true, optional = true }
 api = ["vector-tap/api"]
 api-client = ["dep:vector-api-client"]
 lua = ["vector-core/lua"]
+file-source-common = ["dep:file-source-common"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 ifile-source = ["dep:ifile-source", "dep:file-source-common"]
 opentelemetry = ["dep:opentelemetry-proto"]

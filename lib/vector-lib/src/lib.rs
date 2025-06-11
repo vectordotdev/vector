@@ -2,6 +2,7 @@ pub use codecs;
 pub use enrichment;
 #[cfg(feature = "file-source")]
 pub use file_source;
+#[cfg(feature = "file-source-common")]
 pub use file_source_common;
 #[cfg(feature = "ifile-source")]
 pub use ifile_source;
