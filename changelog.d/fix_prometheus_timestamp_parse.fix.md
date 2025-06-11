@@ -1,3 +1,3 @@
-Fix a bug that allow parse invalid timestamps in Prometheus metrics; invalid timestamps are now rejected during parsing.
+Fix bug allowing invalid Prometheus timestamps; now properly rejected during parsing.
 
 authors: wooffie
