@@ -524,6 +524,7 @@ mod tests {
             None,
             None,
         );
+        
 
         // Single item, just stored regardless of kind
         agg.record(counter_a_1.clone());
