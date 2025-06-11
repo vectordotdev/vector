@@ -646,7 +646,7 @@ async fn handle_stream(
                             ).await;
                         } else if let Some(event) = frame_handler_copy.handle_event(received_from.clone(), frame) {
                             if let Err(e) = event_sink.send_event(event).await {
-                                error!("Error sending event: {:?}.", e);
+                                error!("Error sending event: {e:?}.");
                             }
                         }
                     }
