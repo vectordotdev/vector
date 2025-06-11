@@ -137,7 +137,7 @@ where
 
     // NOTE: in the error cases- `Error` and `EventsDropped` internal events are emitted by the
     // driver, so only need to log here.
-    fn retry(&mut self, req: &mut Req, result: &mut Result<Res, Error>) -> Option<Self::Future> {
+    fn retry(&mut self, _: &mut Req, result: &mut Result<Res, Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => match self.logic.should_retry_response(response) {
                 RetryAction::Retry(reason) => {
