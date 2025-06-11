@@ -26,7 +26,7 @@ should be used for all pull requests:
 - [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backward compatibility](#backward-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
-- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
+- [ ] Is there a risk of performance regressions? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
 For component changes, especially pull requests introducing new components, the
