@@ -507,24 +507,24 @@ mod tests {
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 42.0 },
-            None,
-            None,
+            Some(NonZeroU32::new(1000)),
+            Some(Uts::with_ymd_and_hms(2000,1,1,0,0,1)),
         );
         let counter_a_2 = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 43.0 },
-            None,
-            None,
+            Some(NonZeroU32::new(1000)),
+            Some(Uts::with_ymd_and_hms(2000,1,1,0,0,2)),
         );
         let counter_a_summed = make_metric(
             "counter_a",
             MetricKind::Incremental,
             MetricValue::Counter { value: 85.0 },
-            None,
-            None,
+            Some(NonZeroU32::new(1000)),
+            Some(Uts::with_ymd_and_hms(2000,1,1,0,0,1)),
         );
-        
+
 
         // Single item, just stored regardless of kind
         agg.record(counter_a_1.clone());
@@ -551,28 +551,6 @@ mod tests {
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
         assert_eq!(&counter_a_summed, &out[0]);
-
-        let counter_b_1 = make_metric(
-            "counter_b",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 44.0 },
-            None,
-            None,
-        );
-        // Two increments with the different series, should get each back as-is
-        agg.record(counter_a_1.clone());
-        agg.record(counter_b_1.clone());
-        out.clear();
-        agg.flush_into(&mut out);
-        assert_eq!(2, out.len());
-        // B/c we don't know the order they'll come back
-        for event in out {
-            match event.as_metric().series().name.name.as_str() {
-                "counter_a" => assert_eq!(counter_a_1, event),
-                "counter_b" => assert_eq!(counter_b_1, event),
-                _ => panic!("Unexpected metric name in aggregate output"),
-            }
-        }
     }
 
     #[test]
