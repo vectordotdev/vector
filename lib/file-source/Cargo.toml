@@ -11,14 +11,14 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "3.2.1"
+crc = "3.3.0"
 glob.workspace = true
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 
 [dependencies.bstr]
-version = "1.11"
+version = "1.12"
 default-features = false
 features = []
 
@@ -43,7 +43,7 @@ default-features = false
 features = ["serde"]
 
 [dependencies.flate2]
-version = "1.0"
+version = "1.1"
 default-features = false
 features = ["rust_backend"]
 
@@ -68,7 +68,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.44.2"
+version = "1.45.1"
 default-features = false
 features = ["full"]
 

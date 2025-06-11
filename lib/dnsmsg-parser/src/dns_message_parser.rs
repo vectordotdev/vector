@@ -5,11 +5,11 @@ use std::str::Utf8Error;
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use hickory_proto::dnssec::rdata::{DNSSECRData, CDNSKEY, CDS, DNSKEY, DS};
 use hickory_proto::dnssec::SupportedAlgorithms;
+use hickory_proto::rr::rdata::caa::Property;
 use hickory_proto::{
     op::{message::Message as TrustDnsMessage, Query},
     rr::{
         rdata::{
-            caa::Value,
             opt::{EdnsCode, EdnsOption},
             A, AAAA, NULL, OPT, SVCB,
         },
@@ -263,6 +263,11 @@ impl DnsMessageParser {
         let mut decoder = BinDecoder::new(raw_rdata);
         let prefix = parse_u8(&mut decoder)?;
         let ipv6_address = {
+            if prefix > 128 {
+                return Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("IPV6 prefix can't be greater than 128."),
+                });
+            }
             let address_length = (128 - prefix) / 8;
             let mut address_vec = parse_vec(&mut decoder, address_length)?;
             if address_vec.len() < 16 {
@@ -628,11 +633,19 @@ impl DnsMessageParser {
                     "{} {} \"{}\"",
                     caa.issuer_critical() as u8,
                     caa.tag().as_str(),
-                    match caa.value() {
-                        Value::Url(url) => {
+                    match caa.tag() {
+                        Property::Iodef => {
+                            let url = caa.value_as_iodef().map_err(|source| {
+                                DnsMessageParserError::TrustDnsError { source }
+                            })?;
                             url.as_str().to_string()
                         }
-                        Value::Issuer(option_name, vec_keyvalue) => {
+                        Property::Issue | Property::IssueWild => {
+                            let (option_name, vec_keyvalue) =
+                                caa.value_as_issue().map_err(|source| {
+                                    DnsMessageParserError::TrustDnsError { source }
+                                })?;
+
                             let mut final_issuer = String::new();
                             if let Some(name) = option_name {
                                 final_issuer.push_str(&name.to_string_with_options(&self.options));
@@ -645,9 +658,14 @@ impl DnsMessageParser {
                             }
                             final_issuer.trim_end().to_string()
                         }
-                        Value::Unknown(unknown) => std::str::from_utf8(unknown)
-                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                            .to_string(),
+                        Property::Unknown(_) => {
+                            let unknown = caa.raw_value();
+                            std::str::from_utf8(unknown)
+                                .map_err(|source| DnsMessageParserError::Utf8ParsingError {
+                                    source,
+                                })?
+                                .to_string()
+                        }
                     }
                 );
                 Ok((Some(caa_rdata), None))
@@ -940,8 +958,8 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
         9 => Some("NotAuth"),  // 9    NotAuth    Server Not Authoritative for zone    [RFC2136]
         10 => Some("NotZone"), // 10   NotZone    Name not contained in zone           [RFC2136]
         // backwards compat for 4 bit ResponseCodes so far.
-        // 16    BADVERS    Bad OPT Version    [RFC6891]
-        16 => Some("BADSIG"), // 16    BADSIG    TSIG Signature Failure               [RFC2845]
+        16 => Some("BADVERS"), // 16    BADVERS    Bad OPT Version    [RFC6891]
+        // 16    BADSIG    TSIG Signature Failure               [RFC2845]
         17 => Some("BADKEY"), // 17    BADKEY    Key not recognized                   [RFC2845]
         18 => Some("BADTIME"), // 18    BADTIME   Signature out of time window         [RFC2845]
         19 => Some("BADMODE"), // 19    BADMODE   Bad TKEY Mode                        [RFC2930]
@@ -1531,6 +1549,18 @@ mod tests {
             .expect("Invalid base64 encoded data.");
         assert!(DnsMessageParser::new(raw_update_message)
             .parse_as_update_message()
+            .is_err());
+    }
+
+    #[test]
+    fn test_parse_bad_prefix_value() {
+        // this testcase have prefix value of 160,
+        let raw_dns_message = "oAAAMgABAAAAAAABAAABAAAAACYAAC8BAAAAAaAAAAAAAA==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        assert!(DnsMessageParser::new(raw_query_message)
+            .parse_as_query_message()
             .is_err());
     }
 
