@@ -1756,7 +1756,7 @@ mod test {
         for i in 0..total_events {
             join_handles.push(
                 spawn_event_handling_tasks(
-                    Bytes::from(format!("event_{}", i)),
+                    Bytes::from(format!("event_{i}")),
                     MockFrameHandler::new("test_content".to_string(), true, extra_routine.clone()),
                     out.clone(),
                     None,
