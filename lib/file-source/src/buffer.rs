@@ -1,4 +1,4 @@
-use std::io::{self, BufRead};
+use std::{cmp::min, io::{self, BufRead}};
 
 use bstr::Finder;
 use bytes::BytesMut;
@@ -73,9 +73,10 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
         total_read += used;
 
         if !discarding && buf.len() > max_size {
-            // keep only the first 1k bytes to make sure we can actually emit a usable error
-            let mut truncated: BytesMut = BytesMut::with_capacity(1000);
-            truncated.copy_from_slice(&buf[0..1000]);
+            // keep only the first <1k bytes to make sure we can actually emit a usable error
+            let length_to_keep = min(1000, max_size);
+            let mut truncated: BytesMut = BytesMut::with_capacity(length_to_keep);
+            truncated.copy_from_slice(&buf[0..length_to_keep]);
             discarded_for_size_and_truncated.push(truncated);
             discarding = true;
         }
