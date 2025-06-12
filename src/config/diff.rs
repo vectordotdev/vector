@@ -13,27 +13,29 @@ pub struct ConfigDiff {
     /// This difference does not only contain the actual enrichment_tables keys, but also keys that
     /// may be used for their source and sink components (if available).
     pub enrichment_tables: Difference,
+    pub components_to_reload: HashSet<ComponentKey>,
 }
 
 impl ConfigDiff {
     pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::default(), initial)
+        Self::new(&Config::default(), initial, HashSet::new())
     }
 
-    pub fn new(old: &Config, new: &Config) -> Self {
+    pub fn new(old: &Config, new: &Config, components_to_reload: HashSet<ComponentKey>) -> Self {
         ConfigDiff {
-            sources: Difference::new(&old.sources, &new.sources),
-            transforms: Difference::new(&old.transforms, &new.transforms),
-            sinks: Difference::new(&old.sinks, &new.sinks),
+            sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
+            transforms: Difference::new(&old.transforms, &new.transforms, &components_to_reload),
+            sinks: Difference::new(&old.sinks, &new.sinks, &components_to_reload),
             enrichment_tables: Difference::new_tables(
                 &old.enrichment_tables,
                 &new.enrichment_tables,
             ),
+            components_to_reload,
         }
     }
 
     /// Swaps removed with added in Differences.
-    pub fn flip(mut self) -> Self {
+    pub const fn flip(mut self) -> Self {
         self.sources.flip();
         self.transforms.flip();
         self.sinks.flip();
@@ -41,7 +43,7 @@ impl ConfigDiff {
         self
     }
 
-    /// Checks whether or not the given component is present at all.
+    /// Checks whether the given component is present at all.
     pub fn contains(&self, key: &ComponentKey) -> bool {
         self.sources.contains(key)
             || self.transforms.contains(key)
@@ -49,7 +51,7 @@ impl ConfigDiff {
             || self.enrichment_tables.contains(key)
     }
 
-    /// Checks whether or not the given component is changed.
+    /// Checks whether the given component is changed.
     pub fn is_changed(&self, key: &ComponentKey) -> bool {
         self.sources.is_changed(key)
             || self.transforms.is_changed(key)
@@ -57,7 +59,7 @@ impl ConfigDiff {
             || self.enrichment_tables.contains(key)
     }
 
-    /// Checks whether or not the given component is removed.
+    /// Checks whether the given component is removed.
     pub fn is_removed(&self, key: &ComponentKey) -> bool {
         self.sources.is_removed(key)
             || self.transforms.is_removed(key)
@@ -74,7 +76,11 @@ pub struct Difference {
 }
 
 impl Difference {
-    fn new<C>(old: &IndexMap<ComponentKey, C>, new: &IndexMap<ComponentKey, C>) -> Self
+    fn new<C>(
+        old: &IndexMap<ComponentKey, C>,
+        new: &IndexMap<ComponentKey, C>,
+        need_change: &HashSet<ComponentKey>,
+    ) -> Self
     where
         C: serde::Serialize + serde::Deserialize<'static>,
     {
@@ -92,7 +98,7 @@ impl Difference {
                 // which can iterate in varied orders.
                 let old_value = serde_json::to_value(&old[n]).unwrap();
                 let new_value = serde_json::to_value(&new[n]).unwrap();
-                old_value != new_value
+                old_value != new_value || need_change.contains(n)
             })
             .cloned()
             .collect::<HashSet<_>>();
@@ -183,7 +189,7 @@ impl Difference {
         self.to_remove.contains(key)
     }
 
-    fn flip(&mut self) {
+    const fn flip(&mut self) {
         std::mem::swap(&mut self.to_remove, &mut self.to_add);
     }
 
