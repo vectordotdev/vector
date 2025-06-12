@@ -291,6 +291,7 @@ downsides
 downwardapi
 ede
 emoji
+enableable
 esbuild
 etld
 fakeintake
