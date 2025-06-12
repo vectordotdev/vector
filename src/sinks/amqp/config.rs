@@ -90,6 +90,14 @@ pub struct AmqpSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(crate) acknowledgements: AcknowledgementsConfig,
+
+    /// Maximum number of AMQP channels to keep active (channels are created as needed).
+    #[serde(default = "default_max_channels")]
+    pub(crate) max_channels: u32,
+}
+
+const fn default_max_channels() -> u32 {
+    4
 }
 
 impl Default for AmqpSinkConfig {
@@ -101,6 +109,7 @@ impl Default for AmqpSinkConfig {
             encoding: TextSerializerConfig::default().into(),
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
+            max_channels: default_max_channels(),
         }
     }
 }
@@ -111,7 +120,8 @@ impl GenerateConfig for AmqpSinkConfig {
             r#"connection_string = "amqp://localhost:5672/%2f"
             routing_key = "user_id"
             exchange = "test"
-            encoding.codec = "json""#,
+            encoding.codec = "json"
+            max_channels = 4"#,
         )
         .unwrap()
     }

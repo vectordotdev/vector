@@ -7,11 +7,22 @@ use lapin::options::ConfirmSelectOptions;
 pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 
 pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSinkChannels> {
+    let max_channels = config.max_channels.try_into().map_err(|_| {
+        Box::new(AmqpError::PoolError {
+            error: "max_channels must fit into usize".into(),
+        })
+    })?;
+    if max_channels == 0 {
+        return Err(Box::new(AmqpError::PoolError {
+            error: "max_channels must be positive".into(),
+        }));
+    }
     let channel_manager = AmqpSinkChannelManager::new(&config.connection);
     let channels = Pool::builder(channel_manager)
-        .max_size(4)
+        .max_size(max_channels)
         .runtime(deadpool::Runtime::Tokio1)
         .build()?;
+    debug!("AMQP channel pool created with max size: {}", max_channels);
     Ok(channels)
 }
 
