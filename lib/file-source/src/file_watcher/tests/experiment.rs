@@ -8,7 +8,7 @@ use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 
 use crate::{
-    file_watcher::{tests::*, FileWatcher},
+    file_watcher::{tests::*, FileWatcher, RawLineResult},
     ReadFrom,
 };
 
@@ -96,11 +96,14 @@ fn experiment(actions: Vec<FileWatcherAction>) {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.bytes.is_empty() => {
+                        Ok(RawLineResult {
+                            raw_line: Some(line),
+                            ..
+                        }) if line.bytes.is_empty() => {
                             attempts -= 1;
                             continue;
                         }
-                        Ok(None) => {
+                        Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
                             continue;
                         }
