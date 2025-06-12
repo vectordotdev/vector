@@ -291,6 +291,7 @@ downsides
 downwardapi
 ede
 emoji
+enableable
 esbuild
 etld
 fakeintake
@@ -512,6 +513,7 @@ NRSC
 OPENPGP
 OPENSAFETY
 PROFIBUS
+QA'd
 RFID
 riello
 ROHC

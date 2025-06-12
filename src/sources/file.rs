@@ -978,7 +978,7 @@ mod tests {
         let local_dir = tempdir().unwrap();
 
         let mut config = Config::default();
-        config.global.data_dir = global_dir.into_path().into();
+        config.global.data_dir = global_dir.keep().into();
 
         // local path given -- local should win
         let res = config
