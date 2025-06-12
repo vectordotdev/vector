@@ -394,7 +394,7 @@ base: components: sinks: amqp: configuration: {
 	}
 	max_channels: {
 		description: "Maximum number of AMQP channels to keep active (channels are created as needed)."
-		required: 	 false
+		required:    false
 		type: uint: default: 4
 	}
 	properties: {
