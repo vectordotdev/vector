@@ -1,4 +1,7 @@
-use std::{cmp::min, io::{self, BufRead}};
+use std::{
+    cmp::min,
+    io::{self, BufRead},
+};
 
 use bstr::Finder;
 use bytes::BytesMut;
