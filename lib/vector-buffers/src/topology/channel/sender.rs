@@ -221,7 +221,7 @@ impl<T: Bufferable> BufferSender<T> {
                         .await?;
                 }
             }
-        };
+        }
 
         if sent_to_base || was_dropped {
             if let (Some(send_duration), Some(send_reference)) =

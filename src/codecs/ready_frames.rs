@@ -52,7 +52,7 @@ where
     }
 
     /// Returns a mutable reference to the underlying stream.
-    pub fn get_mut(&mut self) -> &mut T {
+    pub const fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
