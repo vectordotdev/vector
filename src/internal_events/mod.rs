@@ -138,6 +138,9 @@ mod window;
     feature = "sinks-file",
 ))]
 mod file;
+
+#[cfg(feature = "sources-ifile")]
+pub mod ifile;
 mod windows;
 
 #[cfg(feature = "sources-mongodb_metrics")]

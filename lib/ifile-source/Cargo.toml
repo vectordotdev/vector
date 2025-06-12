@@ -1,7 +1,7 @@
 [package]
-name = "file-source"
+name = "ifile-source"
 version = "0.1.0"
-authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>", "Tamer Hassan <thameruddin@gmail.com>"]
 edition = "2021"
 publish = false
 license = "MIT"
@@ -11,15 +11,16 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "3.3.0"
+crc = "3.2.1"
 glob.workspace = true
+notify = "8.0.0"
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 file-source-common = { path = "../file-source-common" }
 
 [dependencies.bstr]
-version = "1.12"
+version = "1.11"
 default-features = false
 features = []
 
@@ -39,12 +40,12 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.9.0"
+version = "2.8.0"
 default-features = false
 features = ["serde"]
 
 [dependencies.flate2]
-version = "1.1"
+version = "1.0"
 default-features = false
 features = ["rust_backend"]
 
@@ -69,7 +70,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.45.1"
+version = "1.44.1"
 default-features = false
 features = ["full"]
 
