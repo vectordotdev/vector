@@ -5,6 +5,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::{
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
+    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
+    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
+    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+};
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::Pkcs12,
@@ -15,13 +21,6 @@ use openssl::{
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
-use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu,
-    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
-    NewStoreBuilderSnafu, ParsePkcs12Snafu, PrivateKeyParseSnafu, Result,
-    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
-    X509ParseSnafu,
-};
 
 pub const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -186,7 +185,7 @@ pub(super) struct IdentityStore {
     _name: String, // only set, never used. maybe we don't need this
     cert: X509,
     key: PKey<Private>,
-    ca: Option<Vec<X509>>
+    ca: Option<Vec<X509>>,
 }
 
 impl TlsSettings {
@@ -282,8 +281,12 @@ impl TlsSettings {
             SslVerifyMode::NONE
         });
         if let Some(identity) = self.identity() {
-            context.set_certificate(&identity.cert).context(SetCertificateSnafu)?;
-            context.set_private_key(&identity.key).context(SetPrivateKeySnafu)?;
+            context
+                .set_certificate(&identity.cert)
+                .context(SetCertificateSnafu)?;
+            context
+                .set_private_key(&identity.key)
+                .context(SetPrivateKeySnafu)?;
 
             if let Some(chain) = &identity.ca {
                 for cert in chain {
@@ -415,13 +418,22 @@ impl TlsConfig {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
                 let ca: Vec<X509> = ca_stack.iter().map(|crt| crt.to_owned()).collect();
-                Ok(Some(IdentityStore { _name: name, cert, key, ca: Some(ca) }))
+                Ok(Some(IdentityStore {
+                    _name: name,
+                    cert,
+                    key,
+                    ca: Some(ca),
+                }))
             }
         }
     }
 
     /// Parse identity from a DER encoded PKCS#12 archive
-    fn parse_pkcs12_identity(&self, der: Vec<u8>, p12_file: &Path) -> Result<Option<IdentityStore>> {
+    fn parse_pkcs12_identity(
+        &self,
+        der: Vec<u8>,
+        p12_file: &Path,
+    ) -> Result<Option<IdentityStore>> {
         let name = p12_file.to_string_lossy().to_string();
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
         // Verify password
@@ -430,11 +442,17 @@ impl TlsConfig {
         // extract cert, key and ca and store as PEM sow e can return an IdentityStore
         let cert = parsed.cert.ok_or(TlsError::MissingCertificate)?;
         let key = parsed.pkey.ok_or(TlsError::MissingKey)?;
-        let ca: Option<Vec<X509>> = parsed.ca.map(|stack| stack.iter().map(|crt| crt.to_owned()).collect());
-        Ok(Some(IdentityStore { _name: name, cert, key, ca }))
+        let ca: Option<Vec<X509>> = parsed
+            .ca
+            .map(|stack| stack.iter().map(|crt| crt.to_owned()).collect());
+        Ok(Some(IdentityStore {
+            _name: name,
+            cert,
+            key,
+            ca,
+        }))
     }
 }
-
 
 /// === System Specific Root Cert ===
 ///
