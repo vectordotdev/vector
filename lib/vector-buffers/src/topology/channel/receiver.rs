@@ -54,7 +54,6 @@ where
                             // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
                             // keep trying to read the next available record.
                             emit(re);
-                            continue;
                         }
                         None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },

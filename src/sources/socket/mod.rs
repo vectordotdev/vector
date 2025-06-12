@@ -319,7 +319,7 @@ mod test {
     use approx::assert_relative_eq;
     use std::{
         collections::HashMap,
-        net::{SocketAddr, UdpSocket},
+        net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
@@ -373,8 +373,11 @@ mod test {
         sources::util::net::SocketListenAddr,
         test_util::{
             collect_n, collect_n_limited,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
-            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
+            components::{
+                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
+                SOCKET_PUSH_SOURCE_TAGS,
+            },
+            next_addr, next_addr_any, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
@@ -898,13 +901,28 @@ mod test {
     }
 
     //////// UDP TESTS ////////
-    fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
-        send_packets_udp(addr, lines.into_iter().map(|line| line.into()))
+    fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
+        send_lines_udp_from(next_addr(), to, lines)
     }
 
-    fn send_packets_udp(addr: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> SocketAddr {
-        let bind = next_addr();
-        let socket = UdpSocket::bind(bind)
+    fn send_lines_udp_from(
+        from: SocketAddr,
+        to: SocketAddr,
+        lines: impl IntoIterator<Item = String>,
+    ) -> SocketAddr {
+        send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
+    }
+
+    fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> SocketAddr {
+        send_packets_udp_from(next_addr(), to, packets)
+    }
+
+    fn send_packets_udp_from(
+        from: SocketAddr,
+        to: SocketAddr,
+        packets: impl IntoIterator<Item = Bytes>,
+    ) -> SocketAddr {
+        let socket = UdpSocket::bind(from)
             .map_err(|error| panic!("{:}", error))
             .ok()
             .unwrap();
@@ -912,7 +930,7 @@ mod test {
         for packet in packets {
             assert_eq!(
                 socket
-                    .send_to(&packet, addr)
+                    .send_to(&packet, to)
                     .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
@@ -926,7 +944,7 @@ mod test {
         thread::sleep(Duration::from_millis(10));
 
         // Done
-        bind
+        from
     }
 
     async fn init_udp_with_shutdown(
@@ -1304,6 +1322,116 @@ mod test {
         .await;
     }
 
+    #[tokio::test]
+    async fn multicast_udp_message() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            // The socket address must be `IPADDR_ANY` (0.0.0.0) in order to receive multicast packets
+            let socket_address = next_addr_any();
+            let multicast_ip_address: Ipv4Addr = "224.0.0.2".parse().unwrap();
+            let multicast_socket_address =
+                SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
+            let mut config = UdpConfig::from_address(socket_address.into());
+            config.multicast_groups = vec![multicast_ip_address];
+            init_udp_with_config(tx, config).await;
+
+            // We must send packets to the same interface the `socket_address` is bound to
+            // in order to receive the multicast packets the `from` socket sends.
+            // To do so, we use the `IPADDR_ANY` address
+            let from = next_addr_any();
+            send_lines_udp_from(from, multicast_socket_address, ["test".to_string()]);
+
+            let event = rx.next().await.expect("must receive an event");
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                "test".into()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn multiple_multicast_addresses_udp_message() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let socket_address = next_addr_any();
+            let multicast_ip_addresses = (2..12)
+                .map(|i| format!("224.0.0.{i}").parse().unwrap())
+                .collect::<Vec<Ipv4Addr>>();
+            let multicast_ip_socket_addresses = multicast_ip_addresses
+                .iter()
+                .map(|ip_address| SocketAddr::new(IpAddr::V4(*ip_address), socket_address.port()))
+                .collect::<Vec<SocketAddr>>();
+            let mut config = UdpConfig::from_address(socket_address.into());
+            config.multicast_groups = multicast_ip_addresses;
+            init_udp_with_config(tx, config).await;
+
+            let from = next_addr_any();
+            for multicast_ip_socket_address in multicast_ip_socket_addresses {
+                send_lines_udp_from(
+                    from,
+                    multicast_ip_socket_address,
+                    [multicast_ip_socket_address.to_string()],
+                );
+
+                let event = rx.next().await.expect("must receive an event");
+                assert_eq!(
+                    event.as_log()[log_schema().message_key().unwrap().to_string()],
+                    multicast_ip_socket_address.to_string().into()
+                );
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn multicast_and_unicast_udp_message() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (tx, mut rx) = SourceSender::new_test();
+            let socket_address = next_addr_any();
+            let multicast_ip_address: Ipv4Addr = "224.0.0.2".parse().unwrap();
+            let multicast_socket_address =
+                SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
+            let mut config = UdpConfig::from_address(socket_address.into());
+            config.multicast_groups = vec![multicast_ip_address];
+            init_udp_with_config(tx, config).await;
+
+            let from = next_addr_any();
+            // Send packet to multicast address
+            send_lines_udp_from(from, multicast_socket_address, ["test".to_string()]);
+            let event = rx.next().await.expect("must receive an event");
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                "test".into()
+            );
+
+            // Windows does not support connecting to `0.0.0.0`,
+            // therefore we connect to `127.0.0.1` instead (the socket is listening at `0.0.0.0`)
+            let to = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), socket_address.port());
+            // Send packet to unicast address
+            send_lines_udp_from(from, to, ["test".to_string()]);
+            let event = rx.next().await.expect("must receive an event");
+            assert_eq!(
+                event.as_log()[log_schema().message_key().unwrap().to_string()],
+                "test".into()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn udp_invalid_multicast_group() {
+        assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let (tx, _rx) = SourceSender::new_test();
+            let socket_address = next_addr_any();
+            let invalid_multicast_ip_address: Ipv4Addr = "192.168.0.3".parse().unwrap();
+            let mut config = UdpConfig::from_address(socket_address.into());
+            config.multicast_groups = vec![invalid_multicast_ip_address];
+            init_udp_with_config(tx, config).await;
+        })
+        .await;
+    }
+
     ////////////// UNIX TEST LIBS //////////////
 
     #[cfg(unix)]
@@ -1329,7 +1457,7 @@ mod test {
         config: Option<UnixConfig>,
     ) -> PathBuf {
         let mut config = config.unwrap_or_else(|| {
-            UnixConfig::new(tempfile::tempdir().unwrap().into_path().join("unix_test"))
+            UnixConfig::new(tempfile::tempdir().unwrap().keep().join("unix_test"))
         });
 
         let in_path = config.path.clone();
@@ -1520,7 +1648,7 @@ mod test {
     async fn unix_datagram_chunked_gelf_messages() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
             let mut config = UnixConfig::new(in_path.clone());
             config.decoding = GelfDeserializerConfig::default().into();
             let path = init_unix_with_config(tx, false, false, config).await;
@@ -1621,7 +1749,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_permissions() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
         let (tx, _) = SourceSender::new_test();
 
         let mut config = UnixConfig::new(in_path.clone());
@@ -1766,7 +1894,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_permissions() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
         let (tx, _) = SourceSender::new_test();
 
         let mut config = UnixConfig::new(in_path.clone());
