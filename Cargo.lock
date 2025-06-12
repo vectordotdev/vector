@@ -4701,7 +4701,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -4742,24 +4742,6 @@ dependencies = [
  "tokio",
  "tower-service",
  "winapi",
-]
-
-[[package]]
-name = "hyper-openssl"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6ee5d7a8f718585d1c3c61dfde28ef5b0bb14734b4db13f5ada856cdc6c612b"
-dependencies = [
- "http 0.2.9",
- "hyper 0.14.28",
- "linked_hash_set",
- "once_cell",
- "openssl",
- "openssl-sys",
- "parking_lot",
- "tokio",
- "tokio-openssl",
- "tower-layer",
 ]
 
 [[package]]
@@ -5536,7 +5518,7 @@ dependencies = [
  "http-body 1.0.0",
  "http-body-util",
  "hyper 1.4.1",
- "hyper-openssl 0.10.2",
+ "hyper-openssl",
  "hyper-timeout 0.5.1",
  "hyper-util",
  "jsonpath-rust",
@@ -11506,7 +11488,7 @@ dependencies = [
  "http-body 0.4.5",
  "http-serde",
  "hyper 0.14.28",
- "hyper-openssl 0.9.2",
+ "hyper-openssl",
  "hyper-proxy",
  "indexmap 2.9.0",
  "indoc",
