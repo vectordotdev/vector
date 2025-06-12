@@ -200,7 +200,6 @@ pub fn position_reserved_attr_event_root(
                 message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
                 meaning = meaning,
                 renamed = &rename_attr,
-                internal_log_rate_limit = true,
             );
             log.rename_key(desired_path, rename_path);
         }
