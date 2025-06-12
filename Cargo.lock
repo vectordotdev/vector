@@ -2287,7 +2287,7 @@ dependencies = [
  "serde_with 3.12.0",
  "similar-asserts",
  "smallvec",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "syslog_loose",
  "tokio",
  "tokio-util",
@@ -3158,7 +3158,7 @@ dependencies = [
  "criterion",
  "data-encoding",
  "hickory-proto",
- "snafu 0.7.5",
+ "snafu 0.8.0",
 ]
 
 [[package]]
@@ -3175,7 +3175,7 @@ dependencies = [
  "paste",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "tracing 0.1.41",
  "vector-lib",
  "vrl",
@@ -3194,7 +3194,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "tracing 0.1.41",
  "vector-config",
  "vector-config-common",
@@ -7665,7 +7665,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "vector-common",
 ]
 
@@ -9605,8 +9605,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4de37ad025c587a29e8f3f5605c00f70b98715ef90b9061a815b9e59e9042d6"
 dependencies = [
  "doc-comment",
- "futures-core",
- "pin-project",
  "snafu-derive 0.7.5",
 ]
 
@@ -9616,6 +9614,8 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d342c51730e54029130d7dc9fd735d28c4cd360f1368c01981d4f03ff207f096"
 dependencies = [
+ "futures-core",
+ "pin-project",
  "snafu-derive 0.8.0",
 ]
 
@@ -11578,7 +11578,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "smpl_jwt",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "snap",
  "socket2 0.5.10",
  "sqlx",
@@ -11674,7 +11674,7 @@ dependencies = [
  "rkyv",
  "serde",
  "serde_yaml",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "temp-dir",
  "tokio",
  "tokio-test",
@@ -11726,7 +11726,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 3.12.0",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "toml",
  "tracing 0.1.41",
  "url",
@@ -11820,7 +11820,7 @@ dependencies = [
  "serde_yaml",
  "similar-asserts",
  "smallvec",
- "snafu 0.7.5",
+ "snafu 0.8.0",
  "socket2 0.5.10",
  "tokio",
  "tokio-openssl",
