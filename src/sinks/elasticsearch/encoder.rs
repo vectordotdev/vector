@@ -244,14 +244,15 @@ mod tests {
     fn suppress_type_with_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             true,
             &DocumentMetadata::Id("ID".to_string()),
-        );
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -272,14 +273,15 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             true,
             &DocumentMetadata::WithoutId,
-        );
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -299,14 +301,15 @@ mod tests {
     fn type_with_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             false,
             &DocumentMetadata::Id("ID".to_string()),
-        );
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -328,14 +331,15 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             false,
             &DocumentMetadata::WithoutId,
-        );
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -356,14 +360,15 @@ mod tests {
     fn encodes_fields_with_newlines() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION\n",
             "INDEX\n",
             "TYPE\n",
             false,
             &DocumentMetadata::Id("ID\n".to_string()),
-        );
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
