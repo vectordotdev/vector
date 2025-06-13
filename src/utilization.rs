@@ -185,10 +185,10 @@ impl UtilizationEmitter {
                 message = self.timer_rx.recv() => {
                     match message {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
-                            self.timers.get_mut(&key).unwrap().start_wait(start_time);
+                            self.timers.get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
                         }
                         Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
-                            self.timers.get_mut(&key).unwrap().stop_wait(stop_time);
+                            self.timers.get_mut(&key).expect("Utilization timer missing for component").stop_wait(stop_time);
                         }
                         None => break,
                     }
