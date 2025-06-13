@@ -4,7 +4,7 @@ use std::{
     task::{ready, Context, Poll},
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
@@ -18,7 +18,7 @@ use crate::stats;
 #[pin_project]
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
-    timer_tx: UnboundedSender<UtilizationTimerMessage>,
+    timer_tx: Sender<UtilizationTimerMessage>,
     component_key: ComponentKey,
     inner: S,
 }
@@ -49,27 +49,19 @@ where
         // This will just measure the time, while UtilizationEmitter collects
         // all the timers and emits utilization value periodically
         let this = self.project();
-        if this
-            .timer_tx
-            .send(UtilizationTimerMessage::StartWait(
-                this.component_key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?this.component_key, "Couldn't send utilization start wait message from wrapped stream.");
+        if let Err(err) = this.timer_tx.try_send(UtilizationTimerMessage::StartWait(
+            this.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?this.component_key, error = ?err, "Couldn't send utilization start wait message from wrapped stream.");
         }
         let _ = this.intervals.poll_next_unpin(cx);
         let result = ready!(this.inner.poll_next_unpin(cx));
-        if this
-            .timer_tx
-            .send(UtilizationTimerMessage::StopWait(
-                this.component_key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?this.component_key, "Couldn't send utilization stop wait message from wrapped stream.");
+        if let Err(err) = this.timer_tx.try_send(UtilizationTimerMessage::StopWait(
+            this.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?this.component_key, error = ?err, "Couldn't send utilization stop wait message from wrapped stream.");
         }
         Poll::Ready(result)
     }
@@ -163,14 +155,14 @@ pub(crate) enum UtilizationTimerMessage {
 
 pub(crate) struct UtilizationEmitter {
     timers: HashMap<ComponentKey, Timer>,
-    timer_rx: UnboundedReceiver<UtilizationTimerMessage>,
-    timer_tx: UnboundedSender<UtilizationTimerMessage>,
+    timer_rx: Receiver<UtilizationTimerMessage>,
+    timer_tx: Sender<UtilizationTimerMessage>,
     intervals: IntervalStream,
 }
 
 impl UtilizationEmitter {
     pub(crate) fn new() -> Self {
-        let (timer_tx, timer_rx) = unbounded_channel();
+        let (timer_tx, timer_rx) = channel(1024);
         Self {
             timers: HashMap::default(),
             intervals: IntervalStream::new(interval(Duration::from_secs(5))),
@@ -183,7 +175,7 @@ impl UtilizationEmitter {
         self.timers.insert(key, Timer::new(gauge));
     }
 
-    pub(crate) fn get_sender(&self) -> UnboundedSender<UtilizationTimerMessage> {
+    pub(crate) fn get_sender(&self) -> Sender<UtilizationTimerMessage> {
         self.timer_tx.clone()
     }
 
@@ -225,7 +217,7 @@ impl UtilizationEmitter {
 /// with knowledge of the config the data is still useful.
 #[allow(clippy::missing_const_for_fn)]
 pub(crate) fn wrap<S>(
-    timer_tx: UnboundedSender<UtilizationTimerMessage>,
+    timer_tx: Sender<UtilizationTimerMessage>,
     component_key: ComponentKey,
     inner: S,
 ) -> Utilization<S> {
