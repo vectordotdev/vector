@@ -4,7 +4,7 @@ components: transforms: "remap": {
 	title: "Remap"
 
 	description: """
-		Is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
+		This is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
 		observability data (logs and metrics) in a safe and performant manner.
 
@@ -47,6 +47,18 @@ components: transforms: "remap": {
 			summary:      true
 		}
 		traces: true
+	}
+
+	output: {
+		logs: event: {
+			description: "The modified input `log` event."
+		}
+		metrics: event: {
+			description: "The modified input `metric` event."
+		}
+		traces: event: {
+			description: "The modified input `trace` event."
+		}
 	}
 
 	examples: [
