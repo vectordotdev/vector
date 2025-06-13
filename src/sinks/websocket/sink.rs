@@ -236,12 +236,12 @@ impl WebSocketSink {
 
     const fn should_encode_as_binary(&self) -> bool {
         use vector_lib::codecs::encoding::Serializer::{
-            Avro, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
+            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
         };
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
 
@@ -457,7 +457,7 @@ mod tests {
 
         let addr = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
-        let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
             uri: format!("wss://{}", addr),
@@ -586,6 +586,8 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            #[cfg(feature = "aws-core")]
+                                            _ => {}
                                         }
                                     }
                                     Ok(res)

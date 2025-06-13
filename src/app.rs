@@ -1,6 +1,11 @@
 #![allow(missing_docs)]
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::{num::NonZeroUsize, path::PathBuf, process::ExitStatus, time::Duration};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+    process::ExitStatus,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 use exitcode::ExitCode;
 use futures::StreamExt;
@@ -12,8 +17,8 @@ use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts},
-    config::{self, Config, ConfigPath},
+    cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
+    config::{self, ComponentConfig, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -63,9 +68,18 @@ impl ApplicationConfig {
         let graceful_shutdown_duration = (!opts.no_graceful_shutdown_limit)
             .then(|| Duration::from_secs(u64::from(opts.graceful_shutdown_limit_secs)));
 
+        let watcher_conf = if opts.watch_config {
+            Some(watcher_config(
+                opts.watch_config_method,
+                opts.watch_config_poll_interval_seconds,
+            ))
+        } else {
+            None
+        };
+
         let config = load_configs(
             &config_paths,
-            opts.watch_config,
+            watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
@@ -322,6 +336,27 @@ async fn handle_signal(
     allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
+        Ok(SignalTo::ReloadComponents(components_to_reload)) => {
+            let mut topology_controller = topology_controller.lock().await;
+            topology_controller
+                .topology
+                .extend_reload_set(components_to_reload);
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+                allow_empty_config,
+            )
+            .await;
+
+            reload_config_from_result(topology_controller, new_config).await
+        }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
             reload_config_from_result(topology_controller, config_builder.build()).await
@@ -469,7 +504,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
 
 pub async fn load_configs(
     config_paths: &[ConfigPath],
-    watch_config: bool,
+    watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
@@ -477,22 +512,14 @@ pub async fn load_configs(
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
-    if watch_config {
-        // Start listening for config changes immediately.
-        config::watcher::spawn_thread(
-            signal_handler.clone_tx(),
-            config_paths.iter().map(Into::into),
-            None,
-        )
-        .map_err(|error| {
-            error!(message = "Unable to start config watcher.", %error);
-            exitcode::CONFIG
-        })?;
-    }
+    let watched_paths = config_paths
+        .iter()
+        .map(<&PathBuf>::from)
+        .collect::<Vec<_>>();
 
     info!(
         message = "Loading configs.",
-        paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
+        paths = ?watched_paths
     );
 
     let mut config = config::load_from_paths_with_provider_and_secrets(
@@ -502,6 +529,46 @@ pub async fn load_configs(
     )
     .await
     .map_err(handle_config_errors)?;
+
+    let mut watched_component_paths = Vec::new();
+
+    if let Some(watcher_conf) = watcher_conf {
+        for (name, transform) in config.transforms() {
+            let files = transform.inner.files_to_watch();
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_component_paths.push(component_config);
+        }
+
+        for (name, sink) in config.sinks() {
+            let files = sink.inner.files_to_watch();
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_component_paths.push(component_config);
+        }
+
+        info!(
+            message = "Starting watcher.",
+            paths = ?watched_paths
+        );
+        info!(
+            message = "Components to watch.",
+            paths = ?watched_component_paths
+        );
+
+        // Start listening for config changes.
+        config::watcher::spawn_thread(
+            watcher_conf,
+            signal_handler.clone_tx(),
+            watched_paths,
+            watched_component_paths,
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
+    }
 
     config::init_log_schema(config.global.log_schema.clone(), true);
     config::init_telemetry(config.global.telemetry.clone(), true);
@@ -523,9 +590,16 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(
-        message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
-    );
+    debug!(message = "Internal log rate limit configured.",);
     info!(message = "Log level is enabled.", level = ?level);
+}
+
+pub fn watcher_config(
+    method: WatchConfigMethod,
+    interval: NonZeroU64,
+) -> config::watcher::WatcherConfig {
+    match method {
+        WatchConfigMethod::Recommended => config::watcher::WatcherConfig::RecommendedWatcher,
+        WatchConfigMethod::Poll => config::watcher::WatcherConfig::PollWatcher(interval.into()),
+    }
 }

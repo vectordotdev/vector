@@ -28,7 +28,7 @@ remap: {
 		pure:       bool | *true
 	}
 
-	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type"
+	#FunctionCategory: "Array" | "Codec" | "Coerce" | "Convert" | "Debug" | "Enrichment" | "Enumerate" | "Event" | "Path" | "Cryptography" | "IP" | "Number" | "Object" | "Parse" | "Random" | "String" | "System" | "Timestamp" | "Type" | "Checksum"
 
 	// A helper array for generating docs. At some point, we should generate this from the
 	// #FunctionCategory enum if CUE adds support for that.
@@ -52,6 +52,7 @@ remap: {
 		"System",
 		"Timestamp",
 		"Type",
+		"Checksum",
 	]
 
 	functions: [Name=string]: #Function & {
@@ -73,7 +74,7 @@ remap: {
 		   performance perspective.
 
 		2. **Date range search**. The given field must be greater than or equal to the `from` date
-		   and less than or equal to the `to` date. A date range search involves
+		   and/or less than or equal to the `to` date. A date range search involves
 		   sequentially scanning through the rows that have been located using any exact match
 		   criteria. This can be an expensive operation if there are many rows returned by any exact
 		   match criteria. Therefore, use date ranges as the _only_ criteria when the enrichment

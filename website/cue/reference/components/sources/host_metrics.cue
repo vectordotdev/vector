@@ -108,6 +108,12 @@ components: sources: host_metrics: {
 			type:        "gauge"
 		}
 
+		// Host process
+		process_runtime: _host & _process_counter & {description: "The process uptime."}
+		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
+		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
+		process_memory_virtual_usage: _host & _process_gauge & {description: "The process virtual memory usage."}
+
 		// Host cgroups
 		cgroup_cpu_usage_seconds_total: _host & _cgroup_cpu & {description: "The total amount CPU time used by this cgroup and its descendants, in seconds."}
 		cgroup_cpu_user_seconds_total: _host & _cgroup_cpu & {description: "The total amount of CPU time spent by this cgroup in user space, in seconds."}
@@ -115,6 +121,10 @@ components: sources: host_metrics: {
 		cgroup_memory_current_bytes: _host & _cgroup_memory & {description: "The total amount of memory currently being used by this cgroup and its descendants, in bytes."}
 		cgroup_memory_anon_bytes: _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup in anonymous mappings (normal program allocation), in bytes."}
 		cgroup_memory_file_bytes: _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup to cache filesystem data, including tmpfs and shared memory, in bytes."}
+		cgroup_memory_anon_active_bytes: _host & _cgroup_memory & {description: "Amount of memory, swap-backed, on the internal memory management active lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_anon_inactive_bytes: _host & _cgroup_memory & {description: "Amount of memory, swap-backed, on the internal memory management inactive lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_file_active_bytes: _host & _cgroup_memory & {description: "Amount of memory, filesystem-backed, on the internal memory management active lists used by the page reclaim algorithm, in bytes."}
+		cgroup_memory_file_inactive_bytes: _host & _cgroup_memory & {description: "Amount of memory, filesystem-backed, on the internal memory management inactive lists used by the page reclaim algorithm, in bytes."}
 
 		// Host disk
 		disk_read_bytes_total: _host & _disk_counter & {description: "The accumulated number of bytes read in."}
@@ -159,13 +169,30 @@ components: sources: host_metrics: {
 		memory_wired_bytes: _host & _memory_macos & {description: "The number of wired bytes of main memory."}
 
 		// Host network
-		network_receive_bytes_total: _host & _network_gauge & {description: "The number of bytes received on this interface."}
-		network_receive_errs_total: _host & _network_gauge & {description: "The number of errors encountered during receives on this interface."}
-		network_receive_packets_total: _host & _network_gauge & {description: "The number of packets received on this interface."}
-		network_transmit_bytes_total: _host & _network_gauge & {description: "The number of bytes transmitted on this interface."}
-		network_transmit_errs_total: _host & _network_gauge & {description: "The number of errors encountered during transmits on this interface."}
+		network_receive_bytes_total: _host & _network_counter & {description: "The number of bytes received on this interface."}
+		network_receive_errs_total: _host & _network_counter & {description: "The number of errors encountered during receives on this interface."}
+		network_receive_packets_total: _host & _network_counter & {description: "The number of packets received on this interface."}
+		network_transmit_bytes_total: _host & _network_counter & {description: "The number of bytes transmitted on this interface."}
+		network_transmit_errs_total: _host & _network_counter & {description: "The number of errors encountered during transmits on this interface."}
 		network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
 		network_transmit_packets_total: _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
+
+		// Host tcp
+		tcp_connections_total: _host & _tcp_linux & _tcp_gauge & {description: "The number of TCP connections."}
+		tcp_tx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the send queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
+		tcp_rx_queued_bytes_total: _host & _tcp_linux & {
+			description: "The number of bytes in the receive queue across all connections."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+			}
+		}
 
 		// Helpers
 		_host: {
@@ -244,8 +271,8 @@ components: sources: host_metrics: {
 		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
 		_memory_macos: _memory_gauge & {relevant_when: "OS is macOS X"}
 		_memory_nowin: {relevant_when: "OS is not Windows"}
-		_network_gauge: {
-			type: "gauge"
+		_network_counter: {
+			type: "counter"
 			tags: _host_metrics_tags & {
 				collector: examples: ["network"]
 				device: {
@@ -255,6 +282,31 @@ components: sources: host_metrics: {
 				}
 			}
 		}
-		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
+		_network_nomac: _network_counter & {relevant_when: "OS is not macOS"}
+		_process_counter: {
+			type: "counter"
+			tags: _host_metrics_tags & {
+				collector: examples: ["process"]
+			}
+		}
+		_process_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["process"]
+			}
+		}
+
+		_tcp_linux: {relevant_when: "OS is Linux"}
+		_tcp_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["tcp"]
+				state: {
+					description: "The connection state."
+					required:    true
+					examples: ["established", "time_wait"]
+				}
+			}
+		}
 	}
 }

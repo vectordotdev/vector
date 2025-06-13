@@ -179,6 +179,7 @@ components: {
 		let Args = _args
 
 		auto_generated: bool | *false
+		has_auth:       bool | *false
 
 		if Args.kind == "source" {
 			acknowledgements: bool
@@ -191,17 +192,19 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?: #FeaturesAggregate
-			convert?:   #FeaturesConvert
-			enrich?:    #FeaturesEnrich
-			filter?:    #FeaturesFilter
-			parse?:     #FeaturesParse
-			program?:   #FeaturesProgram
-			proxy?:     #FeaturesProxy
-			reduce?:    #FeaturesReduce
-			route?:     #FeaturesRoute
-			sanitize?:  #FeaturesSanitize
-			shape?:     #FeaturesShape
+			aggregate?:       #FeaturesAggregate
+			convert?:         #FeaturesConvert
+			enrich?:          #FeaturesEnrich
+			filter?:          #FeaturesFilter
+			parse?:           #FeaturesParse
+			program?:         #FeaturesProgram
+			proxy?:           #FeaturesProxy
+			reduce?:          #FeaturesReduce
+			route?:           #FeaturesRoute
+			exclusive_route?: #FeaturesExclusiveRoute
+			sanitize?:        #FeaturesSanitize
+			shape?:           #FeaturesShape
+			window?:          #FeaturesWindow
 		}
 
 		if Args.kind == "sink" {
@@ -327,9 +330,13 @@ components: {
 
 	#FeaturesRoute: {}
 
+	#FeaturesExclusiveRoute: {}
+
 	#FeaturesSanitize: {}
 
 	#FeaturesShape: {}
+
+	#FeaturesWindow: {}
 
 	#FeaturesSend: {
 		_args: {
@@ -1270,6 +1277,51 @@ components: {
 		}
 
 		how_it_works: {
+			if features.has_auth == true {
+				authorization: {
+					title: "Authorization configuration"
+					body:  """
+					This component has a server component that supports authorization. Authorization
+					supports multiple strategies. [Basic access authentication](\(urls.basic_auth)) is the default, which
+					supports defining a username and password to be used when connecting to the server.
+
+					Custom authorization provides a greater flexibility. It supports writing custom
+					authorization code using VRL. Here is an example that looks up the token in an
+					enrichment table backed by a CSV file.
+
+					Currently custom VRL auth has access to `headers` and `address` (IP address of the
+					client).
+
+					```yaml
+					\(kind)s:
+					  \(Name)_\(kind):
+						type: "\(Name)"
+						# ...
+						auth:
+						  strategy: "custom"
+						  source: |-
+							# We can access request headers here
+							# Let's say that we expect a custom authorization header
+							# In format "Vector {uuid}"
+							parts = split!(.headers.authorization, " ", 2)
+							# We expect Authorization header in format "Vector {uuid}"
+							if parts[0] != "Vector" {
+							  # The header didn't start with Vector, reject
+							  # Returning false means that authentication should fail
+							  false
+							} else {
+							  # Look for uuid in enrichment table (let's say that it has a token column)
+							  # Any errors also reject requests
+							  # We could then do some additional checks on the result from the table
+							  result = get_enrichment_table_record!("auth_data", { "token": parts[1] })
+							  # No errors, so we can return true
+							  true
+							}
+						# ...
+					```
+					"""
+				}
+			}
 			state: {
 				title: "State"
 

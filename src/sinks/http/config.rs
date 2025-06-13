@@ -1,13 +1,28 @@
 //! Configuration for the `http` sink.
 
+#[cfg(feature = "aws-core")]
+use aws_config::meta::region::ProvideRegion;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
 use indexmap::IndexMap;
+use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
 };
+#[cfg(feature = "aws-core")]
+use vector_lib::config::proxy::ProxyConfig;
 
+use super::{
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    sink::HttpSink,
+};
+#[cfg(feature = "aws-core")]
+use crate::aws::AwsAuthentication;
+#[cfg(feature = "aws-core")]
+use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     http::{Auth, HttpClient, MaybeAuth},
@@ -18,11 +33,6 @@ use crate::{
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
-};
-
-use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-    sink::HttpSink,
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -152,7 +162,7 @@ impl From<HttpMethod> for Method {
 
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         Ok(HttpClient::new(tls, cx.proxy())?)
     }
 
@@ -284,7 +294,35 @@ impl SinkConfig for HttpSinkConfig {
             content_encoding,
         );
 
-        let service = HttpService::new(client, http_sink_request_builder);
+        let service = match &self.auth {
+            #[cfg(feature = "aws-core")]
+            Some(Auth::Aws { auth, service }) => {
+                let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
+                    .region()
+                    .await;
+                let region = (match &auth {
+                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
+                    AwsAuthentication::File { .. } => None,
+                    AwsAuthentication::Role { region, .. } => region.clone(),
+                    AwsAuthentication::Default { region, .. } => region.clone(),
+                })
+                .map_or(default_region, |r| Some(Region::new(r.to_string())))
+                .expect("Region must be specified");
+
+                HttpService::new_with_sig_v4(
+                    client,
+                    http_sink_request_builder,
+                    SigV4Config {
+                        shared_credentials_provider: auth
+                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                            .await?,
+                        region: region.clone(),
+                        service: service.clone(),
+                    },
+                )
+            }
+            _ => HttpService::new(client, http_sink_request_builder),
+        };
 
         let request_limits = self.request.tower.into_settings();
 
@@ -299,6 +337,19 @@ impl SinkConfig for HttpSinkConfig {
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

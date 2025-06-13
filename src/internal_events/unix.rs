@@ -54,7 +54,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             path = ?self.path,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -65,14 +65,12 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
     }
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 #[derive(Debug)]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
 }
 
-#[cfg(all(unix, any(feature = "sinks-socket", feature = "sinks-statsd")))]
 impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
     fn emit(self) {
         let reason = "Unix socket send error.";
@@ -82,7 +80,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
             path = ?self.path,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -111,7 +109,6 @@ impl InternalEvent for UnixSendIncompleteError {
             dropped = self.data_size - self.sent,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -130,7 +127,7 @@ pub struct UnixSocketFileDeleteError<'a> {
     pub error: Error,
 }
 
-impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
+impl InternalEvent for UnixSocketFileDeleteError<'_> {
     fn emit(self) {
         error!(
             message = "Failed in deleting unix socket file.",
@@ -139,7 +136,7 @@ impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
             error_code = "delete_socket_file",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",

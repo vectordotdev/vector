@@ -11,6 +11,8 @@ pub mod sample;
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
+#[cfg(feature = "transforms-exclusive-route")]
+mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
 #[cfg(feature = "transforms-log_to_metric")]
@@ -27,6 +29,8 @@ pub mod route;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
+#[cfg(feature = "transforms-window")]
+pub mod window;
 
 pub use vector_lib::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,

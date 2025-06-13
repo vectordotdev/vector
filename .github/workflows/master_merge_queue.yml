@@ -19,6 +19,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+permissions:
+  statuses: write
+
 concurrency:
   # `github.ref` is unique for MQ runs and PRs
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -104,7 +107,7 @@ jobs:
     name: Master Merge Queue Suite
     # Always run this so that pull_request triggers are marked as success.
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - changes

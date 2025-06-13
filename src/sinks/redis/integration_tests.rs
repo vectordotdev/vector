@@ -7,6 +7,10 @@ use vector_lib::{
     event::LogEvent,
 };
 
+use crate::event::{
+    BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent,
+};
+
 use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig};
 use crate::{
     sinks::prelude::*,
@@ -15,7 +19,7 @@ use crate::{
             assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
             SINK_TAGS,
         },
-        random_lines_with_stream, random_string, trace_init,
+        map_event_batch_stream, random_lines_with_stream, random_string, trace_init,
     },
 };
 
@@ -30,8 +34,8 @@ async fn redis_sink_list_lpush() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
@@ -94,8 +98,8 @@ async fn redis_sink_list_rpush() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
@@ -158,8 +162,8 @@ async fn redis_sink_channel() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let client = redis::Client::open(redis_server()).unwrap();
@@ -234,8 +238,8 @@ async fn redis_sink_channel_data_volume_tags() {
     let key = Template::try_from(format!("test-{}", random_string(10)))
         .expect("should not fail to create key template");
     debug!("Test key name: {}.", key);
-    let mut rng = rand::thread_rng();
-    let num_events = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
     debug!("Test events num: {}.", num_events);
 
     let client = redis::Client::open(redis_server()).unwrap();
@@ -289,4 +293,166 @@ async fn redis_sink_channel_data_volume_tags() {
             break;
         }
     }
+}
+
+#[tokio::test]
+async fn redis_sink_metrics() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-metrics-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let num_events = 1000;
+    debug!("Test events num: {}.", num_events);
+
+    let cnf = RedisSinkConfig {
+        endpoint: redis_server(),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::List,
+        list_option: Some(ListOption {
+            method: Method::RPush,
+        }),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        acknowledgements: Default::default(),
+    };
+
+    // Create a mix of counter and gauge metrics
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let metric = if i % 2 == 0 {
+            // Counter metrics
+            Metric::new(
+                format!("counter_{}", i),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: i as f64 },
+            )
+        } else {
+            // Gauge metrics
+            Metric::new(
+                format!("gauge_{}", i),
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: i as f64 },
+            )
+        };
+        events.push(metric.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    // Verify metrics were stored correctly
+    let mut conn = cnf.build_client().await.unwrap();
+
+    let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
+    debug!("Test key: {} exists: {}.", key, key_exists);
+    assert!(key_exists);
+
+    let llen: usize = conn.llen(key.clone().to_string()).await.unwrap();
+    debug!("Test key: {} len: {}.", key, llen);
+    assert_eq!(llen, num_events);
+
+    // Verify the content of each metric
+    for i in 0..num_events {
+        let original_event = events.get(i).unwrap().as_metric();
+        let payload: (String, String) = conn.blpop(key.clone().to_string(), 2000.0).await.unwrap();
+        let val = payload.1;
+
+        // Parse the JSON and verify key metric properties
+        let json: serde_json::Value = serde_json::from_str(&val).unwrap();
+
+        if i % 2 == 0 {
+            // Counter metrics
+            assert_eq!(json["name"], format!("counter_{}", i));
+            assert_eq!(json["kind"], "absolute");
+            assert_eq!(json["counter"]["value"], i as f64);
+        } else {
+            // Gauge metrics
+            assert_eq!(json["name"], format!("gauge_{}", i));
+            assert_eq!(json["kind"], "absolute");
+            assert_eq!(json["gauge"]["value"], i as f64);
+        }
+
+        // Verify that the name matches what we expect
+        assert_eq!(json["name"].as_str().unwrap(), original_event.name());
+    }
+}
+
+#[tokio::test]
+async fn redis_sink_traces() {
+    use crate::test_util::components::{assert_sink_compliance, SINK_TAGS};
+
+    trace_init();
+
+    assert_sink_compliance(&SINK_TAGS, async {
+        // Setup Redis sink config
+        let key = Template::try_from(format!("test-traces-{}", random_string(10))).unwrap();
+        let config = RedisSinkConfig {
+            endpoint: redis_server(),
+            key: key.clone(),
+            encoding: JsonSerializerConfig::default().into(),
+            data_type: DataTypeConfig::List,
+            list_option: Some(ListOption {
+                method: Method::RPush,
+            }),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+        };
+
+        // Build the sink
+        let cx = SinkContext::default();
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        // Create a  trace event
+        let mut trace = TraceEvent::default();
+        trace.insert("name", "test_trace");
+        trace.insert("service", "redis_test");
+
+        // Set up batch notification for checking delivery status
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let trace_with_batch = trace.with_batch_notifier(&batch);
+
+        // Create event stream with proper conversion to EventArray
+        let events = vec![Event::Trace(trace_with_batch)];
+        let stream = map_event_batch_stream(stream::iter(events), Some(batch));
+
+        // Run the sink with the stream
+        sink.run(stream).await.unwrap();
+
+        // Check that events were delivered
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+
+        // Verify data in Redis
+        let mut conn = redis::Client::open(redis_server())
+            .unwrap()
+            .get_async_connection()
+            .await
+            .unwrap();
+
+        let len: usize = conn.llen(key.to_string()).await.unwrap();
+        assert_eq!(len, 1);
+
+        // Check content
+        let payload: (String, String) = conn.blpop(key.to_string(), 2000.0).await.unwrap();
+        let json_str = payload.1;
+
+        // Verify the trace content
+        let json: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(json["name"], "test_trace");
+        assert_eq!(json["service"], "redis_test");
+    })
+    .await;
 }

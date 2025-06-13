@@ -1,10 +1,15 @@
-use std::{path::PathBuf, time::Duration};
+use crate::config::ComponentConfig;
+use std::collections::HashSet;
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use std::{
     sync::mpsc::{channel, Receiver},
     thread,
 };
 
-use notify::{recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, EventKind, RecursiveMode};
 
 use crate::Error;
 
@@ -19,21 +24,68 @@ const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// Refer to [`crate::cli::WatchConfigMethod`] for details.
+pub enum WatcherConfig {
+    /// Recommended watcher for the current OS.
+    RecommendedWatcher,
+    /// A poll-based watcher that checks for file changes at regular intervals.
+    PollWatcher(u64),
+}
+
+enum Watcher {
+    /// recommended watcher for os, usually inotify for linux based systems
+    RecommendedWatcher(notify::RecommendedWatcher),
+    /// poll based watcher. for watching files from NFS.
+    PollWatcher(notify::PollWatcher),
+}
+
+impl Watcher {
+    fn add_paths(&mut self, config_paths: &[PathBuf]) -> Result<(), Error> {
+        for path in config_paths {
+            self.watch(path, RecursiveMode::Recursive)?;
+        }
+        Ok(())
+    }
+
+    fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> Result<(), Error> {
+        use notify::Watcher as NotifyWatcher;
+        match self {
+            Watcher::RecommendedWatcher(watcher) => {
+                watcher.watch(path, recursive_mode)?;
+            }
+            Watcher::PollWatcher(watcher) => {
+                watcher.watch(path, recursive_mode)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Sends a ReloadFromDisk on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
 pub fn spawn_thread<'a>(
+    watcher_conf: WatcherConfig,
     signal_tx: crate::signal::SignalTx,
     config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
+    component_configs: Vec<ComponentConfig>,
     delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
-    let config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
+    let mut config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
+    let mut component_config_paths: Vec<_> = component_configs
+        .clone()
+        .into_iter()
+        .flat_map(|p| p.config_paths.clone())
+        .collect();
+
+    config_paths.append(&mut component_config_paths);
+
     let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
 
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
-    let mut watcher = Some(create_watcher(&config_paths)?);
+    let mut watcher = Some(create_watcher(&watcher_conf, &config_paths)?);
 
     info!("Watching configuration files.");
 
@@ -51,9 +103,15 @@ pub fn spawn_thread<'a>(
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
+                    let component_keys: HashSet<_> = component_configs
+                        .clone()
+                        .into_iter()
+                        .flat_map(|p| p.contains(&event.paths))
+                        .collect();
+
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
-                    if let Err(error) = add_paths(&mut watcher, &config_paths) {
+                    if let Err(error) = watcher.add_paths(&config_paths) {
                         error!(message = "Failed to read files to watch.", %error);
                         break;
                     }
@@ -61,9 +119,17 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
-                    _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk).map_err(|error| {
-                        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
-                    });
+                    if !component_keys.is_empty() {
+                        info!("Component {:?} configuration changed.", component_keys);
+                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
+                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
+                        });
+                    } else {
+                        _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
+                            .map_err(|error| {
+                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
+                            });
+                    }
                 } else {
                     debug!(message = "Ignoring event.", event = ?event)
                 }
@@ -72,7 +138,7 @@ pub fn spawn_thread<'a>(
 
         thread::sleep(RETRY_TIMEOUT);
 
-        watcher = create_watcher(&config_paths)
+        watcher = create_watcher(&watcher_conf, &config_paths)
             .map_err(|error| error!(message = "Failed to create file watcher.", %error))
             .ok();
 
@@ -91,48 +157,112 @@ pub fn spawn_thread<'a>(
 }
 
 fn create_watcher(
+    watcher_conf: &WatcherConfig,
     config_paths: &[PathBuf],
-) -> Result<
-    (
-        RecommendedWatcher,
-        Receiver<Result<notify::Event, notify::Error>>,
-    ),
-    Error,
-> {
+) -> Result<(Watcher, Receiver<Result<notify::Event, notify::Error>>), Error> {
     info!("Creating configuration file watcher.");
-    let (sender, receiver) = channel();
-    let mut watcher = recommended_watcher(sender)?;
-    add_paths(&mut watcher, config_paths)?;
-    Ok((watcher, receiver))
-}
 
-fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Result<(), Error> {
-    for path in config_paths {
-        watcher.watch(path, RecursiveMode::Recursive)?;
-    }
-    Ok(())
+    let (sender, receiver) = channel();
+    let mut watcher = match watcher_conf {
+        WatcherConfig::RecommendedWatcher => {
+            let recommended_watcher = recommended_watcher(sender)?;
+            Watcher::RecommendedWatcher(recommended_watcher)
+        }
+        WatcherConfig::PollWatcher(interval) => {
+            let config =
+                notify::Config::default().with_poll_interval(Duration::from_secs(*interval));
+            let poll_watcher = notify::PollWatcher::new(sender, config)?;
+            Watcher::PollWatcher(poll_watcher)
+        }
+    };
+    watcher.add_paths(config_paths)?;
+    Ok((watcher, receiver))
 }
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
 mod tests {
     use super::*;
     use crate::{
+        config::ComponentKey,
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
     use std::{fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
 
-    async fn test(file: &mut File, timeout: Duration, mut receiver: SignalRx) -> bool {
+    async fn test_signal(
+        file: &mut File,
+        expected_signal: crate::signal::SignalTo,
+        timeout: Duration,
+        mut receiver: SignalRx,
+    ) -> bool {
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
 
-        matches!(
-            tokio::time::timeout(timeout, receiver.recv()).await,
-            Ok(Ok(crate::signal::SignalTo::ReloadFromDisk))
-        )
+        match tokio::time::timeout(timeout, receiver.recv()).await {
+            Ok(Ok(signal)) => signal == expected_signal,
+            _ => false,
+        }
     }
 
+    #[tokio::test]
+    async fn component_update() {
+        trace_init();
+
+        let delay = Duration::from_secs(3);
+        let dir = temp_dir().to_path_buf();
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
+        let component_file_path = vec![dir.join("tls.cert"), dir.join("tls.key")];
+        let http_component = ComponentKey::from("http");
+
+        std::fs::create_dir(&dir).unwrap();
+
+        let mut component_files: Vec<std::fs::File> = component_file_path
+            .iter()
+            .map(|file| File::create(file).unwrap())
+            .collect();
+        let component_config =
+            ComponentConfig::new(component_file_path.clone(), http_component.clone());
+
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(
+            watcher_conf,
+            signal_tx,
+            &[dir],
+            vec![component_config],
+            delay,
+        )
+        .unwrap();
+
+        let signal_rx = signal_rx.resubscribe();
+        let signal_rx2 = signal_rx.resubscribe();
+
+        if !test_signal(
+            &mut component_files[0],
+            crate::signal::SignalTo::ReloadComponents(HashSet::from_iter(vec![
+                http_component.clone()
+            ])),
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
+            panic!("Test timed out");
+        }
+
+        if !test_signal(
+            &mut component_files[1],
+            crate::signal::SignalTo::ReloadComponents(HashSet::from_iter(vec![
+                http_component.clone()
+            ])),
+            delay * 5,
+            signal_rx2,
+        )
+        .await
+        {
+            panic!("Test timed out");
+        }
+    }
     #[tokio::test]
     async fn file_directory_update() {
         trace_init();
@@ -140,14 +270,22 @@ mod tests {
         let delay = Duration::from_secs(3);
         let dir = temp_dir().to_path_buf();
         let file_path = dir.join("vector.toml");
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
 
         std::fs::create_dir(&dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(signal_tx, &[dir], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[dir], vec![], delay).unwrap();
 
-        if !test(&mut file, delay * 5, signal_rx).await {
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadFromDisk,
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
     }
@@ -159,11 +297,19 @@ mod tests {
         let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(signal_tx, &[file_path], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[file_path], vec![], delay).unwrap();
 
-        if !test(&mut file, delay * 5, signal_rx).await {
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadFromDisk,
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
     }
@@ -179,10 +325,19 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         std::os::unix::fs::symlink(&file_path, &sym_file).unwrap();
 
-        let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(signal_tx, &[sym_file], delay).unwrap();
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
 
-        if !test(&mut file, delay * 5, signal_rx).await {
+        let (signal_tx, signal_rx) = broadcast::channel(128);
+        spawn_thread(watcher_conf, signal_tx, &[sym_file], vec![], delay).unwrap();
+
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadFromDisk,
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
     }
@@ -195,14 +350,22 @@ mod tests {
         let dir = temp_dir().to_path_buf();
         let sub_dir = dir.join("sources");
         let file_path = sub_dir.join("input.toml");
+        let watcher_conf = WatcherConfig::RecommendedWatcher;
 
         std::fs::create_dir_all(&sub_dir).unwrap();
         let mut file = File::create(&file_path).unwrap();
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
-        spawn_thread(signal_tx, &[sub_dir], delay).unwrap();
+        spawn_thread(watcher_conf, signal_tx, &[sub_dir], vec![], delay).unwrap();
 
-        if !test(&mut file, delay * 5, signal_rx).await {
+        if !test_signal(
+            &mut file,
+            crate::signal::SignalTo::ReloadFromDisk,
+            delay * 5,
+            signal_rx,
+        )
+        .await
+        {
             panic!("Test timed out");
         }
     }

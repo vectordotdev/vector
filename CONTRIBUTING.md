@@ -42,10 +42,9 @@ Vector team member will find this document useful.
 
 ## Your First Contribution
 
-1. Ensure your change has an issue! Find an
+1. For large PRs or for breaking changes, ensure your change has an issue! Find an
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
    - This is where you can get a feel if the change will be accepted or not.
-     Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
    GitHub account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
@@ -117,6 +116,45 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
+#### Pre-push
+
+To reduce iterations you can create do the following:
+
+```shell
+touch .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+You can use the following as a starting point:
+
+```shell
+#!/bin/sh
+set -e
+echo "Running pre-push checks..."
+
+# We recommend always running all the following checks.
+make check-licenses
+make check-fmt
+make check-clippy
+make check-component-docs
+
+# Some other checks that in our experience rarely fail on PRs.
+make check-deny
+make check-docs
+make check-version
+make check-examples
+make check-scripts
+
+./scripts/check_changelog_fragments.sh
+
+# The following check is very slow.
+# make check-component-features
+```
+
+Please note that `make check-all` covers all checks, but it is slow and may runs checks not
+relevant to your PR. This command is defined
+[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
+
 ### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
@@ -132,7 +170,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -254,6 +292,15 @@ make check-component-docs
 # Generate the code documentation for the Vector project.
 # Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
 cd rust-doc && make docs
+```
+
+### Updating licences
+
+```sh
+cargo install dd-rust-license-tool --locked
+dd-rust-license-tool write
+git commit -am "dd-rust-license-tool write"
+git push
 ```
 
 ### Deprecations

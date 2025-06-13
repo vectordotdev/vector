@@ -9,7 +9,7 @@ pub struct DatadogMetricsEncodingError<'a> {
     pub dropped_events: usize,
 }
 
-impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
+impl InternalEvent for DatadogMetricsEncodingError<'_> {
     fn emit(self) {
         error!(
             message = self.reason,
@@ -17,7 +17,6 @@ impl<'a> InternalEvent for DatadogMetricsEncodingError<'a> {
             error_type = error_type::ENCODER_FAILED,
             intentional = "false",
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -57,7 +57,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         return exitcode::SOFTWARE;
     }
 
-    return if opts.input_path.is_file() && opts.output_path.extension().is_some() {
+    if opts.input_path.is_file() && opts.output_path.extension().is_some() {
         if let Some(base_dir) = opts.output_path.parent() {
             if !base_dir.exists() {
                 fs::create_dir_all(base_dir).unwrap_or_else(|_| {
@@ -96,7 +96,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 exitcode::SOFTWARE
             }
         }
-    };
+    }
 }
 
 fn convert_config(
@@ -271,7 +271,7 @@ mod tests {
         let input_path = test_data_dir();
         let output_dir = tempdir()
             .expect("Unable to create tempdir for config")
-            .into_path();
+            .keep();
         walk_dir_and_convert(&input_path, &output_dir, Format::Yaml).unwrap();
 
         let mut count: usize = 0;

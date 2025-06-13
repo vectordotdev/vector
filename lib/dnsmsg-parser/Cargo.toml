@@ -7,9 +7,9 @@ publish = false
 license = "MIT"
 
 [dependencies]
-data-encoding = "2.6"
-thiserror = "1.0"
-hickory-proto = { version = "0.24", features = ["dnssec"] }
+data-encoding = "2.9"
+hickory-proto.workspace = true
+snafu.workspace = true
 
 [dev-dependencies]
 criterion = "0.5"

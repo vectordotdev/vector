@@ -16,7 +16,7 @@ pub struct PrometheusParseError<'a> {
 }
 
 #[cfg(feature = "sources-prometheus-scrape")]
-impl<'a> InternalEvent for PrometheusParseError<'a> {
+impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",
@@ -24,7 +24,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
@@ -53,7 +53,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -74,7 +74,6 @@ impl InternalEvent for PrometheusNormalizationError {
             message = normalization_reason,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

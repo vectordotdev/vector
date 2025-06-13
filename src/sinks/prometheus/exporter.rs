@@ -313,19 +313,21 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
         let headers = req.headers();
         if let Some(auth_header) = headers.get(hyper::header::AUTHORIZATION) {
             let encoded_credentials = match auth {
-                Auth::Basic { user, password } => HeaderValue::from_str(
+                Auth::Basic { user, password } => Some(HeaderValue::from_str(
                     format!(
                         "Basic {}",
                         BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
                     )
                     .as_str(),
-                ),
-                Auth::Bearer { token } => {
-                    HeaderValue::from_str(format!("Bearer {}", token.inner()).as_str())
-                }
+                )),
+                Auth::Bearer { token } => Some(HeaderValue::from_str(
+                    format!("Bearer {}", token.inner()).as_str(),
+                )),
+                #[cfg(feature = "aws-core")]
+                _ => None,
             };
 
-            if let Ok(encoded_credentials) = encoded_credentials {
+            if let Some(Ok(encoded_credentials)) = encoded_credentials {
                 if auth_header == encoded_credentials {
                     return true;
                 }
@@ -460,7 +462,7 @@ impl PrometheusExporter {
         let tls = self.config.tls.clone();
         let address = self.config.address;
 
-        let tls = MaybeTlsSettings::from_config(&tls, true)?;
+        let tls = MaybeTlsSettings::from_config(tls.as_ref(), true)?;
         let listener = tls.bind(&address).await?;
 
         tokio::spawn(async move {
@@ -893,7 +895,7 @@ mod tests {
     ) -> hyper::body::Bytes {
         trace_init();
 
-        let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
+        let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
         let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
@@ -978,7 +980,7 @@ mod tests {
     ) -> Result<String, http::status::StatusCode> {
         trace_init();
 
-        let client_settings = MaybeTlsSettings::from_config(&None, false).unwrap();
+        let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
         let proto = client_settings.http_protocol_name();
 
         let address = next_addr();

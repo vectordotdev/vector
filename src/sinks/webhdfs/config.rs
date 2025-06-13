@@ -123,8 +123,8 @@ impl WebHdfsConfig {
         // Build OpenDal Operator
         let mut builder = Webhdfs::default();
         // Prefix logic will be handled by key_partitioner.
-        builder.root(&self.root);
-        builder.endpoint(&self.endpoint);
+        builder = builder.root(&self.root);
+        builder = builder.endpoint(&self.endpoint);
 
         let op = Operator::new(builder)?
             .layer(LoggingLayer::default())
@@ -160,6 +160,6 @@ impl WebHdfsConfig {
 
     pub fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         let prefix = self.prefix.clone().try_into()?;
-        Ok(KeyPartitioner::new(prefix))
+        Ok(KeyPartitioner::new(prefix, None))
     }
 }

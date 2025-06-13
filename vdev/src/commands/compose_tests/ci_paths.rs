@@ -13,6 +13,8 @@ pub(crate) fn exec(path: &str) -> Result<()> {
             for path in paths {
                 println!("- {path:?}");
             }
+            println!("- Cargo.toml");
+            println!("- Cargo.lock");
         }
     }
 

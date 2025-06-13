@@ -30,6 +30,7 @@ async fn sets_create_action_when_configured() {
         bulk: BulkConfig {
             action: parse_template("{{ action }}te"),
             index: parse_template("vector"),
+            template_fallback_index: None,
             version: None,
             version_type: VersionType::Internal,
         },
@@ -70,6 +71,7 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
             action: parse_template("create"),
+            template_fallback_index: None,
             index: parse_template("vector"),
             version: None,
             version_type: VersionType::External,
@@ -92,6 +94,7 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
         bulk: BulkConfig {
             action: parse_template("create"),
             index: parse_template("vector"),
+            template_fallback_index: None,
             version: Some(parse_template("{{ my_field }}")),
             version_type: VersionType::External,
         },
@@ -140,6 +143,7 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
         bulk: BulkConfig {
             action: parse_template("create"),
             index: parse_template("vector"),
+            template_fallback_index: None,
             version: Some(parse_template("{{ my_field }}")),
             version_type: VersionType::ExternalGte,
         },

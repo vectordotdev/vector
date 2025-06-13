@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
@@ -19,7 +19,7 @@ use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::path::{parse_target_path, OwnedTargetPath};
 use vrl::prelude::KeyString;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ReduceState {
     events: usize,
     fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
@@ -132,7 +132,7 @@ impl ReduceState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
@@ -244,18 +244,18 @@ impl Reduce {
 
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
-            hash_map::Entry::Vacant(entry) => {
+            Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
                 state.add_event(event, &self.merge_strategies);
                 entry.insert(state);
             }
-            hash_map::Entry::Occupied(mut entry) => {
+            Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
             }
         };
     }
 
-    pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+    pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -312,26 +312,37 @@ impl TaskTransform<Event> for Reduce {
     where
         Self: 'static,
     {
-        let flush_period = self.flush_period;
+        let transform_fn = move |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
+            me.transform_one(emitter, event);
+        };
 
-        Box::pin(map_with_expiration(
-            self,
-            input_rx,
-            flush_period,
-            |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
-                // called for each event
-                me.transform_one(emitter, event);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called periodically to check for expired events
-                me.flush_into(emitter);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called when the input stream ends
-                me.flush_all_into(emitter);
-            },
-        ))
+        construct_output_stream(self, input_rx, transform_fn)
     }
+}
+
+pub fn construct_output_stream(
+    reduce: Box<Reduce>,
+    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    mut transform_fn: impl FnMut(&mut Box<Reduce>, Event, &mut Emitter<Event>) + Send + Sync + 'static,
+) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+where
+    Reduce: 'static,
+{
+    let flush_period = reduce.flush_period;
+    Box::pin(map_with_expiration(
+        reduce,
+        input_rx,
+        flush_period,
+        move |me, event, emitter| {
+            transform_fn(me, event, emitter);
+        },
+        |me, emitter| {
+            me.flush_into(emitter);
+        },
+        |me, emitter| {
+            me.flush_all_into(emitter);
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -985,6 +996,42 @@ merge_strategies.bar = "concat"
                 "events" => vec![v_1, v_2],
                 "another" => btreemap!{ "a" => 1},
                 "a-b" => 2,
+                "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn merged_quoted_path() {
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            [ends_when]
+              type = "vrl"
+              source = "exists(.test_end)"
+            "#,
+        ))
+        .unwrap();
+
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
+
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
+
+            let e_1 = LogEvent::from(Value::from(btreemap! {"a b" => 1}));
+            tx.send(e_1.into()).await.unwrap();
+
+            let e_2 = LogEvent::from(Value::from(btreemap! {"a b" => 2, "test_end" => "done"}));
+            tx.send(e_2.into()).await.unwrap();
+
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "a b" => 3,
                 "test_end" => "done"
             });
             assert_eq!(*output.value(), expected_value);

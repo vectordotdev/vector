@@ -219,7 +219,8 @@ components: sources: file: {
 				check](\(urls.crc)) (CRC) on the first N lines of the file. This serves as a
 				*fingerprint* that uniquely identifies the file. The number of lines, N, that are
 				read can be set using the [`fingerprint.lines`](#fingerprint.lines) and
-				[`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes) options.
+				[`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes) options. Note
+				that for compressed files, these lines and header bytes refer to the uncompressed content.
 
 				This strategy avoids the common pitfalls associated with using device and inode
 				names since inode names can be reused across files. This enables Vector to properly
@@ -429,5 +430,6 @@ components: sources: file: {
 		files_deleted_total:   components.sources.internal_metrics.output.metrics.files_deleted_total
 		files_resumed_total:   components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total: components.sources.internal_metrics.output.metrics.files_unwatched_total
+		open_files:            components.sources.internal_metrics.output.metrics.open_files
 	}
 }

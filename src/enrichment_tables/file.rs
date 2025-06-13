@@ -14,6 +14,7 @@ use crate::config::EnrichmentTableConfig;
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "File encoding type."))]
 pub enum Encoding {
     /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
@@ -76,7 +77,7 @@ pub struct FileConfig {
     /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
     /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
     ///
-    /// ### Types
+    /// Types
     ///
     /// - **`bool`**
     /// - **`string`**
@@ -85,7 +86,7 @@ pub struct FileConfig {
     /// - **`date`**
     /// - **`timestamp`** (see the table below for formats)
     ///
-    /// ### Timestamp Formats
+    /// Timestamp Formats
     ///
     /// | Format               | Description                                                                      | Example                          |
     /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
@@ -111,6 +112,9 @@ pub struct FileConfig {
     /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "Represents mapped log field names and types."
+    ))]
     pub schema: HashMap<String, String>,
 }
 
@@ -192,6 +196,7 @@ impl FileConfig {
             .delimiter(delimiter as u8)
             .from_path(&self.file.path)?;
 
+        let first_row = reader.records().next();
         let headers = if include_headers {
             reader
                 .headers()?
@@ -201,14 +206,15 @@ impl FileConfig {
         } else {
             // If there are no headers in the datafile we make headers as the numerical index of
             // the column.
-            match reader.records().next() {
-                Some(Ok(row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
+            match first_row {
+                Some(Ok(ref row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
                 _ => Vec::new(),
             }
         };
 
-        let data = reader
-            .records()
+        let data = first_row
+            .into_iter()
+            .chain(reader.records())
             .map(|row| {
                 Ok(row?
                     .iter()
@@ -308,6 +314,20 @@ impl File {
                 None => false,
                 Some(idx) => match row[idx] {
                     Value::Timestamp(date) => from <= &date && &date <= to,
+                    _ => false,
+                },
+            },
+            Condition::FromDate { field, from } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => from <= &date,
+                    _ => false,
+                },
+            },
+            Condition::ToDate { field, to } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => &date <= to,
                     _ => false,
                 },
             },
@@ -597,6 +617,64 @@ mod tests {
     use chrono::{TimeZone, Timelike};
 
     use super::*;
+
+    #[test]
+    fn parse_file_with_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "foo,bar\na,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: true,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["foo".to_string(), "bar".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
+
+    #[test]
+    fn parse_file_no_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "a,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: false,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["0".to_string(), "1".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
 
     #[test]
     fn parse_column() {
@@ -966,7 +1044,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_row_with_dates() {
+    fn finds_row_between_dates() {
         let mut file = File::new(
             Default::default(),
             FileData {
@@ -1023,6 +1101,132 @@ mod tests {
                     Value::Timestamp(
                         chrono::Utc
                             .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_from_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::FromDate {
+                field: "field2",
+                from: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_to_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::ToDate {
+                field: "field2",
+                to: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
                             .single()
                             .expect("invalid timestamp")
                     )

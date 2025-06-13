@@ -2,7 +2,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
-            default_dbname_template,
+            default_dbname_template, default_pipeline_template,
             logs::{
                 http_request_builder::{
                     http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder,
@@ -25,6 +25,10 @@ use vector_lib::{
 
 fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])
+}
+
+fn extra_headers_examples() -> HashMap<String, String> {
+    HashMap::new()
 }
 
 /// Configuration for the `greptimedb_logs` sink.
@@ -56,7 +60,11 @@ pub struct GreptimeDBLogsConfig {
     pub dbname: Template,
 
     /// Pipeline name to be used for the logs.
+    ///
+    /// Default to `greptime_identity`, use the original log structure
     #[configurable(metadata(docs::examples = "pipeline_name"))]
+    #[derivative(Default(value = "default_pipeline_template()"))]
+    #[serde(default = "default_pipeline_template")]
     pub pipeline_name: Template,
 
     /// Pipeline version to be used for the logs.
@@ -92,6 +100,16 @@ pub struct GreptimeDBLogsConfig {
     #[configurable(metadata(docs::examples = "extra_params_examples()"))]
     pub extra_params: Option<HashMap<String, String>>,
 
+    /// Custom headers to add to the HTTP request sent to GreptimeDB.
+    /// Note that these headers will override the existing headers.
+    #[serde(default)]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(
+        docs::additional_props_description = "Extra header key-value pairs."
+    ))]
+    #[configurable(metadata(docs::examples = "extra_headers_examples()"))]
+    pub extra_headers: Option<HashMap<String, String>>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
@@ -118,7 +136,7 @@ impl_generate_config_from_default!(GreptimeDBLogsConfig);
 #[typetag::serde(name = "greptimedb_logs")]
 impl SinkConfig for GreptimeDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let auth = match (self.username.clone(), self.password.clone()) {
@@ -140,6 +158,7 @@ impl SinkConfig for GreptimeDBLogsConfig {
             ),
             compression: self.compression,
             extra_params: self.extra_params.clone(),
+            extra_headers: self.extra_headers.clone(),
         };
 
         let service: HttpService<GreptimeDBLogsHttpRequestBuilder, PartitionKey> =

@@ -6,7 +6,7 @@
 #
 # The workflow accepts two optional inputs:
 #   - The baseline SHA:
-#     - If not specified, the SHA from 24 hours ago on origin/master is used.
+#     - If not specified, the SHA from 7 days ago on origin/master is used.
 #   - The comparison SHA:
 #     - If not specified, the current HEAD of origin/master is used.
 #
@@ -26,22 +26,23 @@ on:
   workflow_dispatch:
     inputs:
       baseline-sha:
-        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 24 hours ago."
+        description: "The SHA to use as the baseline (optional). If not provided, it defaults to the SHA from 7 days ago."
         required: false
       comparison-sha:
         description: "The SHA to use for comparison (optional). If not provided, it defaults to the current HEAD of the origin/master branch."
         required: false
   schedule:
-    - cron: '0 6 * * 1-5' # Runs at 6 AM UTC on weekdays (Monday to Friday)
+    - cron: '0 7 * * 1' # Runs at 7 AM UTC on Mondays
 
 env:
   SINGLE_MACHINE_PERFORMANCE_API: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_API }}
   SMP_WARMUP_SECONDS: 70 # default is 45 seconds
+  SMP_REPLICAS: 100 # default is 10
 
 jobs:
 
   resolve-inputs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
@@ -59,8 +60,8 @@ jobs:
         run: |
           # Set baseline SHA
           if [ -z "${{ github.event.inputs.baseline-sha }}" ]; then
-            BASELINE_SHA=$(git rev-list -n 1 --before="24 hours ago" origin/master)
-            echo "Using baseline SHA from 24 hours ago: ${BASELINE_SHA}"
+            BASELINE_SHA=$(git rev-list -n 1 --before="7 days ago" origin/master)
+            echo "Using baseline SHA from 7 days ago: ${BASELINE_SHA}"
           else
             BASELINE_SHA="${{ github.event.inputs.baseline-sha }}"
             echo "Using provided baseline SHA: ${BASELINE_SHA}"
@@ -104,13 +105,13 @@ jobs:
       - name: Set SMP version
         id: experimental-meta
         run: |
-          export SMP_CRATE_VERSION="0.16.1"
+          export SMP_CRATE_VERSION="0.22.0"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
           echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression.
   check-source-changed:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs: resolve-inputs
     outputs:
@@ -140,7 +141,6 @@ jobs:
               - "website/**"
               - "*.md"
               - "Tiltfile"
-              - "netlify.toml"
               - "NOTICE"
               - "LICENSE-3rdparty.csv"
               - "LICENSE"
@@ -171,7 +171,7 @@ jobs:
           echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   should-run-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: check-source-changed
     if: ${{ needs.check-source-changed.outputs.source_changed }}
     steps:
@@ -184,7 +184,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -201,10 +201,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.9.0
+        uses: docker/build-push-action@v6.18.0
         with:
           context: baseline-vector/
           cache-from: type=gha
@@ -223,7 +223,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -240,10 +240,10 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.7.1
+        uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build 'vector' target image
-        uses: docker/build-push-action@v6.9.0
+        uses: docker/build-push-action@v6.18.0
         with:
           context: comparison-vector/
           cache-from: type=gha
@@ -269,7 +269,7 @@ jobs:
       - resolve-inputs
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -303,7 +303,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -343,7 +343,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -366,32 +366,19 @@ jobs:
   submit-job:
     name: Submit regression job
     runs-on: ubuntu-22.04
-    timeout-minutes: 70
+    timeout-minutes: 120
     needs:
       - should-run-gate
       - resolve-inputs
       - upload-baseline-image-to-ecr
       - upload-comparison-image-to-ecr
     steps:
-      - name: Check status, in-progress
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='pending' \
-            -f description='Experiments submitted to the Regression Detection cluster.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -418,7 +405,8 @@ jobs:
             --comparison-sha ${{ needs.resolve-inputs.outputs.comparison-sha }} \
             --target-config-dir ${{ github.workspace }}/regression/ \
             --warmup-seconds ${{ env.SMP_WARMUP_SECONDS }} \
-            --submission-metadata ${{ runner.temp }}/submission-metadata
+            --submission-metadata ${{ runner.temp }}/submission-metadata \
+            --replicas ${{ env.SMP_REPLICAS }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -426,7 +414,7 @@ jobs:
           path: ${{ runner.temp }}/submission-metadata
 
       - name: Await job
-        timeout-minutes: 70
+        timeout-minutes: 120
         env:
           RUST_LOG: info
         run: |
@@ -435,7 +423,7 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job status \
             --wait \
             --wait-delay-seconds 60 \
-            --wait-timeout-minutes 70 \
+            --wait-timeout-minutes 120 \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
       - name: Handle cancellation if necessary
@@ -446,47 +434,6 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/smp
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job cancel \
             --submission-metadata ${{ runner.temp }}/submission-metadata
-
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Experiments submitted to the Regression Detection cluster cancelled.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Experiments submitted to the Regression Detection cluster successfully.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Experiments submitted to the Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / submission' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   ##
   ## ANALYZE
@@ -504,7 +451,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -529,47 +476,6 @@ jobs:
           ${{ runner.temp }}/bin/smp --team-id ${{ secrets.SINGLE_MACHINE_PERFORMANCE_TEAM_ID }} job result \
             --submission-metadata ${{ runner.temp }}/submission-metadata
 
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite cancelled.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Analyze experimental results from Regression Detection Suite succeeded.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / detect-regression' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
   analyze-experiment:
     name: Download regression analysis & upload report
     runs-on: ubuntu-22.04
@@ -579,25 +485,12 @@ jobs:
       - submit-job
       - resolve-inputs
     steps:
-      - name: Check status, in-progress
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='pending' \
-            -f description='Analyze experimental results from Regression Detection Suite.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.2
+        uses: aws-actions/configure-aws-credentials@v4.2.1
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -635,47 +528,6 @@ jobs:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
 
-      - name: Check status, cancelled
-        if: ${{ cancelled() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite cancelled.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='success' \
-            -f description='Analyze experimental results from Regression Detection Suite succeeded.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check status, failure
-        if: ${{ failure() }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/statuses/${{ needs.resolve-inputs.outputs.comparison-sha }} \
-            -f state='failure' \
-            -f description='Analyze experimental results from Regression Detection Suite failed.' \
-            -f context='Regression Detection Suite / analyze-experiment' \
-            -f target_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
   regression-detection-suite:
     name: Set final result
     runs-on: ubuntu-latest
@@ -695,6 +547,22 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
+      - name: Download capture-artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: capture-artifacts
+
+      - name: Display Markdown Summary
+        continue-on-error: true
+        run: |
+          REPORT_MD=report.md
+          if [ -f ${REPORT_MD} ]; then
+            cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Did not find ${REPORT_MD} file."
+          fi
+
       - name: exit
         run: |
           echo "failed=${{ env.FAILED }}"

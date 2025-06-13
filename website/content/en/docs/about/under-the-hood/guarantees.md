@@ -79,7 +79,7 @@ A **best-effort** delivery guarantee means that a Vector component makes a best 
 each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying
 protocol, which is outside Vector's control.
 
-Note that this is _not_ the same as at-most-once delivery, as it'is still possible for Vector to
+Note that this is _not_ the same as at-most-once delivery, as it's still possible for Vector to
 introduce duplicates under extreme circumstances.
 
 ## Stability guarantees
@@ -102,6 +102,11 @@ if it meets the following criteria:
 
 The `beta` status means that a feature has not met the criteria outlined in the [stable](#stable)
 section and therefore should be used with caution in production environments.
+
+### Alpha
+
+The `alpha` status means that a feature is experimental—often incomplete and potentially unstable—
+and is provided for early testing and feedback rather than production use.
 
 ### Deprecated
 

@@ -15,7 +15,7 @@ pub struct ApacheMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
+impl InternalEvent for ApacheMetricsEventsReceived<'_> {
     // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
@@ -46,7 +46,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
             endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",

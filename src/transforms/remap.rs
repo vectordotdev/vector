@@ -207,6 +207,8 @@ impl RemapConfig {
 
         let mut functions = vrl::stdlib::all();
         functions.append(&mut vector_lib::enrichment::vrl_functions());
+        #[cfg(feature = "sources-dnstap")]
+        functions.append(&mut dnstap_parser::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
 
         let state = TypeState {
@@ -381,6 +383,13 @@ impl TransformConfig for RemapConfig {
     fn enable_concurrency(&self) -> bool {
         true
     }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        self.file
+            .iter()
+            .chain(self.files.iter().flatten())
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -484,7 +493,7 @@ where
             .notes()
             .iter()
             .filter(|note| matches!(note, Note::UserErrorMessage(_)))
-            .last()
+            .next_back()
             .map(|note| note.to_string())
             .unwrap_or_else(|| error.to_string());
         serde_json::json!({

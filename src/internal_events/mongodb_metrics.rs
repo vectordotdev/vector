@@ -13,7 +13,7 @@ pub struct MongoDbMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
+impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
     // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(
@@ -40,7 +40,7 @@ pub struct MongoDbMetricsRequestError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
+impl InternalEvent for MongoDbMetricsRequestError<'_> {
     fn emit(self) {
         error!(
             message = "MongoDb request error.",
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -64,7 +64,7 @@ pub struct MongoDbMetricsBsonParseError<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
+impl InternalEvent for MongoDbMetricsBsonParseError<'_> {
     fn emit(self) {
         error!(
             message = "BSON document parse error.",
@@ -72,7 +72,7 @@ impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
