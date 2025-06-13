@@ -2976,10 +2976,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "deadpool"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ed5957ff93768adf7a65ab167a17835c3d2c3c50d084fe305174c112f468e2f"
+dependencies = [
+ "deadpool-runtime",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
 name = "deadpool-runtime"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63dfa964fe2a66f3fde91fc70b267fe193d822c7e603e2a675a49a7f46ad3f49"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "der"
@@ -11475,6 +11489,7 @@ dependencies = [
  "crossterm 0.29.0",
  "csv",
  "databend-client",
+ "deadpool 0.12.2",
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
@@ -12771,7 +12786,7 @@ dependencies = [
  "assert-json-diff",
  "async-trait",
  "base64 0.22.1",
- "deadpool",
+ "deadpool 0.10.0",
  "futures 0.3.31",
  "http 1.1.0",
  "http-body-util",

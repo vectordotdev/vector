@@ -290,6 +290,7 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "2.5.3", default-features = false, features = ["native-tls"], optional = true }
+deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
 # API
 async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
@@ -784,7 +785,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
-sinks-amqp = ["lapin"]
+sinks-amqp = ["deadpool", "lapin"]
 sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
