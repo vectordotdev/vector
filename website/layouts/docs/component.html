@@ -80,7 +80,6 @@
           {{ partial "data.html" (dict "component_env_vars" . ) }}
           {{ end }}
 
-          {{ printf "%#v" $config.outputs }}
           {{/* Component outputs */}}
           {{ with $config.outputs }}
           {{ partial "heading.html" (dict "text" "Outputs" "level" 2) }}
@@ -89,7 +88,6 @@
 
           {{/* Component log/metric/trace output */}}
           {{ with $config.output }}
-          {{ printf "%#v" .component_output }}
           {{ partial "heading.html" (dict "text" "Output Data" "level" 2) }}
           {{ partial "data.html" (dict "component_output" . ) }}
           {{ end }}
