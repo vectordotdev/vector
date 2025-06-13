@@ -56,7 +56,7 @@ components: transforms: "remap": {
 		metrics: event: {
 			description: "The modified input `metric` event."
 		}
-		traces: {
+		traces: event: {
 			description: "The modified input `trace` event."
 		}
 	}

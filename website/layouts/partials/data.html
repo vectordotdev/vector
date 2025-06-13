@@ -252,6 +252,17 @@
     </div>
     {{ end }}
 
+    {{ with .traces }}
+    <span class="flex items-center justify-between">
+      {{ partial "heading.html" (dict "text" "Traces" "level" 3 "id" "output-metrics" "href" "#output-metrics") }}
+    </span>
+
+    <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ template "telemetry" . }}
+    </div>
+    {{ end }}
+
+
     {{ with .logs }}
     <span class="flex items-center justify-between">
       {{ partial "heading.html" (dict "text" "Logs" "level" 3 "id" "output-logs" "href" "#output-logs") }}
@@ -265,6 +276,7 @@
         </svg>
       </a>
     </span>
+
 
     <div
       class="mt-3 border-2 rounded-md border-yellow-400 flex flex-col space-y-1.5 py-2 px-3">

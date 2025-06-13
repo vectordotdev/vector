@@ -89,6 +89,7 @@
 
           {{/* Component log/metric/trace output */}}
           {{ with $config.output }}
+          {{ printf "%#v" .component_output }}
           {{ partial "heading.html" (dict "text" "Output Data" "level" 2) }}
           {{ partial "data.html" (dict "component_output" . ) }}
           {{ end }}

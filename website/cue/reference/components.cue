@@ -450,7 +450,7 @@ components: {
 		fields?:     #Schema
 	}
 
-	#TraceOutput: {
+	#TraceOutput: [Name=string]: {
 		description: string
 		fields?:     #Schema
 	}

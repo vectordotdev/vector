@@ -124,7 +124,7 @@ components: sources: http_client: {
 				tags: _extra_tags
 			}
 		}
-		traces: {
+		traces: trace: {
 			description: "A trace received through an HTTP request."
 			fields: {
 				source_type: {
