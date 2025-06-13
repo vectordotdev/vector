@@ -206,7 +206,7 @@ fn data_stream_body(
 }
 
 fn assert_expected_is_encoded(expected: &str, encoded: &[u8]) {
-    let encoded = std::str::from_utf8(&encoded).unwrap();
+    let encoded = std::str::from_utf8(encoded).unwrap();
 
     let expected_lines: Vec<&str> = expected.lines().collect();
     let encoded_lines: Vec<&str> = encoded.lines().collect();
