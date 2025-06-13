@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use futures::future::ready;
 use futures::stream;
 
-use databend_client::response::QueryResponse as DatabendAPIResponse;
 use databend_client::APIClient as DatabendAPIClient;
+use databend_client::QueryResponse as DatabendAPIResponse;
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
 use crate::sinks::util::test::load_sink;
