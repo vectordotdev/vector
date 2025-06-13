@@ -39,7 +39,7 @@ impl<T, F> AfterRead<T, F> {
     }
 
     #[cfg(all(unix, feature = "sources-utils-net-unix"))]
-    pub fn get_mut_ref(&mut self) -> &mut T {
+    pub const fn get_mut_ref(&mut self) -> &mut T {
         &mut self.inner
     }
 }

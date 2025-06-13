@@ -338,9 +338,9 @@ mod unix {
     use std::os::unix::fs::PermissionsExt as _;
     use std::path::{Path, PathBuf};
 
-    use anyhow::{Context, Result};
-
     use super::super::config::ComposeConfig;
+    use crate::testing::config::VolumeMount;
+    use anyhow::{Context, Result};
 
     /// Unix permissions mask to allow everybody to read a file
     const ALL_READ: u32 = 0o444;
@@ -350,14 +350,17 @@ mod unix {
     /// Fix up potential issues before starting a compose container
     pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
         for service in config.services.values() {
-            // Make sure all volume files are world readable
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
-                    let source = volume
-                        .split_once(':')
-                        .expect("Invalid volume in compose file")
-                        .0;
-                    // Only fixup relative paths, i.e. within our source tree.
+                    let source = match volume {
+                        VolumeMount::Short(s) => {
+                            s.split_once(':').map(|(s, _)| s).ok_or_else(|| {
+                                anyhow::anyhow!("Invalid short volume mount format: {s}")
+                            })?
+                        }
+                        VolumeMount::Long { source, .. } => source,
+                    };
+
                     if !config.volumes.contains_key(source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')

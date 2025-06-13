@@ -393,11 +393,10 @@ impl DnstapParser {
 
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
-
             let timestamp = Utc
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
-                .expect("invalid timestamp");
+                .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 DnstapParser::insert(event, prefix.clone(), timestamp_key, timestamp);
             }
@@ -438,9 +437,15 @@ impl DnstapParser {
 
         if let Some(query_address) = dnstap_message.query_address.as_ref() {
             let source_address = if socket_family == 1 {
+                if query_address.len() < 4 {
+                    return Err(Error::from("Cannot parse query_address"));
+                }
                 let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
+                if query_address.len() < 16 {
+                    return Err(Error::from("Cannot parse query_address"));
+                }
                 let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
@@ -464,9 +469,15 @@ impl DnstapParser {
 
         if let Some(response_address) = dnstap_message.response_address.as_ref() {
             let response_addr = if socket_family == 1 {
+                if response_address.len() < 4 {
+                    return Err(Error::from("Cannot parse response_address"));
+                }
                 let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
+                if response_address.len() < 16 {
+                    return Err(Error::from("Cannot parse response_address"));
+                }
                 let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
@@ -1038,7 +1049,7 @@ mod tests {
     use super::*;
     use chrono::DateTime;
     use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, vec};
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
@@ -1346,9 +1357,9 @@ mod tests {
         fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
             let mut event = LogEvent::default();
             let root = owned_value_path!();
-            let type_ids = HashSet::new();
+            let type_ids = HashSet::from([1]);
             DnstapParser::parse_dnstap_message_time(
-                &mut event, &root, time_sec, time_nsec, 0, None, &type_ids,
+                &mut event, &root, time_sec, time_nsec, 1, None, &type_ids,
             )
         }
         // okay case
@@ -1362,7 +1373,49 @@ mod tests {
         // overflow in add
         assert!(
             test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
-        )
+        );
+        // cannot be parsed by timestamp_opt
+        assert!(test_one_timestamp_parse(96, Some(1616928816)).is_err());
+    }
+
+    #[test]
+    fn test_parse_dnstap_message_socket_family_bad_addr() {
+        // while parsing address is optional, but in this function assume otherwise
+        fn test_one_input(socket_family: i32, msg: DnstapMessage) -> Result<()> {
+            let mut event = LogEvent::default();
+            let root = owned_value_path!();
+            DnstapParser::parse_dnstap_message_socket_family(&mut event, &root, socket_family, &msg)
+        }
+        // all bad cases which can panic
+        {
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(1, message).is_err());
+        }
+        {
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(2, message).is_err());
+        }
+
+        {
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(1, message).is_err());
+        }
+        {
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(2, message).is_err());
+        }
     }
 
     #[test]

@@ -192,6 +192,7 @@ jobs:
             aws_kinesis_streams sink
             aws_s3 sink
             aws_sqs sink
+            axiom sink
             azure_blob sink
             azure_monitor_logs sink
             blackhole sink

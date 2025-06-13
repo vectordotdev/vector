@@ -290,7 +290,7 @@ impl BufferType {
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
-        };
+        }
 
         Ok(())
     }

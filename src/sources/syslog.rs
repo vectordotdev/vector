@@ -1195,7 +1195,7 @@ mod test {
 
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
-            let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
+            let in_path = tempfile::tempdir().unwrap().keep().join("stream_test");
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Unix {

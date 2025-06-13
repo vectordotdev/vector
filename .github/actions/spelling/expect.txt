@@ -175,6 +175,7 @@ efgh
 Elhage
 emerg
 Enableable
+enableable
 endianess
 endler
 eni
