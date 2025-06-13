@@ -11,24 +11,34 @@ mod tests {
         Client,
     };
     use similar_asserts::assert_eq;
-    use tempfile::tempdir;
     use std::{
         fs::{self, File},
         future::Future,
         io::Write,
         path::{Path, PathBuf},
     };
+    use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
     use tower_test::mock::{Handle, SendResponse};
     use vector_lib::{
-        codecs::BytesDeserializerConfig, config::{
-            log_schema, AcknowledgementsConfig, DataType, GlobalOptions, LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput
-        }, id::ComponentKey, lookup::{owned_value_path, OwnedTargetPath}, schema::Definition
+        codecs::BytesDeserializerConfig,
+        config::{
+            log_schema, AcknowledgementsConfig, DataType, GlobalOptions, LegacyKey, LogNamespace,
+            SourceAcknowledgementsConfig, SourceOutput,
+        },
+        id::ComponentKey,
+        lookup::{owned_value_path, OwnedTargetPath},
+        schema::Definition,
     };
     use vrl::value::{kind::Collection, Kind};
 
     use crate::{
-        config::{SourceConfigTest, SourceContext}, event::{Event, EventStatus}, extra_context::ExtraContext, shutdown::ShutdownSignal, test_util::components::{assert_source_compliance, SOURCE_TAGS}, SourceSender
+        config::{SourceConfigTest, SourceContext},
+        event::{Event, EventStatus},
+        extra_context::ExtraContext,
+        shutdown::ShutdownSignal,
+        test_util::components::{assert_source_compliance, SOURCE_TAGS},
+        SourceSender,
     };
 
     use super::super::Config;
@@ -36,10 +46,22 @@ mod tests {
 
     #[async_trait::async_trait]
     impl SourceConfigTest<Client> for Config {
-        async fn build(&self, cx: SourceContext, client: Client) -> crate::Result<super::super::sources::Source> {
+        async fn build(
+            &self,
+            cx: SourceContext,
+            client: Client,
+        ) -> crate::Result<super::super::sources::Source> {
             let log_namespace = cx.log_namespace(self.log_namespace);
             let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-            let source = Source::new_test(self, &cx.globals, &cx.key, acknowledgements, client, cx.extra_context.get::<String>().unwrap().to_string()).await?;
+            let source = Source::new_test(
+                self,
+                &cx.globals,
+                &cx.key,
+                acknowledgements,
+                client,
+                cx.extra_context.get::<String>().unwrap().to_string(),
+            )
+            .await?;
 
             Ok(Box::pin(
                 source
@@ -891,7 +913,10 @@ mod tests {
         let dir = &format!(
             "{}/{}_{}_{}/{}",
             tmp_dir.path().to_str().unwrap(),
-            ns_name, pod_name, pod_uid, container_name
+            ns_name,
+            pod_name,
+            pod_uid,
+            container_name
         );
         let dir_path = Path::new(dir);
         fs::create_dir_all(dir_path).unwrap();

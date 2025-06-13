@@ -35,7 +35,7 @@ impl K8sPathsProvider {
             namespace_state,
             include_paths,
             exclude_paths,
-            maybe_logs_dir
+            maybe_logs_dir,
         }
     }
 }
@@ -62,7 +62,8 @@ impl PathsProvider for K8sPathsProvider {
             })
             .flat_map(|pod| {
                 trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
-                let paths_iter = list_pod_log_paths(self.maybe_logs_dir.as_deref(), real_glob, pod.as_ref());
+                let paths_iter =
+                    list_pod_log_paths(self.maybe_logs_dir.as_deref(), real_glob, pod.as_ref());
                 filter_paths(
                     filter_paths(paths_iter, &self.include_paths, true),
                     &self.exclude_paths,
@@ -106,7 +107,12 @@ fn extract_pod_logs_directory(maybe_logs_dir: Option<&str>, pod: &Pod) -> Option
         metadata.uid.as_ref()?
     };
 
-    Some(build_pod_logs_directory(maybe_logs_dir, namespace, name, uid))
+    Some(build_pod_logs_directory(
+        maybe_logs_dir,
+        namespace,
+        name,
+        uid,
+    ))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
