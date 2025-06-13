@@ -49,6 +49,12 @@ components: transforms: "remap": {
 		traces: true
 	}
 
+	output: {
+		logs: {},
+		metrics: {},
+		traces: {},
+	}
+
 	examples: [
 		for k, v in remap.examples if v.raises == _|_ {
 			{
