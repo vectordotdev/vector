@@ -1,7 +1,7 @@
 package metadata
 
 base: components: sinks: opentelemetry: configuration: protocol: {
-	description: "Protocol configuration"
+	description: "Protocol configuration for logs and metrics."
 	required:    true
 	type: object: options: {
 		acknowledgements: {
@@ -798,7 +798,7 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 
 																				Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
 
-																				When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
+																				When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable
 																				those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
 																				can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																				an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
@@ -1036,6 +1036,93 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 				"""
 			required: true
 			type: string: examples: ["https://10.22.212.22:9000/endpoint"]
+		}
+	}
+
+	endpoint: {
+		description: """
+			The endpoint to send OpenTelemetry events to.
+			
+			This should be a full URL, including the protocol (e.g. `https://`).
+			If not specified, events will not be sent.
+			"""
+		required: false
+		type: string: {
+			examples: ["http://localhost:4317/v1/metrics", "http://localhost:4318/v1/logs"]
+		}
+	}
+
+	healthcheck_endpoint: {
+		description: """
+			The endpoint to send healthcheck requests to.
+			
+			This should be a full URL, including the protocol (e.g. `https://`).
+			"""
+		required: false
+		type: string: {
+			examples: ["http://localhost:13133"]
+		}
+	}
+
+	default_namespace: {
+		description: """
+			The default namespace to use for events that do not have one.
+			
+			Metrics with the same name can only be differentiated by their namespace.
+			"""
+		required: false
+		type: string: {
+			default: "vector"
+			examples: ["myservice"]
+		}
+	}
+
+	aggregation_temporality: {
+		description: """
+			The aggregation temporality to use for metrics.
+			
+			This determines how metrics are aggregated over time.
+			"""
+		required: false
+		type: string: {
+			default: "cumulative"
+			enum: {
+				delta:      "Delta temporality means that metrics are reported as changes since the last report."
+				cumulative: "Cumulative temporality means that metrics are reported as cumulative changes since a fixed start time."
+			}
+		}
+	}
+
+	input: {
+		logs:    true
+		metrics: true
+		traces:  false
+	}
+
+	how_it_works: {
+		opentelemetry_protocol: {
+			title: "OpenTelemetry Protocol"
+			body: """
+				The [OpenTelemetry Protocol][otlp] (OTLP) is a vendor-agnostic way to export telemetry data.
+				This sink supports sending logs, metrics, and traces to any OTLP-compatible backend.
+				
+				[otlp]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md
+				"""
+		}
+
+		metrics_export: {
+			title: "Metrics Export"
+			body: """
+				When the `metrics_endpoint` is configured, Vector will export metrics to the specified endpoint.
+				
+				Vector uses the OpenTelemetry SDK to export metrics, which provides compatibility with the OpenTelemetry protocol
+				and handles details like batching and retries.
+				
+				The `aggregation_temporality` setting controls how metrics are aggregated over time:
+				
+				- **Delta**: Metrics are reported as changes since the last report.
+				- **Cumulative**: Metrics are reported as cumulative changes since a fixed start time.
+				"""
 		}
 	}
 }
