@@ -457,6 +457,92 @@ impl SecretTarget for VrlTarget {
     }
 }
 
+#[derive(Debug)]
+pub enum ImmutableVrlTarget<'a> {
+    LogEvent(&'a Value, &'a EventMetadata),
+    Metric {
+        metric: &'a Metric,
+        value: Value,
+        multi_value_tags: bool,
+    },
+    Trace(&'a Value, &'a EventMetadata),
+}
+
+impl<'a> ImmutableVrlTarget<'a> {
+    pub fn new(event: &'a Event, info: &ProgramInfo, multi_value_metric_tags: bool) -> Self {
+        match event {
+            Event::Log(event) => ImmutableVrlTarget::LogEvent(event.value(), event.metadata()),
+            Event::Metric(metric) => {
+                // We pre-generate [`Value`] types for the metric fields accessed in
+                // the event. This allows us to then return references to those
+                // values, even if the field is accessed more than once.
+                let value = precompute_metric_value(metric, info);
+
+                ImmutableVrlTarget::Metric {
+                    metric,
+                    value,
+                    multi_value_tags: multi_value_metric_tags,
+                }
+            }
+            Event::Trace(event) => ImmutableVrlTarget::Trace(event.value(), event.metadata()),
+        }
+    }
+    fn metadata(&self) -> &EventMetadata {
+        match self {
+            ImmutableVrlTarget::LogEvent(_, metadata) | ImmutableVrlTarget::Trace(_, metadata) => {
+                metadata
+            }
+            ImmutableVrlTarget::Metric { metric, .. } => metric.metadata(),
+        }
+    }
+}
+
+impl Target for ImmutableVrlTarget<'_> {
+    fn target_insert(&mut self, _path: &OwnedTargetPath, _value: Value) -> Result<(), String> {
+        Err("Value is immutable".into())
+    }
+
+    fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
+        match target_path.prefix {
+            PathPrefix::Event => match self {
+                ImmutableVrlTarget::LogEvent(log, _) | ImmutableVrlTarget::Trace(log, _) => {
+                    Ok(log.get(&target_path.path))
+                }
+                ImmutableVrlTarget::Metric { value, .. } => {
+                    target_get_metric(&target_path.path, value)
+                }
+            },
+            PathPrefix::Metadata => Ok(self.metadata().value().get(&target_path.path)),
+        }
+    }
+
+    fn target_get_mut(&mut self, _path: &OwnedTargetPath) -> Result<Option<&mut Value>, String> {
+        Err("Value is immutable".into())
+    }
+
+    fn target_remove(
+        &mut self,
+        _path: &OwnedTargetPath,
+        _compact: bool,
+    ) -> Result<Option<Value>, String> {
+        Err("Value is immutable".into())
+    }
+}
+
+impl SecretTarget for ImmutableVrlTarget<'_> {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata().secrets().get_secret(key)
+    }
+
+    fn insert_secret(&mut self, _key: &str, _value: &str) {
+        warn!("Secrets are immutable");
+    }
+
+    fn remove_secret(&mut self, _key: &str) {
+        warn!("Secrets are immutable");
+    }
+}
+
 /// Retrieves a value from a the provided metric using the path.
 /// Currently the root path and the following paths are supported:
 /// - name
