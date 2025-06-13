@@ -5,7 +5,7 @@ use std::{
 
 use vrl::value::{ObjectMap, Value};
 
-use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
+use crate::{Case, Conditions, IndexHandle, Table, TableRegistry};
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {
@@ -37,9 +37,9 @@ impl Table for DummyEnrichmentTable {
     fn find_table_row(
         &self,
         _case: Case,
-        _condition: &[Condition],
+        _condition: &Conditions,
         _select: Option<&[String]>,
-        _index: Option<IndexHandle>,
+        _index: &[IndexHandle],
     ) -> Result<ObjectMap, String> {
         Ok(self.data.clone())
     }
@@ -47,9 +47,9 @@ impl Table for DummyEnrichmentTable {
     fn find_table_rows(
         &self,
         _case: Case,
-        _condition: &[Condition],
+        _condition: &Conditions,
         _select: Option<&[String]>,
-        _index: Option<IndexHandle>,
+        _index: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
         Ok(vec![self.data.clone()])
     }
