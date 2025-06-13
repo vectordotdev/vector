@@ -1,12 +1,20 @@
 package metadata
 
-components: sinks: azure_monitor_logs: {
-	title: "Azure Monitor Logs"
+components: sinks: azure_logs_ingestion: {
+	title: "Azure Logs Ingestion"
+
+	description: """
+		This sink uses the Azure Monitor Logs Ingestion API to send log events to a Log Analytics Workspace.
+
+		The `azure_identity` crate is used for authentication, which supports the standard Azure authentication types
+		(Workload Identity, Managed Identity, Azure CLI, Service Principal with Certificate or Secret, etc.) through
+		environment variables.
+		"""
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "deprecated"
+		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Azure"]
 		stateful: false
@@ -38,13 +46,13 @@ components: sinks: azure_monitor_logs: {
 				enabled_by_scheme:      true
 			}
 			to: {
-				service: services.azure_monitor_logs
+				service: services.azure_logs_ingestion
 
 				interface: {
 					socket: {
 						api: {
-							title: "Azure Monitor logs API"
-							url:   urls.azure_monitor_logs_endpoints
+							title: "Azure Monitor Logs Ingestion API"
+							url:   urls.azure_logs_ingestion_endpoints
 						}
 						direction: "outgoing"
 						protocols: ["http"]
@@ -57,17 +65,11 @@ components: sinks: azure_monitor_logs: {
 
 	support: {
 		requirements: []
-		warnings: [
-			"""
-					The upstream Data Collector API [has been deprecated](urls.azure_monitor_data_collector_deprecation),
-					and will stop working in September 2026. Consider migrating to the `azure_logs_ingestion` sink, which
-					requires creating Data Collection Endpoint and Data Collection Rule resources in Azure.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
-	configuration: base.components.sinks.azure_monitor_logs.configuration
+	configuration: base.components.sinks.azure_logs_ingestion.configuration
 
 	input: {
 		logs:    true
