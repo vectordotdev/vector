@@ -70,9 +70,9 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod test;
 mod transform_utils;
 mod util;
-mod test;
 
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
@@ -596,7 +596,7 @@ struct Source {
     include_file_metric_tag: bool,
     rotate_wait: Duration,
     acknowledgements: bool,
-    maybe_logs_dir: Option<String>
+    maybe_logs_dir: Option<String>,
 }
 
 impl Source {
@@ -688,7 +688,7 @@ impl Source {
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
             acknowledgements,
-            maybe_logs_dir: None
+            maybe_logs_dir: None,
         })
     }
 

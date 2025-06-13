@@ -23,7 +23,7 @@ pub(super) fn build_pod_logs_directory(
 ) -> PathBuf {
     let logs_dir = match maybe_logs_dir {
         Some(logs_dir) => logs_dir,
-        None => K8S_LOGS_DIR
+        None => K8S_LOGS_DIR,
     };
     [
         logs_dir,
