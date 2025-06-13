@@ -31,7 +31,7 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink excepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
 		warnings: []
 		notices: []
 	}
