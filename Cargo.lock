@@ -635,7 +635,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "rustls-native-certs 0.6.3",
  "rustls-pemfile 1.0.4",
  "rustls-webpki 0.101.7",
@@ -1287,7 +1287,7 @@ dependencies = [
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
  "pin-project-lite",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "tokio",
  "tracing 0.1.41",
 ]
@@ -4808,7 +4808,7 @@ dependencies = [
  "http 0.2.9",
  "hyper 0.14.28",
  "log",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "rustls-native-certs 0.6.3",
  "tokio",
  "tokio-rustls 0.24.1",
@@ -6223,7 +6223,7 @@ dependencies = [
  "percent-encoding",
  "rand 0.8.5",
  "rustc_version_runtime",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_bytes",
@@ -8527,7 +8527,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_json",
@@ -8872,9 +8872,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.21.11"
+version = "0.21.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fecbfb7b1444f477b345853b1fce097a2c6fb637b2bfb87e6bc5db0f043fae4"
+checksum = "3f56a14d1f48b391359b22f731fd4bd7e43c97f3c50eee276f3aa09c94784d3e"
 dependencies = [
  "log",
  "ring",
@@ -10511,7 +10511,7 @@ version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "tokio",
 ]
 
@@ -10569,7 +10569,7 @@ checksum = "212d5dcb2a1ce06d81107c3d0ffa3121fe974b73f068c8282cb1c32328113b6c"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.21.11",
+ "rustls 0.21.12",
  "tokio",
  "tungstenite 0.20.1",
 ]
