@@ -110,6 +110,23 @@ fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
+    println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu");
+    println!("cargo:rustc-link-lib=dylib=lldpctl");
+
+    println!("cargo:rerun-if-changed=src/sources/lldp/wrapper.h");
+
+    // 生成 lldpctl bindings
+    let lldp_bindings = bindgen::Builder::default()
+        .header("src/sources/lldp/wrapper.h") // 你要创建这个 wrapper.h
+        .clang_arg("-I/usr/include/")         // 可能需要根据实际 lldp 安装路径添加
+        .layout_tests(false)
+        .generate()
+        .expect("Unable to generate lldpctl bindings");
+
+    lldp_bindings
+        .write_to_file("src/sources/lldp/bindings.rs")
+        .expect("Couldn't write lldpctl bindings!");
+
     // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
     #[cfg(not(feature = "nightly"))]
     println!("cargo:rerun-if-changed=.git/HEAD");
