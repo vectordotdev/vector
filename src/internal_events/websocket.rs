@@ -33,7 +33,7 @@ impl InternalEvent for WsConnectionFailedError {
             error_code = "ws_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -76,7 +76,7 @@ impl InternalEvent for WsConnectionError {
             error_code = "ws_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
