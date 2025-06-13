@@ -332,13 +332,13 @@ fn configured_to_retry(
     }
 }
 
-// TODO: verify documentation paths
-
 /// S3 Error retry logic.
 ///
-/// For more information, see [Retry Logic][retry_logic].
+/// Specifies a retry policy for S3 service calls.
 ///
-/// [retry_logic]: https://docs.aws.amazon.com/AmazonS3/latest/dev/retry-logic-overview.html#retry-logic
+/// For more information about error responses, see [Client Error Responses][error_responses].
+///
+/// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 #[configurable_component]
 #[derive(Debug, Clone)]
 pub struct S3RetryLogic {
@@ -350,7 +350,7 @@ pub struct S3RetryLogic {
     /// Retry specific errors.
     ///
     /// A vector list of status codes matching specific error types that will trigger
-    /// failed service retry attempts. The list is ignored if `retry_all_errors` is ignored.
+    /// failed service retry attempts. The list is ignored if `retry_all_errors` is true.
     pub errors_to_retry: Option<Vec<u16>>,
 }
 
