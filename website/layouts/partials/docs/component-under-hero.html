@@ -71,14 +71,19 @@
 <div class="w-full mt-4">
   {{ range $k, $v := $output }}
   {{ if eq $k "logs" }}
-  {{ partial "badge.html" (dict "prefix" "output" "word" "log" "color" "yellow" "inline" true) }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "logs" "color" "yellow" "inline" true) }}
   {{ end }}
 
   {{ if eq $k "metrics" }}
   {{ partial "badge.html" (dict "prefix" "output" "word" "metrics" "color" "yellow" "inline" true) }}
   {{ end }}
+
+  {{ if eq $k "traces" }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "traces" "color" "yellow" "inline" true) }}
+  {{ end }}
   {{ end }}
 </div>
+
 
 {{ if .Params.deprecated }}
 <div class="mt-4">
