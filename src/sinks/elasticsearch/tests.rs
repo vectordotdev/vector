@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, iter::zip};
 
 use vector_lib::lookup::PathPrefix;
 
@@ -62,7 +62,7 @@ async fn sets_create_action_when_configured() {
     let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -127,10 +127,10 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","_id":"42","version_type":"external","version":1337}}
+    let expected = r#"{"create":{"_id":"42","_index":"vector","_type":"_doc","version":1337,"version_type":"external"}}
 {"message":"hello there","my_field":"1337","timestamp":"2020-12-01T01:02:03Z"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -176,10 +176,10 @@ async fn encoding_with_external_gte_versioning_with_version_set_includes_version
         )
         .unwrap();
 
-    let expected = r#"{"create":{"_index":"vector","_type":"_doc","_id":"42","version_type":"external_gte","version":1337}}
+    let expected = r#"{"create":{"_id":"42","_index":"vector","_type":"_doc","version":1337,"version_type":"external_gte"}}
 {"message":"hello there","my_field":"1337","timestamp":"2020-12-01T01:02:03Z"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -203,6 +203,21 @@ fn data_stream_body(
     }
 
     ds
+}
+
+fn assert_expected_is_encoded(expected: &str, encoded: &[u8]) {
+    let encoded = std::str::from_utf8(encoded).unwrap();
+
+    let expected_lines: Vec<&str> = expected.lines().collect();
+    let encoded_lines: Vec<&str> = encoded.lines().collect();
+
+    assert_eq!(expected_lines.len(), encoded_lines.len());
+
+    let to_value = |s: &str| -> serde_json::Value { serde_json::from_str(s).unwrap() };
+
+    zip(expected_lines, encoded_lines).for_each(|(expected, encoded)| {
+        assert_eq!(to_value(expected), to_value(encoded));
+    });
 }
 
 #[tokio::test]
@@ -252,7 +267,7 @@ async fn encode_datastream_mode() {
     let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -307,7 +322,7 @@ async fn encode_datastream_mode_no_routing() {
     let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -346,7 +361,7 @@ async fn handle_metrics() {
     assert_eq!(encoded_lines.len(), 3); // there's an empty line at the end
     assert_eq!(
         encoded_lines.first().unwrap(),
-        r#"{"create":{"_index":"vector","_type":"_doc"}}"#
+        r#"{"create":{"_type":"_doc","_index":"vector"}}"#
     );
     assert!(encoded_lines
         .get(1)
@@ -459,7 +474,7 @@ async fn encode_datastream_mode_no_sync() {
     let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -495,7 +510,7 @@ async fn allows_using_except_fields() {
     let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
@@ -530,7 +545,7 @@ async fn allows_using_only_fields() {
     let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar"}
 "#;
-    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_expected_is_encoded(expected, &encoded);
     assert_eq!(encoded.len(), encoded_size);
 }
 
