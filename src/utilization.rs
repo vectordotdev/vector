@@ -162,7 +162,7 @@ pub(crate) struct UtilizationEmitter {
 
 impl UtilizationEmitter {
     pub(crate) fn new() -> Self {
-        let (timer_tx, timer_rx) = channel(1024);
+        let (timer_tx, timer_rx) = channel(4096);
         Self {
             timers: HashMap::default(),
             intervals: IntervalStream::new(interval(Duration::from_secs(5))),
