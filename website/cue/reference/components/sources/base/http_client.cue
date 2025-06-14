@@ -639,8 +639,7 @@ base: components: sources: http_client: configuration: {
 
 			VRL functions are supported within query parameters. You can
 			use functions like `now()` to dynamically modify query
-			parameter values. The VRL function must be wrapped in `{{ ... }}`
-			e.g. {{ now() }}
+			parameter values.
 			"""
 		required: false
 		type: object: {
