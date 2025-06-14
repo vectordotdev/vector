@@ -331,7 +331,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        http::QueryParameterValue,
+        http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
@@ -576,11 +576,16 @@ mod test {
             query: HashMap::from([
                 (
                     "key1".to_string(),
-                    QueryParameterValue::MultiParams(vec!["val2".to_string()]),
+                    QueryParameterValue::MultiParams(vec![ParameterValue::String(
+                        "val2".to_string(),
+                    )]),
                 ),
                 (
                     "key2".to_string(),
-                    QueryParameterValue::MultiParams(vec!["val1".to_string(), "val2".to_string()]),
+                    QueryParameterValue::MultiParams(vec![
+                        ParameterValue::String("val1".to_string()),
+                        ParameterValue::String("val2".to_string()),
+                    ]),
                 ),
             ]),
             auth: None,
