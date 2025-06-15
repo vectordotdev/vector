@@ -1,3 +1,3 @@
-Fixed crash if nats sink url is unresolvable or unavailable even when --require-healthy is not set.
+The `nats` sink now does not return an error when an unresolvable or unavailable URL is provided. Note that if `--require-healthy` is set then Vector will stop on startup.
 
 authors: rdwr-tomers
