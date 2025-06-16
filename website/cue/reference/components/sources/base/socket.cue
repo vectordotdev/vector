@@ -498,6 +498,27 @@ base: components: sources: socket: configuration: {
 			unix_stream:   "Listen on a Unix domain socket (UDS), in stream mode."
 		}
 	}
+	multicast_groups: {
+		description: """
+			List of IPv4 multicast groups to join on socket's binding process.
+
+			In order to read multicast packets, this source's listening address should be set to `0.0.0.0`.
+			If any other address is used (such as `127.0.0.1` or an specific interface address), the
+			listening interface will filter out all multicast packets received,
+			as their target IP would be the one of the multicast group
+			and it will not match the socket's bound IP.
+
+			Note that this setting will only work if the source's address
+			is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
+			with multicast groups).
+			"""
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: array: {
+			default: []
+			items: type: string: examples: ["['224.0.0.2', '224.0.0.4']"]
+		}
+	}
 	path: {
 		description: """
 			The Unix socket path.

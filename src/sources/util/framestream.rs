@@ -1043,7 +1043,7 @@ mod test {
         pub fn new(content_type: String, multithreaded: bool, extra_routine: F) -> Self {
             Self {
                 frame_handler: MockFrameHandler::new(content_type, multithreaded, extra_routine),
-                socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
+                socket_path: tempfile::tempdir().unwrap().keep().join("unix_test"),
                 socket_file_mode: None,
                 socket_receive_buffer_size: None,
                 socket_send_buffer_size: None,

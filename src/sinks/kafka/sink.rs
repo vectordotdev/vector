@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use rdkafka::{
     error::KafkaError,
     producer::{BaseProducer, FutureProducer, Producer},
     ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
+use tower::limit::RateLimit;
 use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
@@ -27,7 +30,7 @@ pub(super) enum BuildError {
 pub struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    service: KafkaService,
+    service: RateLimit<KafkaService>,
     topic: Template,
     key_field: Option<OwnedTargetPath>,
     headers_key: Option<OwnedTargetPath>,
@@ -57,7 +60,12 @@ impl KafkaSink {
             headers_key: config.headers_key.map(|key| key.0),
             transformer,
             encoder,
-            service: KafkaService::new(producer),
+            service: ServiceBuilder::new()
+                .rate_limit(
+                    config.rate_limit_num,
+                    Duration::from_secs(config.rate_limit_duration_secs),
+                )
+                .service(KafkaService::new(producer)),
             topic: config.topic,
             key_field: config.key_field.map(|key| key.0),
         })

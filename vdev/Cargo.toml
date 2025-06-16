@@ -11,9 +11,9 @@ publish = false
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
-clap-verbosity-flag = "3.0.2"
-clap_complete = "4.5.48"
-confy = "0.6.1"
+clap-verbosity-flag = "3.0.3"
+clap_complete = "4.5.54"
+confy = "1.0.0"
 directories = "6.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.5"
@@ -24,7 +24,7 @@ indicatif = { version = "0.17.11", features = ["improved_unicode"] }
 itertools = "0.14.0"
 log = "0.4.27"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.2.0", features = ["supports-colors"] }
+owo-colors = { version = "4.2.1", features = ["supports-colors"] }
 paste.workspace = true
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }

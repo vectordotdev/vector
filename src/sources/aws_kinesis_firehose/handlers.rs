@@ -78,13 +78,14 @@ pub(super) async fn firehose(
                         events.estimated_json_encoded_size_of(),
                     ));
 
-                    let (batch, receiver) = context
-                        .acknowledgements
-                        .then(|| {
+                    let (batch, receiver) = if context.acknowledgements {
+                        {
                             let (batch, receiver) = BatchNotifier::new_with_receiver();
                             (Some(batch), Some(receiver))
-                        })
-                        .unwrap_or((None, None));
+                        }
+                    } else {
+                        (None, None)
+                    };
 
                     let now = Utc::now();
                     for event in &mut events {

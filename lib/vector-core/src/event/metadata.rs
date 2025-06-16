@@ -356,7 +356,7 @@ impl EventMetadata {
                 inner.source_event_id = Some(uuid2);
             }
             _ => {} // Keep the existing value.
-        };
+        }
     }
 
     /// Update the finalizer(s) status.
