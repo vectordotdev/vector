@@ -5,7 +5,7 @@ permissions:
 
 on:
   pull_request:
-    types: [synchronize, review_requested]
+    types: [synchronize, review_requested, labeled]
 
 jobs:
   remove_label:
