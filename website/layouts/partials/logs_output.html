@@ -21,9 +21,7 @@
           {{ partial "heading.html" (dict "text" "Fields" "level" 5 "id" $id) }}
         </div>
 
-        <div
-          class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded dark:border-gray-700"
-        >
+        <div class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded dark:border-gray-700">
           {{ range $k, $v := . }}
             <div class="py-2.5 px-3.5">
               <span class="flex justify-between items-center">
