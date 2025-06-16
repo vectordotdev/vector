@@ -14,7 +14,7 @@ use super::{metric::TagValue, Event, EventMetadata, LogEvent, Metric, MetricKind
 use crate::config::{log_schema, LogNamespace};
 use crate::schema::Definition;
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
+const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set it.
 const VALID_METRIC_PATHS_GET: &str =
