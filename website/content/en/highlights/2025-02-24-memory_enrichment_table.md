@@ -104,9 +104,8 @@ can expire; in that case, the computation step will be repeated.
 
 ## Populate with other components
 
-This new table type can also accepts `inputs` which means sources and/or transforms can populate with data.
-The data can can then be queried like any other enrichment table. The config above demonstrates this.
-
+This new table type also accepts `inputs`, meaning that sources and/or transforms can populate it with data, similar to how a sink operates.
+The data can then be queried like any other enrichment table. The configuration above demonstrates this behavior.
 
 > We plan to make this component even more flexible in the future. For example, it can also act as a
 source. This exercise raises some important questions on component flexibility. The end goal is
