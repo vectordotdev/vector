@@ -29,6 +29,7 @@ use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
 
+use crate::aws::AwsAuthentication;
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
 use crate::internal_events::{
@@ -78,16 +79,39 @@ pub(super) struct DeferredConfig {
     pub(super) max_age_secs: u64,
 }
 
+/// Configuration of the authentication strategy for interacting with AWS SQS.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+#[serde(untagged)]
+#[derivative(Default)]
+pub(super) enum AwsAuthenticationOrDefault {
+    /// Specified authentication for AWS SQS
+    #[derivative(Default)]
+    Auth(AwsAuthentication),
+
+    /// Use the default system authentication strategy
+    #[configurable(metadata(
+        docs::examples = "default"))]
+    Default(String),
+}
+
+
 /// SQS configuration options.
-//
-// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
-// way, given the near 100% overlap in configurable values.
+///
+/// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
+/// way, given the near 100% overlap in configurable values.
 #[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) auth: Option<AwsAuthenticationOrDefault>,
+
     /// The URL of the SQS queue to poll for bucket notifications.
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
