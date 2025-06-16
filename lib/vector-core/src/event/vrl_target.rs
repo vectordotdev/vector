@@ -477,14 +477,14 @@ impl SecretTarget for VrlTarget {
 
 /// Retrieves a value from a the provided metric using the path.
 /// Currently the root path and the following paths are supported:
-/// - name
-/// - namespace
-/// - interval_ms
-/// - timestamp
-/// - kind
-/// - tags
-/// - tags.<tagname>
-/// - type
+/// - `name`
+/// - `namespace`
+/// - `interval_ms`
+/// - `timestamp`
+/// - `kind`
+/// - `tags`
+/// - `tags.<tagname>`
+/// - `type`
 ///
 /// Any other paths result in a `MetricPathError::InvalidPath` being returned.
 fn target_get_metric<'a>(
