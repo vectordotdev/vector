@@ -26,7 +26,7 @@ type TapSender = tokio_mpsc::Sender<TapPayload>;
 type ShutdownTx = oneshot::Sender<()>;
 type ShutdownRx = oneshot::Receiver<()>;
 
-const TAP_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
+const TAP_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 /// Clients can supply glob patterns to find matched topology components.
 trait GlobMatcher<T> {

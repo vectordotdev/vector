@@ -100,7 +100,7 @@ base: components: sources: kubernetes_logs: configuration: {
 
 			If your files share a common header that is not always a fixed size,
 
-			If the file has less than this amount of lines, it won’t be read at all.
+			If the file has less than this amount of lines, it won't be read at all.
 			"""
 		required: false
 		type: uint: {
@@ -190,6 +190,19 @@ base: components: sources: kubernetes_logs: configuration: {
 			default: 32768
 			unit:    "bytes"
 		}
+	}
+	max_merged_line_bytes: {
+		description: """
+			The maximum number of bytes a line can contain - after merging - before being discarded.
+
+			This protects against malformed lines or tailing incorrect files.
+
+			Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
+			config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
+			if auto_partial_merge is true, so if this is set to be 1 MiB, for example, but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+			"""
+		required: false
+		type: uint: unit: "bytes"
 	}
 	max_read_bytes: {
 		description: """

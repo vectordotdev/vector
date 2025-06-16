@@ -271,7 +271,7 @@ mod tests {
         let input_path = test_data_dir();
         let output_dir = tempdir()
             .expect("Unable to create tempdir for config")
-            .into_path();
+            .keep();
         walk_dir_and_convert(&input_path, &output_dir, Format::Yaml).unwrap();
 
         let mut count: usize = 0;

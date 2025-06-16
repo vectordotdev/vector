@@ -134,6 +134,14 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				required: false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	compression: {
@@ -706,6 +714,29 @@ base: components: sources: aws_s3: configuration: {
 				type: uint: {
 					examples: [20]
 					unit: "seconds"
+				}
+			}
+			deferred: {
+				description: "Configuration for deferring events to another queue based on their age."
+				required:    false
+				type: object: options: {
+					max_age_secs: {
+						description: """
+																Event must have been emitted within the last `max_age_secs` seconds to be processed.
+
+																If the event is older, it is forwarded to the `queue_url` for later processing.
+																"""
+						required: true
+						type: uint: {
+							examples: [3600]
+							unit: "seconds"
+						}
+					}
+					queue_url: {
+						description: "The URL of the queue to forward events to when they are older than `max_age_secs`."
+						required:    true
+						type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+					}
 				}
 			}
 			delete_failed_message: {

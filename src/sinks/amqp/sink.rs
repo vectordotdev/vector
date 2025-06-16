@@ -1,10 +1,10 @@
 //! The sink for the `AMQP` sink that wires together the main stream that takes the
 //! event and sends it to `AMQP`.
 use crate::sinks::prelude::*;
-use lapin::{options::ConfirmSelectOptions, BasicProperties};
+use lapin::BasicProperties;
 use serde::Serialize;
-use std::sync::Arc;
 
+use super::channel::AmqpSinkChannels;
 use super::{
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
     encoder::AmqpEncoder,
@@ -27,7 +27,7 @@ pub(super) struct AmqpEvent {
 }
 
 pub(super) struct AmqpSink {
-    pub(super) channel: Arc<lapin::Channel>,
+    pub(super) channels: AmqpSinkChannels,
     exchange: Template,
     routing_key: Option<Template>,
     properties: Option<AmqpPropertiesConfig>,
@@ -37,26 +37,15 @@ pub(super) struct AmqpSink {
 
 impl AmqpSink {
     pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
-        let (_, channel) = config
-            .connection
-            .connect()
-            .await
+        let channels = super::channel::new_channel_pool(&config)
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
-
-        // Enable confirmations on the channel.
-        channel
-            .confirm_select(ConfirmSelectOptions::default())
-            .await
-            .map_err(|e| BuildError::AmqpCreateFailed {
-                source: Box::new(e),
-            })?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
 
         Ok(AmqpSink {
-            channel: Arc::new(channel),
+            channels,
             exchange: config.exchange,
             routing_key: config.routing_key,
             properties: config.properties,
@@ -96,7 +85,7 @@ impl AmqpSink {
 
         let properties = match &self.properties {
             None => BasicProperties::default(),
-            Some(prop) => prop.build(),
+            Some(prop) => prop.build(&event)?,
         };
 
         Some(AmqpEvent {
@@ -115,7 +104,7 @@ impl AmqpSink {
             },
         };
         let service = ServiceBuilder::new().service(AmqpService {
-            channel: Arc::clone(&self.channel),
+            channels: self.channels.clone(),
         });
 
         input

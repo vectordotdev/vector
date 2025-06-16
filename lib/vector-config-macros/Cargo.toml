@@ -8,7 +8,7 @@ license = "MPL-2.0"
 proc-macro = true
 
 [dependencies]
-darling = { version = "0.20", default-features = false, features = ["suggestions"] }
+darling.workspace = true
 proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
 serde_derive_internals = "0.29"

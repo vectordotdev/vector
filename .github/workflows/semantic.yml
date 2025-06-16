@@ -192,6 +192,7 @@ jobs:
             aws_kinesis_streams sink
             aws_s3 sink
             aws_sqs sink
+            axiom sink
             azure_blob sink
             azure_monitor_logs sink
             blackhole sink
@@ -225,6 +226,7 @@ jobs:
             new_relic_logs sink
             opentelemetry sink
             papertrail sink
+            postgres sink
             prometheus_exporter sink
             prometheus_remote_write sink
             pulsar sink
@@ -245,3 +247,6 @@ jobs:
             search website
             template website
             website
+            website deps
+
+            config provider

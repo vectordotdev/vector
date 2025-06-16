@@ -68,6 +68,9 @@ pub mod mock;
 pub mod compression;
 pub mod stats;
 
+#[cfg(test)]
+pub mod integration;
+
 #[macro_export]
 macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{
@@ -119,6 +122,10 @@ pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
 
 pub fn next_addr() -> SocketAddr {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
+}
+
+pub fn next_addr_any() -> SocketAddr {
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
@@ -230,6 +237,10 @@ pub fn temp_dir() -> PathBuf {
     let path = std::env::temp_dir();
     let dir_name = random_string(16);
     path.join(dir_name)
+}
+
+pub fn random_table_name() -> String {
+    format!("test_{}", random_string(10).to_lowercase())
 }
 
 pub fn map_event_batch_stream(

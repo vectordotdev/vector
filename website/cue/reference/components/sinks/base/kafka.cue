@@ -36,7 +36,7 @@ base: components: sinks: kafka: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: unit: "bytes"
@@ -487,6 +487,22 @@ base: components: sinks: kafka: configuration: {
 			default: 300000
 			examples: [150000, 450000]
 			unit: "milliseconds"
+		}
+	}
+	rate_limit_duration_secs: {
+		description: "The time window used for the `rate_limit_num` option."
+		required:    false
+		type: uint: {
+			default: 1
+			unit:    "seconds"
+		}
+	}
+	rate_limit_num: {
+		description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+		required:    false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "requests"
 		}
 	}
 	sasl: {
