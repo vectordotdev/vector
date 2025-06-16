@@ -2901,19 +2901,6 @@ checksum = "7762d17f1241643615821a8455a0b2c3e803784b058693d990b11f2dce25a0ca"
 
 [[package]]
 name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
-]
-
-[[package]]
-name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -3691,7 +3678,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion",
- "dashmap 6.1.0",
+ "dashmap",
  "flate2",
  "futures 0.3.31",
  "glob",
@@ -4090,7 +4077,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0746aa765db78b521451ef74221663b57ba595bf83f75d0ce23cc09447c8139f"
 dependencies = [
  "cfg-if",
- "dashmap 6.1.0",
+ "dashmap",
  "futures-sink",
  "futures-timer",
  "futures-util",
@@ -4164,7 +4151,7 @@ dependencies = [
 [[package]]
 name = "greptime-proto"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.7.0#4bc0d17577dbea47396a064c1ccf229a4c9539fa"
+source = "git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.9.0#396206c2801b5a3ec51bfe8984c66b686da910e6"
 dependencies = [
  "prost 0.12.6",
  "serde",
@@ -4178,9 +4165,9 @@ dependencies = [
 [[package]]
 name = "greptimedb-ingester"
 version = "0.1.0"
-source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust?rev=2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d#2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d"
+source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust?rev=f7243393808640f5123b0d5b7b798da591a4df6e#f7243393808640f5123b0d5b7b798da591a4df6e"
 dependencies = [
- "dashmap 5.5.3",
+ "dashmap",
  "derive_builder",
  "enum_dispatch",
  "futures 0.3.31",
@@ -4188,8 +4175,8 @@ dependencies = [
  "greptime-proto",
  "parking_lot",
  "prost 0.12.6",
- "rand 0.8.5",
- "snafu 0.7.5",
+ "rand 0.9.1",
+ "snafu 0.8.0",
  "tokio",
  "tokio-stream",
  "tonic 0.11.0",
@@ -10952,7 +10939,7 @@ name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "dashmap 6.1.0",
+ "dashmap",
  "mock_instant",
  "tracing 0.1.41",
  "tracing-core 0.1.33",
