@@ -9,7 +9,7 @@ on:
 
 jobs:
   remove_label:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'meta: awaiting author') }}
+    if: contains(github.event.pull_request.labels.*.name, 'meta: awaiting author')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
