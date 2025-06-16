@@ -23,5 +23,20 @@ tilt_modules/
 # Jetbrains
 .idea/
 
-# Ignore generated temporary Docker Compose files
+# Docker build cache
+**/Dockerfile~
+**/Dockerfile.*~
+.dockerignore
+
+# Docker Compose override files
+docker-compose.override.yml
+docker-compose.override.*.yml
 **/compose-temp-*.yaml
+
+# Compose project volume mounts (if stored locally)
+volumes/
+*.volume/
+
+# Environment variable files (can contain secrets)
+.env
+.env.*
