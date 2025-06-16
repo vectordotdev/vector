@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::{NonZero, TryFromIntError};
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
@@ -16,7 +17,8 @@ use crate::schema::Definition;
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set it.
-const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
+const VALID_METRIC_PATHS_GET: &str =
+    ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
 /// Metrics aren't interested in paths that have a length longer than 3.
 ///
@@ -319,6 +321,15 @@ impl Target for VrlTarget {
                                 metric.series.name.namespace =
                                     Some(String::from_utf8_lossy(&value).into_owned());
                             }
+                            ["interval_ms"] => {
+                                let value: i64 =
+                                    value.clone().try_into_i64().map_err(|e| e.to_string())?;
+                                let value: u32 = value
+                                    .try_into()
+                                    .map_err(|e: TryFromIntError| e.to_string())?;
+                                let value = NonZero::try_from(value).map_err(|e| e.to_string())?;
+                                metric.data.time.interval_ms = Some(value);
+                            }
                             ["timestamp"] => {
                                 let value =
                                     value.clone().try_timestamp().map_err(|e| e.to_string())?;
@@ -412,6 +423,13 @@ impl Target for VrlTarget {
                         let removed_value = match paths.as_slice() {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
+                            ["interval_ms"] => metric
+                                .data
+                                .time
+                                .interval_ms
+                                .take()
+                                .map(u32::from)
+                                .map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
                                 map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
@@ -461,6 +479,7 @@ impl SecretTarget for VrlTarget {
 /// Currently the root path and the following paths are supported:
 /// - name
 /// - namespace
+/// - interval_ms
 /// - timestamp
 /// - kind
 /// - tags
@@ -481,7 +500,7 @@ fn target_get_metric<'a>(
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {
             ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
-            ["namespace"] | ["timestamp"] | ["tags"] => {
+            ["namespace"] | ["timestamp"] | ["interval_ms"] | ["tags"] => {
                 if let Some(value) = value {
                     return Ok(Some(value));
                 }
@@ -1132,40 +1151,54 @@ mod test {
         )
         .with_tags(Some(metric_tags!("tig" => "tog")));
 
+        struct Case {
+            path: OwnedValuePath,
+            current: Option<Value>,
+            new: Value,
+            delete: bool,
+        }
+
         let cases = vec![
-            (
-                owned_value_path!("name"), // Path
-                Some(Value::from("name")), // Current value
-                Value::from("namefoo"),    // New value
-                false,                     // Test deletion
-            ),
-            (
-                owned_value_path!("namespace"),
-                None,
-                "namespacefoo".into(),
-                true,
-            ),
-            (
-                owned_value_path!("timestamp"),
-                None,
-                Utc.with_ymd_and_hms(2020, 12, 8, 12, 0, 0)
+            Case {
+                path: owned_value_path!("name"),
+                current: Some(Value::from("name")),
+                new: Value::from("namefoo"),
+                delete: false,
+            },
+            Case {
+                path: owned_value_path!("namespace"),
+                current: None,
+                new: "namespacefoo".into(),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("timestamp"),
+                current: None,
+                new: Utc
+                    .with_ymd_and_hms(2020, 12, 8, 12, 0, 0)
                     .single()
                     .expect("invalid timestamp")
                     .into(),
-                true,
-            ),
-            (
-                owned_value_path!("kind"),
-                Some(Value::from("absolute")),
-                "incremental".into(),
-                false,
-            ),
-            (
-                owned_value_path!("tags", "thing"),
-                None,
-                "footag".into(),
-                true,
-            ),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("interval_ms"),
+                current: None,
+                new: 123456.into(),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("kind"),
+                current: Some(Value::from("absolute")),
+                new: "incremental".into(),
+                delete: false,
+            },
+            Case {
+                path: owned_value_path!("tags", "thing"),
+                current: None,
+                new: "footag".into(),
+                delete: true,
+            },
         ];
 
         let info = ProgramInfo {
@@ -1175,13 +1208,20 @@ mod test {
                 OwnedTargetPath::event(owned_value_path!("name")),
                 OwnedTargetPath::event(owned_value_path!("namespace")),
                 OwnedTargetPath::event(owned_value_path!("timestamp")),
+                OwnedTargetPath::event(owned_value_path!("interval_ms")),
                 OwnedTargetPath::event(owned_value_path!("kind")),
             ],
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
-        for (path, current, new, delete) in cases {
+        for Case {
+            path,
+            current,
+            new,
+            delete,
+        } in cases
+        {
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -1249,6 +1289,7 @@ mod test {
         let validpaths_get = [
             ".name",
             ".namespace",
+            ".interval_ms",
             ".timestamp",
             ".kind",
             ".tags",

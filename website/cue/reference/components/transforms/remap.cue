@@ -98,7 +98,8 @@ components: transforms: "remap": {
 				`type` | Read only |
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
 				`name` | Read/write |
-				`timestamp` | Read/write/delete | You assign only a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`timestamp` | Read/write/delete | You can only assign a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`interval_ms` | Read/write/delete | You can assign it a non zero 32 byte unsigned interval
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
 
