@@ -149,6 +149,14 @@ base: components: sinks: loki: configuration: {
 						required: false
 						type: string: examples: ["vector-indexer-role"]
 					}
+					session_token: {
+						description: """
+																The AWS session token.
+																See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+																"""
+						required: false
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+					}
 				}
 			}
 			password: {
