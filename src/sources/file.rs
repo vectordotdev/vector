@@ -318,6 +318,25 @@ pub enum FingerprintConfig {
         lines: usize,
     },
 
+    /// Read lines from the beginning of the file and compute a checksum and with the path as the random salt
+    ChecksumWithSalt {
+        /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+        ///
+        /// This can be helpful if all files share a common header that should be skipped.
+        #[serde(default = "default_ignored_header_bytes")]
+        #[configurable(metadata(docs::type_unit = "bytes"))]
+        ignored_header_bytes: usize,
+
+        /// The number of lines to read for generating the checksum.
+        ///
+        /// If your files share a common header that is not always a fixed size,
+        ///
+        /// If the file has less than this amount of lines, it won’t be read at all.
+        #[serde(default = "default_lines")]
+        #[configurable(metadata(docs::type_unit = "lines"))]
+        lines: usize,
+    },
+
     /// Use the [device and inode][inode] as the identifier.
     ///
     /// [inode]: https://en.wikipedia.org/wiki/Inode
@@ -374,6 +393,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
+            FingerprintConfig::ChecksumWithSalt{ ignored_header_bytes, lines } => FingerprintStrategy::ChecksumWithSalt { ignored_header_bytes, lines },
             FingerprintConfig::FullContentChecksum => FingerprintStrategy::FullContentChecksum,
             FingerprintConfig::ModificationTime => FingerprintStrategy::ModificationTime,
         }

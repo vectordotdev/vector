@@ -298,7 +298,8 @@ where
                         crate::FileFingerprint::BytesChecksum(_) | 
                         crate::FileFingerprint::FirstLinesChecksum(_) |
                         crate::FileFingerprint::DevInode(_, _) | 
-                        crate::FileFingerprint::Unknown(_) => false,
+                        crate::FileFingerprint::Unknown(_) |
+                        crate::FileFingerprint::ChecksumWithSalt(_, _) => false,
                     
                         crate::FileFingerprint::FullContentChecksum(_) |
                         crate::FileFingerprint::ModificationTime(_, _) => true,
