@@ -1,5 +1,6 @@
 use std::{
     cmp, fmt,
+    fmt::Debug,
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -54,9 +55,69 @@ impl<T> fmt::Display for TrySendError<T> {
 
 impl<T: fmt::Debug> std::error::Error for TrySendError<T> {}
 
+// Trait over common queue operations so implementation can be chosen at initialization phase
+trait QueueImpl<T>: Send + Sync + fmt::Debug {
+    fn push(&self, item: T);
+    fn pop(&self) -> Option<T>;
+}
+
+#[derive(Debug)]
+struct CBArrayQueue<T> {
+    queue: ArrayQueue<T>,
+}
+
+impl<T: fmt::Debug> CBArrayQueue<T> {
+    fn new(size: usize) -> Self {
+        Self {
+            queue: ArrayQueue::new(size),
+        }
+    }
+}
+
+impl<T> QueueImpl<T> for CBArrayQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.queue
+            .push(item)
+            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full."));
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.queue.pop()
+    }
+}
+
+#[derive(Debug)]
+struct SizeTerms<T> {
+    method: fn(&T) -> usize,
+}
+
+impl<T> Clone for SizeTerms<T> {
+    fn clone(&self) -> Self {
+        Self {
+            method: self.method,
+        }
+    }
+}
+
+impl<T: InMemoryBufferable> SizeTerms<T> {
+    fn apply(&self, item: &T) -> usize {
+        (self.method)(item)
+    }
+
+    fn by_number_events() -> Self {
+        Self {
+            method: |item: &T| -> usize { item.event_count() },
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Inner<T> {
-    data: Arc<ArrayQueue<(OwnedSemaphorePermit, T)>>,
+    data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
+    terms: SizeTerms<T>,
     limit: usize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
@@ -66,6 +127,7 @@ impl<T> Clone for Inner<T> {
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
+            terms: self.terms.clone(),
             limit: self.limit,
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
@@ -85,7 +147,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         // We have to limit the number of permits we ask for to the overall limit since we're always
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
-        cmp::min(self.inner.limit, item.event_count()) as u32
+        cmp::min(self.inner.limit, self.inner.terms.apply(item)) as u32
     }
 
     /// Gets the number of items that this channel could accept.
@@ -112,10 +174,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             return Err(SendError(item));
         };
 
-        self.inner
-            .data
-            .push((permits, item))
-            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
+        self.inner.data.push((permits, item));
         self.inner.read_waker.notify_one();
 
         trace!("Sent item.");
@@ -153,10 +212,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             }
         };
 
-        self.inner
-            .data
-            .push((permits, item))
-            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
+        self.inner.data.push((permits, item));
         self.inner.read_waker.notify_one();
 
         trace!("Attempt to send item succeeded.");
@@ -235,9 +291,12 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
-pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
+pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+    limit: usize,
+) -> (LimitedSender<T>, LimitedReceiver<T>) {
     let inner = Inner {
-        data: Arc::new(ArrayQueue::new(limit)),
+        data: Arc::new(CBArrayQueue::new(limit)),
+        terms: SizeTerms::by_number_events(),
         limit,
         limiter: Arc::new(Semaphore::new(limit)),
         read_waker: Arc::new(Notify::new()),
