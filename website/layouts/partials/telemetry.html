@@ -6,7 +6,9 @@
       {{ partial "heading.html" (dict "text" $k "level" 4) }}
     </span>
 
+    {{ with $v.type }}
     {{ partial "badge.html" (dict "word" $v.type "color" "gray") }}
+    {{ end }}
   </span>
 
     {{ with $v.description }}
