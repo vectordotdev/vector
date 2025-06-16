@@ -1144,19 +1144,19 @@ mod test {
 
     #[test]
     fn metric_fields() {
-        let metric = Metric::new(
-            "name",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 1.23 },
-        )
-        .with_tags(Some(metric_tags!("tig" => "tog")));
-
         struct Case {
             path: OwnedValuePath,
             current: Option<Value>,
             new: Value,
             delete: bool,
         }
+
+        let metric = Metric::new(
+            "name",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.23 },
+        )
+        .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let cases = vec![
             Case {
