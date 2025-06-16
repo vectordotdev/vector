@@ -16,3 +16,4 @@ jobs:
       - uses: actions-ecosystem/action-remove-labels@v1
         with:
           labels: "meta: awaiting author"
+          fail_on_error: true
