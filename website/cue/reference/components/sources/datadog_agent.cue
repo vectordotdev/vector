@@ -153,7 +153,7 @@ components: sources: datadog_agent: {
 				tags: _extra_tags
 			}
 		}
-		traces: {
+		traces: trace: {
 			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
 			fields: {
 				spans: {
