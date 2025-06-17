@@ -19,6 +19,7 @@ on:
 jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
+    fail_on_error: true
     if: github.event_name == 'pull_request'
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
@@ -40,20 +41,3 @@ jobs:
           git fetch origin master:refs/remotes/origin/master
 
           ./scripts/check_changelog_fragments.sh
-
-  check-changelog:
-    name: Changelog
-    runs-on: ubuntu-24.04
-    needs: validate-changelog
-    if: always()
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
-    steps:
-      - name: exit
-        run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
-            exit 1
-          else
-            exit 0
-          fi
