@@ -1184,7 +1184,7 @@ mod test {
             Case {
                 path: owned_value_path!("interval_ms"),
                 current: None,
-                new: 123456.into(),
+                new: 123_456.into(),
                 delete: true,
             },
             Case {
