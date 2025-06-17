@@ -1057,8 +1057,8 @@ base: components: sinks: aws_s3: configuration: {
 				description: """
 					Retry specific errors.
 
-					A vector list of status codes matching specific error types that trigger failed
-					service retry attempts. The list is ignored if `retry_all_errors` is true.
+					A list of HTTP status codes matching specific error types that trigger failed
+					service retry attempts. This list is ignored if `retry_all_errors` is true.
 					"""
 				required: false
 				type: array: items: type: uint: {}
