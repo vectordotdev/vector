@@ -198,7 +198,7 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
             "AvroValue::Decimal is not supported",
         )),
         AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
-            "AvroValue::BugDecimal is not supported",
+            "AvroValue::BigDecimal is not supported",
         )),
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
         AvroValue::Duration(_) => Err(vector_common::Error::from(
