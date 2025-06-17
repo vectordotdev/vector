@@ -20,7 +20,7 @@ jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
     fail_on_error: true
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target'
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
     steps:
