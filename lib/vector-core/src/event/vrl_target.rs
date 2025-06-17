@@ -498,14 +498,14 @@ fn target_get_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
-        ["namespace"] | ["timestamp"] | ["interval_ms"] | ["tags"] => {
-            if let Some(value) = value {
-                return Ok(Some(value));
-            } else {
-                return Ok(None);
-            }
-        }
+        ["name"]
+        | ["kind"]
+        | ["type"]
+        | ["tags", _]
+        | ["namespace"]
+        | ["timestamp"]
+        | ["interval_ms"]
+        | ["tags"] => return Ok(value),
         _ => {
             return Err(MetricPathError::InvalidPath {
                 path: &path.to_string(),
@@ -531,14 +531,13 @@ fn target_get_mut_metric<'a>(
     };
 
     match paths.as_slice() {
-        ["name"] | ["kind"] | ["tags", _] => return Ok(value),
-        ["namespace"] | ["timestamp"] | ["tags"] => {
-            if let Some(value) = value {
-                return Ok(Some(value));
-            } else {
-                return Ok(None);
-            }
-        }
+        ["name"]
+        | ["kind"]
+        | ["tags", _]
+        | ["namespace"]
+        | ["timestamp"]
+        | ["interval_ms"]
+        | ["tags"] => return Ok(value),
         _ => {
             return Err(MetricPathError::InvalidPath {
                 path: &path.to_string(),
