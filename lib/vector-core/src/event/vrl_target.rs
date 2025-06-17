@@ -1296,7 +1296,14 @@ mod test {
             ".type",
         ];
 
-        let validpaths_set = [".name", ".namespace", ".timestamp", ".kind", ".tags"];
+        let validpaths_set = [
+            ".name",
+            ".namespace",
+            ".interval_ms",
+            ".timestamp",
+            ".kind",
+            ".tags",
+        ];
 
         let info = ProgramInfo {
             fallible: false,
