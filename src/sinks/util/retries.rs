@@ -109,11 +109,10 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     }
 
     fn advance(&mut self) {
-        let next_duration: Duration = cmp::min(
-            self.previous_duration + self.current_duration,
-            self.max_duration,
-        );
-        self.remaining_attempts -= 1;
+    let sum = self.previous_duration.checked_add(self.current_duration)
+    .unwrap_or(Duration::MAX);
+	let next_duration = cmp::min(sum, self.max_duration);
+        self.remaining_attempts = self.remaining_attempts.saturating_sub(1);
         self.previous_duration = self.current_duration;
         self.current_duration = next_duration;
         self.current_jitter_duration = Self::add_full_jitter(next_duration);
