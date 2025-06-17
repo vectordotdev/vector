@@ -505,14 +505,12 @@ fn target_get_metric<'a>(
         | ["namespace"]
         | ["timestamp"]
         | ["interval_ms"]
-        | ["tags"] => return Ok(value),
-        _ => {
-            return Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_GET,
-            }
-            .to_string())
+        | ["tags"] => Ok(value),
+        _ => Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_GET,
         }
+        .to_string()),
     }
 }
 
@@ -537,14 +535,12 @@ fn target_get_mut_metric<'a>(
         | ["namespace"]
         | ["timestamp"]
         | ["interval_ms"]
-        | ["tags"] => return Ok(value),
-        _ => {
-            return Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_SET,
-            }
-            .to_string())
+        | ["tags"] => Ok(value),
+        _ => Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_SET,
         }
+        .to_string()),
     }
 }
 
