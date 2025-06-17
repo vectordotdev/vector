@@ -66,7 +66,7 @@
           {{/* Component configuration */}}
           {{ with $config.configuration }}
           {{ if gt (len .) 1 }} {{/* Don't display if only the "type" config is present */}}
-          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}Ø
+          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
 
           {{ partial "components/example-configs.html" (dict "examples" $exampleConfigs) }}
 
