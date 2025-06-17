@@ -9,7 +9,7 @@ use std::{
 };
 
 use async_stream::stream;
-use crossbeam_queue::ArrayQueue;
+use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
@@ -90,6 +90,32 @@ where
 }
 
 #[derive(Debug)]
+struct CBSegQueue<T> {
+    queue: SegQueue<T>,
+}
+
+impl<T> CBSegQueue<T> {
+    fn new() -> Self {
+        Self {
+            queue: SegQueue::new(),
+        }
+    }
+}
+
+impl<T> QueueImpl<T> for CBSegQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.queue.push(item);
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.queue.pop()
+    }
+}
+
+#[derive(Debug)]
 struct SizeTerms<T> {
     method: fn(&T) -> usize,
 }
@@ -105,6 +131,12 @@ impl<T> Clone for SizeTerms<T> {
 impl<T: InMemoryBufferable> SizeTerms<T> {
     fn apply(&self, item: &T) -> usize {
         (self.method)(item)
+    }
+
+    fn by_bytes_allocated() -> Self {
+        Self {
+            method: |item: &T| -> usize { item.allocated_bytes() },
+        }
     }
 
     fn by_number_events() -> Self {
@@ -291,15 +323,31 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
-pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+pub enum LimitedBy {
+    NumberOfEvents,
+    #[allow(dead_code)]
+    AllocatedBytes,
+}
+
+pub fn limited_by<T: InMemoryBufferable + fmt::Debug>(
     limit: usize,
+    method: LimitedBy,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner {
-        data: Arc::new(CBArrayQueue::new(limit)),
-        terms: SizeTerms::by_number_events(),
-        limit,
-        limiter: Arc::new(Semaphore::new(limit)),
-        read_waker: Arc::new(Notify::new()),
+    let inner = match method {
+        LimitedBy::NumberOfEvents => Inner {
+            data: Arc::new(CBArrayQueue::new(limit)),
+            terms: SizeTerms::by_number_events(),
+            limit,
+            limiter: Arc::new(Semaphore::new(limit)),
+            read_waker: Arc::new(Notify::new()),
+        },
+        LimitedBy::AllocatedBytes => Inner {
+            data: Arc::new(CBSegQueue::new()),
+            terms: SizeTerms::by_bytes_allocated(),
+            limit,
+            limiter: Arc::new(Semaphore::new(limit)),
+            read_waker: Arc::new(Notify::new()),
+        },
     };
 
     let sender = LimitedSender {
@@ -309,6 +357,12 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     let receiver = LimitedReceiver { inner };
 
     (sender, receiver)
+}
+
+pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+    limit: usize,
+) -> (LimitedSender<T>, LimitedReceiver<T>) {
+    limited_by(limit, LimitedBy::NumberOfEvents)
 }
 
 #[cfg(test)]
