@@ -10,7 +10,7 @@ impl From<PBValue> for Value {
             PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
+            PBValue::DoubleValue(v) => NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
             PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::ArrayValue(arr) => Value::Array(
                 arr.values
@@ -56,4 +56,39 @@ pub fn to_hex(d: &[u8]) -> String {
         return "".to_string();
     }
     hex::encode(d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pb_double_value_nan_handling() {
+        // Test that NaN values are converted to Value::Null instead of panicking
+        let nan_value = PBValue::DoubleValue(f64::NAN);
+        let result = Value::from(nan_value);
+        assert_eq!(result, Value::Null);
+    }
+
+    #[test]
+    fn test_pb_double_value_infinity() {
+        // Test that infinity values work correctly
+        let inf_value = PBValue::DoubleValue(f64::INFINITY);
+        let result = Value::from(inf_value);
+        match result {
+            Value::Float(f) => {
+                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_positive())
+            }
+            _ => panic!("Expected Float value, got {:?}", result),
+        }
+
+        let neg_inf_value = PBValue::DoubleValue(f64::NEG_INFINITY);
+        let result = Value::from(neg_inf_value);
+        match result {
+            Value::Float(f) => {
+                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_negative())
+            }
+            _ => panic!("Expected Float value, got {:?}", result),
+        }
+    }
 }

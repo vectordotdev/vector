@@ -79,7 +79,7 @@ A **best-effort** delivery guarantee means that a Vector component makes a best 
 each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying
 protocol, which is outside Vector's control.
 
-Note that this is _not_ the same as at-most-once delivery, as it'is still possible for Vector to
+Note that this is _not_ the same as at-most-once delivery, as it's still possible for Vector to
 introduce duplicates under extreme circumstances.
 
 ## Stability guarantees
