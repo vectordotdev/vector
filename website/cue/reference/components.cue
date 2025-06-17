@@ -439,9 +439,10 @@ components: {
 	}
 
 	#Input: {
-		logs:    bool
-		metrics: #MetricInput | null
-		traces:  bool
+		description?: string
+		logs:         bool
+		metrics:      #MetricInput | null
+		traces:       bool
 	}
 
 	#LogOutput: [Name=string]: {
