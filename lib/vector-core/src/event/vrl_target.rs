@@ -282,10 +282,7 @@ impl Target for VrlTarget {
                         return Err(MetricPathError::SetPathError.to_string());
                     }
 
-                    if let Some(paths) = path
-                        .to_alternative_components(MAX_METRIC_PATH_DEPTH)
-                        .first()
-                    {
+                    if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
                         match paths.as_slice() {
                             ["tags"] => {
                                 let value =
@@ -407,7 +404,6 @@ impl Target for VrlTarget {
                     if let Some(paths) = target_path
                         .path
                         .to_alternative_components(MAX_METRIC_PATH_DEPTH)
-                        .first()
                     {
                         let removed_value = match paths.as_slice() {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
@@ -429,10 +425,10 @@ impl Target for VrlTarget {
 
                         value.remove(&target_path.path, false);
 
-                        return Ok(removed_value);
+                        Ok(removed_value)
+                    } else {
+                        Ok(None)
                     }
-
-                    Ok(None)
                 }
             },
             PathPrefix::Metadata => Ok(self
@@ -478,27 +474,27 @@ fn target_get_metric<'a>(
 
     let value = value.get(path);
 
-    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-        match paths.as_slice() {
-            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
-            ["namespace"] | ["timestamp"] | ["tags"] => {
-                if let Some(value) = value {
-                    return Ok(Some(value));
-                }
-            }
-            _ => {
-                return Err(MetricPathError::InvalidPath {
-                    path: &path.to_string(),
-                    expected: VALID_METRIC_PATHS_GET,
-                }
-                .to_string())
+    let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
+        return Ok(None);
+    };
+
+    match paths.as_slice() {
+        ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
+        ["namespace"] | ["timestamp"] | ["tags"] => {
+            if let Some(value) = value {
+                return Ok(Some(value));
+            } else {
+                return Ok(None);
             }
         }
+        _ => {
+            return Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_GET,
+            }
+            .to_string())
+        }
     }
-
-    // We only reach this point if we have requested a tag that doesn't exist or an empty
-    // field.
-    Ok(None)
 }
 
 fn target_get_mut_metric<'a>(
@@ -511,27 +507,27 @@ fn target_get_mut_metric<'a>(
 
     let value = value.get_mut(path);
 
-    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-        match paths.as_slice() {
-            ["name"] | ["kind"] | ["tags", _] => return Ok(value),
-            ["namespace"] | ["timestamp"] | ["tags"] => {
-                if let Some(value) = value {
-                    return Ok(Some(value));
-                }
-            }
-            _ => {
-                return Err(MetricPathError::InvalidPath {
-                    path: &path.to_string(),
-                    expected: VALID_METRIC_PATHS_SET,
-                }
-                .to_string())
+    let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
+        return Ok(None);
+    };
+
+    match paths.as_slice() {
+        ["name"] | ["kind"] | ["tags", _] => return Ok(value),
+        ["namespace"] | ["timestamp"] | ["tags"] => {
+            if let Some(value) = value {
+                return Ok(Some(value));
+            } else {
+                return Ok(None);
             }
         }
+        _ => {
+            return Err(MetricPathError::InvalidPath {
+                path: &path.to_string(),
+                expected: VALID_METRIC_PATHS_SET,
+            }
+            .to_string())
+        }
     }
-
-    // We only reach this point if we have requested a tag that doesn't exist or an empty
-    // field.
-    Ok(None)
 }
 
 /// pre-compute the `Value` structure of the metric.
