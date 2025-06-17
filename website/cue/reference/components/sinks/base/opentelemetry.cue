@@ -152,6 +152,14 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 							required: false
 							type: string: examples: ["vector-indexer-role"]
 						}
+						session_token: {
+							description: """
+																				The AWS session token.
+																				See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+																				"""
+							required: false
+							type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						}
 					}
 				}
 				password: {
@@ -678,12 +686,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 			}
 		}
 		method: {
-			description: """
-				HTTP method.
-
-				The HTTP method to use when making the request.
-				"""
-			required: false
+			description: "The HTTP method to use when making the request."
+			required:    false
 			type: string: {
 				default: "post"
 				enum: {

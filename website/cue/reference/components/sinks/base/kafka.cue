@@ -489,6 +489,22 @@ base: components: sinks: kafka: configuration: {
 			unit: "milliseconds"
 		}
 	}
+	rate_limit_duration_secs: {
+		description: "The time window used for the `rate_limit_num` option."
+		required:    false
+		type: uint: {
+			default: 1
+			unit:    "seconds"
+		}
+	}
+	rate_limit_num: {
+		description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+		required:    false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "requests"
+		}
+	}
 	sasl: {
 		description: "Configuration for SASL authentication when interacting with Kafka."
 		required:    false

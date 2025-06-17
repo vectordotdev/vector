@@ -96,6 +96,18 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::advanced))]
     pub message_timeout_ms: Duration,
 
+    /// The time window used for the `rate_limit_num` option.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Rate Limit Duration"))]
+    #[serde(default = "default_rate_limit_duration_secs")]
+    pub rate_limit_duration_secs: u64,
+
+    /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[configurable(metadata(docs::human_name = "Rate Limit Number"))]
+    #[serde(default = "default_rate_limit_num")]
+    pub rate_limit_num: u64,
+
     /// A map of advanced options to pass directly to the underlying `librdkafka` client.
     ///
     /// For more information on configuration options, see [Configuration properties][config_props_docs].
@@ -132,6 +144,14 @@ const fn default_socket_timeout_ms() -> Duration {
 
 const fn default_message_timeout_ms() -> Duration {
     Duration::from_millis(300000) // default in librdkafka
+}
+
+const fn default_rate_limit_duration_secs() -> u64 {
+    1
+}
+
+const fn default_rate_limit_num() -> u64 {
+    i64::MAX as u64 // i64 avoids TOML deserialize issue
 }
 
 fn example_librdkafka_options() -> HashMap<String, String> {
@@ -245,6 +265,8 @@ impl GenerateConfig for KafkaSinkConfig {
             auth: Default::default(),
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
+            rate_limit_duration_secs: default_rate_limit_duration_secs(),
+            rate_limit_num: default_rate_limit_num(),
             librdkafka_options: Default::default(),
             headers_key: None,
             acknowledgements: Default::default(),
