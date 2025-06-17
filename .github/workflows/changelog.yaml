@@ -10,7 +10,7 @@
 name: Changelog
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   # Due to merge queue requiring same status checks as PRs, must pass by default
   merge_group:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request'
     env:
-      PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
+      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
     steps:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
       # merge base. If we only shallow clone the repo, git may not have enough history to determine
