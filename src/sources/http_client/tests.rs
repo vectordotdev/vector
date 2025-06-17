@@ -253,7 +253,7 @@ async fn request_query_vrl_applied() {
                 "key1".to_string(),
                 QueryParameterValue::SingleParam(ParameterValue::Typed {
                     value: "upcase(\"bar\") + \"-\" + md5(\"baz\")".to_string(),
-                    param_type: ParamType::Vrl,
+                    r#type: ParamType::Vrl,
                 }),
             ),
             // Test multiple parameters with a mixture of string and VRL types
@@ -264,11 +264,11 @@ async fn request_query_vrl_applied() {
                     ParameterValue::String("\"bob ross\"".to_string()),
                     ParameterValue::Typed {
                         value: "mod(5, 2)".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                     ParameterValue::Typed {
                         value: "camelcase(\"input-string\")".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                 ]),
             ),
@@ -278,7 +278,7 @@ async fn request_query_vrl_applied() {
                 QueryParameterValue::SingleParam(ParameterValue::Typed {
                     value: "parse_timestamp!(\"10-Oct-2020 16:00+00:00\", format: \"%v %R %:z\")"
                         .to_string(),
-                    param_type: ParamType::Vrl,
+                    r#type: ParamType::Vrl,
                 }),
             ),
             // Test if other types are formatted correctly
@@ -287,19 +287,19 @@ async fn request_query_vrl_applied() {
                 QueryParameterValue::MultiParams(vec![
                     ParameterValue::Typed {
                         value: "to_int!(\"123\")".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                     ParameterValue::Typed {
                         value: "to_bool!(\"yes\")".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                     ParameterValue::Typed {
                         value: "to_float!(\"-99.9\")".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                     ParameterValue::Typed {
                         value: "to_string!(false)".to_string(),
-                        param_type: ParamType::Vrl,
+                        r#type: ParamType::Vrl,
                     },
                 ]),
             ),
@@ -382,7 +382,7 @@ async fn request_query_vrl_dynamic_updates() {
             "timestamp".to_string(),
             QueryParameterValue::SingleParam(ParameterValue::Typed {
                 value: "to_unix_timestamp(now(), unit: \"milliseconds\")".to_string(),
-                param_type: ParamType::Vrl,
+                r#type: ParamType::Vrl,
             }),
         )]),
         decoding: DeserializerConfig::Json(Default::default()),

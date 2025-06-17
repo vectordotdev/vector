@@ -605,7 +605,7 @@ pub enum ParameterValue {
             skip_serializing_if = "ParamType::is_default",
             rename = "type"
         )]
-        param_type: ParamType,
+        r#type: ParamType,
     },
 }
 
@@ -614,7 +614,7 @@ impl ParameterValue {
     pub const fn is_vrl(&self) -> bool {
         match self {
             ParameterValue::String(_) => false,
-            ParameterValue::Typed { param_type, .. } => matches!(param_type, ParamType::Vrl),
+            ParameterValue::Typed { r#type, .. } => matches!(r#type, ParamType::Vrl),
         }
     }
 

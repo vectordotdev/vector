@@ -151,7 +151,7 @@ fn query_examples() -> QueryParameters {
             "start_time".to_owned(),
             QueryParameterValue::SingleParam(ParameterValue::Typed {
                 value: "now()".to_owned(),
-                param_type: ParamType::Vrl,
+                r#type: ParamType::Vrl,
             }),
         ),
     ])
