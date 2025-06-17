@@ -614,7 +614,7 @@ base: components: sources: http_client: configuration: {
 				"X-My-Custom-Header": ["a", "vector", "of", "values"]
 			}]
 			options: "*": {
-				description: "An HTTP request header and it's value(s)."
+				description: "An HTTP request header and its value(s)."
 				required:    true
 				type: array: items: type: string: {}
 			}
@@ -644,17 +644,45 @@ base: components: sources: http_client: configuration: {
 
 			The parameters provided in this option are appended to any parameters
 			manually provided in the `endpoint` option.
+
+			VRL functions are supported within query parameters. You can
+			use functions like `now()` to dynamically modify query
+			parameter values.
 			"""
 		required: false
 		type: object: {
 			examples: [{
 				field: "value"
 				fruit: ["mango", "papaya", "kiwi"]
+				start_time: {
+					type:  "vrl"
+					value: "now()"
+				}
 			}]
 			options: "*": {
-				description: "A query string parameter and it's value(s)."
+				description: "A query string parameter and its value(s)."
 				required:    true
-				type: string: {}
+				type: {
+					object: options: {
+						type: {
+							description: "The type of the parameter, indicating how the `value` should be treated."
+							required:    false
+							type: string: {
+								default: "string"
+								enum: {
+									string: "The parameter value is a plain string."
+									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								}
+							}
+						}
+						value: {
+							description: "The raw value of the parameter."
+							required:    true
+							type: string: {}
+						}
+					}
+					string: {}
+				}
 			}
 		}
 	}
