@@ -349,8 +349,8 @@ pub struct S3RetryLogic {
 
     /// Retry specific errors.
     ///
-    /// A vector list of status codes matching specific error types that trigger failed
-    /// service retry attempts. The list is ignored if `retry_all_errors` is true.
+    /// A list of HTTP status codes matching specific error types that trigger failed
+    /// service retry attempts. This list is ignored if `retry_all_errors` is true.
     pub errors_to_retry: Option<Vec<u16>>,
 }
 
