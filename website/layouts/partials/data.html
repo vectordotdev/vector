@@ -253,6 +253,11 @@
     </div>
   {{ end }}
 
+  {{/* Source/transform/sink input */}}
+  {{ with .component_input_types }}
+    {{ template "telemetry_input" . }}
+  {{ end }}
+
   {{/* Source/transform/sink output */}}
   {{ with .component_output_types }}
     <div class="py-3 px-5">
@@ -274,7 +279,7 @@
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
-          {{ template "telemetry" . }}
+          {{ template "telemetry_output" . }}
         </div>
       {{ end }}
 
@@ -284,7 +289,7 @@
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
-          {{ template "telemetry" . }}
+          {{ template "telemetry_output" . }}
         </div>
       {{ end }}
 
@@ -447,7 +452,7 @@
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
-          {{ template "telemetry" . }}
+          {{ template "telemetry_output" . }}
         </div>
       {{ end }}
 
@@ -460,7 +465,7 @@
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
-          {{ template "telemetry" . }}
+          {{ template "telemetry_output" . }}
         </div>
       {{ end }}
 

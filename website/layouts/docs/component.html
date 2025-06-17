@@ -66,7 +66,7 @@
           {{/* Component configuration */}}
           {{ with $config.configuration }}
           {{ if gt (len .) 1 }} {{/* Don't display if only the "type" config is present */}}
-          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}Ø
 
           {{ partial "components/example-configs.html" (dict "examples" $exampleConfigs) }}
 
@@ -78,6 +78,12 @@
           {{ with $config.env_vars }}
           {{ partial "heading.html" (dict "text" "Environment variables" "level" 2) }}
           {{ partial "data.html" (dict "component_env_vars" . ) }}
+          {{ end }}
+
+          {{/* Component log/metric/trace input types */}}
+          {{ with $config.input }}
+          {{ partial "heading.html" (dict "text" "Input Types" "level" 2) }}
+          {{ partial "data.html" (dict "component_input_types" . ) }}
           {{ end }}
 
           {{/* Component outputs */}}
