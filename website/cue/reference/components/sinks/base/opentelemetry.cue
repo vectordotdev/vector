@@ -686,12 +686,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 			}
 		}
 		method: {
-			description: """
-				HTTP method.
-
-				The HTTP method to use when making the request.
-				"""
-			required: false
+			description: "The HTTP method to use when making the request."
+			required:    false
 			type: string: {
 				default: "post"
 				enum: {
