@@ -1048,8 +1048,8 @@ base: components: sinks: aws_s3: configuration: {
 		description: """
 			Specifies errors to retry
 
-			By default, the sink will only retry attempts it deems to be "retriable,"
-			these settings override that behavior.
+			By default, the sink only retries attempts it deems possible to retry.
+			These settings override the default behavior.
 			"""
 		required: false
 		type: object: options: {
@@ -1057,8 +1057,8 @@ base: components: sinks: aws_s3: configuration: {
 				description: """
 					Retry specific errors.
 
-					A vector list of status codes matching specific error types that will trigger
-					failed service retry attempts. The list is ignored if `retry_all_errors` is true.
+					A vector list of status codes matching specific error types that trigger failed
+					service retry attempts. The list is ignored if `retry_all_errors` is true.
 					"""
 				required: false
 				type: array: items: type: uint: {}
@@ -1067,7 +1067,7 @@ base: components: sinks: aws_s3: configuration: {
 				description: """
 					Retry all errors.
 
-					All failed service calls will be retried.
+					The sink retries all failed service calls.
 					"""
 				required: false
 				type: bool: {}

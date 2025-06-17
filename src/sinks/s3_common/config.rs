@@ -344,13 +344,13 @@ fn configured_to_retry(
 pub struct S3RetryLogic {
     /// Retry all errors.
     ///
-    /// All failed service calls will be retried.
+    /// The sink retries all failed service calls.
     pub retry_all_errors: Option<bool>,
 
     /// Retry specific errors.
     ///
-    /// A vector list of status codes matching specific error types that will trigger
-    /// failed service retry attempts. The list is ignored if `retry_all_errors` is true.
+    /// A vector list of status codes matching specific error types that trigger failed
+    /// service retry attempts. The list is ignored if `retry_all_errors` is true.
     pub errors_to_retry: Option<Vec<u16>>,
 }
 

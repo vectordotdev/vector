@@ -148,8 +148,8 @@ pub struct S3SinkConfig {
 
     /// Specifies errors to retry
     ///
-    /// By default, the sink will only retry attempts it deems to be "retriable,"
-    /// these settings override that behavior.
+    /// By default, the sink only retries attempts it deems possible to retry.
+    /// These settings override the default behavior.
     #[configurable(derived)]
     #[serde(default)]
     pub retry_logic: Option<S3RetryLogic>,
