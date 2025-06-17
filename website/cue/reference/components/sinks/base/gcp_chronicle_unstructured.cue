@@ -116,8 +116,12 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 		type: string: examples: ["c8c65bfa-5f2c-42d4-9189-64bb7b939f2c"]
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
