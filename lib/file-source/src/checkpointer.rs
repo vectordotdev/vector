@@ -282,7 +282,7 @@ impl Checkpointer {
                 let (c, salt, pos) =
                     scan_fmt!(file_name, "m{x}.{}.{}", [hex u64], u64, FilePosition)
                         .unwrap();
-                (ModificationTime(c, salt), pos)
+                (ChecksumWithSalt(c, salt), pos)
             }
             _ => {
                 let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
