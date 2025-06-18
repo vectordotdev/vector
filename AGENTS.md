@@ -11,6 +11,11 @@ This repository uses industry best practices for documentation, code quality, an
 - Keep the subject under 72 characters.
 - Provide a body when the change is non-trivial.
 
+## Pull Requests
+
+- Reference the related GitHub issue in the pull request description.
+- Use "closes #<issue>" so that the issue closes automatically when the pull request is merged.
+
 ## Documentation
 
 - All Markdown should pass markdownlint.

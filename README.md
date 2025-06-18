@@ -7,7 +7,8 @@
     <a href="https://chat.vector.dev">Chat</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="docs/guides/development_best_practices.md">Development Guide</a>
+    <a href="docs/guides/development_best_practices.md">Development Guide</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="docs/guides/pull_request_workflow.md">Pull Request Guide</a>
   </strong>
 </p>
 <p align="center">
