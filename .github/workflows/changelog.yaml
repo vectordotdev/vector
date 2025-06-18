@@ -22,7 +22,7 @@ jobs:
     fail_on_error: true
     if: github.event_name == 'pull_request'
     env:
-      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+      PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
     steps:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
       # merge base. If we only shallow clone the repo, git may not have enough history to determine
