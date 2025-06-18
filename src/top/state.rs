@@ -22,6 +22,7 @@ pub struct SentEventsMetric {
 #[derive(Debug)]
 pub enum EventType {
     InitializeState(State),
+    UptimeChanged(f64),
     ReceivedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
     ReceivedBytesThroughputs(i64, Vec<IdentifiedMetric>),
@@ -76,6 +77,7 @@ impl ConnectionStatus {
 #[derive(Debug, Clone)]
 pub struct State {
     pub connection_status: ConnectionStatus,
+    pub uptime_secs: f64,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
 }
 
@@ -83,6 +85,7 @@ impl State {
     pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
+            uptime_secs: 0.0,
             components,
         }
     }
@@ -243,6 +246,9 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                 }
                 EventType::ConnectionUpdated(status) => {
                     state.connection_status = status;
+                }
+                EventType::UptimeChanged(uptime) => {
+                    state.uptime_secs = uptime;
                 }
             }
 
