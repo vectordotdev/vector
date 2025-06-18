@@ -45,18 +45,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch base branch
+      - name: Validate changelog
+        if: env.PR_HAS_LABEL == 'false'
         run: |
           git fetch origin $BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH
-
-      - name: Bypass when no‑changelog label is present
-        if: env.PR_HAS_LABEL == 'true'
-        run: |
-          echo "'no-changelog' label detected – skipping changelog validation."
-          exit 0
-
-      - name: Run changelog fragment checker
-        run: ./scripts/check_changelog_fragments.sh
+          ./scripts/check_changelog_fragments.sh
 
   # Report a commit‑status named exactly "Changelog" so the branch‑protection rule is satisfied.
   report-status:
