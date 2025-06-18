@@ -37,7 +37,7 @@ use std::{
 use arc_swap::ArcSwap;
 use vrl::value::ObjectMap;
 
-use super::{Condition, IndexHandle, Table};
+use super::{Conditions, IndexHandle, Table};
 use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
@@ -214,9 +214,9 @@ impl TableSearch {
         &self,
         table: &str,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
@@ -236,9 +236,9 @@ impl TableSearch {
         &self,
         table: &str,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        index: Option<IndexHandle>,
+        index: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
@@ -285,7 +285,7 @@ fn fmt_enrichment_table(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::DummyEnrichmentTable;
+    use crate::{test_util::DummyEnrichmentTable, Condition};
     use vrl::value::Value;
 
     #[test]
@@ -332,12 +332,12 @@ mod tests {
             tables.find_table_row(
                 "dummy1",
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
-                }],
+                }]],
                 None,
-                None
+                &[]
             )
         );
     }
@@ -373,12 +373,12 @@ mod tests {
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,
-                &[Condition::Equals {
+                &[vec![Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
-                }],
+                }]],
                 None,
-                None
+                &[]
             )
         );
     }
@@ -442,7 +442,7 @@ mod tests {
             tables
                 .get("dummy1")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &[], None, &[])
                 .unwrap()
                 .get("field")
                 .cloned()
@@ -455,7 +455,7 @@ mod tests {
             tables
                 .get("dummy2")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &[], None, &[])
                 .unwrap()
                 .get("thing")
                 .cloned()
