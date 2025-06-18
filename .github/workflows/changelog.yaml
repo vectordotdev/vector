@@ -1,12 +1,9 @@
 # Changelog
 #
+# Validates that a changelog entry was added.
 # - Works for both fork‑based PRs (pull_request) and same‑repo PRs (pull_request_target)
-# Runs on PRs when:
-#   - opened/re-opened
-#   - new commits pushed
-#   - label is added or removed
-# Runs on merge queues, but just passes, because it is a required check.
-
+# - Gives the merge‑queue a green light by exiting early under merge_group events
+#
 name: Changelog
 
 on:
@@ -29,21 +26,38 @@ jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
 
+    # Skip all real work for merge‑queue jobs – they just need a green check.
+    if: ${{ github.event_name != 'merge_group' }}
+
     env:
+      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
       # Base branch (e.g. master or main) that the PR targets
       BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
-      SHOULD_VALIDATE_CHANGELOG: ${{ github.event_name != 'merge_group' && contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+
     steps:
       # Checkout the full repo history. For pull_request events this checks out the PR head (fork),
       # for pull_request_target it checks out the base repo. Either way we fetch the base branch so
       # the changelog script can diff against it.
-      if: ${{ env.SHOULD_VALIDATE_CHANGELOG == 'true' }}
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate changelog
-        if: ${{ env.SHOULD_VALIDATE_CHANGELOG == 'true' }}
+      - name: Fetch base branch
         run: |
           git fetch origin $BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH
-          ./scripts/check_changelog_fragments.sh
+
+      - name: Bypass when no‑changelog label is present
+        if: env.PR_HAS_LABEL == 'true'
+        run: |
+          echo "'no-changelog' label detected – skipping changelog validation."
+          exit 0
+
+      - name: Run changelog fragment checker
+        run: ./scripts/check_changelog_fragments.sh
+
+  # Lightweight pass‑through job for merge‑queue checks so the queue doesn’t block.
+  merge-queue-pass:
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "merge_group event – passing without running changelog validation."
