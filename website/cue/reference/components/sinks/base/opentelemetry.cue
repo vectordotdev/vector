@@ -274,8 +274,12 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 			}
 		}
 		encoding: {
-			description: "Configures how events are encoded into raw bytes."
-			required:    true
+			description: """
+				Encoding configuration.
+				Configures how events are encoded into raw bytes.
+				The selected encoding also determines which input types (logs, metrics, traces) are supported.
+				"""
+			required: true
 			type: object: options: {
 				avro: {
 					description:   "Apache Avro-specific encoder options."
@@ -686,12 +690,8 @@ base: components: sinks: opentelemetry: configuration: protocol: {
 			}
 		}
 		method: {
-			description: """
-				HTTP method.
-
-				The HTTP method to use when making the request.
-				"""
-			required: false
+			description: "The HTTP method to use when making the request."
+			required:    false
 			type: string: {
 				default: "post"
 				enum: {
