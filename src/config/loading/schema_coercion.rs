@@ -389,8 +389,10 @@ fn try_coerce_to_allowed_type(
             coerce_object(value, schema, definitions, path_components)
         }
         "array" => {
+            // Any type can be wrapped to an array. This is needed because  we have deserialization logic that accepts
+            // e.g. a single string and converts it to an array, set or some other collection.
             if !value.is_array() {
-                return fail_expected!(Array, value, path_components);
+                *value = Value::Array(vec![value.clone()]);
             }
             coerce_array(value, schema, definitions, path_components)
         }
