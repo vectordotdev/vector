@@ -91,6 +91,12 @@ impl SecretBackendLoader {
 impl Process for SecretBackendLoader {
     fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
         let table = resolve_environment_variables(table)?;
+
+        // If there's no top-level `secret` section, nothing to do here.
+        if !table.contains_key("secret") {
+            return Ok(table);
+        }
+
         collect_secret_keys_from_table(&table, &mut self.secret_keys);
         Ok(table)
     }
