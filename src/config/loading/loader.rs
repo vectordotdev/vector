@@ -338,7 +338,5 @@ pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>>
         }
     }
 
-    let table = interpolate_toml_table_with_env_vars(&table, &vars)?;
-    // println!("Interpolated table: {table:#?}");
-    Ok(table)
+    interpolate_toml_table_with_env_vars(&table, &vars)
 }
