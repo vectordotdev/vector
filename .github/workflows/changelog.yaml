@@ -27,8 +27,6 @@ jobs:
     runs-on: ubuntu-24.04
 
     # Skip all real work for merge‑queue jobs – they just need a green check.
-    if: ${{ github.event_name != 'merge_group' }}
-
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
       # Base branch (e.g. master or main) that the PR targets
@@ -39,10 +37,12 @@ jobs:
       # for pull_request_target it checks out the base repo. Either way we fetch the base branch so
       # the changelog script can diff against it.
       - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'merge_group' }}
         with:
           fetch-depth: 0
 
       - name: Fetch base branch
+        if: ${{ github.event_name != 'merge_group' }}
         run: |
           git fetch origin $BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH
 
@@ -52,12 +52,12 @@ jobs:
           echo "'no-changelog' label detected – skipping changelog validation."
           exit 0
 
-      - name: Run changelog fragment checker
-        run: ./scripts/check_changelog_fragments.sh
+      - name: Merge queue
+        if: ${{ github.event_name == 'merge_group' }}
+        run: |
+          echo "merge_group event – passing without running changelog validation."
+          exit 0
 
-  # Lightweight pass‑through job for merge‑queue checks so the queue doesn’t block.
-  merge-queue-pass:
-    if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-24.04
-    steps:
-      - run: echo "merge_group event – passing without running changelog validation."
+      - name: Run changelog fragment checker
+        if: ${{ env.PR_HAS_LABEL == 'false' && github.event_name != 'merge_group' }}
+        run: ./scripts/check_changelog_fragments.sh
