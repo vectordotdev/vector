@@ -295,9 +295,21 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
 pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     table: Table,
 ) -> Result<T, Vec<String>> {
-    Value::Table(table)
-        .try_into()
-        .map_err(|e| vec![e.to_string()])
+    let mut table_json = serde_json::to_value(table)
+        .map_err(|err| err.to_string())
+        .map_err(|err| vec![err])?;
+
+    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
+    let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
+    coerce(
+        &mut table_json,
+        &schema_json,
+        schema_json.get("definitions"),
+        &mut Vec::new(),
+    )
+    .map_err(|err| vec![err.to_string()])?;
+
+    serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])
 }
 
 fn string_from_input<R: Read>(mut input: R) -> Result<String, Vec<String>> {
@@ -328,22 +340,5 @@ pub fn resolve_environment_variables(table: Table) -> Result<Table, Vec<String>>
 
     let table = interpolate_toml_table_with_env_vars(&table, &vars)?;
     // println!("Interpolated table: {table:#?}");
-    let mut table_json = serde_json::to_value(table)
-        .map_err(|err| err.to_string())
-        .map_err(|err| vec![err])?;
-
-    let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
-    let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
-    coerce(
-        &mut table_json,
-        &schema_json,
-        schema_json.get("definitions"),
-        &mut Vec::new(),
-    )
-    .map_err(|err| vec![err.to_string()])?;
-
-    let final_table =
-        serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])?;
-    // println!("Final table: {final_table:#?}");
-    Ok(final_table)
+    Ok(table)
 }
