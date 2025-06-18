@@ -9,6 +9,9 @@
 
 name: Changelog
 
+permissions:
+  pull-requests: write
+
 on:
   # Trigger in the PR context (reads the workflow from the PR branch). This lets the check
   # run even before the workflow file change is merged, which prevents the “Changelog Expected”
