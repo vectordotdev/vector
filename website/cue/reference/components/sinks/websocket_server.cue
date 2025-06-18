@@ -66,6 +66,10 @@ components: sinks: websocket_server: {
 	}
 
 	input: {
+		description: """
+			The supported input types depend on the encoding configuration.
+			This sink accepts any input type supported by the specified encoder.
+			"""
 		logs: true
 		metrics: {
 			counter:      true

@@ -35,7 +35,7 @@ impl ConfigDiff {
     }
 
     /// Swaps removed with added in Differences.
-    pub fn flip(mut self) -> Self {
+    pub const fn flip(mut self) -> Self {
         self.sources.flip();
         self.transforms.flip();
         self.sinks.flip();
@@ -189,7 +189,7 @@ impl Difference {
         self.to_remove.contains(key)
     }
 
-    fn flip(&mut self) {
+    const fn flip(&mut self) {
         std::mem::swap(&mut self.to_remove, &mut self.to_add);
     }
 

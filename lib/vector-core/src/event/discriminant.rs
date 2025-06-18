@@ -77,7 +77,7 @@ fn f64_eq(this: f64, other: f64) -> bool {
     }
     if this != other {
         return false;
-    };
+    }
     if (this.is_sign_positive() && other.is_sign_negative())
         || (this.is_sign_negative() && other.is_sign_positive())
     {

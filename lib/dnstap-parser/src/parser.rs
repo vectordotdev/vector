@@ -393,11 +393,10 @@ impl DnstapParser {
 
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
-
             let timestamp = Utc
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
-                .expect("invalid timestamp");
+                .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 DnstapParser::insert(event, prefix.clone(), timestamp_key, timestamp);
             }
@@ -1358,9 +1357,9 @@ mod tests {
         fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
             let mut event = LogEvent::default();
             let root = owned_value_path!();
-            let type_ids = HashSet::new();
+            let type_ids = HashSet::from([1]);
             DnstapParser::parse_dnstap_message_time(
-                &mut event, &root, time_sec, time_nsec, 0, None, &type_ids,
+                &mut event, &root, time_sec, time_nsec, 1, None, &type_ids,
             )
         }
         // okay case
@@ -1374,7 +1373,9 @@ mod tests {
         // overflow in add
         assert!(
             test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
-        )
+        );
+        // cannot be parsed by timestamp_opt
+        assert!(test_one_timestamp_parse(96, Some(1616928816)).is_err());
     }
 
     #[test]

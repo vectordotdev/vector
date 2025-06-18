@@ -182,6 +182,15 @@ base: components: sinks: elasticsearch: configuration: {
 				required:      false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 			strategy: {
 				description: """
 					The authentication strategy to use.
@@ -605,7 +614,27 @@ base: components: sinks: elasticsearch: configuration: {
 			options: "*": {
 				description: "A query string parameter."
 				required:    true
-				type: string: {}
+				type: {
+					object: options: {
+						type: {
+							description: "The type of the parameter, indicating how the `value` should be treated."
+							required:    false
+							type: string: {
+								default: "string"
+								enum: {
+									string: "The parameter value is a plain string."
+									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								}
+							}
+						}
+						value: {
+							description: "The raw value of the parameter."
+							required:    true
+							type: string: {}
+						}
+					}
+					string: {}
+				}
 			}
 		}
 	}

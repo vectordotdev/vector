@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 # Minimum supported rust version
 # See docs/DEVELOPING.md for policy
-rust-version = "1.83"
+rust-version = "1.86"
 
 [[bin]]
 name = "vector"
@@ -135,15 +135,15 @@ members = [
 
 [workspace.dependencies]
 anyhow = "1.0.98"
-cfg-if = { version = "1.0.0", default-features = false }
+cfg-if = { version = "1.0.1", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
-clap = { version = "4.5.37", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.40", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
-flate2 = { version = "1.1.1", default-features = false, features = ["zlib-rs"] }
+flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 glob = { version = "0.3.2", default-features = false }
-hickory-proto = { version = "0.25.1", default-features = false, features = ["dnssec-ring"] }
+hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 indexmap = { version = "2.9.0", default-features = false, features = ["serde", "std"] }
 inventory = { version = "0.3" }
 indoc = { version = "2.0.6" }
@@ -163,18 +163,18 @@ rand_distr = { version = "0.5.1", default-features = false }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde_json = { version = "1.0.140", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-snafu = { version = "0.7.5", default-features = false, features = ["futures", "std"] }
-tempfile = "3.19.1"
-tokio = { version = "1.44.2", default-features = false, features = ["full"] }
-toml = { version = "0.8.22", default-features = false, features = ["display", "parse"] }
+snafu = { version = "0.8.0", default-features = false, features = ["futures", "std"] }
+tempfile = "3.20.0"
+tokio = { version = "1.45.1", default-features = false, features = ["full"] }
+toml = { version = "0.8.23", default-features = false, features = ["display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-uuid = { version = "1.16.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vrl = { features = ["arbitrary", "cli", "test", "test_framework"], version = "0.24.0" }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 cfg-if.workspace = true
@@ -207,7 +207,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.88", default-features = false }
 futures.workspace = true
-tokio = { version = "1.44.2", default-features = false, features = ["full"] }
+tokio = { version = "1.45.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -225,7 +225,7 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 
 # AWS - Official SDK
-aws-runtime = { version = "1.5.6", optional = true }
+aws-runtime = { version = "1.5.7", optional = true }
 aws-config = { version = "1.6.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.3", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sdk-cloudwatch = { version = "1.70.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -247,7 +247,7 @@ aws-sdk-sts = { version = "1.65.0", default-features = false, features = ["behav
 
 # The `aws-sdk-sts` crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication is configured.
-aws-sigv4 = { version = "1.3.1", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "1.3.2", default-features = false, features = ["sign-http"], optional = true }
 
 aws-smithy-async = { version = "1.2.5", default-features = false, features = ["rt-tokio"], optional = true }
 aws-smithy-http = { version = "0.62", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
@@ -290,10 +290,11 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "2.5.3", default-features = false, features = ["native-tls"], optional = true }
+deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
 # API
-async-graphql = { version = "7.0.16", default-features = false, optional = true, features = ["chrono", "playground"] }
-async-graphql-warp = { version = "7.0.16", default-features = false, optional = true }
+async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
+async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.29.0", default-features = false, features = ["event-stream", "windows"], optional = true }
@@ -306,11 +307,11 @@ ratatui = { version = "0.29.0", optional = true, default-features = false, featu
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d", optional = true }
+greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.23", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.24", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
@@ -335,8 +336,8 @@ flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
 governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
-h2 = { version = "0.4.9", default-features = false, optional = true }
-hash_hasher = { version = "2.0.0", default-features = false }
+h2 = { version = "0.4.10", default-features = false, optional = true }
+hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
@@ -362,12 +363,12 @@ async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.4", default-features = false, optional = true }
 nom = { version = "7.1.3", default-features = false, optional = true }
 notify = { version = "8.0.0", default-features = false, features = ["macos_fsevent"] }
-openssl = { version = "0.10.72", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.3.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
@@ -379,8 +380,8 @@ rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustl
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
-socket2 = { version = "0.5.9", default-features = false }
-sqlx = { version = "0.8.5", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
+socket2 = { version = "0.5.10", default-features = false }
+sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -402,12 +403,12 @@ arr_macro = { version = "0.2.1" }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix", default-features = false, features = ["disk"] }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.10.3", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
+mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
 sysinfo = "0.34.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.7.0"
+windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.26.2", default-features = false, features = ["socket", "signal"] }
@@ -443,7 +444,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.25.0" }
 tempfile.workspace = true
 test-generator = "0.3.1"
-tokio = { version = "1.44.2", features = ["test-util"] }
+tokio = { version = "1.45.1", features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
@@ -784,7 +785,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
-sinks-amqp = ["lapin"]
+sinks-amqp = ["deadpool", "lapin"]
 sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]
