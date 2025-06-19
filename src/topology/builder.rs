@@ -52,7 +52,7 @@ use crate::{
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{wrap, UtilizationEmitter, UtilizationTimerMessage},
+    utilization::{wrap, UtilizationComponentSender, UtilizationEmitter},
     SourceSender,
 };
 
@@ -619,9 +619,9 @@ impl<'a> Builder<'a> {
 
             let (trigger, tripwire) = Tripwire::new();
 
-            self.utilization_emitter
+            let utilization_sender = self
+                .utilization_emitter
                 .add_component(key.clone(), gauge!("utilization"));
-            let utilization_sender = self.utilization_emitter.get_sender();
             let component_key = key.clone();
             let sink = async move {
                 debug!("Sink starting.");
@@ -826,15 +826,8 @@ fn build_sync_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs, &node.key);
 
-    utilization_emitter.add_component(node.key.clone(), gauge!("utilization"));
-    let runner = Runner::new(
-        t,
-        input_rx,
-        utilization_emitter.get_sender(),
-        node.key.clone(),
-        node.input_details.data_type(),
-        outputs,
-    );
+    let sender = utilization_emitter.add_component(node.key.clone(), gauge!("utilization"));
+    let runner = Runner::new(t, input_rx, sender, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
     } else {
@@ -874,8 +867,7 @@ struct Runner {
     input_rx: Option<BufferReceiver<EventArray>>,
     input_type: DataType,
     outputs: TransformOutputs,
-    key: ComponentKey,
-    timer_tx: UnboundedSender<UtilizationTimerMessage>,
+    timer_tx: UtilizationComponentSender,
     events_received: Registered<EventsReceived>,
 }
 
@@ -883,8 +875,7 @@ impl Runner {
     fn new(
         transform: Box<dyn SyncTransform>,
         input_rx: BufferReceiver<EventArray>,
-        timer_tx: UnboundedSender<UtilizationTimerMessage>,
-        key: ComponentKey,
+        timer_tx: UtilizationComponentSender,
         input_type: DataType,
         outputs: TransformOutputs,
     ) -> Self {
@@ -893,23 +884,13 @@ impl Runner {
             input_rx: Some(input_rx),
             input_type,
             outputs,
-            key,
             timer_tx,
             events_received: register!(EventsReceived),
         }
     }
 
     fn on_events_received(&mut self, events: &EventArray) {
-        if self
-            .timer_tx
-            .send(UtilizationTimerMessage::StopWait(
-                self.key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?self.key, "Couldn't send utilization stop wait message from sync transform.");
-        }
+        self.timer_tx.stop();
 
         self.events_received.emit(CountByteSize(
             events.len(),
@@ -918,16 +899,7 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
-        if self
-            .timer_tx
-            .send(UtilizationTimerMessage::StartWait(
-                self.key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?self.key, "Couldn't send utilization start wait message from sync transform.");
-        }
+        self.timer_tx.start();
         self.outputs.send(outputs_buf).await
     }
 
@@ -944,16 +916,7 @@ impl Runner {
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
-        if self
-            .timer_tx
-            .send(UtilizationTimerMessage::StartWait(
-                self.key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?self.key, "Couldn't send utilization start wait message from sync transform.");
-        }
+        self.timer_tx.start();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
             self.transform.transform_all(events, &mut outputs_buf);
@@ -979,16 +942,7 @@ impl Runner {
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
 
-        if self
-            .timer_tx
-            .send(UtilizationTimerMessage::StartWait(
-                self.key.clone(),
-                Instant::now(),
-            ))
-            .is_err()
-        {
-            debug!(component_id = ?self.key, "Couldn't send utilization start wait message from sync transform.");
-        }
+        self.timer_tx.start();
         loop {
             tokio::select! {
                 biased;
@@ -1053,12 +1007,8 @@ fn build_task_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    utilization_emitter.add_component(key.clone(), gauge!("utilization"));
-    let input_rx = wrap(
-        utilization_emitter.get_sender(),
-        key.clone(),
-        input_rx.into_stream(),
-    );
+    let sender = utilization_emitter.add_component(key.clone(), gauge!("utilization"));
+    let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
 
     let events_received = register!(EventsReceived);
     let filtered = input_rx

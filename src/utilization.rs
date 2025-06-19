@@ -18,7 +18,7 @@ use crate::stats;
 #[pin_project]
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
-    timer_tx: Sender<UtilizationTimerMessage>,
+    timer_tx: UtilizationComponentSender,
     component_key: ComponentKey,
     inner: S,
 }
@@ -49,20 +49,10 @@ where
         // This will just measure the time, while UtilizationEmitter collects
         // all the timers and emits utilization value periodically
         let this = self.project();
-        if let Err(err) = this.timer_tx.try_send(UtilizationTimerMessage::StartWait(
-            this.component_key.clone(),
-            Instant::now(),
-        )) {
-            debug!(component_id = ?this.component_key, error = ?err, "Couldn't send utilization start wait message from wrapped stream.");
-        }
+        this.timer_tx.start();
         let _ = this.intervals.poll_next_unpin(cx);
         let result = ready!(this.inner.poll_next_unpin(cx));
-        if let Err(err) = this.timer_tx.try_send(UtilizationTimerMessage::StopWait(
-            this.component_key.clone(),
-            Instant::now(),
-        )) {
-            debug!(component_id = ?this.component_key, error = ?err, "Couldn't send utilization stop wait message from wrapped stream.");
-        }
+        this.timer_tx.stop();
         Poll::Ready(result)
     }
 }
@@ -148,9 +138,34 @@ impl Timer {
 }
 
 #[derive(Debug)]
-pub(crate) enum UtilizationTimerMessage {
+enum UtilizationTimerMessage {
     StartWait(ComponentKey, Instant),
     StopWait(ComponentKey, Instant),
+}
+
+pub(crate) struct UtilizationComponentSender {
+    component_key: ComponentKey,
+    timer_tx: Sender<UtilizationTimerMessage>,
+}
+
+impl UtilizationComponentSender {
+    pub(crate) fn start(&self) {
+        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StartWait(
+            self.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization start wait message.");
+        }
+    }
+
+    pub(crate) fn stop(&self) {
+        if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StopWait(
+            self.component_key.clone(),
+            Instant::now(),
+        )) {
+            debug!(component_id = ?self.component_key, error = ?err, "Couldn't send utilization stop wait message.");
+        }
+    }
 }
 
 pub(crate) struct UtilizationEmitter {
@@ -171,12 +186,19 @@ impl UtilizationEmitter {
         }
     }
 
-    pub(crate) fn add_component(&mut self, key: ComponentKey, gauge: Gauge) {
-        self.timers.insert(key, Timer::new(gauge));
-    }
-
-    pub(crate) fn get_sender(&self) -> Sender<UtilizationTimerMessage> {
-        self.timer_tx.clone()
+    /// Adds a new component to this utilization metric emitter
+    ///
+    /// Returns a sender which can be used to send utilization information back to the emitter
+    pub(crate) fn add_component(
+        &mut self,
+        key: ComponentKey,
+        gauge: Gauge,
+    ) -> UtilizationComponentSender {
+        self.timers.insert(key.clone(), Timer::new(gauge));
+        UtilizationComponentSender {
+            timer_tx: self.timer_tx.clone(),
+            component_key: key,
+        }
     }
 
     pub(crate) async fn run_utilization(&mut self, mut shutdown: ShutdownSignal) {
@@ -217,7 +239,7 @@ impl UtilizationEmitter {
 /// with knowledge of the config the data is still useful.
 #[allow(clippy::missing_const_for_fn)]
 pub(crate) fn wrap<S>(
-    timer_tx: Sender<UtilizationTimerMessage>,
+    timer_tx: UtilizationComponentSender,
     component_key: ComponentKey,
     inner: S,
 ) -> Utilization<S> {
