@@ -692,15 +692,54 @@ mod test {
     #[test]
     fn test_coercion_with_array_support() {
         let mut input = json!({
+            "api": {
+                "enabled": "false",
+            },
+            "proxy": {
+                "enabled": true,
+                "http": "http://example.com",
+                "https": "https://example.com",
+                "no_proxy": "no-proxy.com"
+            },
+            "enrichment_tables": {
+                "memory_table": {
+                    "type": "memory",
+                    "ttl": 60,
+                    "flush_interval": 5,
+                    "inputs": ["s0"],
+                },
+            },
+            "secret": {
+                "backend_1": {
+                    "type": "file",
+                    "path": "some.json",
+                },
+            },
             "sources": {
                 "source0": {
                     "type": "demo_logs",
                     "count": "100",
                     "format": "shuffle",
                     "lines": ["777", true, false, 0.1, 123, "some string"],
-                    "interval": "1"
-                }
-            }
+                    "interval": "1",
+                },
+            },
+            "transforms": {
+                "t0": {
+                    "inputs": ["s0"],
+                    "type": "remap",
+                    "source": ".host = \"${HOSTNAME}\""
+                },
+            },
+            "sinks": {
+                "sink0": {
+                    "inputs": ["t0"],
+                    "type": "console",
+                    "encoding": {
+                        "codec": "json",
+                    },
+                },
+            },
         });
 
         let demo_logs_schema =
@@ -712,25 +751,71 @@ mod test {
             &mut Vec::new(),
         )
         .unwrap();
+
         assert_eq!(
             input,
             json!({
-                "sources": {
-                    "source0": {
-                        "type": "demo_logs",
-                        "count": 100,
-                        "format": "shuffle",
-                        "lines": [
-                            "777",
-                            "true",
-                            "false",
-                            "0.1",
-                            "123",
-                            "some string"
-                        ],
-                        "interval": 1
-                    }
+              "api": {
+                "enabled": false
+              },
+              "proxy": {
+                "enabled": true,
+                "http": "http://example.com",
+                "https": "https://example.com",
+                "no_proxy": "no-proxy.com"
+              },
+              "enrichment_tables": {
+                "memory_table": {
+                  "type": "memory",
+                  "ttl": 60,
+                  "flush_interval": 5,
+                  "inputs": [
+                    "s0"
+                  ]
                 }
+              },
+              "secret": {
+                "backend_1": {
+                  "type": "file",
+                  "path": "some.json"
+                }
+              },
+              "sources": {
+                "source0": {
+                  "type": "demo_logs",
+                  "count": 100,
+                  "format": "shuffle",
+                  "lines": [
+                    "777",
+                    "true",
+                    "false",
+                    "0.1",
+                    "123",
+                    "some string"
+                  ],
+                  "interval": 1
+                }
+              },
+              "transforms": {
+                "t0": {
+                  "inputs": [
+                    "s0"
+                  ],
+                  "type": "remap",
+                  "source": ".host = \"${HOSTNAME}\""
+                }
+              },
+              "sinks": {
+                "sink0": {
+                  "inputs": [
+                    "t0"
+                  ],
+                  "type": "console",
+                  "encoding": {
+                    "codec": "json"
+                  }
+                }
+              }
             })
         );
     }
