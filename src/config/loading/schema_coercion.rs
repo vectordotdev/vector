@@ -87,7 +87,8 @@ pub fn coerce(
     handle_bool(schema, path_components)?;
     handle_ref(value, schema, definitions, path_components)?;
     handle_all_of(value, schema, definitions, path_components)?;
-    handle_one_of_any_of(value, schema, definitions, path_components)?;
+    handle_one_of(value, schema, definitions, path_components)?;
+    handle_any_of(value, schema, definitions, path_components)?;
     handle_enum(value, schema, path_components)?;
     handle_const(value, schema, path_components)?;
 
@@ -166,22 +167,46 @@ fn handle_all_of(
     Ok(())
 }
 
-fn handle_one_of_any_of(
+/// Apply `oneOf` semantics: exactly one schema must match,
+/// or, if the schema is marked `"untagged"`, behave like `anyOf`.
+fn handle_one_of(
     value: &mut Value,
     schema: &Value,
     definitions: Option<&Value>,
     path_components: &mut Vec<String>,
 ) -> Result<(), Error> {
-    if let Some(one_of) = schema.get("oneOf").and_then(|v| v.as_array()) {
-        return coerce_one_of(value, one_of, definitions, path_components);
-    }
+    let Some(variants) = schema.get("oneOf").and_then(|v| v.as_array()) else {
+        return Ok(());
+    };
 
-    if let Some(any_of) = schema.get("anyOf").and_then(|v| v.as_array()) {
-        return coerce_any_of(value, any_of, definitions, path_components);
-    }
+    // If this oneOf is marked untagged, treat it like anyOf
+    let is_untagged = schema
+        .get("_metadata")
+        .and_then(|m| m.get("docs::enum_tagging"))
+        .and_then(Value::as_str)
+        == Some("untagged");
 
-    Ok(())
+    if is_untagged {
+        coerce_any_of(value, variants, definitions, path_components)
+    } else {
+        coerce_one_of(value, variants, definitions, path_components)
+    }
 }
+
+/// Apply `anyOf` semantics: at least one schema must match.
+fn handle_any_of(
+    value: &mut Value,
+    schema: &Value,
+    definitions: Option<&Value>,
+    path_components: &mut Vec<String>,
+) -> Result<(), Error> {
+    let Some(variants) = schema.get("anyOf").and_then(|v| v.as_array()) else {
+        return Ok(());
+    };
+    coerce_any_of(value, variants, definitions, path_components)
+}
+
+
 
 fn handle_enum(
     value: &mut Value,
@@ -762,7 +787,7 @@ mod test {
                 "enabled": true,
                 "http": "http://example.com",
                 "https": "https://example.com",
-                "no_proxy": "no-proxy.com"
+                "no_proxy": ["no-proxy.com"]
               },
               "enrichment_tables": {
                 "memory_table": {
