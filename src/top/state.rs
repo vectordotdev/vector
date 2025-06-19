@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 
 use chrono::{DateTime, Local};
 use ratatui::{
@@ -77,7 +80,7 @@ impl ConnectionStatus {
 #[derive(Debug, Clone)]
 pub struct State {
     pub connection_status: ConnectionStatus,
-    pub uptime_secs: f64,
+    pub uptime: Duration,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
 }
 
@@ -85,7 +88,7 @@ impl State {
     pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
-            uptime_secs: 0.0,
+            uptime: Duration::from_secs(0),
             components,
         }
     }
@@ -248,7 +251,7 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                     state.connection_status = status;
                 }
                 EventType::UptimeChanged(uptime) => {
-                    state.uptime_secs = uptime;
+                    state.uptime = Duration::from_secs_f64(uptime);
                 }
             }
 
