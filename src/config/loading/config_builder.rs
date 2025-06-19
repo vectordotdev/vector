@@ -76,6 +76,7 @@ impl Process for ConfigBuilderLoader {
                 );
             }
             None => {
+                println!("merge {:#?}", table);
                 self.builder.append(deserialize_table(table)?)?;
             }
         };

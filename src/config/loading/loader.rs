@@ -295,9 +295,11 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
 pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     table: Table,
 ) -> Result<T, Vec<String>> {
+    // println!("deserialize_table {table:#?}");
     let mut table_json = serde_json::to_value(table)
         .map_err(|err| err.to_string())
         .map_err(|err| vec![err])?;
+    println!("deserialize_table JSON: {table_json:#?}");
 
     let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
     let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;

@@ -31,6 +31,7 @@ use crate::{
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].]+)\]").unwrap());
 
+const SECRET_KEY: &str = "secret";
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct SecretBackendOuter {
@@ -93,7 +94,7 @@ impl Process for SecretBackendLoader {
         let table = resolve_environment_variables(table)?;
 
         // If there's no top-level `secret` section, nothing to do here.
-        if !table.contains_key("secret") {
+        if !table.contains_key(SECRET_KEY) {
             return Ok(table);
         }
 
@@ -102,8 +103,10 @@ impl Process for SecretBackendLoader {
     }
 
     fn merge(&mut self, table: Table, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if table.contains_key("secret") {
-            let additional = deserialize_table::<SecretBackendOuter>(table)?;
+        if let Some(secret_value) = table.get(SECRET_KEY) {
+            let mut secret_table = Table::new();
+            secret_table.insert(SECRET_KEY.to_string(), secret_value.clone());
+            let additional = deserialize_table::<SecretBackendOuter>(secret_table)?;
             self.backends.extend(additional.secret);
         }
         Ok(())
