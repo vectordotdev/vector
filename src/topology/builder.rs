@@ -890,7 +890,7 @@ impl Runner {
     }
 
     fn on_events_received(&mut self, events: &EventArray) {
-        self.timer_tx.stop();
+        self.timer_tx.try_send_stop_wait();
 
         self.events_received.emit(CountByteSize(
             events.len(),
@@ -899,7 +899,7 @@ impl Runner {
     }
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
-        self.timer_tx.start();
+        self.timer_tx.try_send_start_wait();
         self.outputs.send(outputs_buf).await
     }
 
@@ -916,7 +916,7 @@ impl Runner {
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
 
-        self.timer_tx.start();
+        self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
             self.transform.transform_all(events, &mut outputs_buf);
@@ -942,7 +942,7 @@ impl Runner {
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
 
-        self.timer_tx.start();
+        self.timer_tx.try_send_start_wait();
         loop {
             tokio::select! {
                 biased;

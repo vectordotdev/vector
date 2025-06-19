@@ -49,10 +49,10 @@ where
         // This will just measure the time, while UtilizationEmitter collects
         // all the timers and emits utilization value periodically
         let this = self.project();
-        this.timer_tx.start();
+        this.timer_tx.try_send_start_wait();
         let _ = this.intervals.poll_next_unpin(cx);
         let result = ready!(this.inner.poll_next_unpin(cx));
-        this.timer_tx.stop();
+        this.timer_tx.try_send_stop_wait();
         Poll::Ready(result)
     }
 }
@@ -149,7 +149,7 @@ pub(crate) struct UtilizationComponentSender {
 }
 
 impl UtilizationComponentSender {
-    pub(crate) fn start(&self) {
+    pub(crate) fn try_send_start_wait(&self) {
         if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StartWait(
             self.component_key.clone(),
             Instant::now(),
@@ -158,7 +158,7 @@ impl UtilizationComponentSender {
         }
     }
 
-    pub(crate) fn stop(&self) {
+    pub(crate) fn try_send_stop_wait(&self) {
         if let Err(err) = self.timer_tx.try_send(UtilizationTimerMessage::StopWait(
             self.component_key.clone(),
             Instant::now(),
