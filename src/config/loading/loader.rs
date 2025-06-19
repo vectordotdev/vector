@@ -65,6 +65,7 @@ pub(super) mod process {
         fn load<R: Read>(&mut self, input: R, format: Format) -> Result<Table, Vec<String>> {
             let value = string_from_input(input)?;
             let table: Table = format::deserialize(&value, format)?;
+            let table = resolve_environment_variables(table)?;
             self.postprocess(table)
         }
 
@@ -299,7 +300,7 @@ pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     let mut table_json = serde_json::to_value(table)
         .map_err(|err| err.to_string())
         .map_err(|err| vec![err])?;
-    println!("deserialize_table JSON: {table_json:#?}");
+    println!("deserialize_table JSON before coercion: {table_json:#?}");
 
     let schema = generate_root_schema::<ConfigBuilder>().map_err(|e| vec![format!("{e:?}")])?;
     let schema_json = serde_json::to_value(schema).map_err(|err| vec![err.to_string()])?;
@@ -311,6 +312,7 @@ pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
     )
     .map_err(|err| vec![err.to_string()])?;
 
+    println!("deserialize_table JSON after coercion: {table_json:#?}");
     serde::Deserialize::deserialize(table_json).map_err(|err| vec![err.to_string()])
 }
 

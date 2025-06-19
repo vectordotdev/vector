@@ -11,7 +11,7 @@ use toml::value::Table;
 use toml::Value;
 use vector_lib::config::ComponentKey;
 
-use crate::config::loading::{interpolate_toml_table, resolve_environment_variables};
+use crate::config::loading::interpolate_toml_table;
 use crate::{
     config::{
         loading::{deserialize_table, process::Process, ComponentHint, Loader},
@@ -91,8 +91,6 @@ impl SecretBackendLoader {
 
 impl Process for SecretBackendLoader {
     fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
-        let table = resolve_environment_variables(table)?;
-
         // If there's no top-level `secret` section, nothing to do here.
         if !table.contains_key(SECRET_KEY) {
             return Ok(table);

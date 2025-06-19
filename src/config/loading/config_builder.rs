@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use toml::value::Table;
 
 use super::{
-    deserialize_table, interpolate_toml_table_with_secrets, loader, resolve_environment_variables,
+    deserialize_table, interpolate_toml_table_with_secrets, loader,
 };
 use super::{ComponentHint, Process};
 use crate::config::{
@@ -36,7 +36,6 @@ impl ConfigBuilderLoader {
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
     fn postprocess(&mut self, table: Table) -> Result<Table, Vec<String>> {
-        let table = resolve_environment_variables(table)?;
         self.secrets
             .as_ref()
             .map(|secrets_map| interpolate_toml_table_with_secrets(&table, secrets_map))
