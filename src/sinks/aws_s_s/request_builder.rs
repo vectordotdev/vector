@@ -13,12 +13,14 @@ use crate::{
     },
     template::Template,
 };
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub(super) struct SSMetadata {
     pub(super) finalizers: EventFinalizers,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
+    pub(super) message_attributes: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -26,6 +28,7 @@ pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
     message_group_id: Option<Template>,
     message_deduplication_id: Option<Template>,
+    message_attributes: Option<HashMap<String, String>>,
 }
 
 impl SSRequestBuilder {
@@ -42,6 +45,7 @@ impl SSRequestBuilder {
             encoder: (transformer, encoder),
             message_group_id,
             message_deduplication_id,
+            message_attributes: None,
         })
     }
 }
@@ -95,12 +99,15 @@ impl RequestBuilder<Event> for SSRequestBuilder {
             None => None,
         };
 
+        let message_attributes = self.message_attributes.clone();
+
         let builder = RequestMetadataBuilder::from_event(&event);
 
         let metadata = SSMetadata {
             finalizers: event.take_finalizers(),
             message_group_id,
             message_deduplication_id,
+            message_attributes,
         };
         (metadata, builder, event)
     }
@@ -118,6 +125,7 @@ impl RequestBuilder<Event> for SSRequestBuilder {
             message_body,
             message_group_id: client_metadata.message_group_id,
             message_deduplication_id: client_metadata.message_deduplication_id,
+            message_attributes: client_metadata.message_attributes,
             finalizers: client_metadata.finalizers,
             metadata,
         }
@@ -129,6 +137,7 @@ pub(super) struct SendMessageEntry {
     pub(super) message_body: String,
     pub(super) message_group_id: Option<String>,
     pub(super) message_deduplication_id: Option<String>,
+    pub(super) message_attributes: Option<HashMap<String, String>>,
     pub(super) finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
 }
@@ -138,6 +147,9 @@ impl ByteSizeOf for SendMessageEntry {
         self.message_body.size_of()
             + self.message_group_id.size_of()
             + self.message_deduplication_id.size_of()
+            + self.message_attributes.as_ref().map_or(0, |attrs| {
+                attrs.iter().map(|(k, v)| k.size_of() + v.size_of()).sum()
+            })
     }
 }
 
