@@ -206,8 +206,6 @@ fn handle_any_of(
     coerce_any_of(value, variants, definitions, path_components)
 }
 
-
-
 fn handle_enum(
     value: &mut Value,
     schema: &Value,

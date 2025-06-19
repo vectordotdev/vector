@@ -86,7 +86,6 @@ impl GenerateConfig for SecretBackends {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::secrets::SecretBackends;
@@ -94,9 +93,9 @@ mod tests {
     #[test]
     fn interpolation() {
         let ok = serde_json::from_value::<SecretBackends>(serde_json::json!({
-    "type": "file",
-    "path": "/tmp/foo"
-}));
+            "type": "file",
+            "path": "/tmp/foo"
+        }));
         eprintln!("flat parse: {ok:?}");
     }
 }
