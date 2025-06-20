@@ -245,7 +245,7 @@ vector --config /etc/vector/vector.json
 
 ### Environment variables
 
-Section moved to [Environment Variables](docs/reference/environment_variables/).
+Refer to the [Environment Variables](docs/reference/environment_variables/) page.
 
 ### Formats
 
