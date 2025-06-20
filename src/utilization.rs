@@ -237,7 +237,6 @@ impl UtilizationEmitter {
 /// and the rest of the time it is doing useful work. This is more true for
 /// sinks than transforms, which can be blocked by downstream components, but
 /// with knowledge of the config the data is still useful.
-#[allow(clippy::missing_const_for_fn)]
 pub(crate) fn wrap<S>(
     timer_tx: UtilizationComponentSender,
     component_key: ComponentKey,
