@@ -105,7 +105,7 @@ impl CheckpointsView {
             .filter(|entry| {
                 let ts = entry.value();
                 let duration = now - *ts;
-                duration >= chrono::Duration::seconds(1)
+                duration >= chrono::Duration::seconds(60)
             })
             .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
@@ -280,7 +280,7 @@ impl Checkpointer {
             }
             's' => {
                 let (c, salt, pos) =
-                    scan_fmt!(file_name, "m{x}.{}.{}", [hex u64], u64, FilePosition)
+                    scan_fmt!(file_name, "s{x}.{}.{}", [hex u64], u64, FilePosition)
                         .unwrap();
                 (ChecksumWithSalt(c, salt), pos)
             }
