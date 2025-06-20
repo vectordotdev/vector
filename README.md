@@ -228,4 +228,3 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_twitter]: https://twitter.com/vectordotdev
 [urls.vector_versioning_policy]: https://github.com/vectordotdev/vector/blob/master/VERSIONING.md
 [urls.vote_feature]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22type%3A+feature%22
-
