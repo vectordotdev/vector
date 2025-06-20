@@ -218,12 +218,8 @@ base: components: sources: static_metrics: configuration: {
 											type: float: {}
 										}
 										bins: {
-											description: """
-																															A split representation of sketch bins.
-
-																															The bins within the sketch.
-																															"""
-											required: true
+											description: "The bins within the sketch."
+											required:    true
 											type: object: options: {
 												k: {
 													description: "The bin keys."

@@ -5,7 +5,7 @@ use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
 
 use crate::components::validation::prelude::*;
-use crate::http::QueryParameterValue;
+use crate::http::{ParamType, ParameterValue, QueryParameterValue};
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
 use vector_lib::codecs::decoding::{
@@ -183,11 +183,14 @@ async fn request_query_applied() {
         query: HashMap::from([
             (
                 "key1".to_string(),
-                QueryParameterValue::MultiParams(vec!["val2".to_string()]),
+                QueryParameterValue::MultiParams(vec![ParameterValue::String("val2".to_string())]),
             ),
             (
                 "key2".to_string(),
-                QueryParameterValue::MultiParams(vec!["val1".to_string(), "val2".to_string()]),
+                QueryParameterValue::MultiParams(vec![
+                    ParameterValue::String("val1".to_string()),
+                    ParameterValue::String("val2".to_string()),
+                ]),
             ),
         ]),
         decoding: DeserializerConfig::Json(Default::default()),
@@ -226,6 +229,201 @@ async fn request_query_applied() {
         }
         assert_eq!(got, expected);
     }
+}
+
+/// VRL query parameters should be parsed correctly
+#[tokio::test]
+async fn request_query_vrl_applied() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::query::raw())
+        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::from([
+            // Test a single VRL parameter with concatenation
+            (
+                "key1".to_string(),
+                QueryParameterValue::SingleParam(ParameterValue::Typed {
+                    value: "upcase(\"bar\") + \"-\" + md5(\"baz\")".to_string(),
+                    r#type: ParamType::Vrl,
+                }),
+            ),
+            // Test multiple parameters with a mixture of string and VRL types
+            (
+                "key2".to_string(),
+                QueryParameterValue::MultiParams(vec![
+                    // Check that nested quotes are not stripped
+                    ParameterValue::String("\"bob ross\"".to_string()),
+                    ParameterValue::Typed {
+                        value: "mod(5, 2)".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "camelcase(\"input-string\")".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                ]),
+            ),
+            // Test if VRL timestamps are correctly formatted as a raw ISO 8601 string
+            (
+                "key3".to_string(),
+                QueryParameterValue::SingleParam(ParameterValue::Typed {
+                    value: "parse_timestamp!(\"10-Oct-2020 16:00+00:00\", format: \"%v %R %:z\")"
+                        .to_string(),
+                    r#type: ParamType::Vrl,
+                }),
+            ),
+            // Test if other types are formatted correctly
+            (
+                "key4".to_string(),
+                QueryParameterValue::MultiParams(vec![
+                    ParameterValue::Typed {
+                        value: "to_int!(\"123\")".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_bool!(\"yes\")".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_float!(\"-99.9\")".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                    ParameterValue::Typed {
+                        value: "to_string!(false)".to_string(),
+                        r#type: ParamType::Vrl,
+                    },
+                ]),
+            ),
+        ]),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    let mut expected = HashMap::from([
+        (
+            "key1".to_string(),
+            vec!["BAR-73feffa4b7f6bb68e44cf984c85f6e88".to_string()],
+        ),
+        (
+            "key2".to_string(),
+            vec![
+                "\"bob ross\"".to_string(),
+                "1".to_string(),
+                "inputString".to_string(),
+            ],
+        ),
+        ("key3".to_string(), vec!["2020-10-10T16:00:00Z".to_string()]),
+        (
+            "key4".to_string(),
+            vec![
+                "123".to_string(),
+                "true".to_string(),
+                "-99.9".to_string(),
+                "false".to_string(),
+            ],
+        ),
+    ]);
+
+    for v in expected.values_mut() {
+        v.sort();
+    }
+
+    for log in logs {
+        let query = log.get("data").expect("data must be available");
+        let mut got: HashMap<String, Vec<String>> = HashMap::new();
+        for (k, v) in
+            url::form_urlencoded::parse(query.as_bytes().expect("byte conversion should succeed"))
+        {
+            got.entry(k.to_string()).or_default().push(v.to_string());
+        }
+        for v in got.values_mut() {
+            v.sort();
+        }
+        assert_eq!(got, expected);
+    }
+}
+
+/// VRL query parameters should dynamically update on each request
+#[tokio::test]
+async fn request_query_vrl_dynamic_updates() {
+    let in_addr = next_addr();
+
+    // A handler that returns the query parameters as part of the response
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::query::raw())
+        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    // The timestamp should be different for each event
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{}/endpoint", in_addr),
+        interval: Duration::from_millis(100),
+        timeout: TIMEOUT,
+        query: HashMap::from([(
+            "timestamp".to_string(),
+            QueryParameterValue::SingleParam(ParameterValue::Typed {
+                value: "to_unix_timestamp(now(), unit: \"milliseconds\")".to_string(),
+                r#type: ParamType::Vrl,
+            }),
+        )]),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    // Make sure we have at least 2 events to check for unique timestamps
+    assert!(
+        logs.len() >= 2,
+        "Expected at least 2 events, got {}",
+        logs.len()
+    );
+
+    let mut timestamps = Vec::new();
+    for log in logs {
+        let query = log.get("data").expect("data must be available");
+        let query_bytes = query.as_bytes().expect("byte conversion should succeed");
+
+        // Parse the timestamp value
+        for (k, v) in url::form_urlencoded::parse(query_bytes) {
+            if k == "timestamp" {
+                timestamps.push(v.to_string());
+            }
+        }
+    }
+
+    // Check that timestamps are unique (should be different for each request)
+    let unique_timestamps: std::collections::HashSet<String> = timestamps.iter().cloned().collect();
+    assert_eq!(
+        timestamps.len(),
+        unique_timestamps.len(),
+        "Expected all timestamps to be unique"
+    );
 }
 
 /// HTTP request headers configured by the user should be applied correctly.

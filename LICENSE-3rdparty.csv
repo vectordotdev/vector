@@ -96,7 +96,6 @@ base64-simd,https://github.com/Nugine/simd,MIT,The base64-simd Authors
 base64ct,https://github.com/RustCrypto/formats/tree/master/base64ct,Apache-2.0 OR MIT,RustCrypto Developers
 bit-set,https://github.com/contain-rs/bit-set,Apache-2.0 OR MIT,Alexis Beingessner <a.beingessner@gmail.com>
 bit-vec,https://github.com/contain-rs/bit-vec,Apache-2.0 OR MIT,Alexis Beingessner <a.beingessner@gmail.com>
-bit-vec,https://github.com/contain-rs/bit-vec,MIT OR Apache-2.0,Alexis Beingessner <a.beingessner@gmail.com>
 bitflags,https://github.com/bitflags/bitflags,MIT OR Apache-2.0,The Rust Project Developers
 bitmask-enum,https://github.com/Lukas3674/rust-bitmask-enum,MIT OR Apache-2.0,Lukas3674 <lukashassler@web.de>
 bitvec,https://github.com/bitvecto-rs/bitvec,MIT,The bitvec Authors
@@ -180,6 +179,7 @@ data-encoding,https://github.com/ia0/data-encoding,MIT,Julien Cretin <git@ia0.eu
 data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
 databend-client,https://github.com/databendlabs/bendsql,Apache-2.0,Databend Authors <opensource@databend.com>
 dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
+deadpool,https://github.com/bikeshedder/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
 der,https://github.com/RustCrypto/formats/tree/master/der,Apache-2.0 OR MIT,RustCrypto Developers
 deranged,https://github.com/jhpratt/deranged,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 derivative,https://github.com/mcarton/rust-derivative,MIT OR Apache-2.0,mcarton <cartonmartin+git@gmail.com>
@@ -267,7 +267,7 @@ graphql_client_codegen,https://github.com/graphql-rust/graphql-client,Apache-2.0
 graphql_query_derive,https://github.com/graphql-rust/graphql-client,Apache-2.0 OR MIT,Tom Houlé <tom@tomhoule.com>
 greptime-proto,https://github.com/GreptimeTeam/greptime-proto,Apache-2.0,The greptime-proto Authors
 greptimedb-ingester,https://github.com/GreptimeTeam/greptimedb-ingester-rust,Apache-2.0,The greptimedb-ingester Authors
-grok,https://github.com/daschl/grok,Apache-2.0,Michael Nitschinger <michael@nitschinger.at>
+grok,https://github.com/mmastrac/grok,Apache-2.0,"Matt Mastracci <matthew@mastracci.com>, Michael Nitschinger <michael@nitschinger.at>"
 group,https://github.com/zkcrypto/group,MIT OR Apache-2.0,"Sean Bowe <ewillbefull@gmail.com>, Jack Grigg <jack@z.cash>"
 h2,https://github.com/hyperium/h2,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
 half,https://github.com/starkat99/half-rs,MIT OR Apache-2.0,Kathryn Long <squeeself@gmail.com>
@@ -423,6 +423,7 @@ num-integer,https://github.com/rust-num/num-integer,MIT OR Apache-2.0,The Rust P
 num-iter,https://github.com/rust-num/num-iter,MIT OR Apache-2.0,The Rust Project Developers
 num-rational,https://github.com/rust-num/num-rational,MIT OR Apache-2.0,The Rust Project Developers
 num-traits,https://github.com/rust-num/num-traits,MIT OR Apache-2.0,The Rust Project Developers
+num_cpus,https://github.com/seanmonstar/num_cpus,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 num_enum,https://github.com/illicitonion/num_enum,BSD-3-Clause OR MIT OR Apache-2.0,"Daniel Wagner-Hall <dawagner@gmail.com>, Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>, Vincent Esche <regexident@gmail.com>"
 num_threads,https://github.com/jhpratt/num_threads,MIT OR Apache-2.0,Jacob Pratt <open-source@jhpratt.dev>
 number_prefix,https://github.com/ogham/rust-number-prefix,MIT,Benjamin Sago <ogham@bsago.me>
@@ -433,7 +434,7 @@ object,https://github.com/gimli-rs/object,Apache-2.0 OR MIT,The object Authors
 octseq,https://github.com/NLnetLabs/octets/,BSD-3-Clause,NLnet Labs <rust-team@nlnetlabs.nl>
 ofb,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 once_cell,https://github.com/matklad/once_cell,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
-onig,http://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>, Ivan Ivashchenko <defuz@me.com>"
+onig,https://github.com/iwillspeak/rust-onig,MIT,"Will Speak <will@willspeak.me>, Ivan Ivashchenko <defuz@me.com>"
 opaque-debug,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 opendal,https://github.com/apache/opendal,Apache-2.0,Apache OpenDAL <dev@opendal.apache.org>
 openidconnect,https://github.com/ramosbugs/openidconnect-rs,MIT,David A. Ramos <ramos@cs.stanford.edu>
@@ -486,9 +487,7 @@ proc-macro-error2,https://github.com/GnomedDev/proc-macro-error-2,MIT OR Apache-
 proc-macro-hack,https://github.com/dtolnay/proc-macro-hack,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 proc-macro2,https://github.com/dtolnay/proc-macro2,MIT OR Apache-2.0,"David Tolnay <dtolnay@gmail.com>, Alex Crichton <alex@alexcrichton.com>"
 proptest,https://github.com/proptest-rs/proptest,MIT OR Apache-2.0,Jason Lingle
-prost,https://github.com/tokio-rs/prost,Apache-2.0,"Dan Burkert <dan@danburkert.com>, Lucio Franco <luciofranco14@gmail.com, Tokio Contributors <team@tokio.rs>"
 prost,https://github.com/tokio-rs/prost,Apache-2.0,"Dan Burkert <dan@danburkert.com>, Lucio Franco <luciofranco14@gmail.com>, Casper Meijn <casper@meijn.net>, Tokio Contributors <team@tokio.rs>"
-prost-derive,https://github.com/tokio-rs/prost,Apache-2.0,"Dan Burkert <dan@danburkert.com>, Lucio Franco <luciofranco14@gmail.com>, Tokio Contributors <team@tokio.rs>"
 prost-reflect,https://github.com/andrewhickman/prost-reflect,MIT OR Apache-2.0,Andrew Hickman <andrew.hickman1@sky.com>
 psl,https://github.com/addr-rs/psl,MIT OR Apache-2.0,rushmorem <rushmore@webenchanter.com>
 psl-types,https://github.com/addr-rs/psl-types,MIT OR Apache-2.0,rushmorem <rushmore@webenchanter.com>
