@@ -27,6 +27,8 @@ faster than every alternative in the space.
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
 
+Vector is maintained by the Datadog's [Community Open Source Engineering team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team).
+
 ### Principles
 
 * **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
