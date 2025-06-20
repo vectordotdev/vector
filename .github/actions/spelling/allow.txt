@@ -531,3 +531,4 @@ zst
 zstandard
 ZTE
 Zync
+envsubst
