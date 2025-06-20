@@ -11442,6 +11442,7 @@ dependencies = [
  "indicatif",
  "indoc",
  "itertools 0.14.0",
+ "libc",
  "log",
  "owo-colors",
  "paste",
