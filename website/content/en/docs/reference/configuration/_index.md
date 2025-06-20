@@ -245,47 +245,7 @@ vector --config /etc/vector/vector.json
 
 ### Environment variables
 
-Vector interpolates environment variables within your configuration file with
-the following syntax:
-
-```yaml
-transforms:
-  add_host:
-    type: "remap"
-    source: |
-      # Basic usage. "$HOSTNAME" also works.
-      .host = "${HOSTNAME}" # or "$HOSTNAME"
-
-      # Setting a default value when not present.
-      .environment = "${ENV:-development}"
-
-      # Requiring an environment variable to be present.
-      .tenant = "${TENANT:?tenant must be supplied}"
-```
-
-#### Default values
-
-Default values can be supplied using `:-` or `-` syntax:
-
-```yaml
-option: "${ENV_VAR:-default}" # default value if variable is unset or empty
-option: "${ENV_VAR-default}" # default value only if variable is unset
-```
-
-#### Required variables
-
-Environment variables that are required can be specified using `:?` or `?` syntax:
-
-```yaml
-option: "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
-option: "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
-```
-
-#### Escaping
-
-You can escape environment variables by prefacing them with a `$` character. For
-example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
-environment variable example.
+Section moved to [Environment Variables](docs/reference/environment_variables/).
 
 ### Formats
 
