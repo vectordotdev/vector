@@ -33,11 +33,8 @@ jobs:
         if: ${{ github.event_name != 'merge_group' }}
         with:
           fetch-depth: 0
-
-      - name: Fetch base branch
-        if: ${{ github.event_name != 'merge_group' }}
-        run: |
-          git fetch origin $BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref:        ${{ github.event.pull_request.head.sha }}
 
       - name: Bypass when no‑changelog label is present
         if: env.PR_HAS_LABEL == 'true'
