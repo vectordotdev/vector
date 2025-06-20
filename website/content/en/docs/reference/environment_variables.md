@@ -45,10 +45,10 @@ Environment variables that are required can be specified using `:?` syntax:
 option: "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
 ```
 
-Or  the `?` syntax:
+Or  the `?` syntax for unset variables:
 
 ```yaml
-option: "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
+option: "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset.
 ```
 
 ## Escaping
