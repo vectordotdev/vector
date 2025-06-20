@@ -8,7 +8,7 @@ use std::{
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
@@ -46,10 +46,12 @@ pub struct FileWatcher {
     reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    reach_eof_time: Option<Instant>,
     data_ready_time: Instant,
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
+    eof_linger_timeout_sec: Option<u64>,
     buf: BytesMut,
     trigger_wait_sec: Option<Duration>,
 }
@@ -66,9 +68,11 @@ impl FileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
+        eof_linger_timeout_sec: Option<u64>,
         trigger_wait_sec: Option<Duration>,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
+        let f_size = f.metadata()?.len();
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
         let metadata = f.metadata()?;
         let mut reader = io::BufReader::new(f);
@@ -121,7 +125,17 @@ impl FileWatcher {
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::Checkpoint(file_position)) => {
-                    let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
+                    // if the total size of the read file is lower than the next read position,
+                    // then seek the read position to the beginning
+                    let pos = if f_size < file_position {
+                        info!(
+                            message = "Recoded checkpoint position is greater than current file size, read from beginning.",
+                            ?path
+                        );
+                        reader.seek(io::SeekFrom::Start(0)).unwrap()
+                    } else {
+                        reader.seek(io::SeekFrom::Start(file_position)).unwrap()
+                    };
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::Beginning) => {
@@ -153,10 +167,12 @@ impl FileWatcher {
             reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            reach_eof_time: None,
             data_ready_time: Instant::now(),
             last_seen: ts,
             max_line_bytes,
             line_delimiter,
+            eof_linger_timeout_sec,
             buf: BytesMut::new(),
             trigger_wait_sec,
         })
@@ -223,6 +239,7 @@ impl FileWatcher {
     /// a new file handler as needed, transparently to the caller.
     pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         self.track_read_attempt();
+        let should_read_eof_line = self.should_read_eof_linger_line();
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
@@ -260,7 +277,22 @@ impl FileWatcher {
                     }
                 } else {
                     self.reached_eof = true;
-                    Ok(None)
+                    // recode reach eof time
+                    if !self.buf.is_empty() {
+                        self.track_reach_eof(Some(Instant::now()));
+                    }
+                    if should_read_eof_line && !self.buf.is_empty() {
+                        // set track_reach_eof to false
+                        self.track_reach_eof(None);
+                        // eof linger line read timeout is set
+                        // and reach the timeout, get the linger line.
+                        Ok(Some(RawLine {
+                            offset: initial_position,
+                            bytes: self.buf.split().freeze(),
+                        }))
+                    } else {
+                        Ok(None)
+                    }
                 }
             }
             Err(e) => {
@@ -291,6 +323,20 @@ impl FileWatcher {
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
+    }
+
+    #[inline]
+    pub fn track_reach_eof(&mut self, reach_time: Option<Instant>) {
+        if let Some(_) = self.eof_linger_timeout_sec {
+            self.reach_eof_time = reach_time;
+        }
+    }
+
+    #[inline]
+pub fn should_read_eof_linger_line(& self) -> bool {
+        self.eof_linger_timeout_sec
+        .and_then(|timeout| self.reach_eof_time.map(|t| t.elapsed() > Duration::from_secs(timeout)))
+        .unwrap_or(false)
     }
 
     #[inline]
