@@ -77,7 +77,7 @@ export SOURCES_BLOCK="sources:\"
 ```
 
 {{< warning >}}
-Support for this feature may be removed in the future.
+Support for block interpolation feature may be removed in the future.
 We do not recommend using this feature, as it can lead to unwanted injections.
 For example, a malicious actor could inject components that execute arbitrary code.
 Of course this assumes said actor penetrated the system and has write access to the environment variables.
