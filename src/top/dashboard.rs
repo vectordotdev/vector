@@ -17,7 +17,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
-use std::io::stdout;
+use std::{io::stdout, time::Duration};
 use tokio::sync::oneshot;
 
 use super::{
@@ -164,7 +164,13 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a title and the URL the dashboard is currently connected to.
-    fn title(&'a self, f: &mut Frame, area: Rect, connection_status: &ConnectionStatus) {
+    fn title(
+        &'a self,
+        f: &mut Frame,
+        area: Rect,
+        connection_status: &ConnectionStatus,
+        uptime: Duration,
+    ) {
         let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
@@ -174,6 +180,10 @@ impl<'a> Widgets<'a> {
             Span::from(" | "),
         ];
         text.extend(connection_status.as_ui_spans());
+        text.extend(vec![Span::from(format!(
+            " | Uptime: {}",
+            humantime::format_duration(uptime)
+        ))]);
 
         let text = vec![Line::from(text)];
 
@@ -327,7 +337,7 @@ impl<'a> Widgets<'a> {
             .constraints(self.constraints.clone())
             .split(size);
 
-        self.title(f, rects[0], &state.connection_status);
+        self.title(f, rects[0], &state.connection_status, state.uptime);
 
         // Require a minimum of 80 chars of line width to display the table
         if size.width >= 80 {
