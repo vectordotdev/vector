@@ -29,6 +29,7 @@ yarn.lock
 .dir-locals.el
 
 # Temporary files
+tmp/
 *.tmp
 *~
 sample.log
