@@ -57,7 +57,7 @@ You can escape environment variables by prefacing them with a `$` character. For
 example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
 environment variable example.
 
-## Interpolation Gotchas
+## Interpolation Pitfalls
 
 
 It is possible to inject multiline blocks. For example, the following section of a config:
@@ -84,7 +84,7 @@ Of course this assumes said actor penetrated the system and has write access to 
 {{< /warning >}}
 
 A better approach is to introduce a config pre-processing step with a mature tool. This also has the benefit of giving the user
-more control over the configuration and the result can be inspectd before it is passed to Vector. See the following example:
+more control over the configuration and the result can be inspected before it is passed to Vector. See the following example:
 
 ```shell
 envsubst < snippet_in.yaml > snippet_out.yaml
