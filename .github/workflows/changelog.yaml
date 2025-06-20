@@ -1,24 +1,21 @@
 # Changelog
 #
 # Validates that a changelog entry was added.
-# - Works for both fork‑based PRs (pull_request) and same‑repo PRs (pull_request_target)
-# - Gives the merge‑queue a green light by exiting early under merge_group events
-#
+# Runs on PRs when:
+#   - opened/re-opened
+#   - new commits pushed
+#   - label is added or removed
+# Runs on merge queues, but just passes, because it is a required check.
 name: Changelog
 
 on:
-  # Trigger in the PR context (reads the workflow from the PR branch). This lets the check
-  # run even before the workflow file change is merged, which prevents the “Changelog Expected”
-  # status from getting stuck on the current PR.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
-  # Trigger again in the base‑repo context so that future PRs from forks have access to
-  # protected‑branch refs (and any required secrets).
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
-  # Required by GitHub merge queue. We create a noop success for it so the queue proceeds.
+  # Required by GitHub merge queue due to branch protection rules. Should always be successful
   merge_group:
     types: [checks_requested]
 
@@ -26,16 +23,16 @@ jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
 
-    # Skip all real work for merge‑queue jobs – they just need a green check.
+    # Skip all real work while in the merge queue
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
       # Base branch (e.g. master or main) that the PR targets
       BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
 
     steps:
-      # Checkout the full repo history. For pull_request events this checks out the PR head (fork),
-      # for pull_request_target it checks out the base repo. Either way we fetch the base branch so
-      # the changelog script can diff against it.
+      # Checkout full depth because in the check_changelog_fragments script, we need to specify a
+      # merge base. If we only shallow clone the repo, git may not have enough history to determine
+      # the base.
       - uses: actions/checkout@v4
         if: ${{ github.event_name != 'merge_group' }}
         with:
