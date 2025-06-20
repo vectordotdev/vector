@@ -13,7 +13,7 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
-use crate::InMemoryBufferable;
+use crate::{config::MemoryBufferSize, InMemoryBufferable};
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -323,29 +323,22 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
-pub enum LimitedBy {
-    NumberOfEvents,
-    #[allow(dead_code)]
-    AllocatedBytes,
-}
-
-pub fn limited_by<T: InMemoryBufferable + fmt::Debug>(
-    limit: usize,
-    method: LimitedBy,
+pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+    limit: MemoryBufferSize,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = match method {
-        LimitedBy::NumberOfEvents => Inner {
-            data: Arc::new(CBArrayQueue::new(limit)),
+    let inner = match limit {
+        MemoryBufferSize::MaxEvents { max_size } => Inner {
+            data: Arc::new(CBArrayQueue::new(max_size.get())),
             terms: SizeTerms::by_number_events(),
-            limit,
-            limiter: Arc::new(Semaphore::new(limit)),
+            limit: max_size.get(),
+            limiter: Arc::new(Semaphore::new(max_size.get())),
             read_waker: Arc::new(Notify::new()),
         },
-        LimitedBy::AllocatedBytes => Inner {
+        MemoryBufferSize::MaxSize { max_bytes } => Inner {
             data: Arc::new(CBSegQueue::new()),
             terms: SizeTerms::by_bytes_allocated(),
-            limit,
-            limiter: Arc::new(Semaphore::new(limit)),
+            limit: max_bytes.get(),
+            limiter: Arc::new(Semaphore::new(max_bytes.get())),
             read_waker: Arc::new(Notify::new()),
         },
     };
@@ -359,25 +352,24 @@ pub fn limited_by<T: InMemoryBufferable + fmt::Debug>(
     (sender, receiver)
 }
 
-pub fn limited<T: InMemoryBufferable + fmt::Debug>(
-    limit: usize,
-) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    limited_by(limit, LimitedBy::NumberOfEvents)
-}
-
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use tokio_test::{assert_pending, assert_ready, task::spawn};
 
     use super::limited;
     use crate::{
-        test::MultiEventRecord, topology::channel::limited_queue::SendError,
-        topology::test_util::Sample,
+        test::MultiEventRecord,
+        topology::{channel::limited_queue::SendError, test_util::Sample},
+        MemoryBufferSize,
     };
 
     #[tokio::test]
     async fn send_receive() {
-        let (mut tx, mut rx) = limited(2);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(2).unwrap(),
+        });
 
         assert_eq!(2, tx.available_capacity());
 
@@ -405,7 +397,9 @@ mod tests {
 
     #[test]
     fn sender_waits_for_more_capacity_when_none_available() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(1).unwrap(),
+        });
 
         assert_eq!(1, tx.available_capacity());
 
@@ -466,7 +460,9 @@ mod tests {
 
     #[test]
     fn sender_waits_for_more_capacity_when_partial_available() {
-        let (mut tx, mut rx) = limited(7);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(7).unwrap(),
+        });
 
         assert_eq!(7, tx.available_capacity());
 
@@ -554,7 +550,9 @@ mod tests {
 
     #[test]
     fn empty_receiver_returns_none_when_last_sender_drops() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(1).unwrap(),
+        });
 
         assert_eq!(1, tx.available_capacity());
 
@@ -596,7 +594,9 @@ mod tests {
 
     #[test]
     fn receiver_returns_none_once_empty_when_last_sender_drops() {
-        let (tx, mut rx) = limited::<Sample>(1);
+        let (tx, mut rx) = limited::<Sample>(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(1).unwrap(),
+        });
 
         assert_eq!(1, tx.available_capacity());
 
@@ -625,7 +625,9 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_empty() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(1).unwrap(),
+        });
 
         assert_eq!(1, tx.available_capacity());
 
@@ -657,7 +659,9 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_partial_capacity() {
-        let (mut tx, mut rx) = limited(2);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(2).unwrap(),
+        });
 
         assert_eq!(2, tx.available_capacity());
 
@@ -709,3 +713,5 @@ mod tests {
         assert_eq!(2, tx.available_capacity());
     }
 }
+
+

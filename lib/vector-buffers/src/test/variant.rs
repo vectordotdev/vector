@@ -1,5 +1,5 @@
 use std::{
-    num::{NonZeroU16, NonZeroU64, NonZeroUsize},
+    num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
 };
 
@@ -14,7 +14,7 @@ use crate::{
         channel::{BufferReceiver, BufferSender},
     },
     variants::{DiskV2Buffer, MemoryBuffer},
-    Bufferable, WhenFull,
+    Bufferable, MemoryBufferSize, WhenFull,
 };
 
 #[cfg(test)]
@@ -31,7 +31,7 @@ const ALPHABET: [&str; 27] = [
 #[derive(Debug, Clone)]
 pub enum Variant {
     Memory {
-        max_events: NonZeroUsize,
+        size: MemoryBufferSize,
         when_full: WhenFull,
     },
     DiskV2 {
@@ -50,11 +50,9 @@ impl Variant {
         let mut builder = TopologyBuilder::default();
         match self {
             Variant::Memory {
-                max_events,
-                when_full,
-                ..
+                size, when_full, ..
             } => {
-                builder.stage(MemoryBuffer::new(*max_events), *when_full);
+                builder.stage(MemoryBuffer::new(*size), *when_full);
             }
             Variant::DiskV2 {
                 max_size,
@@ -103,16 +101,16 @@ impl Arbitrary for Variant {
         let use_memory_buffer = bool::arbitrary(g);
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
-        let max_events = NonZeroU16::arbitrary(g).into();
-        let max_size = NonZeroU16::arbitrary(g).into();
+        let max_events = NonZeroUsize::arbitrary(g);
+        let max_size = NonZeroU64::arbitrary(g);
+        let size = MemoryBufferSize::MaxEvents {
+            max_size: max_events,
+        };
 
         let when_full = WhenFull::arbitrary(g);
 
         if use_memory_buffer {
-            Variant::Memory {
-                max_events,
-                when_full,
-            }
+            Variant::Memory { size, when_full }
         } else {
             Variant::DiskV2 {
                 max_size,
@@ -126,15 +124,23 @@ impl Arbitrary for Variant {
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
             Variant::Memory {
-                max_events,
-                when_full,
-                ..
+                size, when_full, ..
             } => {
                 let when_full = *when_full;
-                Box::new(max_events.shrink().map(move |me| Variant::Memory {
-                    max_events: me,
-                    when_full,
-                }))
+                match size {
+                    MemoryBufferSize::MaxEvents { max_size } => {
+                        Box::new(max_size.shrink().map(move |me| Variant::Memory {
+                            size: MemoryBufferSize::MaxEvents { max_size: me },
+                            when_full,
+                        }))
+                    }
+                    MemoryBufferSize::MaxSize { max_bytes } => {
+                        Box::new(max_bytes.shrink().map(move |me| Variant::Memory {
+                            size: MemoryBufferSize::MaxSize { max_bytes: me },
+                            when_full,
+                        }))
+                    }
+                }
             }
             Variant::DiskV2 {
                 max_size,

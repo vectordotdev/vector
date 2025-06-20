@@ -10,7 +10,7 @@ use criterion::{
     Criterion, SamplingMode, Throughput,
 };
 use tokio::runtime::{Handle, Runtime};
-use vector_buffers::{BufferType, WhenFull};
+use vector_buffers::{BufferType, MemoryBufferSize, WhenFull};
 
 use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
 
@@ -81,7 +81,9 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
 
 fn create_in_memory_variant(max_events: usize, _max_size: u64) -> BufferType {
     BufferType::Memory {
-        max_events: NonZeroUsize::new(max_events).unwrap(),
+        size: MemoryBufferSize::MaxEvents {
+            max_size: NonZeroUsize::new(max_events).unwrap(),
+        },
         when_full: WhenFull::DropNewest,
     }
 }

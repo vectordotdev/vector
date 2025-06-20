@@ -21,7 +21,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType, Bufferable, EventCount, WhenFull,
+    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::finalization::{
@@ -260,8 +260,11 @@ where
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
+            // TODO(rob) edit benchmarks to work with new buffer impls
             BufferType::Memory {
-                max_events: max_size_events,
+                size: MemoryBufferSize::MaxEvents {
+                    max_size: max_size_events,
+                },
                 when_full,
             }
         }
