@@ -22,8 +22,6 @@ jobs:
 
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
-      # Base branch (e.g. master or main) that the PR targets
-      BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
 
     steps:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
