@@ -26,8 +26,6 @@ jobs:
     # Skip all real work while in the merge queue
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
-      # Base branch (e.g. master or main) that the PR targets
-      BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
 
     steps:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
@@ -37,11 +35,6 @@ jobs:
         if: ${{ github.event_name != 'merge_group' }}
         with:
           fetch-depth: 0
-
-      - name: Fetch base branch
-        if: ${{ github.event_name != 'merge_group' }}
-        run: |
-          git fetch origin $BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH
 
       - name: Bypass when no‑changelog label is present
         if: env.PR_HAS_LABEL == 'true'
