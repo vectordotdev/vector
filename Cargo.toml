@@ -174,7 +174,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false, features = ["v
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
-vrl = { features = ["arbitrary", "cli", "test", "test_framework"], version = "0.24.0" }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
 cfg-if.workspace = true
@@ -290,6 +290,7 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "2.5.3", default-features = false, features = ["native-tls"], optional = true }
+deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
 # API
 async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
@@ -306,7 +307,7 @@ ratatui = { version = "0.29.0", optional = true, default-features = false, featu
 hex = { version = "0.4.3", default-features = false, optional = true }
 
 # GreptimeDB
-greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d", optional = true }
+greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
@@ -367,7 +368,7 @@ openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.3.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.3.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
@@ -784,7 +785,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
-sinks-amqp = ["lapin"]
+sinks-amqp = ["deadpool", "lapin"]
 sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]

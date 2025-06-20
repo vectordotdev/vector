@@ -439,20 +439,21 @@ components: {
 	}
 
 	#Input: {
-		logs:    bool
-		metrics: #MetricInput | null
-		traces:  bool
+		description?: string
+		logs:         bool
+		metrics:      #MetricInput | null
+		traces:       bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
-		name:        Name
-		fields:      #Schema
+		name?:       Name
+		fields?:     #Schema
 	}
 
-	#TraceOutput: {
+	#TraceOutput: [Name=string]: {
 		description: string
-		fields:      #Schema
+		fields?:     #Schema
 	}
 
 	#MetricInput: {
@@ -465,12 +466,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:       string
-		relevant_when?:    string
-		tags:              #MetricTags
-		name:              Name
-		type:              #MetricType
-		default_namespace: string
+		description:        string
+		relevant_when?:     string
+		tags?:              #MetricTags
+		name?:              Name
+		type?:              #MetricType
+		default_namespace?: string
 	}
 
 	#OutputData: {
