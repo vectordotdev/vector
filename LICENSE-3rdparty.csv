@@ -293,6 +293,7 @@ http-serde,https://gitlab.com/kornelski/http-serde,Apache-2.0 OR MIT,Kornel <kor
 http-types,https://github.com/http-rs/http-types,MIT OR Apache-2.0,Yoshua Wuyts <yoshuawuyts@gmail.com>
 httparse,https://github.com/seanmonstar/httparse,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 httpdate,https://github.com/pyfisch/httpdate,MIT OR Apache-2.0,Pyfisch <pyfisch@posteo.org>
+humantime,https://github.com/chronotope/humantime,MIT OR Apache-2.0,The humantime Authors
 hyper,https://github.com/hyperium/hyper,MIT,Sean McArthur <sean@seanmonstar.com>
 hyper-named-pipe,https://github.com/fussybeaver/hyper-named-pipe,Apache-2.0,The hyper-named-pipe Authors
 hyper-openssl,https://github.com/sfackler/hyper-openssl,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
