@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 use toml::value::Table;
 
-use super::{
-    deserialize_table, interpolate_toml_table_with_secrets, loader,
-};
+use super::{deserialize_table, interpolate_toml_table_with_secrets, loader};
 use super::{ComponentHint, Process};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
