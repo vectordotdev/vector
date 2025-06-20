@@ -23,7 +23,6 @@ jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
 
-    # Skip all real work while in the merge queue
     env:
       PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
 
