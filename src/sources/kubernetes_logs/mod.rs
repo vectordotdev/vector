@@ -21,13 +21,18 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
+use tokio::sync::oneshot;
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
     calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
     Fingerprinter, Line, ReadFrom, ReadFromConfig,
 };
 use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use vector_lib::{
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    event::{BatchNotifier, BatchStatus},
+    finalizer::OrderedFinalizer,
+};
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
@@ -37,12 +42,13 @@ use vrl::value::{kind::Collection, Kind};
 
 use crate::{
     built_info::{PKG_NAME, PKG_VERSION},
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+    serde::bool_or_struct,
+    sources::{file::FinalizerEntry, kubernetes_logs::partial_events_merger::merge_partial_events},
 };
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
-        SourceContext, SourceOutput,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions,
+        SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{
@@ -66,6 +72,7 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod test;
 mod transform_utils;
 mod util;
 
@@ -268,6 +275,10 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     rotate_wait: Duration,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: SourceAcknowledgementsConfig,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -315,6 +326,7 @@ impl Default for Config {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -324,7 +336,8 @@ impl Default for Config {
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let source = Source::new(self, &cx.globals, &cx.key).await?;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        let source = Source::new(self, &cx.globals, &cx.key, acknowledgements).await?;
 
         Ok(Box::pin(
             source
@@ -540,7 +553,7 @@ impl SourceConfig for Config {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
@@ -572,6 +585,8 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    acknowledgements: bool,
+    maybe_logs_dir: Option<String>,
 }
 
 impl Source {
@@ -579,6 +594,7 @@ impl Source {
         config: &Config,
         globals: &GlobalOptions,
         key: &ComponentKey,
+        acknowledgements: bool,
     ) -> crate::Result<Self> {
         let self_node_name = if config.self_node_name.is_empty()
             || config.self_node_name == default_self_node_name_env_template()
@@ -661,6 +677,82 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            acknowledgements,
+            maybe_logs_dir: None,
+        })
+    }
+
+    #[cfg(any(test, feature = "all-integration-tests"))]
+    async fn new_test(
+        config: &Config,
+        globals: &GlobalOptions,
+        key: &ComponentKey,
+        acknowledgements: bool,
+        client: Client,
+        logs_dir: String,
+    ) -> crate::Result<Self> {
+        let self_node_name = if config.self_node_name.is_empty()
+            || config.self_node_name == default_self_node_name_env_template()
+        {
+            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+                format!(
+                    "self_node_name config value or {} env var is not set",
+                    SELF_NODE_NAME_ENV_KEY
+                )
+            })?
+        } else {
+            config.self_node_name.clone()
+        };
+
+        let field_selector = prepare_field_selector(config, self_node_name.as_str())?;
+        let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
+        let namespace_label_selector =
+            prepare_label_selector(config.extra_namespace_label_selector.as_ref());
+        let node_selector = prepare_node_selector(self_node_name.as_str())?;
+
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
+
+        let include_paths = prepare_include_paths(config)?;
+
+        let exclude_paths = prepare_exclude_paths(config)?;
+
+        let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
+
+        let delay_deletion = config.delay_deletion_ms;
+
+        let ingestion_timestamp_field = config
+            .ingestion_timestamp_field
+            .clone()
+            .and_then(|k| k.path);
+
+        Ok(Self {
+            client,
+            data_dir,
+            auto_partial_merge: config.auto_partial_merge,
+            pod_fields_spec: config.pod_annotation_fields.clone(),
+            namespace_fields_spec: config.namespace_annotation_fields.clone(),
+            node_field_spec: config.node_annotation_fields.clone(),
+            field_selector,
+            label_selector,
+            namespace_label_selector,
+            node_selector,
+            self_node_name,
+            include_paths,
+            exclude_paths,
+            read_from: ReadFrom::from(config.read_from),
+            ignore_older_secs: config.ignore_older_secs,
+            max_read_bytes: config.max_read_bytes,
+            oldest_first: config.oldest_first,
+            max_line_bytes: config.max_line_bytes,
+            fingerprint_lines: config.fingerprint_lines,
+            glob_minimum_cooldown,
+            use_apiserver_cache: config.use_apiserver_cache,
+            ingestion_timestamp_field,
+            delay_deletion,
+            include_file_metric_tag: config.internal_metrics.include_file_tag,
+            rotate_wait: config.rotate_wait,
+            acknowledgements,
+            maybe_logs_dir: Some(logs_dir),
         })
     }
 
@@ -697,6 +789,8 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            acknowledgements,
+            maybe_logs_dir,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -785,6 +879,7 @@ impl Source {
             ns_state.clone(),
             include_paths,
             exclude_paths,
+            maybe_logs_dir,
         );
         let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator =
@@ -860,6 +955,33 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
+        let (finalizer, shutdown_checkpointer) = if acknowledgements {
+            // The shutdown sent in to the finalizer is the global
+            // shutdown handle used to tell it to stop accepting new batch
+            // statuses and just wait for the remaining acks to come in.
+            let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
+
+            // We set up a separate shutdown signal to tie together the
+            // finalizer and the checkpoint writer task in the file
+            // server, to make it continue to write out updated
+            // checkpoints until all the acks have come in.
+            let (send_shutdown, shutdown2) = oneshot::channel::<()>();
+            let checkpoints = checkpointer.view();
+            tokio::spawn(async move {
+                while let Some((status, entry)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        checkpoints.update(entry.file_id, entry.offset);
+                    }
+                }
+                send_shutdown.send(())
+            });
+            (Some(finalizer), shutdown2.map(|_| ()).boxed())
+        } else {
+            // When not dealing with end-to-end acknowledgements, just
+            // clone the global shutdown to stop the checkpoint writer.
+            (None, global_shutdown.clone().map(|_| ()).boxed())
+        };
+
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
@@ -905,7 +1027,18 @@ impl Source {
                 }
             }
 
-            checkpoints.update(line.file_id, line.end_offset);
+            if let Some(finalizer) = &finalizer {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                event = event.with_batch_notifier(&batch);
+                let entry = FinalizerEntry {
+                    file_id: line.file_id,
+                    offset: line.end_offset,
+                };
+                finalizer.add(entry, receiver);
+            } else {
+                checkpoints.update(line.file_id, line.end_offset);
+            }
+
             event
         });
 
@@ -929,15 +1062,21 @@ impl Source {
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
-                        error,
-                        count: events_count,
-                    }),
-                });
+            let fut = util::run_file_server(
+                file_server,
+                file_source_tx,
+                shutdown,
+                shutdown_checkpointer,
+                checkpointer,
+            )
+            .map(|result| match result {
+                Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                Err(error) => emit!(KubernetesLifecycleError {
+                    message: "File server exited with an error.",
+                    error,
+                    count: events_count,
+                }),
+            });
             slot.bind(Box::pin(fut));
         }
         {
@@ -1147,372 +1286,4 @@ fn prepare_label_selector(selector: &str) -> String {
     }
 
     format!("{},{}", BUILT_IN, selector)
-}
-
-#[cfg(test)]
-mod tests {
-    use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-    use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{kind::Collection, Kind};
-
-    use crate::config::SourceConfig;
-
-    use super::Config;
-
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<Config>();
-    }
-
-    #[test]
-    fn prepare_exclude_paths() {
-        let cases = vec![
-            (
-                Config::default(),
-                vec![
-                    glob::Pattern::new("**/*.gz").unwrap(),
-                    glob::Pattern::new("**/*.tmp").unwrap(),
-                ],
-            ),
-            (
-                Config {
-                    exclude_paths_glob_patterns: vec![std::path::PathBuf::from("**/*.tmp")],
-                    ..Default::default()
-                },
-                vec![glob::Pattern::new("**/*.tmp").unwrap()],
-            ),
-            (
-                Config {
-                    exclude_paths_glob_patterns: vec![
-                        std::path::PathBuf::from("**/kube-system_*/**"),
-                        std::path::PathBuf::from("**/*.gz"),
-                        std::path::PathBuf::from("**/*.tmp"),
-                    ],
-                    ..Default::default()
-                },
-                vec![
-                    glob::Pattern::new("**/kube-system_*/**").unwrap(),
-                    glob::Pattern::new("**/*.gz").unwrap(),
-                    glob::Pattern::new("**/*.tmp").unwrap(),
-                ],
-            ),
-        ];
-
-        for (input, mut expected) in cases {
-            let mut output = super::prepare_exclude_paths(&input).unwrap();
-            expected.sort();
-            output.sort();
-            assert_eq!(expected, output, "expected left, actual right");
-        }
-    }
-
-    #[test]
-    fn prepare_field_selector() {
-        let cases = vec![
-            // We're not testing `Config::default()` or empty `self_node_name`
-            // as passing env vars in the concurrent tests is difficult.
-            (
-                Config {
-                    self_node_name: "qwe".to_owned(),
-                    ..Default::default()
-                },
-                "spec.nodeName=qwe",
-            ),
-            (
-                Config {
-                    self_node_name: "qwe".to_owned(),
-                    extra_field_selector: "".to_owned(),
-                    ..Default::default()
-                },
-                "spec.nodeName=qwe",
-            ),
-            (
-                Config {
-                    self_node_name: "qwe".to_owned(),
-                    extra_field_selector: "foo=bar".to_owned(),
-                    ..Default::default()
-                },
-                "spec.nodeName=qwe,foo=bar",
-            ),
-        ];
-
-        for (input, expected) in cases {
-            let output = super::prepare_field_selector(&input, "qwe").unwrap();
-            assert_eq!(expected, output, "expected left, actual right");
-        }
-    }
-
-    #[test]
-    fn prepare_label_selector() {
-        let cases = vec![
-            (
-                Config::default().extra_label_selector,
-                "vector.dev/exclude!=true",
-            ),
-            (
-                Config::default().extra_namespace_label_selector,
-                "vector.dev/exclude!=true",
-            ),
-            (
-                Config {
-                    extra_label_selector: "".to_owned(),
-                    ..Default::default()
-                }
-                .extra_label_selector,
-                "vector.dev/exclude!=true",
-            ),
-            (
-                Config {
-                    extra_namespace_label_selector: "".to_owned(),
-                    ..Default::default()
-                }
-                .extra_namespace_label_selector,
-                "vector.dev/exclude!=true",
-            ),
-            (
-                Config {
-                    extra_label_selector: "qwe".to_owned(),
-                    ..Default::default()
-                }
-                .extra_label_selector,
-                "vector.dev/exclude!=true,qwe",
-            ),
-            (
-                Config {
-                    extra_namespace_label_selector: "qwe".to_owned(),
-                    ..Default::default()
-                }
-                .extra_namespace_label_selector,
-                "vector.dev/exclude!=true,qwe",
-            ),
-        ];
-
-        for (input, expected) in cases {
-            let output = super::prepare_label_selector(&input);
-            assert_eq!(expected, output, "expected left, actual right");
-        }
-    }
-
-    #[test]
-    fn test_output_schema_definition_vector_namespace() {
-        let definitions = toml::from_str::<Config>("")
-            .unwrap()
-            .outputs(LogNamespace::Vector)
-            .remove(0)
-            .schema_definition(true);
-
-        assert_eq!(
-            definitions,
-            Some(
-                Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "file"),
-                        Kind::bytes(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "container_id"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "container_image"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "container_name"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "namespace_labels"),
-                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
-                            .or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "node_labels"),
-                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
-                            .or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_annotations"),
-                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
-                            .or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_ip"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_ips"),
-                        Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_labels"),
-                        Kind::object(Collection::empty().with_unknown(Kind::bytes()))
-                            .or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_name"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_namespace"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_node_name"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_owner"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "pod_uid"),
-                        Kind::bytes().or_undefined(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "stream"),
-                        Kind::bytes(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("kubernetes_logs", "timestamp"),
-                        Kind::timestamp(),
-                        Some("timestamp")
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("vector", "source_type"),
-                        Kind::bytes(),
-                        None
-                    )
-                    .with_metadata_field(
-                        &owned_value_path!("vector", "ingest_timestamp"),
-                        Kind::timestamp(),
-                        None
-                    )
-                    .with_meaning(OwnedTargetPath::event_root(), "message")
-            )
-        )
-    }
-
-    #[test]
-    fn test_output_schema_definition_legacy_namespace() {
-        let definitions = toml::from_str::<Config>("")
-            .unwrap()
-            .outputs(LogNamespace::Legacy)
-            .remove(0)
-            .schema_definition(true);
-
-        assert_eq!(
-            definitions,
-            Some(
-                Definition::new_with_default_metadata(
-                    Kind::object(Collection::empty()),
-                    [LogNamespace::Legacy]
-                )
-                .with_event_field(&owned_value_path!("file"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("message"),
-                    Kind::bytes(),
-                    Some("message")
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "container_id"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "container_image"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "container_name"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "namespace_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "node_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_annotations"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_ip"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_ips"),
-                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_labels"),
-                    Kind::object(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_name"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_namespace"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_node_name"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_owner"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(
-                    &owned_value_path!("kubernetes", "pod_uid"),
-                    Kind::bytes().or_undefined(),
-                    None
-                )
-                .with_event_field(&owned_value_path!("stream"), Kind::bytes(), None)
-                .with_event_field(
-                    &owned_value_path!("timestamp"),
-                    Kind::timestamp(),
-                    Some("timestamp")
-                )
-                .with_event_field(
-                    &owned_value_path!("source_type"),
-                    Kind::bytes(),
-                    None
-                )
-            )
-        )
-    }
 }
