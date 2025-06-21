@@ -221,6 +221,16 @@ where
                                 }
                             }
                         } else {
+                            // maybe_upgrade is not executed during file_server's initialization with `kubernetes_log`
+                            // because `kubernetes_logs` source returns the files after it fetches k8s metadata.
+                            // so execute maybe_upgrade every time new file is added to file_server.
+                            checkpointer.maybe_upgrade(
+                                &path,
+                                file_id,
+                                &self.fingerprinter,
+                                &mut fingerprint_buffer,
+                            );
+
                             // untracked file fingerprint
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
                             self.emitter.emit_files_open(fp_map.len());
