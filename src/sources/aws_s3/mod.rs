@@ -101,7 +101,7 @@ pub struct AwsS3Config {
 
     #[configurable(derived)]
     #[serde(default)]
-    auth: AwsAuthentication,
+    auth: Option<AwsAuthentication>,
 
     /// Multiline aggregation configuration.
     ///
@@ -242,11 +242,17 @@ impl AwsS3Config {
         let region = self.region.region();
         let endpoint = self.region.endpoint();
 
+
+        let s3_auth = match self.auth {
+            Some(ref auth) => auth.clone(),
+            None => AwsAuthentication::default(),
+        };    
+
         let s3_client = create_client::<S3ClientBuilder>(
             &S3ClientBuilder {
                 force_path_style: Some(self.force_path_style),
             },
-            &self.auth,
+            &s3_auth,
             region.clone(),
             endpoint.clone(),
             proxy,
@@ -261,9 +267,15 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
+                let sqs_auth = match sqs.auth {
+                    Some(sqs::AwsAuthenticationOrDefault::Auth(ref auth)) => auth.clone(),
+                    Some(sqs::AwsAuthenticationOrDefault::Default(_)) => AwsAuthentication::default(),
+                    None => self.auth.clone().unwrap_or_else(AwsAuthentication::default),
+                };
+
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &SqsClientBuilder {},
-                    &self.auth,
+                    &sqs_auth,
                     region.clone(),
                     endpoint,
                     proxy,
