@@ -82,9 +82,9 @@ components: sinks: elasticsearch: {
 			counter:      true
 			distribution: true
 			gauge:        true
-			histogram:    false
-			set:          false
-			summary:      false
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 		traces:  false
 	}
