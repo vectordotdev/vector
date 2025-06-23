@@ -160,8 +160,11 @@ base: components: sources: aws_sqs: configuration: {
 		type: uint: {}
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -234,6 +237,8 @@ base: components: sources: aws_sqs: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -241,6 +246,8 @@ base: components: sources: aws_sqs: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
