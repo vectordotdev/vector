@@ -151,7 +151,7 @@ async fn remove_container(docker: &Docker, id: &str) {
     trace!("Stopping container.");
 
     _ = docker
-        .stop_container(id, Option::<StopContainerOptions>::None)
+        .stop_container(id, None::<StopContainerOptions>)
         .await
         .map_err(|e| error!(%e));
 
@@ -159,7 +159,7 @@ async fn remove_container(docker: &Docker, id: &str) {
 
     // Don't panic, as this is unrelated to the test
     _ = docker
-        .remove_container(id, Option::<RemoveContainerOptions>::None)
+        .remove_container(id, None::<RemoveContainerOptions>)
         .await
         .map_err(|e| error!(%e));
 }
@@ -219,7 +219,7 @@ impl Container {
             .unwrap();
 
         docker
-            .start_container(&container.id, Option::<StartContainerOptions>::None)
+            .start_container(&container.id, None::<StartContainerOptions>)
             .await
             .unwrap();
 
