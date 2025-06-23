@@ -31,4 +31,13 @@ components: transforms: sample: {
 		metrics: null
 		traces:  true
 	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		traces: "": {
+			description: "The modified input `trace` event."
+		}
+	}
 }
