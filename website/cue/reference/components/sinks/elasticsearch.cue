@@ -77,8 +77,8 @@ components: sinks: elasticsearch: {
 	configuration: base.components.sinks.elasticsearch.configuration
 
 	input: {
-		logs:    true
-    metrics: {
+		logs: true
+		metrics: {
 			counter:      true
 			distribution: true
 			gauge:        true
@@ -86,7 +86,7 @@ components: sinks: elasticsearch: {
 			set:          true
 			summary:      true
 		}
-		traces:  false
+		traces: false
 	}
 
 	how_it_works: {
