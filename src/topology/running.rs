@@ -1233,7 +1233,10 @@ impl RunningTopology {
             return None;
         }
 
-        let mut utilization_emitter = pieces.utilization_emitter.take().unwrap();
+        let mut utilization_emitter = pieces
+            .utilization_emitter
+            .take()
+            .expect("Topology is missing the utilization metric emitter!");
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
