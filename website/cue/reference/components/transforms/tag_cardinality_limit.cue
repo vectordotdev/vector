@@ -51,6 +51,12 @@ components: transforms: tag_cardinality_limit: {
 		traces: false
 	}
 
+	output: {
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Drop high-cardinality tag"

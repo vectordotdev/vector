@@ -33,6 +33,12 @@ components: transforms: window: {
 		traces:  false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Flush recent events when an error happens"
