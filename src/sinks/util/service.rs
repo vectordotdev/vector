@@ -44,7 +44,10 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<FibonacciRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+    Retry<
+        FibonacciRetryPolicy<RL>,
+        Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+    >,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
     BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
@@ -352,7 +355,7 @@ impl TowerRequestSettings {
                     )
             })
             .enumerate()
-            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
         // Build sink service
