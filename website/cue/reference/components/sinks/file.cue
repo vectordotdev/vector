@@ -47,8 +47,15 @@ components: sinks: file: {
 
 	input: {
 		logs:    true
-		metrics: null
-		traces:  false
+    metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces:  true
 	}
 
 	how_it_works: {

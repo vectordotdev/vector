@@ -78,7 +78,14 @@ components: sinks: elasticsearch: {
 
 	input: {
 		logs:    true
-		metrics: null
+    metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    false
+			set:          false
+			summary:      false
+		}
 		traces:  false
 	}
 
