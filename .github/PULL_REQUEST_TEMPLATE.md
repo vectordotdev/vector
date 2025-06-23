@@ -25,9 +25,6 @@ This should help the reviewers give feedback faster and with higher quality. -->
 
 ## References
 
-<!-- Please list any issues closed by this PR. -->
-<!-- Also list any other issues/PRs that may be relevant to your changes. -->
-
 <!--
 - Closes: #<issue number>
 - Related: #<issue number>
