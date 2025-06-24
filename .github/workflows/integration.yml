@@ -84,10 +84,12 @@ jobs:
     if: ${{ needs.check-all.outputs.should_run == 'true' }}
     outputs:
       can_access_secrets: ${{ steps.secret_access_check.outputs.can_access_secrets }}
+    env:
+      DATADOG_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
     steps:
       - uses: actions/checkout@v4
       - name: Run setup steps required by the IT suite
-        if: ${{ github.event_name == 'merge_group' || secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+        if: ${{ github.event_name == 'merge_group' || env.DATADOG_CI_APP_ID }}
         run: |
           sudo npm -g install @datadog/datadog-ci
           sudo -E bash scripts/ci-free-disk-space.sh
@@ -98,7 +100,9 @@ jobs:
     needs:
       - changes
       - setup
-    if: ${{ github.event_name == 'merge_group' || secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+    env:
+      DATADOG_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+    if: ${{ github.event_name == 'merge_group' || env.DATADOG_CI_APP_ID }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
