@@ -14,8 +14,6 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # See docs/DEVELOPING.md for policy
 rust-version = "1.86"
 
-# Trigger - tests
-
 [[bin]]
 name = "vector"
 test = false
