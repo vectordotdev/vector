@@ -135,19 +135,10 @@ impl TtlPolicy {
 /// is maintained) with convenience methods to make it easier to perform
 /// normalization-specific operations. It also includes an optional TTL policy
 /// to automatically expire old entries.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MetricSet {
     inner: IndexMap<MetricSeries, MetricEntry>,
     ttl_policy: Option<TtlPolicy>,
-}
-
-impl Default for MetricSet {
-    fn default() -> Self {
-        Self {
-            inner: IndexMap::default(),
-            ttl_policy: None,
-        }
-    }
 }
 
 impl MetricSet {
@@ -168,7 +159,7 @@ impl MetricSet {
     }
 
     /// Gets a reference to the cleanup configuration.
-    pub fn ttl_policy(&self) -> Option<&TtlPolicy> {
+    pub const fn ttl_policy(&self) -> Option<&TtlPolicy> {
         self.ttl_policy.as_ref()
     }
 

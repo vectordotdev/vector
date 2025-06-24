@@ -1,6 +1,5 @@
 use std::fmt;
 
-use std::time::Duration;
 use vector_lib::byte_size_of::ByteSizeOf;
 use vector_lib::event::Metric;
 use vector_lib::stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};

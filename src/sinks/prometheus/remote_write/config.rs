@@ -1,6 +1,5 @@
 use http::Uri;
 use snafu::prelude::*;
-use std::time::Duration;
 
 use crate::{
     http::HttpClient,
