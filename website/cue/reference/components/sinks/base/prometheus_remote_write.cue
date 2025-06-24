@@ -317,6 +317,17 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: true
 		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
+	expire_metrics_secs: {
+		description: """
+			TTL (time-to-live) for cached metric state entries.
+
+			This controls how long metric normalization state is retained in memory.
+			Expired entries are automatically cleaned up during normalization operations.
+			If not specified, entries are retained indefinitely.
+			"""
+		required: false
+		type: float: examples: ["300s", "5m"]
+	}
 	quantiles: {
 		description: """
 			Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
