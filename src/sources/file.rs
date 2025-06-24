@@ -325,7 +325,7 @@ pub enum FingerprintConfig {
     },
 
     /// Read lines from the beginning of the file and compute a checksum and with the path as the random salt
-    ChecksumWithSalt {
+    ChecksumWithPathSalt {
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
@@ -399,7 +399,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
-            FingerprintConfig::ChecksumWithSalt{ ignored_header_bytes, lines } => FingerprintStrategy::ChecksumWithSalt { ignored_header_bytes, lines },
+            FingerprintConfig::ChecksumWithPathSalt{ ignored_header_bytes, lines } => FingerprintStrategy::ChecksumWithPathSalt { ignored_header_bytes, lines },
             FingerprintConfig::FullContentChecksum => FingerprintStrategy::FullContentChecksum,
             FingerprintConfig::ModificationTime => FingerprintStrategy::ModificationTime,
         }

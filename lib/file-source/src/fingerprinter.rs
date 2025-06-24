@@ -34,7 +34,7 @@ pub enum FingerprintStrategy {
         ignored_header_bytes: usize,
         lines: usize,
     },
-    ChecksumWithSalt {
+    ChecksumWithPathSalt {
         ignored_header_bytes: usize,
         lines: usize,
     },
@@ -50,7 +50,7 @@ pub enum FileFingerprint {
     BytesChecksum(u64),
     #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
-    ChecksumWithSalt(u64, u64),
+    ChecksumWithPathSalt(u64, u64),
     DevInode(u64, u64),
     FullContentChecksum(u64),
     ModificationTime(u64, u64),
@@ -70,7 +70,7 @@ impl FileFingerprint {
                 buf.write_all(&ino.to_be_bytes()).expect("writing to array");
                 FINGERPRINT_CRC.checksum(&buf[..])
             },
-            ChecksumWithSalt(c, salt) => {
+            ChecksumWithPathSalt(c, salt) => {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(c));
                 buf.write_all(&c.to_be_bytes()).expect("writing to array");
                 let mut salt_buf = Vec::with_capacity(std::mem::size_of_val(salt));
@@ -92,7 +92,7 @@ impl FileFingerprint {
         match self {
             BytesChecksum(_) => false,
             FirstLinesChecksum(_) => false,
-            ChecksumWithSalt(_, _) => false,
+            ChecksumWithPathSalt(_, _) => false,
             DevInode(_, _) => false,
             FullContentChecksum(_) => false,
             ModificationTime(_, _) => false,
@@ -138,7 +138,7 @@ impl Fingerprinter {
                 path_str.hash(&mut hasher);
                 Ok(ModificationTime(hasher.finish(), update_timestamp))
             }
-            FingerprintStrategy::ChecksumWithSalt{ignored_header_bytes, lines} => {
+            FingerprintStrategy::ChecksumWithPathSalt{ignored_header_bytes, lines} => {
                 buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
@@ -148,7 +148,7 @@ impl Fingerprinter {
                 let path_str = path.to_str().unwrap();
                 let mut hasher = DefaultHasher::new();
                 path_str.hash(&mut hasher);
-                Ok(ChecksumWithSalt(fingerprint, hasher.finish()))
+                Ok(ChecksumWithPathSalt(fingerprint, hasher.finish()))
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,

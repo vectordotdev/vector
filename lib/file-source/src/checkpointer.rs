@@ -231,7 +231,7 @@ impl Checkpointer {
         let path = match fng {
             BytesChecksum(c) => format!("g{:x}.{}", c, pos),
             FirstLinesChecksum(c) => format!("h{:x}.{}", c, pos),
-            ChecksumWithSalt(c, salt ) => format!("s{:x}.{}.{}", c, salt, pos),
+            ChecksumWithPathSalt(c, salt ) => format!("s{:x}.{}.{}", c, salt, pos),
             DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
             FullContentChecksum(c) => format!("f{:x}.{}", c, pos),
             ModificationTime(path, timestamp) => format!("m{:x}.{}.{}", path, timestamp, pos),
@@ -282,7 +282,7 @@ impl Checkpointer {
                 let (c, salt, pos) =
                     scan_fmt!(file_name, "s{x}.{}.{}", [hex u64], u64, FilePosition)
                         .unwrap();
-                (ChecksumWithSalt(c, salt), pos)
+                (ChecksumWithPathSalt(c, salt), pos)
             }
             _ => {
                 let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
