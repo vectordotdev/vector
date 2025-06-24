@@ -1,3 +1,4 @@
+use std::time::Duration;
 use http::Uri;
 use snafu::prelude::*;
 
@@ -92,6 +93,16 @@ pub struct RemoteWriteConfig {
     #[configurable(metadata(docs::examples = "my-domain"))]
     #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
+
+    /// TTL (time-to-live) for cached metric state entries.
+    ///
+    /// This controls how long metric normalization state is retained in memory.
+    /// Expired entries are automatically cleaned up during normalization operations.
+    /// If not specified, entries are retained indefinitely.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "300s", docs::examples = "5m"))]
+    #[configurable(metadata(docs::advanced))]
+    pub expire_metrics_secs: Option<f64>,
 
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -202,6 +213,7 @@ impl SinkConfig for RemoteWriteConfig {
             buckets,
             quantiles,
             default_namespace,
+            expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
 

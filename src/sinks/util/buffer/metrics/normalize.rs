@@ -1,5 +1,7 @@
 use indexmap::IndexMap;
 
+use std::time::{Duration, Instant};
+
 use vector_lib::event::{
     metric::{MetricData, MetricSeries},
     EventMetadata, Metric, MetricKind,
@@ -46,6 +48,14 @@ pub struct MetricNormalizer<N> {
 }
 
 impl<N> MetricNormalizer<N> {
+    /// Creates a new normalizer with TTL policy.
+    pub fn with_ttl(normalizer: N, ttl: TtlPolicy) -> Self {
+        Self {
+            state: MetricSet::with_ttl_policy(ttl),
+            normalizer,
+        }
+    }
+
     /// Gets a mutable reference to the current metric state for this normalizer.
     pub const fn get_state_mut(&mut self) -> &mut MetricSet {
         &mut self.state
@@ -79,46 +89,142 @@ impl<N> From<N> for MetricNormalizer<N> {
     }
 }
 
-type MetricEntry = (MetricData, EventMetadata);
+type MetricEntry = (MetricData, EventMetadata, Option<Instant>);
+
+/// Configuration for automatic cleanup of expired entries.
+#[derive(Clone, Debug)]
+pub struct TtlPolicy {
+    /// Time-to-live for entries
+    pub ttl: Duration,
+    /// How often to run cleanup
+    pub cleanup_interval: Duration,
+    /// Last time cleanup was performed
+    pub(crate) last_cleanup: Instant,
+}
+
+impl TtlPolicy {
+    /// Creates a new cleanup configuration with TTL.
+    /// Cleanup interval defaults to TTL/10 with a 10-second minimum.
+    pub fn new(ttl: Duration) -> Self {
+        Self {
+            ttl,
+            cleanup_interval: ttl.div_f32(10.0).max(Duration::from_secs(10)),
+            last_cleanup: Instant::now(),
+        }
+    }
+
+    /// Checks if it's time to run cleanup.
+    pub fn should_cleanup(&self) -> bool {
+        Instant::now().duration_since(self.last_cleanup) >= self.cleanup_interval
+    }
+
+    /// Marks cleanup as having been performed.
+    pub fn mark_cleanup_done(&mut self) {
+        self.last_cleanup = Instant::now();
+    }
+
+    /// Checks if an entry with the given timestamp is expired.
+    pub fn is_expired(&self, timestamp: Instant) -> bool {
+        Instant::now().duration_since(timestamp) >= self.ttl
+    }
+}
 
 /// Metric storage for use with normalization.
 ///
 /// This is primarily a wrapper around [`IndexMap`] (to ensure insertion order
 /// is maintained) with convenience methods to make it easier to perform
-/// normalization-specific operations.
-#[derive(Clone, Default, Debug)]
-pub struct MetricSet(IndexMap<MetricSeries, MetricEntry>);
+/// normalization-specific operations. It also includes an optional TTL policy
+/// to automatically expire old entries.
+#[derive(Clone, Debug)]
+pub struct MetricSet {
+    inner: IndexMap<MetricSeries, MetricEntry>,
+    ttl_policy: Option<TtlPolicy>,
+}
+
+impl Default for MetricSet {
+    fn default() -> Self {
+        Self {
+            inner: IndexMap::default(),
+            ttl_policy: None,
+        }
+    }
+}
 
 impl MetricSet {
-    /// Creates an empty `MetricSet` with the specified capacity.
-    ///
-    /// The metric set will be able to hold at least `capacity` elements without reallocating. If `capacity` is 0, the
-    /// metric set will not allocate.
+    /// Creates an empty MetricSet with the specified capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        Self(IndexMap::with_capacity(capacity))
+        Self {
+            inner: IndexMap::with_capacity(capacity),
+            ttl_policy: None,
+        }
+    }
+
+    /// Creates a MetricSet with custom cleanup configuration.
+    pub fn with_ttl_policy(ttl_policy: TtlPolicy) -> Self {
+        Self {
+            inner: IndexMap::default(),
+            ttl_policy: Some(ttl_policy),
+        }
+    }
+
+    /// Gets a reference to the cleanup configuration.
+    pub fn ttl_policy(&self) -> Option<&TtlPolicy> {
+        self.ttl_policy.as_ref()
+    }
+
+    // Perform periodic cleanup if enough time has passed since the last cleanup
+    fn maybe_cleanup(&mut self) {
+        if let Some(config) = self.ttl_policy(){
+            if config.should_cleanup() {
+                self.cleanup_expired()
+            }
+        };
+    }
+
+    /// Removes expired entries based on TTL if configured.
+    fn cleanup_expired(&mut self) {
+        let now = Instant::now();
+        if let Some(config) = &self.ttl_policy {
+            self.inner.retain(|_, (_, _, timestamp)| {
+                match timestamp {
+                    Some(ts) => now.duration_since(*ts) < config.ttl,
+                    None => true,
+                }
+            });
+        }
     }
 
     /// Returns the number of elements in the set.
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
     }
 
-    /// Returns `true` if the set contains no elements.
+    fn create_timestamp(&self) -> Option<Instant> {
+        match self.ttl_policy() {
+            Some(_) => Some(Instant::now()),
+            _ => None,
+        }
+    }
+
+    /// Returns true if the set contains no elements.
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.inner.is_empty()
     }
 
-    /// Consumes this `MetricSet` and returns a vector of `Metric`.
-    pub fn into_metrics(self) -> Vec<Metric> {
-        self.0
+    /// Consumes this MetricSet and returns a vector of Metric.
+    pub fn into_metrics(mut self) -> Vec<Metric> {
+        // Always cleanup on final consumption
+        self.cleanup_expired();
+        self.inner
             .into_iter()
-            .map(|(series, (data, metadata))| Metric::from_parts(series, data, metadata))
+            .map(|(series, (data, metadata, _))| Metric::from_parts(series, data, metadata))
             .collect()
     }
 
     /// Either pass the metric through as-is if absolute, or convert it
     /// to absolute if incremental.
     pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
+        self.maybe_cleanup();
         match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
@@ -128,6 +234,7 @@ impl MetricSet {
     /// Either convert the metric to incremental if absolute, or
     /// aggregate it with any previous value if already incremental.
     pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        self.maybe_cleanup();
         match metric.kind() {
             MetricKind::Absolute => self.absolute_to_incremental(metric),
             MetricKind::Incremental => Some(metric),
@@ -138,22 +245,24 @@ impl MetricSet {
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
-        match self.0.get_mut(metric.series()) {
+        let timestamp = self.create_timestamp();
+        match self.inner.get_mut(metric.series()) {
             Some(existing) => {
                 if existing.0.value.add(metric.value()) {
                     metric = metric.with_value(existing.0.value.clone());
+                    existing.2 = timestamp; // Update timestamp
                 } else {
                     // Metric changed type, store this as the new reference value
-                    self.0.insert(
+                    self.inner.insert(
                         metric.series().clone(),
-                        (metric.data().clone(), EventMetadata::default()),
+                        (metric.data().clone(), EventMetadata::default(), self.create_timestamp()),
                     );
                 }
             }
             None => {
-                self.0.insert(
+                self.inner.insert(
                     metric.series().clone(),
-                    (metric.data().clone(), EventMetadata::default()),
+                    (metric.data().clone(), EventMetadata::default(), self.create_timestamp()),
                 );
             }
         }
@@ -182,12 +291,14 @@ impl MetricSet {
         // introducing a small amount of lag before a metric is emitted by having to wait to see it
         // again, but this is a behavior we have to observe for sinks that can only handle
         // incremental updates.
-        match self.0.get_mut(metric.series()) {
+        let timestamp = self.create_timestamp();
+        match self.inner.get_mut(metric.series()) {
             Some(reference) => {
                 let new_value = metric.value().clone();
                 // From the stored reference value, emit an increment
                 if metric.subtract(&reference.0) {
                     reference.0.value = new_value;
+                    reference.2 = timestamp; // Update timestamp
                     Some(metric.into_incremental())
                 } else {
                     // Metric changed type, store this and emit nothing
@@ -205,19 +316,22 @@ impl MetricSet {
 
     fn insert(&mut self, metric: Metric) {
         let (series, data, metadata) = metric.into_parts();
-        self.0.insert(series, (data, metadata));
+        self.inner.insert(series, (data, metadata, self.create_timestamp()));
     }
 
     pub fn insert_update(&mut self, metric: Metric) {
+        self.maybe_cleanup();
         let update = match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
+                let timestamp = self.create_timestamp();
                 // Incremental metrics update existing entries, if present
-                match self.0.get_mut(metric.series()) {
+                match self.inner.get_mut(metric.series()) {
                     Some(existing) => {
                         let (series, data, metadata) = metric.into_parts();
                         if existing.0.update(&data) {
                             existing.1.merge(metadata);
+                            existing.2 = timestamp;
                             None
                         } else {
                             warn!(message = "Metric changed type, dropping old value.", %series);
@@ -237,6 +351,7 @@ impl MetricSet {
     ///
     /// If the series existed and was removed, returns `true`.  Otherwise, `false`.
     pub fn remove(&mut self, series: &MetricSeries) -> bool {
-        self.0.shift_remove(series).is_some()
+        self.maybe_cleanup();
+        self.inner.shift_remove(series).is_some()
     }
 }
