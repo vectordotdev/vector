@@ -98,9 +98,8 @@ pub struct RemoteWriteConfig {
     /// This controls how long metric normalization state is retained in memory.
     /// Expired entries are automatically cleaned up during normalization operations.
     /// If not specified, entries are retained indefinitely.
-    #[serde(default)]
-    #[configurable(metadata(docs::examples = "300"))]
-    #[configurable(metadata(docs::advanced))]
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
     #[configurable(derived)]

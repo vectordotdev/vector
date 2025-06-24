@@ -318,6 +318,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
 	expire_metrics_secs: {
+		common: false
 		description: """
 			TTL (time-to-live) for cached metric state entries.
 
@@ -326,9 +327,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			If not specified, entries are retained indefinitely.
 			"""
 		required: false
-		type: float: examples: [
-			"300",
-		]
+		type: float: {}
 	}
 	quantiles: {
 		description: """
