@@ -141,6 +141,7 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
+      website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.other == 'false' }}
     steps:
     - uses: actions/checkout@v4
 
@@ -195,6 +196,12 @@ jobs:
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
+          website:
+            - "website/**"
+          # any change _not_ under website/
+          not_website:
+            - "**"
+            - "!website/**"
 
   # Detects changes that are specific to integration tests
   int_tests:
