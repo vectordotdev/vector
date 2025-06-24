@@ -8,9 +8,12 @@ use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+use vector_lib::{
+    codecs::{
+        encoding::{Framer, FramingConfig},
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    },
+    event::BatchStatusReceiver,
 };
 
 use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -30,7 +33,7 @@ use crate::{
         },
     },
     test_util::{
-        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
+        components::{self, run_and_assert_sink_compliance, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
         next_addr, random_lines_with_stream,
     },
 };
@@ -527,6 +530,85 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     })
     .await;
 }
+
+fn create_event_with_id(id: i64) -> Event {
+    let mut event = LogEvent::from("test event");
+    event.insert("id", id);
+    event.into()
+}
+
+fn create_events_with_id(id: i64, num_events: usize) -> (Vec<Event>, BatchStatusReceiver) {
+    let mut events = (0..num_events)
+        .map(|_| create_event_with_id(id))
+        .collect::<Vec<_>>();
+    let receiver = BatchNotifier::apply_to(&mut events);
+    (events, receiver)
+}
+
+#[tokio::test]
+async fn templateable_uri() {
+    let num_events_per_id = 100;
+    let in_addr = next_addr();
+
+    let config = format!(
+        r#"
+        uri = "http://{in_addr}/id/{{{{id}}}}"
+        encoding.codec = "json"
+        "#
+    );
+
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (some_events_with_an_id, mut a_receiver) = create_events_with_id(1, num_events_per_id);
+    let (some_events_with_another_id, mut another_receiver) =
+        create_events_with_id(2, num_events_per_id);
+    let all_events = some_events_with_an_id
+        .into_iter()
+        .chain(some_events_with_another_id);
+
+    let event_stream = stream::iter(all_events);
+
+    tokio::spawn(server);
+
+    run_and_assert_sink_compliance(sink, event_stream, &HTTP_SINK_TAGS).await;
+
+    drop(trigger);
+
+    assert_eq!(a_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(another_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let request_batches = rx
+        .inspect(|(parts, body)| {
+            let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+            // Assert that all the events are received
+            assert_eq!(events.len(), num_events_per_id);
+
+            // Assert that all events have the same id
+            let expected_event_id = events[0]["id"].as_i64().unwrap();
+
+            for event in events {
+                let event_id = event["id"].as_i64().unwrap();
+                assert_eq!(event_id, expected_event_id)
+            }
+
+            // Assert that the uri path is the expected one for the given id
+            let expected_uri_path = format!("/id/{expected_event_id}");
+            assert_eq!(parts.uri.path(), expected_uri_path);
+        })
+        .collect::<Vec<_>>()
+        .await;
+    // Assert that only two event batches were sent
+    assert_eq!(request_batches.len(), 2)
+}
+
+// TODO: test for auth in the uri template
+// TODO: failing test for both auth at `auth` section & uri auth
 
 fn parse_compressed_json<T>(compression: &str, buf: Bytes) -> T
 where
