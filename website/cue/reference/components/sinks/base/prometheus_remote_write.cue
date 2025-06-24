@@ -326,7 +326,9 @@ base: components: sinks: prometheus_remote_write: configuration: {
 			If not specified, entries are retained indefinitely.
 			"""
 		required: false
-		type: float: examples: ["300s", "5m"]
+		type: float: examples: [
+			"300",
+		]
 	}
 	quantiles: {
 		description: """
