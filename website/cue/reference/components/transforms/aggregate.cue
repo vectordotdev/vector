@@ -41,6 +41,12 @@ components: transforms: aggregate: {
 		traces: false
 	}
 
+	output: {
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Aggregate over 5 seconds"
