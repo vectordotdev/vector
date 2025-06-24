@@ -1,7 +1,7 @@
 use std::time::Duration;
 use vector_lib::codecs::TextSerializerConfig;
 
-use super::{config::NatsSinkConfig, sink::NatsSink, ConfigSnafu, NatsError};
+use super::{config::NatsSinkConfig, sink::NatsSink, NatsError};
 use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
@@ -13,7 +13,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-use snafu::ResultExt;
 
 async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     // Publish `N` messages to NATS.
@@ -27,10 +26,9 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
 
     // Establish the consumer subscription.
     let subject = conf.subject.clone();
-    let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect(options)
+        .connect()
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer

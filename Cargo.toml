@@ -266,7 +266,7 @@ azure_storage_blobs = { version = "0.17", default-features = false, optional = t
 opendal = { version = "0.53", default-features = false, features = ["services-webhdfs"], optional = true }
 
 # Tower
-tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
+tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-gzip", "trace"] }
 # Serde
 serde.workspace = true

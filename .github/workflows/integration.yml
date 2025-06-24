@@ -108,7 +108,7 @@ jobs:
     needs:
       - changes
       - setup
-    if: ${{ needs.setup.outputs.can_access_secrets == 'true' }}
+    if: ${{ needs.setup.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group' }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
