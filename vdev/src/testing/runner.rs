@@ -1,11 +1,13 @@
 use std::collections::HashSet;
-use std::process::{Command, Stdio};
-use std::{env, ffi::OsStr, ffi::OsString, path::PathBuf, sync::LazyLock};
+use std::process::Command;
+use std::{env, path::PathBuf};
 
 use anyhow::Result;
 
 use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
+use crate::testing::build::prepare_build_command;
+use crate::testing::docker::{docker_command, DOCKER_SOCKET};
 use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -24,40 +26,6 @@ const TEST_COMMAND: &[&str] = &[
 // The upstream container we publish artifacts to on a successful master build.
 const UPSTREAM_IMAGE: &str =
     "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
-
-pub static CONTAINER_TOOL: LazyLock<OsString> =
-    LazyLock::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));
-
-pub(super) static DOCKER_SOCKET: LazyLock<PathBuf> = LazyLock::new(detect_docker_socket);
-
-fn detect_container_tool() -> OsString {
-    for tool in ["docker", "podman"] {
-        if Command::new(tool)
-            .arg("version")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .and_then(|mut child| child.wait())
-            .is_ok_and(|status| status.success())
-        {
-            return OsString::from(String::from(tool));
-        }
-    }
-    fatal!("No container tool could be detected.");
-}
-
-fn get_rust_version() -> String {
-    match RustToolchainConfig::parse() {
-        Ok(config) => config.channel,
-        Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
-    }
-}
-
-fn dockercmd<I: AsRef<OsStr>>(args: impl IntoIterator<Item = I>) -> Command {
-    let mut command = Command::new(&*CONTAINER_TOOL);
-    command.args(args);
-    command
-}
 
 pub enum RunnerState {
     Running,
@@ -101,7 +69,7 @@ pub trait ContainerTestRunner: TestRunner {
     fn volumes(&self) -> Vec<String>;
 
     fn state(&self) -> Result<RunnerState> {
-        let mut command = dockercmd(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
+        let mut command = docker_command(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
 
         for line in command.check_output()?.lines() {
@@ -151,7 +119,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn ensure_volumes(&self) -> Result<()> {
-        let mut command = dockercmd(["volume", "ls", "--format", "{{.Name}}"]);
+        let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
 
         let mut volumes = HashSet::new();
         volumes.insert(VOLUME_TARGET);
@@ -162,7 +130,7 @@ pub trait ContainerTestRunner: TestRunner {
         }
 
         for volume in &volumes {
-            dockercmd(["volume", "create", volume]).wait(format!("Creating volume {volume}"))?;
+            docker_command(["volume", "create", volume]).wait(format!("Creating volume {volume}"))?;
         }
 
         Ok(())
@@ -172,32 +140,13 @@ pub trait ContainerTestRunner: TestRunner {
         let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
-        let mut command = dockercmd(["build"]);
-        command.current_dir(app::path());
-        if *IS_A_TTY {
-            command.args(["--progress", "tty"]);
-        }
-        command.args([
-            "--pull",
-            "--tag",
-            &self.image_name(),
-            "--file",
-            dockerfile.to_str().unwrap(),
-            "--label",
-            "vector-test-runner=true",
-            "--build-arg",
-            &format!("RUST_VERSION={}", get_rust_version()),
-            "--build-arg",
-            &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
-            ".",
-        ]);
-
+        let mut command = prepare_build_command(&self.image_name(), &dockerfile, features);
         waiting!("Building image {}", self.image_name());
         command.check_run()
     }
 
     fn start(&self) -> Result<()> {
-        dockercmd(["start", &self.container_name()])
+        docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
 
@@ -205,13 +154,13 @@ pub trait ContainerTestRunner: TestRunner {
         if matches!(self.state()?, RunnerState::Missing) {
             Ok(())
         } else {
-            dockercmd(["rm", "--force", "--volumes", &self.container_name()])
+            docker_command(["rm", "--force", "--volumes", &self.container_name()])
                 .wait(format!("Removing container {}", self.container_name()))
         }
     }
 
     fn unpause(&self) -> Result<()> {
-        dockercmd(["unpause", &self.container_name()])
+        docker_command(["unpause", &self.container_name()])
             .wait(format!("Unpausing container {}", self.container_name()))
     }
 
@@ -230,7 +179,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
-        dockercmd(
+        docker_command(
             [
                 "create",
                 "--name",
@@ -272,7 +221,7 @@ where
     ) -> Result<()> {
         self.ensure_running(features, directory)?;
 
-        let mut command = dockercmd(["exec"]);
+        let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
             command.arg("--tty");
         }
@@ -329,7 +278,7 @@ impl IntegrationTestRunner {
 
     pub(super) fn ensure_network(&self) -> Result<()> {
         if let Some(network_name) = &self.network {
-            let mut command = dockercmd(["network", "ls", "--format", "{{.Name}}"]);
+            let mut command = docker_command(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
                 .check_output()?
@@ -339,7 +288,7 @@ impl IntegrationTestRunner {
                 return Ok(());
             }
 
-            dockercmd(["network", "create", network_name]).wait("Creating network")
+            docker_command(["network", "create", network_name]).wait("Creating network")
         } else {
             Ok(())
         }
@@ -353,9 +302,9 @@ impl ContainerTestRunner for IntegrationTestRunner {
 
     fn container_name(&self) -> String {
         if let Some(integration) = self.integration.as_ref() {
-            format!("vector-test-runner-{}-{}", integration, get_rust_version())
+            format!("vector-test-runner-{}-{}", integration, RustToolchainConfig::rust_version())
         } else {
-            format!("vector-test-runner-{}", get_rust_version())
+            format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
         }
     }
 
@@ -380,7 +329,7 @@ impl ContainerTestRunner for DockerTestRunner {
     }
 
     fn container_name(&self) -> String {
-        format!("vector-test-runner-{}", get_rust_version())
+        format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
     }
 
     fn image_name(&self) -> String {
@@ -423,17 +372,5 @@ impl TestRunner for LocalTestRunner {
         }
 
         command.check_run()
-    }
-}
-
-fn detect_docker_socket() -> PathBuf {
-    match env::var_os("DOCKER_HOST") {
-        Some(host) => host
-            .into_string()
-            .expect("Invalid value in $DOCKER_HOST")
-            .strip_prefix("unix://")
-            .expect("$DOCKER_HOST is not a socket path")
-            .into(),
-        None => "/var/run/docker.sock".into(),
     }
 }
