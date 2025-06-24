@@ -16,7 +16,7 @@ export MINOR_VERSION=$(echo "$NEW_VERSION" | cut -d. -f2)
 export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version
-vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VERSION
+vdev release prepare --version "${NEW_VERSION}" --vrl-version "${NEW_VRL_VERSION}"
 ```
 
 # The week before the release
