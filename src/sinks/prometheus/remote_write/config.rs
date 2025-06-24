@@ -99,7 +99,7 @@ pub struct RemoteWriteConfig {
     /// Expired entries are automatically cleaned up during normalization operations.
     /// If not specified, entries are retained indefinitely.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "300s", docs::examples = "5m"))]
+    #[configurable(metadata(docs::examples = "300"))]
     #[configurable(metadata(docs::advanced))]
     pub expire_metrics_secs: Option<f64>,
 
