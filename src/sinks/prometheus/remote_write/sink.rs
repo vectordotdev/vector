@@ -1,14 +1,11 @@
 use std::fmt;
 
+use std::time::Duration;
 use vector_lib::byte_size_of::ByteSizeOf;
 use vector_lib::event::Metric;
 use vector_lib::stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};
-use std::time::Duration;
 
-use crate::sinks::{
-    prelude::*,
-    util::buffer::metrics::{MetricSet},
-};
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
 
 use super::{
     request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},

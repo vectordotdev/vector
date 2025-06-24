@@ -174,7 +174,7 @@ impl MetricSet {
 
     // Perform periodic cleanup if enough time has passed since the last cleanup
     fn maybe_cleanup(&mut self) {
-        if let Some(config) = self.ttl_policy(){
+        if let Some(config) = self.ttl_policy() {
             if config.should_cleanup() {
                 self.cleanup_expired()
             }
@@ -185,11 +185,9 @@ impl MetricSet {
     fn cleanup_expired(&mut self) {
         let now = Instant::now();
         if let Some(config) = &self.ttl_policy {
-            self.inner.retain(|_, (_, _, timestamp)| {
-                match timestamp {
-                    Some(ts) => now.duration_since(*ts) < config.ttl,
-                    None => true,
-                }
+            self.inner.retain(|_, (_, _, timestamp)| match timestamp {
+                Some(ts) => now.duration_since(*ts) < config.ttl,
+                None => true,
             });
         }
     }
@@ -255,14 +253,22 @@ impl MetricSet {
                     // Metric changed type, store this as the new reference value
                     self.inner.insert(
                         metric.series().clone(),
-                        (metric.data().clone(), EventMetadata::default(), self.create_timestamp()),
+                        (
+                            metric.data().clone(),
+                            EventMetadata::default(),
+                            self.create_timestamp(),
+                        ),
                     );
                 }
             }
             None => {
                 self.inner.insert(
                     metric.series().clone(),
-                    (metric.data().clone(), EventMetadata::default(), self.create_timestamp()),
+                    (
+                        metric.data().clone(),
+                        EventMetadata::default(),
+                        self.create_timestamp(),
+                    ),
                 );
             }
         }
@@ -316,7 +322,8 @@ impl MetricSet {
 
     fn insert(&mut self, metric: Metric) {
         let (series, data, metadata) = metric.into_parts();
-        self.inner.insert(series, (data, metadata, self.create_timestamp()));
+        self.inner
+            .insert(series, (data, metadata, self.create_timestamp()));
     }
 
     pub fn insert_update(&mut self, metric: Metric) {
