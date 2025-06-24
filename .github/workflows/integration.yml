@@ -86,29 +86,19 @@ jobs:
       can_access_secrets: ${{ steps.secret_access_check.outputs.can_access_secrets }}
     steps:
       - uses: actions/checkout@v4
-
-      - run: sudo npm -g install @datadog/datadog-ci
-      - run: sudo -E bash scripts/ci-free-disk-space.sh
-      - run: docker image prune -af ; docker container prune -f
-
-      - name: Determine if secrets are defined (PR author is team member)
-        id: secret_access_check
-        if: github.event_name == 'pull_request'
-        env:
-          GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+      - name: Run setup steps required by the IT suite
+        if: ${{ github.event_name == 'merge_group' || secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
         run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]] ; then
-            echo "can_access_secrets=true" >> $GITHUB_OUTPUT
-          else
-            echo "can_access_secrets=false" >> $GITHUB_OUTPUT
-          fi
+          sudo npm -g install @datadog/datadog-ci
+          sudo -E bash scripts/ci-free-disk-space.sh
+          docker image prune -af && docker container prune -f
 
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
       - changes
       - setup
-    if: ${{ needs.setup.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' || secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
