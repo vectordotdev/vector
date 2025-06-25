@@ -87,10 +87,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: sudo npm -g install @datadog/datadog-ci
-      - run: sudo -E bash scripts/ci-free-disk-space.sh
-      - run: docker image prune -af ; docker container prune -f
-
       - name: Determine if secrets are defined (PR author is team member)
         id: secret_access_check
         if: github.event_name == 'pull_request'
@@ -103,6 +99,13 @@ jobs:
             echo "can_access_secrets=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Run setup steps required by the IT suite
+        if: ${{ github.event_name == 'merge_group' || steps.check.outputs.can_access_secrets == 'true' }}
+        run: |
+          sudo npm -g install @datadog/datadog-ci
+          sudo -E bash scripts/ci-free-disk-space.sh
+          docker image prune -af && docker container prune -f
+
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
@@ -112,13 +115,12 @@ jobs:
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
-        # TODO: Add "nats" back once https://github.com/vectordotdev/vector/issues/23253 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mongodb", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
           "redis", "webhdfs"
         ]
     timeout-minutes: 90
