@@ -33,6 +33,12 @@ components: transforms: reduce: {
 		traces:  false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Merge Ruby exceptions"

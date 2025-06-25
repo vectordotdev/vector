@@ -91,7 +91,6 @@ pub struct HttpClientConfig {
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
 
-    /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,

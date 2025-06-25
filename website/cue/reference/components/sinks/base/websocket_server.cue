@@ -84,8 +84,12 @@ base: components: sinks: websocket_server: configuration: {
 		}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -488,8 +492,11 @@ base: components: sinks: websocket_server: configuration: {
 				required: false
 				type: object: options: {
 					ack_decoding: {
-						description: "Configures how events are decoded from raw bytes."
-						required:    false
+						description: """
+																Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+																type (log, metric, trace).
+																"""
+						required: false
 						type: object: options: {
 							avro: {
 								description:   "Apache Avro-specific encoder options."
@@ -562,6 +569,8 @@ base: components: sinks: websocket_server: configuration: {
 										native: """
 																							Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+																							This decoder can output all types of events (logs, metrics, traces).
+
 																							This codec is **[experimental][experimental]**.
 
 																							[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -569,6 +578,8 @@ base: components: sinks: websocket_server: configuration: {
 																							"""
 										native_json: """
 																							Decodes the raw bytes as [native JSON format][vector_native_json].
+
+																							This decoder can output all types of events (logs, metrics, traces).
 
 																							This codec is **[experimental][experimental]**.
 

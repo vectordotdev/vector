@@ -50,13 +50,13 @@ components: transforms: "remap": {
 	}
 
 	output: {
-		logs: event: {
+		logs: "": {
 			description: "The modified input `log` event."
 		}
-		metrics: event: {
+		metrics: "": {
 			description: "The modified input `metric` event."
 		}
-		traces: event: {
+		traces: "": {
 			description: "The modified input `trace` event."
 		}
 	}
