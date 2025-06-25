@@ -65,39 +65,47 @@ components: sources: heroku_logs: {
 
 	configuration: base.components.sources.heroku_logs.configuration
 
-	output: logs: line: {
-		description: "An individual event from a batch of events received through an HTTP POST request."
-		fields: {
-			app_name: {
-				description: "The app name field extracted from log message."
-				required:    true
-				type: string: {
-					examples: ["erlang"]
+	output: {
+		logs: line: {
+			description: "An individual event from a batch of events received through an HTTP POST request."
+			fields: {
+				app_name: {
+					description: "The app name field extracted from log message."
+					required:    true
+					type: string: {
+						examples: ["erlang"]
+					}
 				}
-			}
-			host: fields._local_host
-			message: {
-				description: "The message field, containing the plain text message."
-				required:    true
-				type: string: {
-					examples: ["Hi from erlang"]
+				host: fields._local_host
+				message: {
+					description: "The message field, containing the plain text message."
+					required:    true
+					type: string: {
+						examples: ["Hi from erlang"]
+					}
 				}
-			}
-			proc_id: {
-				description: "The procid field extracted from log message."
-				required:    true
-				type: string: {
-					examples: ["console"]
+				proc_id: {
+					description: "The procid field extracted from log message."
+					required:    true
+					type: string: {
+						examples: ["console"]
+					}
 				}
-			}
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["heroku_logs"]
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["heroku_logs"]
+					}
 				}
+				timestamp: fields._current_timestamp
 			}
-			timestamp: fields._current_timestamp
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 
