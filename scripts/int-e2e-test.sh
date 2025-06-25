@@ -17,9 +17,6 @@ set -x
 TEST_TYPE=$1 # either "int" or "e2e"
 TEST_NAME=$2
 
-# Build an image with the "all-integration-tests" enabled.
-cargo vdev int build
-
 # Start the containers that are required for the test.
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 
