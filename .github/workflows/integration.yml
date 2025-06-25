@@ -46,7 +46,7 @@ jobs:
       int_tests: true
     secrets: inherit
 
-  check-all:
+  check-changes:
     runs-on: ubuntu-latest
     needs: changes
     outputs:
@@ -80,7 +80,7 @@ jobs:
 
   check-secrets:
     runs-on: ubuntu-latest
-    needs: check-all
+    needs: check-changes
     outputs:
       can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
     steps:
@@ -172,7 +172,7 @@ jobs:
     if: always()
     needs:
       - changes
-      - check-all
+      - check-changes
       - setup
       - integration-tests
     env:
