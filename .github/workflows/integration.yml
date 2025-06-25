@@ -106,6 +106,9 @@ jobs:
           sudo -E bash scripts/ci-free-disk-space.sh
           docker image prune -af && docker container prune -f
 
+          # Build before running the integration tests in parallel.
+          cargo vdev int build
+
   integration-tests:
     runs-on: ubuntu-24.04
     needs:

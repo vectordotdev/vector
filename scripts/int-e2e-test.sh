@@ -17,8 +17,15 @@ set -x
 TEST_TYPE=$1 # either "int" or "e2e"
 TEST_NAME=$2
 
+# Build an image with the "all-integration-tests" enabled.
+cargo vdev int build
+
+# Start the containers that are required for the test.
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
+
 sleep 15
+
+# Run the test cases using the existing environment.
 cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
 
@@ -38,6 +45,7 @@ if [[ $RET -ne 0 ]]; then
   fi
 fi
 
+# Gracefully stop the environment.
 cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
 
 # Only upload test results if CI is defined
