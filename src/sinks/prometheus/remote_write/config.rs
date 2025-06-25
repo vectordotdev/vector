@@ -93,11 +93,10 @@ pub struct RemoteWriteConfig {
     #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
-    /// TTL (time-to-live) for cached metric state entries.
+    /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
+    /// after having not been updated before they expire and are removed.
     ///
-    /// This controls how long metric normalization state is retained in memory.
-    /// Expired entries are automatically cleaned up during normalization operations.
-    /// If not specified, entries are retained indefinitely.
+    /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
