@@ -139,11 +139,23 @@ base: components: sinks: aws_sns: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				required: false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."

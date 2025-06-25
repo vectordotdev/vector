@@ -5,10 +5,10 @@ releases: "0.46.1": {
 	codename: ""
 
 	description: """
-			Resolved a regression affecting AWS integrations introduced in version 0.46.0.
-			This issue has been addressed by updating to the latest aws-* crate versions.
-			No configuration changes are required for this fix.
-			"""
+		Resolved a regression affecting AWS integrations introduced in version 0.46.0.
+		This issue has been addressed by updating to the latest aws-* crate versions.
+		No configuration changes are required for this fix.
+		"""
 
 	whats_next: []
 

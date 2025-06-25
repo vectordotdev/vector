@@ -115,11 +115,20 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
     }
 
     fn advance(&mut self) {
+<<<<<<< HEAD
         let next_duration: Duration = cmp::min(
             self.previous_duration + self.current_duration,
             self.max_duration,
         );
         self.remaining_attempts -= 1;
+=======
+        let sum = self
+            .previous_duration
+            .checked_add(self.current_duration)
+            .unwrap_or(Duration::MAX);
+        let next_duration = cmp::min(sum, self.max_duration);
+        self.remaining_attempts = self.remaining_attempts.saturating_sub(1);
+>>>>>>> origin
         self.previous_duration = self.current_duration;
         self.current_duration = next_duration;
         self.current_jitter_duration = Self::add_full_jitter(next_duration);
@@ -143,7 +152,11 @@ where
 
     // NOTE: in the error cases- `Error` and `EventsDropped` internal events are emitted by the
     // driver, so only need to log here.
+<<<<<<< HEAD
     fn retry(&mut self, req: &mut Req, result: &mut Result<Res, Error>) -> Option<Self::Future> {
+=======
+    fn retry(&mut self, _: &mut Req, result: &mut Result<Res, Error>) -> Option<Self::Future> {
+>>>>>>> origin
         match result {
             Ok(response) => match self.logic.should_retry_response(response) {
                 RetryAction::Retry(reason) => {
@@ -151,7 +164,6 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
-                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
@@ -210,7 +222,7 @@ where
                         error!(
                             message = "Non-retriable error; dropping the request.",
                             %error,
-                            internal_log_rate_limit = true,
+
                         );
                         None
                     }
@@ -224,7 +236,6 @@ where
                     error!(
                         message = "Unexpected error type; dropping the request.",
                         %error,
-                        internal_log_rate_limit = true
                     );
                     None
                 }
@@ -311,7 +322,7 @@ impl ExponentialBackoff {
     }
 
     /// Resents the exponential back-off strategy to its initial state.
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.current = self.base;
     }
 }

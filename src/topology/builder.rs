@@ -12,7 +12,7 @@ use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
     select,
     sync::{mpsc::UnboundedSender, oneshot},
-    time::{timeout, Duration},
+    time::timeout,
 };
 use tracing::Instrument;
 use vector_lib::config::LogNamespace;
@@ -61,8 +61,8 @@ static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
-const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
-pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
+const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
+pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
     crate::app::worker_threads()
@@ -544,6 +544,7 @@ impl<'a> Builder<'a> {
             let sink_inputs = &sink.inputs;
             let healthcheck = sink.healthcheck();
             let enable_healthcheck = healthcheck.enabled && self.config.healthchecks.enabled;
+            let healthcheck_timeout = healthcheck.timeout;
 
             let typetag = sink.inner.get_component_name();
             let input_type = sink.inner.input().data_type();
@@ -659,8 +660,7 @@ impl<'a> Builder<'a> {
             let component_key = key.clone();
             let healthcheck_task = async move {
                 if enable_healthcheck {
-                    let duration = Duration::from_secs(10);
-                    timeout(duration, healthcheck)
+                    timeout(healthcheck_timeout, healthcheck)
                         .map(|result| match result {
                             Ok(Ok(_)) => {
                                 info!("Healthcheck passed.");
