@@ -51,6 +51,7 @@ jobs:
             vdev
             durability
             enriching
+            enrichment tables
             enterprise
             exceptions
             external
