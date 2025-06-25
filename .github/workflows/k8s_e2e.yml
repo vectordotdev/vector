@@ -66,7 +66,7 @@ jobs:
     timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.k8s != 'false' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.k8s != 'false' || needs.changes.website_only != 'true') }}
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -130,7 +130,7 @@ jobs:
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.k8s != 'false' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.k8s != 'false' || needs.changes.website_only != 'true') }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
