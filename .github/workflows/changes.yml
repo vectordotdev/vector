@@ -117,8 +117,6 @@ on:
       all-changes-json:
         value: ${{ jobs.int_tests.outputs.all-changes-json }}
       # e2e tests
-      all-e2e:
-        value: ${{ jobs.e2e_tests.outputs.all-tests }}
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
@@ -206,7 +204,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -319,7 +316,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
