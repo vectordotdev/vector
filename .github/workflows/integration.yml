@@ -114,8 +114,8 @@ jobs:
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
-      - changes
       - setup
+      - check-secrets
     if: ${{ needs.setup.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group' }}
     strategy:
       matrix:
