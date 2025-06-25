@@ -197,6 +197,9 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Decimal(_) => Err(vector_common::Error::from(
             "AvroValue::Decimal is not supported",
         )),
+        AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
+            "AvroValue::BigDecimal is not supported",
+        )),
         AvroValue::Double(double) => Ok(VrlValue::from_f64_or_zero(double)),
         AvroValue::Duration(_) => Err(vector_common::Error::from(
             "AvroValue::Duration is not supported",
@@ -226,10 +229,12 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         )),
         AvroValue::TimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
         AvroValue::TimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
+        AvroValue::TimestampNanos(ts_nanos) => Ok(VrlValue::from(ts_nanos)),
         AvroValue::Union(_, v) => try_from(*v),
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
+        AvroValue::LocalTimestampNanos(ts_nanos) => Ok(VrlValue::from(ts_nanos)),
     }
 }
 
