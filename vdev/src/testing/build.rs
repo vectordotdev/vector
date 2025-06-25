@@ -55,7 +55,11 @@ pub fn build_integration_image() -> Result<()> {
         .iter()
         .collect();
     let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
-    let mut cmd = prepare_build_command(&image, &dockerfile, Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]));
+    let mut cmd = prepare_build_command(
+        &image,
+        &dockerfile,
+        Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
+    );
     waiting!("Building {image}");
     cmd.check_run()
 }

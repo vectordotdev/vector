@@ -3,10 +3,11 @@ use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command
 use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
-use super::config::{ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR};
-use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _,
+use super::config::{
+    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
+    INTEGRATION_TESTS_DIR,
 };
+use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;

@@ -9,7 +9,7 @@ pub static CONTAINER_TOOL: LazyLock<OsString> =
 
 pub(super) static DOCKER_SOCKET: LazyLock<PathBuf> = LazyLock::new(detect_docker_socket);
 
-pub fn docker_command<I: AsRef<OsStr>>(args: impl IntoIterator<Item=I>) -> Command {
+pub fn docker_command<I: AsRef<OsStr>>(args: impl IntoIterator<Item = I>) -> Command {
     let mut command = Command::new(&*CONTAINER_TOOL);
     command.args(args);
     command

@@ -130,7 +130,8 @@ pub trait ContainerTestRunner: TestRunner {
         }
 
         for volume in &volumes {
-            docker_command(["volume", "create", volume]).wait(format!("Creating volume {volume}"))?;
+            docker_command(["volume", "create", volume])
+                .wait(format!("Creating volume {volume}"))?;
         }
 
         Ok(())
@@ -302,7 +303,11 @@ impl ContainerTestRunner for IntegrationTestRunner {
 
     fn container_name(&self) -> String {
         if let Some(integration) = self.integration.as_ref() {
-            format!("vector-test-runner-{}-{}", integration, RustToolchainConfig::rust_version())
+            format!(
+                "vector-test-runner-{}-{}",
+                integration,
+                RustToolchainConfig::rust_version()
+            )
         } else {
             format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
         }

@@ -47,7 +47,6 @@ impl RustToolchainConfig {
     }
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum VolumeMount {
