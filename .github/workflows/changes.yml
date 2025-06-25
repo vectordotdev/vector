@@ -44,8 +44,6 @@ on:
         value: ${{ jobs.source.outputs.install }}
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
-      all-int:
-        value: ${{ jobs.int_tests.outputs.all-tests }}
       amqp:
         value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
@@ -171,7 +169,6 @@ jobs:
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'rust-toolchain.toml'
-            - '.github/workflows/pr.yml'
             - 'Makefile'
             - 'scripts/cross/**'
             - "vdev/**"

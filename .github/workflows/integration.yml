@@ -152,7 +152,7 @@ jobs:
 
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "merge_group" || \
-                  "${{ needs.changes.outputs.all-int }}" == "true" || \
+                  "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               echo "Running test for ${{ matrix.service }}"
               bash scripts/int-e2e-test.sh int ${{ matrix.service }}
