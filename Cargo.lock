@@ -10816,11 +10816,7 @@ checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
 dependencies = [
  "futures-core",
  "futures-util",
-<<<<<<< HEAD
- "indexmap 2.8.0",
-=======
  "indexmap 2.9.0",
->>>>>>> origin
  "pin-project-lite",
  "slab",
  "sync_wrapper 1.0.1",
@@ -11959,11 +11955,7 @@ dependencies = [
  "rand_distr",
  "tokio",
  "tokio-util",
-<<<<<<< HEAD
- "tower 0.4.13",
-=======
  "tower 0.5.2",
->>>>>>> origin
  "tracing 0.1.41",
  "twox-hash 2.1.1",
  "vector-common",
