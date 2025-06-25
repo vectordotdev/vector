@@ -18,7 +18,7 @@ TEST_TYPE=$1 # either "int" or "e2e"
 TEST_NAME=$2
 
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
-sleep 15
+sleep 30
 cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
 RET=$?
 
