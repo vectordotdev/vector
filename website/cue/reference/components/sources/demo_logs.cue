@@ -54,11 +54,5 @@ components: sources: demo_logs: {
 				}
 			}
 		}
-		metrics: "": {
-			description: "The input `metric` event."
-		}
-		traces: "": {
-			description: "The input `trace` event."
-		}
 	}
 }
