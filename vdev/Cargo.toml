@@ -36,3 +36,6 @@ tempfile.workspace = true
 toml.workspace = true
 semver.workspace = true
 indoc.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
