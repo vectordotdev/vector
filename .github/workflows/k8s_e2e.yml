@@ -53,12 +53,20 @@ env:
 jobs:
   changes:
     # Only evaluate files changed on pull request trigger
-    if: github.event_name == 'pull_request'
-    uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref }}
-    secrets: inherit
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # need at least two commits so HEAD^ is available
+          fetch-depth: 2
+      - name: Identify changes
+        uses: ./.github/workflows/changes.yml
+        with:
+          # for PRs, use the branch names; for merge_group, diff parent vs HEAD
+          base_ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || format('{0}^', github.sha) }}
+          head_ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref  || github.sha }}
+        secrets: inherit
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
