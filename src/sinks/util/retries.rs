@@ -73,9 +73,8 @@ pub struct FibonacciRetryPolicy<L> {
     logic: L,
 }
 
-pub struct RetryPolicyFuture<L: RetryLogic> {
+pub struct RetryPolicyFuture {
     delay: Pin<Box<Sleep>>,
-    policy: FibonacciRetryPolicy<L>,
 }
 
 impl<L: RetryLogic> FibonacciRetryPolicy<L> {
@@ -102,23 +101,6 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
         Duration::from_millis(jitter)
     }
 
-    fn advance(&self) -> FibonacciRetryPolicy<L> {
-        let next_duration: Duration = cmp::min(
-            self.previous_duration + self.current_duration,
-            self.max_duration,
-        );
-
-        FibonacciRetryPolicy {
-            remaining_attempts: self.remaining_attempts - 1,
-            previous_duration: self.current_duration,
-            current_duration: next_duration,
-            current_jitter_duration: Self::add_full_jitter(next_duration),
-            jitter_mode: self.jitter_mode,
-            max_duration: self.max_duration,
-            logic: self.logic.clone(),
-        }
-    }
-
     const fn backoff(&self) -> Duration {
         match self.jitter_mode {
             JitterMode::None => self.current_duration,
@@ -126,25 +108,37 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
         }
     }
 
-    fn build_retry(&self) -> RetryPolicyFuture<L> {
-        let policy = self.advance();
+    fn advance(&mut self) {
+        let sum = self
+            .previous_duration
+            .checked_add(self.current_duration)
+            .unwrap_or(Duration::MAX);
+        let next_duration = cmp::min(sum, self.max_duration);
+        self.remaining_attempts = self.remaining_attempts.saturating_sub(1);
+        self.previous_duration = self.current_duration;
+        self.current_duration = next_duration;
+        self.current_jitter_duration = Self::add_full_jitter(next_duration);
+    }
+
+    fn build_retry(&mut self) -> RetryPolicyFuture {
+        self.advance();
         let delay = Box::pin(sleep(self.backoff()));
 
         debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
-        RetryPolicyFuture { delay, policy }
+        RetryPolicyFuture { delay }
     }
 }
 
 impl<Req, Res, L> Policy<Req, Res, Error> for FibonacciRetryPolicy<L>
 where
-    Req: Clone,
+    Req: Clone + 'static,
     L: RetryLogic<Response = Res>,
 {
-    type Future = RetryPolicyFuture<L>;
+    type Future = RetryPolicyFuture;
 
     // NOTE: in the error cases- `Error` and `EventsDropped` internal events are emitted by the
     // driver, so only need to log here.
-    fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
+    fn retry(&mut self, _: &mut Req, result: &mut Result<Res, Error>) -> Option<Self::Future> {
         match result {
             Ok(response) => match self.logic.should_retry_response(response) {
                 RetryAction::Retry(reason) => {
@@ -152,7 +146,6 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
-                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
@@ -182,7 +175,7 @@ where
                         error!(
                             message = "Non-retriable error; dropping the request.",
                             %error,
-                            internal_log_rate_limit = true,
+
                         );
                         None
                     }
@@ -196,7 +189,6 @@ where
                     error!(
                         message = "Unexpected error type; dropping the request.",
                         %error,
-                        internal_log_rate_limit = true
                     );
                     None
                 }
@@ -204,21 +196,21 @@ where
         }
     }
 
-    fn clone_request(&self, request: &Req) -> Option<Req> {
+    fn clone_request(&mut self, request: &Req) -> Option<Req> {
         Some(request.clone())
     }
 }
 
 // Safety: `L` is never pinned and we use no unsafe pin projections
 // therefore this safe.
-impl<L: RetryLogic> Unpin for RetryPolicyFuture<L> {}
+impl Unpin for RetryPolicyFuture {}
 
-impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
-    type Output = FibonacciRetryPolicy<L>;
+impl Future for RetryPolicyFuture {
+    type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         std::task::ready!(self.delay.poll_unpin(cx));
-        Poll::Ready(self.policy.clone())
+        Poll::Ready(())
     }
 }
 
@@ -283,7 +275,7 @@ impl ExponentialBackoff {
     }
 
     /// Resents the exponential back-off strategy to its initial state.
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.current = self.base;
     }
 }
@@ -421,25 +413,25 @@ mod tests {
         );
         assert_eq!(Duration::from_secs(1), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(1), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(2), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(3), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(5), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(8), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(10), policy.backoff());
 
-        policy = policy.advance();
+        policy.advance();
         assert_eq!(Duration::from_secs(10), policy.backoff());
     }
 
@@ -469,7 +461,7 @@ mod tests {
                 backoff
             );
 
-            policy = policy.advance();
+            policy.advance();
         }
 
         // Once the max backoff is reached, it should not exceed the max backoff.
@@ -482,7 +474,7 @@ mod tests {
                 backoff
             );
 
-            policy = policy.advance();
+            policy.advance();
         }
     }
 

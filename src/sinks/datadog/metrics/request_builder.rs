@@ -91,7 +91,10 @@ impl DatadogMetricsRequestBuilder {
         })
     }
 
-    fn get_encoder(&mut self, endpoint: DatadogMetricsEndpoint) -> &mut DatadogMetricsEncoder {
+    const fn get_encoder(
+        &mut self,
+        endpoint: DatadogMetricsEndpoint,
+    ) -> &mut DatadogMetricsEncoder {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => &mut self.series_encoder,
             DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,

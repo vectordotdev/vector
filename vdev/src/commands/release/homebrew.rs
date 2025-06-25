@@ -42,8 +42,9 @@ impl Cli {
 fn clone_and_setup_git(username: &str) -> Result<()> {
     let github_token = env::var("GITHUB_TOKEN")?;
     let homebrew_repo = format!(
-        "https://{github_token}@github.com/{username}/homebrew-brew.git",
+        "https://{username}:{github_token}@github.com/{username}/homebrew-brew.git"
     );
+
 
     git::clone(&homebrew_repo)?;
     env::set_current_dir("homebrew-brew")?;

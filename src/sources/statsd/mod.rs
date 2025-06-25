@@ -498,7 +498,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_unix() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
             let config = StatsdConfig::Unix(UnixConfig {
                 path: in_path.clone(),
                 sanitize: true,

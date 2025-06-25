@@ -9,7 +9,7 @@ pub struct TempFile {
 
 impl TempFile {
     pub fn new(file_name: &str, data: &str) -> std::io::Result<Self> {
-        let dir = tempdir()?.into_path();
+        let dir = tempdir()?.keep();
         let path = dir.join(file_name);
         std::fs::write(&path, data)?;
         Ok(Self { path })
