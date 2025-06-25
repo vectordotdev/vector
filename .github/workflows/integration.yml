@@ -46,7 +46,7 @@ jobs:
       int_tests: true
     secrets: inherit
 
-  check-all:
+  check-changes:
     runs-on: ubuntu-latest
     needs: changes
     outputs:
@@ -78,29 +78,34 @@ jobs:
             echo "should_run=true" >> $GITHUB_OUTPUT
           fi
 
-  setup:
+  check-secrets:
     runs-on: ubuntu-latest
-    needs: check-all
-    if: ${{ needs.check-all.outputs.should_run == 'true' }}
+    needs: check-changes
     outputs:
-      can_access_secrets: ${{ steps.secret_access_check.outputs.can_access_secrets }}
+      can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Determine if secrets are defined (PR author is team member)
-        id: secret_access_check
-        if: github.event_name == 'pull_request'
+        id: secret_check
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
         run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]] ; then
+          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]]; then
             echo "can_access_secrets=true" >> $GITHUB_OUTPUT
           else
             echo "can_access_secrets=false" >> $GITHUB_OUTPUT
           fi
 
+  setup:
+    runs-on: ubuntu-latest
+    needs: check-secrets
+    if: ${{ github.event_name == 'merge_group' || needs.check-secrets.outputs.can_access_secrets == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Run setup steps required by the IT suite
-        if: ${{ github.event_name == 'merge_group' || steps.check.outputs.can_access_secrets == 'true' }}
         run: |
           sudo npm -g install @datadog/datadog-ci
           sudo -E bash scripts/ci-free-disk-space.sh
@@ -163,7 +168,7 @@ jobs:
     if: always()
     needs:
       - changes
-      - check-all
+      - check-changes
       - setup
       - integration-tests
     env:
