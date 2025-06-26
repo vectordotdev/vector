@@ -7,15 +7,18 @@ use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -330,7 +333,7 @@ impl SourceConfig for DemoLogsConfig {
             );
 
         vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
+            DataType::Log,
             schema_definition,
         )]
     }
