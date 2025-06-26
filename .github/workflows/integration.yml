@@ -44,41 +44,8 @@ jobs:
       int_tests: true
     secrets: inherit
 
-  check-changes:
-    runs-on: ubuntu-latest
-    needs: changes
-    outputs:
-      should_run: ${{ steps.check.outputs.should_run }}
-    steps:
-      - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@v4
-        with:
-          name: int_tests_changes
-
-      - name: Check if all values are false
-        id: check
-        run: |
-          # Always run the suite when the PR is in the merge queue
-          if [[ "${{ github.event_name }}" == "merge_group" ]] ; then
-            echo "should_run=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Check if all values are 'false'
-          json=$(cat int_tests_changes.json)
-          all_false=$(echo "$json" | jq -r 'to_entries | all(.value == false)')
-
-          if [[ "$all_false" == "true" ]]; then
-            echo "No changes detected. Skipping integration tests."
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
-            echo "Detected changes. Proceeding with integration tests."
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          fi
-
   check-secrets:
     runs-on: ubuntu-latest
-    needs: check-changes
     outputs:
       can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
     steps:
@@ -145,11 +112,17 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            # Parse the JSON and check if the specific integration test should run.
-            should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
+            if [[ -f int_tests_changes.json ]]; then
+              # Parse the JSON and check if the specific integration test should run.
+              should_run=$(jq -r '."${{ matrix.service }}" // false' int_tests_changes.json)
+            else
+              # The `changes` job did not run (manual run) or the file is missing, default to false.
+              should_run=false
+            fi
 
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "merge_group" || \
+                  "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               echo "Running test for ${{ matrix.service }}"
@@ -165,8 +138,6 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs:
-      - changes
-      - check-changes
       - setup
       - integration-tests
     env:
