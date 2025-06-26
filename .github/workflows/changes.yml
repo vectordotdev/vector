@@ -10,10 +10,10 @@ on:
     # merge_group context.
     inputs:
       base_ref:
-        required: true
+        required: false
         type: string
       head_ref:
-        required: true
+        required: false
         type: string
       int_tests:
         required: false
