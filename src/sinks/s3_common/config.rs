@@ -312,7 +312,7 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
     }
 }
 
-fn check_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
+fn is_retriable_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
     let status_code = res.status();
 
     match errors_to_retry {
@@ -321,13 +321,13 @@ fn check_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool
     }
 }
 
-fn configured_to_retry(
+fn should_retry_error(
     errors_to_retry: Option<Vec<u16>>,
     error: &SdkError<PutObjectError, HttpResponse>,
 ) -> bool {
     match error {
-        SdkError::ResponseError(err) => check_response(err.raw(), errors_to_retry),
-        SdkError::ServiceError(err) => check_response(err.raw(), errors_to_retry),
+        SdkError::ResponseError(err) => is_retriable_response(err.raw(), errors_to_retry),
+        SdkError::ServiceError(err) => is_retriable_response(err.raw(), errors_to_retry),
         _ => false,
     }
 }
@@ -378,7 +378,7 @@ impl RetryLogic for S3RetryLogic {
 
         retry_all_errors
             || is_retriable_error(error)
-            || configured_to_retry(self.errors_to_retry.clone(), error)
+            || should_retry_error(self.errors_to_retry.clone(), error)
     }
 }
 
