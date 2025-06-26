@@ -140,7 +140,6 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs:
-      - changes
       - setup
       - integration-tests
     env:
