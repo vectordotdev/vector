@@ -40,6 +40,8 @@ on:
         value: ${{ jobs.source.outputs.component_docs }}
       markdown:
         value: ${{ jobs.source.outputs.markdown }}
+      website_only:
+        value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
       k8s:
