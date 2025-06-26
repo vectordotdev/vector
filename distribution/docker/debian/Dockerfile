@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
 # we want the latest versions of these
 # hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd liblldpctl-dev && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/bin/vector /usr/bin/vector
 COPY --from=builder /usr/share/vector /usr/share/vector
