@@ -114,8 +114,13 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            # Parse the JSON and check if the specific integration test should run.
-            should_run=$(jq '."${{ matrix.service }}"' int_tests_changes.json)
+            if [[ -f int_tests_changes.json ]]; then
+              # Parse the JSON and check if the specific integration test should run.
+              should_run=$(jq -r '."${{ matrix.service }}" // false' int_tests_changes.json)
+            else
+              # The `changes` job did not run (manual run) or the file is missing, default to false.
+              should_run=false
+            fi
 
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "merge_group" || \
