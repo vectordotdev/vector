@@ -14,6 +14,8 @@ autobenches = false # our benchmarks are not runnable on their own either way
 # See docs/DEVELOPING.md for policy
 rust-version = "1.86"
 
+# this line should trigger the IT suite - full run
+
 [[bin]]
 name = "vector"
 test = false
