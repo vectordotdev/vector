@@ -55,9 +55,6 @@ jobs:
     # Only evaluate files changed on pull request trigger
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
     secrets: inherit
 
   build-x86_64-unknown-linux-gnu:
