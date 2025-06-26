@@ -5,6 +5,8 @@ use vector_lib::sensitive_string::SensitiveString;
 
 use crate::tls::TlsEnableableConfig;
 
+// trigger it suite
+
 #[derive(Debug, Snafu)]
 pub enum NatsConfigError {
     #[snafu(display("NATS Auth Config Error: {}", source))]

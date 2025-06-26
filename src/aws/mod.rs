@@ -3,6 +3,8 @@ pub mod auth;
 pub mod region;
 pub mod timeout;
 
+// trigger it suite
+
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{
     meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
