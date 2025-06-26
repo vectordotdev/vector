@@ -123,6 +123,9 @@ on:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
+env:
+  BASE_REF: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
+  HEAD_REF: ${{ inputs.head_ref  || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
 
 jobs:
   # Detects changes that are not specific to integration tests
@@ -146,8 +149,8 @@ jobs:
     - uses: dorny/paths-filter@v3
       id: filter
       with:
-        base: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
-        ref:  ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
+        base: ${{ env.BASE_REF }}
+        ref:  ${{ env.HEAD_REF }}
         filters: |
           source:
             - ".github/workflows/test.yml"
@@ -253,8 +256,8 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          base: ${{ inputs.base_ref }}
-          ref: ${{ inputs.head_ref }}
+          base: ${{ env.BASE_REF }}
+          ref:  ${{ env.HEAD_REF }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -331,6 +334,6 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          base: ${{ inputs.base_ref }}
-          ref: ${{ inputs.head_ref }}
+          base: ${{ env.BASE_REF }}
+          ref:  ${{ env.HEAD_REF }}
           filters: int_test_filters.yaml
