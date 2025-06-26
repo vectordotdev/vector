@@ -63,14 +63,14 @@ releases: "0.48.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed description for RCODE 16 (it was BADSIG previously, but it should be BADVERS).
+				The dnstap source now correctly labels DNS response code 16 as BADVERS instead of BADSIG, which is reserved for TSIG RRs.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "fix"
 			description: """
-				Improved backpressure and load handling of dnstap TCP source.
+				Improved `dnstap` source TCP backpressure and load handling.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -138,7 +138,7 @@ releases: "0.48.0": {
 		{
 			type: "fix"
 			description: """
-				Fix problem with parsing timestamp that could lead into panic in `dnstap-parser::DnstapParser::parse_dnstap_message_time`.
+				Fix panic when dnstap parser encounters unusual timestamps.
 				"""
 			contributors: ["wooffie"]
 		},
@@ -153,7 +153,7 @@ releases: "0.48.0": {
 		{
 			type: "fix"
 			description: """
-				Added checks to avoid possible panic while parsing address in `dnstap-parser::DnstapParser::parse_dnstap_message_socket_family`.
+				Fix crash when dnstap source parses unexpected socket address values.”
 				"""
 			contributors: ["wooffie"]
 		},
