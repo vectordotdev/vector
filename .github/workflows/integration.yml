@@ -40,8 +40,6 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
-      base_ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref  }}
-      head_ref: ${{ github.event.pull_request.head.ref || github.event.merge_group.head_ref  }}
       source: false
       int_tests: true
     secrets: inherit

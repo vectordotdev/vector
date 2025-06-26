@@ -44,8 +44,6 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref  }}
       source: false
       e2e_tests: true
     secrets: inherit

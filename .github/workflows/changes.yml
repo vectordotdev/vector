@@ -146,8 +146,8 @@ jobs:
     - uses: dorny/paths-filter@v3
       id: filter
       with:
-        base: ${{ inputs.base_ref }}
-        ref: ${{ inputs.head_ref }}
+        base: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
+        ref:  ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
         filters: |
           source:
             - ".github/workflows/test.yml"
