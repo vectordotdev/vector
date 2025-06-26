@@ -40,14 +40,12 @@ on:
         value: ${{ jobs.source.outputs.component_docs }}
       markdown:
         value: ${{ jobs.source.outputs.markdown }}
+      website_only:
+        value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
-      website_only:
-        value: ${{ jobs.source.outputs.website_only }}
-      all-int:
-        value: ${{ jobs.int_tests.outputs.all-tests }}
       amqp:
         value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
@@ -121,8 +119,6 @@ on:
       all-changes-json:
         value: ${{ jobs.int_tests.outputs.all-changes-json }}
       # e2e tests
-      all-e2e:
-        value: ${{ jobs.e2e_tests.outputs.all-tests }}
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
@@ -173,7 +169,6 @@ jobs:
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'rust-toolchain.toml'
-            - '.github/workflows/pr.yml'
             - 'Makefile'
             - 'scripts/cross/**'
             - "vdev/**"
@@ -210,7 +205,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -323,7 +317,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
