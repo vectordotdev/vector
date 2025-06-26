@@ -137,10 +137,14 @@ pub fn clone(repo_url: &str) -> Result<String> {
     Command::new("git").args(["clone", repo_url]).check_output()
 }
 
+/// Walks up from the current working directory until it finds a `.git`
+/// and opens that repo.  Panics (Err) if none is found.
+fn find_repo() -> Result<Repository, git2::Error> {
+    Repository::discover(".")
+}
 
 pub fn branch_exists(branch: &str) -> Result<bool> {
-    // Discover will find the repo root from anywhere beneath it
-    let repo = Repository::discover(".")?;
+    let repo = find_repo()?;
 
     // Do the lookup inside its own scope so the temporary Branch<'_> is dropped
     // before we try to drop `repo` at function exit.
@@ -165,16 +169,18 @@ pub fn checkout_main_branch() -> Result<()> {
 }
 
 pub fn create_branch(branch_name: &str) -> Result<()> {
-    let repo = Repository::discover(".")?;
+    let repo = find_repo()?;
 
     let head_ref = repo.head()?;
-    let target_oid = head_ref.target()
+    let target_oid = head_ref
+        .target()
         .ok_or_else(|| anyhow!("HEAD is not pointing at a valid commit"))?;
     let target_commit = repo.find_commit(target_oid)?;
 
     let branch = repo.branch(branch_name, &target_commit, false)?;
     let reference = branch.into_reference();
-    let full_ref_name = reference.name()
+    let full_ref_name = reference
+        .name()
         .ok_or_else(|| git2::Error::from_str("branch reference has no name"))?;
     repo.set_head(&full_ref_name)?;
     repo.checkout_head(None)?;
