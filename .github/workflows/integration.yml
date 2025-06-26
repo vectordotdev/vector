@@ -78,9 +78,11 @@ jobs:
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
+      - changes
       - setup
       - check-secrets
-    if: ${{ needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group' }}
+
+    if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
