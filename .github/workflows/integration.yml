@@ -74,7 +74,6 @@ jobs:
           sudo npm -g install @datadog/datadog-ci
           sudo -E bash scripts/ci-free-disk-space.sh
           docker image prune -af && docker container prune -f
-          cargo vdev version
 
   integration-tests:
     runs-on: ubuntu-24.04
