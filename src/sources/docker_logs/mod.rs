@@ -430,7 +430,7 @@ impl DockerLogsSourceCore {
 
         self.docker.events(Some(
             EventsOptionsBuilder::new()
-                .since(&self.now_timestamp.to_rfc3339()) // TODO check this
+                .since(&self.now_timestamp.timestamp().to_string())
                 .filters(&filters)
                 .build(),
         ))
