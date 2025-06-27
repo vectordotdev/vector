@@ -122,11 +122,6 @@ impl TtlPolicy {
     pub fn mark_cleanup_done(&mut self) {
         self.last_cleanup = Instant::now();
     }
-
-    /// Checks if an entry with the given timestamp is expired.
-    pub fn is_expired(&self, timestamp: Instant) -> bool {
-        Instant::now().duration_since(timestamp) >= self.ttl
-    }
 }
 
 /// Metric storage for use with normalization.
