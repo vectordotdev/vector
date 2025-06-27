@@ -25,8 +25,25 @@ releases: "0.48.0": {
 			type: "enhancement"
 			description: """
 				The HTTP client source now supports VRL within query parameters.
+
+				For example:
+				```yaml
+				sources:
+					http:
+						type: http_client
+						endpoint: https://endpoint.com
+						method: GET
+						query:
+							timestamp:
+								 value: "now()"
+								 type: "vrl"
+							foo:
+								 value: "bar"
+								 type: "string"
+				```
 				
-				This means that HTTP requests can now be made with dynamic query parameters. This is particularly useful for generating unique timestamps or UUIDs per request.
+				This means that HTTP requests can now be made with dynamic query parameters.
+				This is particularly useful for generating unique timestamps or UUIDs per request.
 				"""
 			contributors: ["benjamin-awd"]
 		},
@@ -181,9 +198,6 @@ releases: "0.48.0": {
 		- Add support for decompressing lz4 frame compressed data.
 		
 		authors: jimmystewpot (https://github.com/vectordotdev/vrl/pull/1367)
-		
-		
-		### [0.24.0 (2025-05-19)]
 		"""
 
 	commits: [
