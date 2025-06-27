@@ -83,8 +83,12 @@ base: components: sinks: kafka: configuration: {
 		}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -487,6 +491,22 @@ base: components: sinks: kafka: configuration: {
 			default: 300000
 			examples: [150000, 450000]
 			unit: "milliseconds"
+		}
+	}
+	rate_limit_duration_secs: {
+		description: "The time window used for the `rate_limit_num` option."
+		required:    false
+		type: uint: {
+			default: 1
+			unit:    "seconds"
+		}
+	}
+	rate_limit_num: {
+		description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+		required:    false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "requests"
 		}
 	}
 	sasl: {

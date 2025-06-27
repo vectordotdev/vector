@@ -101,7 +101,7 @@ cargo build --no-default-features --features default-msvc --release
 Start Vector. After these steps, a binary `vector.exe` in `target\release` would be created. It can be started by running:
 
 ```powershell
-.\target\release\vector --config config\vector.toml
+.\target\release\vector --config config\vector.yaml
 ```
 
 ### Docker

@@ -47,7 +47,7 @@ pub struct MetricNormalizer<N> {
 
 impl<N> MetricNormalizer<N> {
     /// Gets a mutable reference to the current metric state for this normalizer.
-    pub fn get_state_mut(&mut self) -> &mut MetricSet {
+    pub const fn get_state_mut(&mut self) -> &mut MetricSet {
         &mut self.state
     }
 }

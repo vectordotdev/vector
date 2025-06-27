@@ -1,7 +1,8 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::{app, config, platform, testing::runner};
+use crate::testing::docker::CONTAINER_TOOL;
+use crate::{app, config, platform};
 
 /// Show `vdev` command configuration
 #[derive(Args, Debug)]
@@ -10,7 +11,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        println!("Container tool:  {:?}", *runner::CONTAINER_TOOL);
+        println!("Container tool:  {:?}", *CONTAINER_TOOL);
         println!("Data path:       {:?}", platform::data_dir());
         println!("Repository:      {:?}", app::path());
         println!("Shell:           {:?}", *app::SHELL);

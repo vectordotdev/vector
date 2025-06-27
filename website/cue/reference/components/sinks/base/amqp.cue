@@ -44,8 +44,12 @@ base: components: sinks: amqp: configuration: {
 		type: string: examples: ["amqp://user:password@127.0.0.1:5672/%2f?timeout=10"]
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -391,6 +395,11 @@ base: components: sinks: amqp: configuration: {
 		description: "The exchange to publish messages to."
 		required:    true
 		type: string: syntax: "template"
+	}
+	max_channels: {
+		description: "Maximum number of AMQP channels to keep active (channels are created as needed)."
+		required:    false
+		type: uint: default: 4
 	}
 	properties: {
 		description: """
