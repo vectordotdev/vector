@@ -2,11 +2,7 @@ use std::{mem, ptr::addr_of};
 
 use bytecheck::{CheckBytes, ErrorBox, StructCheckError};
 use crc32fast::Hasher;
-use rkyv::{
-    boxed::ArchivedBox,
-    with::{CopyOptimize, RefAsBox},
-    Archive, Archived, Serialize,
-};
+use rkyv::{boxed::ArchivedBox, Archive, Archived, Serialize};
 
 use super::{
     common::align16,
@@ -68,7 +64,7 @@ pub struct Record<'a> {
     /// The record payload.
     ///
     /// This is the encoded form of the actual record itself.
-    #[with(CopyOptimize, RefAsBox)]
+    // TODO check removal
     payload: &'a [u8],
 }
 

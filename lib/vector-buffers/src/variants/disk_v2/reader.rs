@@ -372,7 +372,7 @@ where
         // - `try_next_record` is the only method that can hand back a `ReadToken`
         // - we only get a `ReadToken` if there's a valid record in `self.aligned_buf`
         // - `try_next_record` does all the archive checks, checksum validation, etc
-        let record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
+        let record = unsafe { rkyv::access_unchecked::<Record<'_>>(&self.aligned_buf) };
 
         decode_record_payload(record)
     }

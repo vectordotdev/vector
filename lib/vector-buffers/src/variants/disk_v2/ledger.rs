@@ -11,7 +11,10 @@ use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
 use futures::StreamExt;
-use rkyv::{with::Atomic, Archive, Serialize};
+use rkyv::{
+    with::{Acquire, AtomicLoad, Relaxed},
+    Archive, ArchiveUnsized, Serialize,
+};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 use vector_common::finalizer::OrderedFinalizer;
@@ -88,19 +91,19 @@ pub enum LedgerLoadCreateError {
 ///
 /// Do not do any of the listed things unless you _absolutely_ know what you're doing. :)
 #[derive(Archive, Serialize, Debug)]
-#[archive_attr(derive(CheckBytes, Debug))]
+#[rkyv(derive(CheckBytes, Debug))]
 pub struct LedgerState {
     /// Next record ID to use when writing a record.
-    #[with(Atomic)]
+    #[rkyv(with = AtomicLoad<Acquire>)]
     writer_next_record: AtomicU64,
     /// The current data file ID being written to.
-    #[with(Atomic)]
+    #[rkyv(with = AtomicLoad<Acquire>)]
     writer_current_data_file: AtomicU16,
     /// The current data file ID being read from.
-    #[with(Atomic)]
+    #[rkyv(with = AtomicLoad<Acquire>)]
     reader_current_data_file: AtomicU16,
     /// The last record ID read by the reader.
-    #[with(Atomic)]
+    #[rkyv(with = AtomicLoad<Acquire>)]
     reader_last_record: AtomicU64,
 }
 
@@ -119,21 +122,40 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
+    pub(super) fn get_next_writer_record_id(&self) -> u64 {
+        self.writer_next_record.to_native()
+    }
+
+    pub(super) fn get_last_reader_record_id(&self) -> u64 {
+        self.reader_last_record.to_native()
+    }
+
+    fn get_offset_reader_file_id(&self, offset: u16) -> u16 {
+        self.get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID
+    }
+
+    fn get_current_reader_file_id(&self) -> u16 {
+        self.reader_current_data_file.to_native()
+    }
+
+    fn get_next_reader_file_id(&self) -> u16 {
+        (self.get_current_reader_file_id() + 1) % MAX_FILE_ID
+    }
+
     fn get_current_writer_file_id(&self) -> u16 {
-        self.writer_current_data_file.load(Ordering::Acquire)
+        self.writer_current_data_file.to_native()
     }
 
     fn get_next_writer_file_id(&self) -> u16 {
         (self.get_current_writer_file_id() + 1) % MAX_FILE_ID
     }
+}
 
+impl LedgerState {
     pub(super) fn increment_writer_file_id(&self) {
-        self.writer_current_data_file
-            .store(self.get_next_writer_file_id(), Ordering::Release);
-    }
-
-    pub(super) fn get_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record.load(Ordering::Acquire)
+        // self.writer_current_data_file
+        //     .store(self.get_next_writer_file_id(), Ordering::Release);
+        todo!();
     }
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
@@ -141,27 +163,12 @@ impl ArchivedLedgerState {
         previous.wrapping_add(amount)
     }
 
-    fn get_current_reader_file_id(&self) -> u16 {
-        self.reader_current_data_file.load(Ordering::Acquire)
-    }
-
-    fn get_next_reader_file_id(&self) -> u16 {
-        (self.get_current_reader_file_id() + 1) % MAX_FILE_ID
-    }
-
-    fn get_offset_reader_file_id(&self, offset: u16) -> u16 {
-        self.get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID
-    }
-
     fn increment_reader_file_id(&self) -> u16 {
-        let value = self.get_next_reader_file_id();
+        // let value = self.get_next_reader_file_id();
+        let value = todo!();
         self.reader_current_data_file
             .store(value, Ordering::Release);
         value
-    }
-
-    pub(super) fn get_last_reader_record_id(&self) -> u64 {
-        self.reader_last_record.load(Ordering::Acquire)
     }
 
     pub(super) fn increment_last_reader_record_id(&self, amount: u64) {

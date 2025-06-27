@@ -3,11 +3,16 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 
 use bytecheck::CheckBytes;
+#[cfg(test)]
+use rkyv::seal::Seal;
 use rkyv::{
-    archived_root, check_archived_root,
-    ser::{serializers::AllocSerializer, Serializer},
-    validation::validators::DefaultValidator,
-    Archive, Serialize,
+    api::high::HighValidator,
+    rancor::Source,
+    ser::{
+        allocator::{Allocator, SubAllocator},
+        Serializer,
+    },
+    Archive, Portable, Serialize,
 };
 
 use super::ser::{DeserializeError, SerializeError};
@@ -16,7 +21,7 @@ use super::ser::{DeserializeError, SerializeError};
 ///
 /// Callers do not need to know or care about this, but it must be public as it is part of the
 /// `BackedArchive` API.
-pub type DefaultSerializer = AllocSerializer<4096>;
+pub type DefaultSerializer<'a> = SubAllocator<'a>;
 
 /// Backed wrapper for any type that implements [`Archive`][archive].
 ///
@@ -51,15 +56,20 @@ pub type DefaultSerializer = AllocSerializer<4096>;
 ///
 /// [archive]: rkyv::Archive
 #[derive(Debug)]
-pub struct BackedArchive<B, T> {
+pub struct BackedArchive<B, T>
+where
+    T: Portable,
+{
     backing: B,
     _archive: PhantomData<T>,
 }
 
-impl<B, T> BackedArchive<B, T>
+impl<B, T, E> BackedArchive<B, T>
 where
     B: AsRef<[u8]>,
-    T: Archive,
+    T: Archive + Portable,
+    E: Source,
+    for<'a> T: CheckBytes<HighValidator<'a, E>>,
 {
     /// Deserializes the archived value from the backing store and wraps it.
     ///
@@ -68,10 +78,10 @@ where
     /// If the data in the backing store is not valid for `T`, an error variant will be returned.
     pub fn from_backing(backing: B) -> Result<BackedArchive<B, T>, DeserializeError>
     where
-        for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
+        for<'a> T: CheckBytes<HighValidator<'a, E>>,
     {
         // Validate that the input is, well, valid.
-        _ = check_archived_root::<T>(backing.as_ref())?;
+        _ = rkyv::access::<T, DeserializeError>(backing.as_ref())?;
 
         // Now that we know the buffer fits T, we're good to go!
         Ok(Self {
@@ -87,14 +97,14 @@ where
 
     /// Gets a reference to the archived value.
     pub fn get_archive_ref(&self) -> &T::Archived {
-        unsafe { archived_root::<T>(self.backing.as_ref()) }
+        unsafe { rkyv::access_unchecked::<T::Archived>(self.backing.as_ref()) }
     }
 }
 
 impl<B, T> BackedArchive<B, T>
 where
     B: AsMut<[u8]>,
-    T: Archive,
+    T: Archive + Portable,
 {
     /// Serializes the provided value to the backing store and wraps it.
     ///
@@ -106,10 +116,10 @@ where
     /// must be, as well containing the value that failed to get serialized.
     pub fn from_value(mut backing: B, value: T) -> Result<BackedArchive<B, T>, SerializeError<T>>
     where
-        T: Serialize<DefaultSerializer>,
+        for<'a> T: Serialize<DefaultSerializer<'a>>,
     {
         // Serialize our value so we can shove it into the backing.
-        let mut serializer = DefaultSerializer::default();
+        let mut serializer = DefaultSerializer::empty();
         _ = serializer
             .serialize_value(&value)
             .map_err(|e| SerializeError::FailedToSerialize(e.to_string()))?;
@@ -136,10 +146,10 @@ where
 
     /// Gets a reference to the archived value.
     #[cfg(test)]
-    pub fn get_archive_mut(&mut self) -> Pin<&mut T::Archived> {
-        use rkyv::archived_root_mut;
+    pub fn get_archive_mut(&mut self) -> Seal<T::Archived> {
+        use rkyv::access_unchecked_mut;
 
         let pinned = Pin::new(self.backing.as_mut());
-        unsafe { archived_root_mut::<T>(pinned) }
+        unsafe { access_unchecked_mut::<T::Archived>(pinned.get_mut()) }
     }
 }

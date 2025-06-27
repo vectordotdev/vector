@@ -2,7 +2,7 @@ use std::fmt;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    check_archived_root,
+    rancor::{Failure, Source, Trace},
     validation::{validators::DefaultValidator, CheckArchiveError},
     Archive,
 };
@@ -47,6 +47,9 @@ pub enum DeserializeError {
     /// The backing store that was given is returned, along with an error string that briefly
     /// describes the error in a more verbose fashion, suitable for debugging.
     InvalidData(String),
+
+    /// TODO
+    Other(String),
 }
 
 impl DeserializeError {
@@ -55,24 +58,38 @@ impl DeserializeError {
         match self {
             DeserializeError::InvalidData(s) => format!("invalid data: {s}"),
             DeserializeError::InvalidStructure(s) => format!("invalid structure: {s}"),
+            DeserializeError::Other(s) => format!("other: {s}"), // FIXME
         }
     }
 }
 
-impl<T, C> From<CheckArchiveError<T, C>> for DeserializeError
-where
-    T: fmt::Display,
-    C: fmt::Display,
-{
-    fn from(e: CheckArchiveError<T, C>) -> Self {
-        match e {
-            CheckArchiveError::ContextError(ce) => {
-                DeserializeError::InvalidStructure(ce.to_string())
-            }
-            CheckArchiveError::CheckBytesError(cbe) => {
-                DeserializeError::InvalidData(cbe.to_string())
-            }
-        }
+impl From<Failure> for DeserializeError {
+    fn from(e: Failure) -> Self {
+        Self::Other(e.to_string())
+    }
+}
+
+impl std::fmt::Display for DeserializeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(format!("{:#?}", self).as_str()); // FIXME
+        Ok(())
+    }
+}
+
+impl std::error::Error for DeserializeError {}
+
+impl Trace for DeserializeError {
+    fn trace<R>(self, trace: R) -> Self
+    where
+        R: core::fmt::Debug + core::fmt::Display + Send + Sync + 'static,
+    {
+        Self::Other(trace.to_string())
+    }
+}
+
+impl Source for DeserializeError {
+    fn new<T: core::error::Error + Send + Sync + 'static>(source: T) -> Self {
+        Self::Other(source.to_string())
     }
 }
 
