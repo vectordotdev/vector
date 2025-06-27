@@ -4,7 +4,8 @@ use nom::{
     bytes::complete::{tag, take_while_m_n},
     combinator::{all_consuming, map_res},
     error::ErrorKind,
-    sequence::{preceded, terminated, tuple},
+    sequence::{preceded, terminated},
+    Parser,
 };
 use snafu::Snafu;
 
@@ -29,7 +30,8 @@ fn get_usize(input: &str) -> nom::IResult<&str, usize, nom::error::Error<&str>> 
     map_res(
         take_while_m_n(1, 20, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<usize>(),
-    )(input)
+    )
+    .parse(input)
 }
 
 impl<'a> TryFrom<&'a str> for NginxStubStatus {
@@ -39,7 +41,7 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
     // https://github.com/nginx/nginx/blob/master/src/http/modules/ngx_http_stub_status_module.c#L137-L145
     fn try_from(input: &'a str) -> Result<Self, Self::Error> {
         // `usize::MAX` eq `18446744073709551615` (20 characters)
-        match all_consuming(tuple((
+        match all_consuming((
             preceded(tag("Active connections: "), get_usize),
             preceded(tag(" \nserver accepts handled requests\n "), get_usize),
             preceded(tag(" "), get_usize),
@@ -47,7 +49,8 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
             preceded(tag(" \nReading: "), get_usize),
             preceded(tag(" Writing: "), get_usize),
             terminated(preceded(tag(" Waiting: "), get_usize), tag(" \n")),
-        )))(input)
+        ))
+        .parse(input)
         {
             Ok((_, (active, accepts, handled, requests, reading, writing, waiting))) => {
                 Ok(NginxStubStatus {
