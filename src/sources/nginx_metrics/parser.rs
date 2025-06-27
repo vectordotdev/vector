@@ -5,6 +5,7 @@ use nom::{
     combinator::{all_consuming, map_res},
     error::ErrorKind,
     sequence::{preceded, terminated},
+    Parser,
 };
 use snafu::Snafu;
 
