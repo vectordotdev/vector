@@ -9,15 +9,12 @@ releases: "0.48.0": {
 	description: """
 		The Vector team is excited to announce version `0.47.0`!
 
-		This release deepens Vector’s dynamic configuration surface—VRL expressions can now live in HTTP query parameters,
-		you get script-level URL path access for custom auth, and you can read/write/delete the interval_ms field on metric
-		 events. We’ve also extended observability with OpenTelemetry trace support in the Axiom sink and added stricter
-		 timestamp and JSON-escaping validation across sinks.
+		This release new configuration options for various components.
+		For example, VRL expressions can be used in HTTP
+		query parameters.
 
-		Reliability and ops improvements: the AMQP sink now auto-reconnects and pools up to 4 channels, the UDP socket
-		source can join multicast groups, and the Kafka sink offers built-in rate limiting.
-		Temporary AWS credentials (including session tokens) are fully supported, the Splunk HEC source accepts any
-		application/json header variant, and you’ll find an uptime counter in vector top for easy monitoring.
+		Also, this release includes numerous bug fixes which should improve Vector's reliability in
+		production environments.
 		"""
 
 	changelog: [
