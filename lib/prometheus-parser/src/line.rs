@@ -11,6 +11,7 @@ use nom::{
     multi::fold_many0,
     number::complete::double,
     sequence::{delimited, pair, preceded, tuple},
+    Parser,
 };
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
@@ -140,7 +141,8 @@ impl Metric {
             // This shouldn't be necessary if that issue is remedied.
             value(f64::NAN, tag("NaN")),
             double,
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| {
             ErrorKind::ParseFloatError {
                 input: input.to_owned(),
@@ -154,7 +156,8 @@ impl Metric {
         opt(map_res(
             recognize(pair(opt(char('-')), digit1)),
             |s: &str| s.parse(),
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| {
             ErrorKind::ParseTimestampError {
                 input: input.to_owned(),
@@ -167,7 +170,8 @@ impl Metric {
         map(
             tuple((parse_name, match_char('='), Self::parse_escaped_string)),
             |(name, _, value)| (name, value),
-        )(input)
+        )
+        .parse(input)
     }
 
     // Return:
@@ -224,7 +228,7 @@ impl Metric {
     fn parse_labels(input: &str) -> IResult<BTreeMap<String, String>> {
         let input = trim_space(input);
 
-        match opt(char('{'))(input) {
+        match opt(char('{')).parse(input) {
             Ok((input, None)) => Ok((input, BTreeMap::new())),
             Ok((input, Some(_))) => Self::parse_labels_inner(input),
             Err(failure) => Err(failure),
@@ -280,7 +284,7 @@ impl Metric {
             })
         }
 
-        delimited(match_quote, build_string, match_quote)(input)
+        delimited(match_quote, build_string, match_quote).parse(input)
     }
 }
 
@@ -317,7 +321,8 @@ impl Header {
             value(MetricKind::Summary, tag("summary")),
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| ErrorKind::InvalidMetricKind {
             input: input.to_owned(),
         })?;
@@ -372,7 +377,8 @@ fn parse_name(input: &str) -> IResult<String> {
     let (input, (a, b)) = pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_' || c == ':'),
-    )(input)
+    )
+    .parse(input)
     .map_err(|_: NomError| ErrorKind::ParseNameError {
         input: input.to_owned(),
     })?;
@@ -389,7 +395,7 @@ fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, 
 
 fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
     move |input| {
-        preceded(sp, char(c))(input).map_err(|_: NomError| {
+        preceded(sp, char(c)).parse(input).map_err(|_: NomError| {
             ErrorKind::ExpectedChar {
                 expected: c,
                 input: input.to_owned(),
