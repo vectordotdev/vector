@@ -7,7 +7,7 @@ releases: "0.48.0": {
 	whats_next: []
 
 	description: """
-		The Vector team is excited to announce version `0.47.0`!
+		The Vector team is excited to announce version `0.48.0`!
 
 		This release new configuration options for various components.
 		For example, VRL expressions can be used in HTTP
