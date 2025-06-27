@@ -12,7 +12,7 @@ use maxminddb::{
 };
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::enrichment::{Case, Condition, Conditions, IndexHandle, Table};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -262,9 +262,9 @@ impl Table for Geoip {
     fn find_table_row<'a>(
         &self,
         case: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        index: Option<IndexHandle>,
+        index:&[IndexHandle],
     ) -> Result<ObjectMap, String> {
         let mut rows = self.find_table_rows(case, condition, select, index)?;
 
@@ -281,11 +281,11 @@ impl Table for Geoip {
     fn find_table_rows<'a>(
         &self,
         _: Case,
-        condition: &'a [Condition<'a>],
+        condition: &'a Conditions<'a>,
         select: Option<&[String]>,
-        _: Option<IndexHandle>,
+        _: &[IndexHandle],
     ) -> Result<Vec<ObjectMap>, String> {
-        match condition.first() {
+        match condition.first().unwrap().first() {
             Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
             Some(Condition::Equals { value, .. }) => {
                 let ip = value
@@ -508,12 +508,12 @@ mod tests {
         .unwrap()
         .find_table_rows(
             Case::Insensitive,
-            &[Condition::Equals {
+            &[vec![Condition::Equals {
                 field: "ip",
                 value: ip.into(),
-            }],
+            }]],
             select,
-            None,
+            &[],
         )
         .unwrap()
         .pop()
