@@ -239,6 +239,7 @@ aws-sdk-s3 = { version = "1.15.0", default-features = false, features = ["behavi
 aws-sdk-secretsmanager = { version = "1.68.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sns = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sqs = { version = "1.64.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-xray = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-types = { version = "1.3.7", default-features = false, optional = true }
 
 # The sts crate is needed despite not being referred to anywhere in the code because we need to set the
@@ -769,6 +770,7 @@ sinks-logs = [
   "sinks-webhdfs",
   "sinks-websocket",
   "sinks-websocket-server",
+  "sinks-xray",
 ]
 sinks-metrics = [
   "sinks-appsignal",
@@ -841,6 +843,7 @@ sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
 sinks-websocket-server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal"]
+sinks-xray = ["aws-core", "dep:aws-sdk-xray"]
 
 # Identifies that the build is a nightly build
 nightly = []
