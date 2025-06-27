@@ -317,6 +317,17 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		required: true
 		type: string: examples: ["https://localhost:8087/api/v1/write"]
 	}
+	expire_metrics_secs: {
+		common: false
+		description: """
+			The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
+			after having not been updated before they expire and are removed.
+
+			If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
+			"""
+		required: false
+		type: float: {}
+	}
 	quantiles: {
 		description: """
 			Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.

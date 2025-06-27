@@ -93,6 +93,14 @@ pub struct RemoteWriteConfig {
     #[configurable(metadata(docs::advanced))]
     pub tenant_id: Option<Template>,
 
+    /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
+    /// after having not been updated before they expire and are removed.
+    ///
+    /// If unset, sending unique incremental metrics to this sink will cause indefinite memory growth.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
+    pub expire_metrics_secs: Option<f64>,
+
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
@@ -202,6 +210,7 @@ impl SinkConfig for RemoteWriteConfig {
             buckets,
             quantiles,
             default_namespace,
+            expire_metrics_secs: self.expire_metrics_secs,
             service,
         };
 
