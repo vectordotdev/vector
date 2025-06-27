@@ -26,11 +26,14 @@ fn exclude_self() {
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
+        query_parameters::{
+            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
         },
-        image::{CreateImageOptions, ListImagesOptions},
+        query_parameters::{
+            KillContainerOptions, RemoveContainerOptions, StartContainerOptions,
+            WaitContainerOptions,
+        },
+        secret::ContainerCreateBody,
     };
     use futures::{stream::TryStreamExt, FutureExt};
     use itertools::Itertools as _;
@@ -140,14 +143,16 @@ mod integration_tests {
 
         trace!("Creating container.");
 
-        let options = Some(CreateContainerOptions {
-            name,
-            platform: None,
-        });
-        let config = ContainerConfig {
-            image: Some("busybox"),
-            cmd: Some(cmd),
-            labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+        let options = Some(CreateContainerOptionsBuilder::new().name(name).build());
+
+        let config = ContainerCreateBody {
+            image: Some("busybox".to_string()),
+            cmd: Some(cmd.iter().map(|i| i.to_string()).collect::<Vec<_>>()),
+            labels: label.map(|label| {
+                vec![(label.to_string(), String::new())]
+                    .into_iter()
+                    .collect()
+            }),
             tty: Some(tty),
             ..Default::default()
         };
@@ -160,19 +165,17 @@ mod integration_tests {
         let mut filters = HashMap::new();
         filters.insert("reference", vec!["busybox:latest"]);
 
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
+        let options = Some(ListImagesOptionsBuilder::new().filters(&filters).build());
 
         let images = docker.list_images(options).await.unwrap();
         if images.is_empty() {
             // If `busybox:latest` not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: "busybox",
-                tag: "latest",
-                ..Default::default()
-            });
+            let options = Some(
+                CreateImageOptionsBuilder::new()
+                    .from_image("busybox")
+                    .tag("latest")
+                    .build(),
+            );
 
             docker
                 .create_image(options, None, None)
@@ -190,7 +193,7 @@ mod integration_tests {
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         trace!("Starting container.");
 
-        let options = None::<StartContainerOptions<&str>>;
+        let options = None::<StartContainerOptions>;
         docker.start_container(id, options).await
     }
 
@@ -199,7 +202,7 @@ mod integration_tests {
         trace!("Waiting for container.");
 
         docker
-            .wait_container(id, None::<WaitContainerOptions<&str>>)
+            .wait_container(id, None::<WaitContainerOptions>)
             .try_for_each(|exit| async move {
                 info!(message = "Container exited with status code.", status_code = ?exit.status_code);
                 Ok(())
@@ -212,7 +215,7 @@ mod integration_tests {
         trace!("Waiting for container to be killed.");
 
         docker
-            .kill_container(id, None::<KillContainerOptions<&str>>)
+            .kill_container(id, None::<KillContainerOptions>)
             .await
     }
 
