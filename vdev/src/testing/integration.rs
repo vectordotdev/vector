@@ -4,18 +4,16 @@ use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, Environment, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
+    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
+    INTEGRATION_TESTS_DIR,
 };
-use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
-};
+use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::testing::config::get_rust_version;
+use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
+use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
-
-const INTEGRATION_FEATURE_FLAG: &str = "all-integration-tests";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
 pub(crate) struct ComposeTest {
@@ -197,7 +195,7 @@ pub(crate) struct IntegrationTest;
 impl ComposeTestT for IntegrationTest {
     const DIRECTORY: &'static str = INTEGRATION_TESTS_DIR;
 
-    const FEATURE_FLAG: &'static str = INTEGRATION_FEATURE_FLAG;
+    const FEATURE_FLAG: &'static str = ALL_INTEGRATIONS_FEATURE_FLAG;
 }
 
 /// E2E tests are located in the `scripts/e2e` dir,
@@ -299,7 +297,7 @@ impl Compose {
         command.env(NETWORK_ENV_VAR, &self.network);
 
         // some services require this in order to build Vector
-        command.env("RUST_VERSION", get_rust_version());
+        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
 
         for (key, value) in &self.env {
             if let Some(value) = value {
