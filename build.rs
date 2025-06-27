@@ -137,8 +137,22 @@ fn main() {
             .btree_map(["."])
             .file_descriptor_set_path(protobuf_fds_path);
 
-        tonic_build::configure()
-            .protoc_arg("--experimental_allow_proto3_optional")
+        let mut builder =
+            tonic_build::configure().protoc_arg("--experimental_allow_proto3_optional");
+
+        for path in ["google.rpc.Status"] {
+            builder = builder
+                .type_attribute(path, "#[derive(serde::Serialize, serde::Deserialize)]")
+                .type_attribute(path, "#[serde(rename_all = \"camelCase\")]");
+        }
+
+        // TODO: fix
+        for path in ["google.rpc.Status.details"] {
+            builder =
+                builder.field_attribute(path, "#[serde(skip_serializing, skip_deserializing)]")
+        }
+
+        builder
             .compile_with_config(
                 prost_build,
                 &[
