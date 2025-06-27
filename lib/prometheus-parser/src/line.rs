@@ -10,7 +10,7 @@ use nom::{
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded},
     Parser,
 };
 
@@ -168,7 +168,7 @@ impl Metric {
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
         map(
-            tuple((parse_name, match_char('='), Self::parse_escaped_string)),
+            (parse_name, match_char('='), Self::parse_escaped_string),
             |(name, _, value)| (name, value),
         )
         .parse(input)
@@ -361,7 +361,7 @@ impl Line {
         };
 
         if let Ok((input, _)) = char::<_, NomErrorType>('#')(input) {
-            if tuple::<_, _, NomErrorType, _>((sp, tag("TYPE")))(input).is_ok() {
+            if (tag::<_, _, NomErrorType>("TYPE"), sp).parse(input).is_ok() {
                 return Err(header_error);
             }
             Ok(None)
