@@ -158,18 +158,32 @@ impl MetricSet {
         }
     }
 
-    /// Gets a reference to the cleanup configuration.
+    /// Gets a reference to the TTL policy configuration.
     pub const fn ttl_policy(&self) -> Option<&TtlPolicy> {
         self.ttl_policy.as_ref()
     }
 
+    /// Gets a mutable reference to the TTL policy configuration.
+    pub const fn ttl_policy_mut(&mut self) -> Option<&mut TtlPolicy> {
+        self.ttl_policy.as_mut()
+    }
+
     // Perform periodic cleanup if enough time has passed since the last cleanup
     fn maybe_cleanup(&mut self) {
-        if let Some(config) = self.ttl_policy() {
-            if config.should_cleanup() {
-                self.cleanup_expired()
-            }
+        // Check if cleanup is needed
+        let should_cleanup = match self.ttl_policy() {
+            Some(config) => config.should_cleanup(),
+            _ => false,
         };
+
+        // Perform cleanup if needed
+        if should_cleanup {
+            self.cleanup_expired();
+            // Mark cleanup done
+            if let Some(config) = self.ttl_policy_mut() {
+                config.mark_cleanup_done();
+            }
+        }
     }
 
     /// Removes expired entries based on TTL if configured.
@@ -244,22 +258,14 @@ impl MetricSet {
                     // Metric changed type, store this as the new reference value
                     self.inner.insert(
                         metric.series().clone(),
-                        (
-                            metric.data().clone(),
-                            EventMetadata::default(),
-                            self.create_timestamp(),
-                        ),
+                        (metric.data().clone(), EventMetadata::default(), timestamp),
                     );
                 }
             }
             None => {
                 self.inner.insert(
                     metric.series().clone(),
-                    (
-                        metric.data().clone(),
-                        EventMetadata::default(),
-                        self.create_timestamp(),
-                    ),
+                    (metric.data().clone(), EventMetadata::default(), timestamp),
                 );
             }
         }
@@ -299,30 +305,29 @@ impl MetricSet {
                     Some(metric.into_incremental())
                 } else {
                     // Metric changed type, store this and emit nothing
-                    self.insert(metric);
+                    self.insert(metric, timestamp);
                     None
                 }
             }
             None => {
                 // No reference so store this and emit nothing
-                self.insert(metric);
+                self.insert(metric, timestamp);
                 None
             }
         }
     }
 
-    fn insert(&mut self, metric: Metric) {
+    fn insert(&mut self, metric: Metric, timestamp: Option<Instant>) {
         let (series, data, metadata) = metric.into_parts();
-        self.inner
-            .insert(series, (data, metadata, self.create_timestamp()));
+        self.inner.insert(series, (data, metadata, timestamp));
     }
 
     pub fn insert_update(&mut self, metric: Metric) {
         self.maybe_cleanup();
+        let timestamp = self.create_timestamp();
         let update = match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
-                let timestamp = self.create_timestamp();
                 // Incremental metrics update existing entries, if present
                 match self.inner.get_mut(metric.series()) {
                     Some(existing) => {
@@ -341,7 +346,7 @@ impl MetricSet {
             }
         };
         if let Some(metric) = update {
-            self.insert(metric);
+            self.insert(metric, timestamp);
         }
     }
 
