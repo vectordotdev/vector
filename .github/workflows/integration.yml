@@ -40,7 +40,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
-      source: false
+      source: true
       int_tests: true
     secrets: inherit
 
@@ -53,7 +53,6 @@ jobs:
 
       - name: Determine if secrets are defined (PR author is team member)
         id: secret_check
-        if: ${{ github.event_name == 'pull_request' }}
         env:
           GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
         run: |
@@ -79,9 +78,11 @@ jobs:
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
+      - changes
       - setup
       - check-secrets
-    if: ${{ needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group' }}
+
+    if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
