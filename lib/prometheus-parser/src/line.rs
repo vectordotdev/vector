@@ -361,7 +361,7 @@ impl Line {
         };
 
         if let Ok((input, _)) = char::<_, NomErrorType>('#')(input) {
-            if (tag::<_, _, NomErrorType>("TYPE"), sp).parse(input).is_ok() {
+            if (sp, tag::<_, _, NomErrorType>("TYPE")).parse(input).is_ok() {
                 return Err(header_error);
             }
             Ok(None)
