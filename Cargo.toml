@@ -336,7 +336,7 @@ exitcode = { version = "1.1.2", default-features = false }
 flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
-governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
+governor = { version = "0.10.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 h2 = { version = "0.4.10", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
