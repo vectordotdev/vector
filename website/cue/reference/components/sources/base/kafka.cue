@@ -505,7 +505,11 @@ base: components: sources: kafka: configuration: {
 		}
 	}
 	group_id: {
-		description: "The consumer group name to be used to consume events from Kafka."
+		description: """
+			The consumer group name to be used to consume events from Kafka. Must be unique across Vector instances if they all are to consume the same events. If two instances (consumers) share the same group name, any event will be received by only one of them.
+
+			See the Apache Kafka documentation on [KafkaConsumer](https://kafka.apache.org/39/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html) for the implications.
+			"""
 		required:    true
 		type: string: examples: ["consumer-group-name"]
 	}
