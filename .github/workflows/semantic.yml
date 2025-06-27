@@ -48,8 +48,10 @@ jobs:
             deployment
             deps
             dev
+            vdev
             durability
             enriching
+            enrichment tables
             enterprise
             exceptions
             external
