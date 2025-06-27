@@ -5,6 +5,7 @@ urls: {
 	azure_blob_storage:                         "https://azure.microsoft.com/en-us/services/storage/blobs/"
 	azure_event_hubs:                           "https://learn.microsoft.com/en-us/azure/event-hubs/"
 	azure_event_hubs_kafka:                     "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-for-kafka-ecosystem-overview"
+	azure_event_hubs_kafka_config:              "https://learn.microsoft.com/en-us/azure/event-hubs/apache-kafka-configurations#librdkafka-configuration-properties"
 	azure_event_hubs_connection_string:         "https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-get-connection-string"
 	azure_event_hubs_tiers:                     "https://learn.microsoft.com/en-us/azure/event-hubs/compare-tiers"
 	affine_type_system:                         "\(wikipedia)/wiki/Substructural_type_system#Affine_type_systems"
