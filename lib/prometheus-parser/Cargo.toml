@@ -10,7 +10,7 @@ license = "MPL-2.0"
 
 [dependencies]
 indexmap.workspace = true
-nom = "8.0.0"
+nom.workspace = true
 prost.workspace = true
 prost-types.workspace = true
 snafu.workspace = true
