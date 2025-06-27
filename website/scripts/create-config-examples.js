@@ -39,7 +39,6 @@ const getExampleValue = (param, deepFilter) => {
             const options = typeInfo[k].options;
 
             var subObj = {};
-
             Object
               .keys(options)
               .filter(k => deepFilter(options[k]))
@@ -66,7 +65,75 @@ const getExampleValue = (param, deepFilter) => {
           }
         });
       } else {
-        value = getValue(p);
+        if (p.options) {
+          const options = p.options;
+          let subObj = {};
+
+          // Iterate over each key-value pair in the options object
+          for (let [k, { type: type1 }] of Object.entries(options)) {
+            // If the current option is required
+            if (options[k].required) {
+              // Iterate over each key-value pair in the type1 object
+              for (let [key, { options: options2 }] of Object.entries(type1)) {
+                // If the current type1 key has examples and there is at least one example
+                if (type1[key].examples && type1[key].examples.length > 0) {
+                  // Get the value from the type1 key
+                  let valueFromGetType = getValue(type1[key]);
+                  // If the value is not null, add it to the subObj
+                  if (valueFromGetType !== null) {
+                    subObj[k] = valueFromGetType;
+                  }
+                }
+                // If there are no examples for the current type1 key, but there are options2
+                else if (options2) {
+                  // Iterate over each key-value pair in the options2 object
+                  for (let [optionKey, { type: type2, required }] of Object.entries(options2)) {
+                    // If the current option2 is required
+                    if (required) {
+                      // Iterate over each key-value pair in the type2 object
+                      for (let [typeKey, typeValue] of Object.entries(type2)) {
+                        // If the current type2 key has examples and there is at least one example
+                        if (typeValue.examples && typeValue.examples.length > 0) {
+                          // Get the value from the type2 key
+                          let valueFromGetType = getValue(typeValue);
+                          // If the value is not null, add it to the subObj
+                          if (valueFromGetType !== null) {
+                            subObj[k] = valueFromGetType;
+                          }
+                        }
+                        // If there are no examples for the current type2 key, but there are items
+                        else if (typeValue.items) {
+                          // Iterate over each key-value pair in the items type object
+                          for (let [itemTypeKey, itemTypeValue] of Object.entries(typeValue.items.type)) {
+                            // Get the value from the itemType key
+                            let valueFromGetType = getValue(itemTypeValue);
+                            // If the value is not null, add it to the subObj
+                            if (valueFromGetType !== null) {
+                              subObj[k] = valueFromGetType;
+                            }
+                          }
+                        }
+                        // If there are no examples or items for the current type2 key
+                        else {
+                          // Get the value from the type2 key
+                          let valueFromGetType = getValue(typeValue);
+                          // If the value is not null, add it to the subObj
+                          if (valueFromGetType !== null) {
+                            subObj[k] = valueFromGetType;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // Set the value to the subObj
+          value = subObj;
+        } else {
+          value = getValue(p);
+        }
       }
     } else {
       value = getValue(p);
@@ -292,8 +359,8 @@ const main = () => {
           _ => true,
           p => p.required || p.common || p.relevant_when,
         );
-        const useCaseExamples = makeUseCaseExamples(component);
 
+        const useCaseExamples = makeUseCaseExamples(component);
         const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
         let commonExampleConfig, advancedExampleConfig;
