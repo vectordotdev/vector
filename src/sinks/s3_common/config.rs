@@ -312,15 +312,73 @@ impl From<S3CannedAcl> for ObjectCannedAcl {
     }
 }
 
+fn is_retriable_response(res: &HttpResponse, errors_to_retry: Option<Vec<u16>>) -> bool {
+    let status_code = res.status();
+
+    match errors_to_retry {
+        Some(error_codes) => error_codes.contains(&status_code.as_u16()),
+        None => false,
+    }
+}
+
+fn should_retry_error(
+    errors_to_retry: Option<Vec<u16>>,
+    error: &SdkError<PutObjectError, HttpResponse>,
+) -> bool {
+    match error {
+        SdkError::ResponseError(err) => is_retriable_response(err.raw(), errors_to_retry),
+        SdkError::ServiceError(err) => is_retriable_response(err.raw(), errors_to_retry),
+        _ => false,
+    }
+}
+
+/// S3 Error retry logic.
+///
+/// Specifies a retry policy for S3 service calls.
+///
+/// For more information about error responses, see [Client Error Responses][error_responses].
+///
+/// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+#[configurable_component]
 #[derive(Debug, Clone)]
-pub struct S3RetryLogic;
+pub struct S3RetryLogic {
+    /// Retry all errors.
+    ///
+    /// The sink retries all failed service calls.
+    pub retry_all_errors: Option<bool>,
+
+    /// Retry specific errors.
+    ///
+    /// A list of HTTP status codes matching specific error types that trigger failed
+    /// service retry attempts. This list is ignored if `retry_all_errors` is true.
+    pub errors_to_retry: Option<Vec<u16>>,
+}
+
+impl S3RetryLogic {
+    pub const fn new() -> Self {
+        Self {
+            retry_all_errors: None,
+            errors_to_retry: Some(Vec::new()),
+        }
+    }
+}
+
+impl Default for S3RetryLogic {
+    fn default() -> Self {
+        S3RetryLogic::new()
+    }
+}
 
 impl RetryLogic for S3RetryLogic {
     type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+        let retry_all_errors = self.retry_all_errors.unwrap_or(false);
+
+        retry_all_errors
+            || is_retriable_error(error)
+            || should_retry_error(self.errors_to_retry.clone(), error)
     }
 }
 
