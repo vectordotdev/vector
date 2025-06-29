@@ -158,9 +158,25 @@ impl NatsSinkConfig {
             .collect()
     }
 
-    pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
+
+    #[cfg(not(test))]
+    fn create_connect_options(&self) -> Result<async_nats::ConnectOptions, NatsError> {
         let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
         options = options.retry_on_initial_connect();
+        Ok(options)
+    }
+
+
+    #[cfg(test)]
+    fn create_connect_options(&self) -> Result<async_nats::ConnectOptions, NatsError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+        Ok(options)
+    }
+
+    pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
+        // let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+        // options = options.retry_on_initial_connect();
+        let options = self.create_connect_options()?;
         let connection = self.connect(options).await?;
 
         if self.jetstream {
