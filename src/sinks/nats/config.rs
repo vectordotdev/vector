@@ -174,8 +174,6 @@ impl NatsSinkConfig {
     }
 
     pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
-        // let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
-        // options = options.retry_on_initial_connect();
         let options = self.create_connect_options()?;
         let connection = self.connect(options).await?;
 
