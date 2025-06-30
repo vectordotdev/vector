@@ -240,6 +240,12 @@ components: sources: opentelemetry: {
 				}
 			}
 		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	how_it_works: {

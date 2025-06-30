@@ -1290,8 +1290,8 @@ components: {
 					authorization code using VRL. Here is an example that looks up the token in an
 					enrichment table backed by a CSV file.
 
-					Currently custom VRL auth has access to `headers` and `address` (IP address of the
-					client).
+					Currently custom VRL auth has access to `headers`, `path`, and `address` (IP
+					address of the client).
 
 					```yaml
 					\(kind)s:
