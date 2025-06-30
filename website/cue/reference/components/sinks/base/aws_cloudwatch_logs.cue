@@ -139,6 +139,14 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				required: false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	batch: {
@@ -150,7 +158,7 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -232,8 +240,12 @@ base: components: sinks: aws_cloudwatch_logs: configuration: {
 		type: bool: default: true
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."

@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures::stream;
-use opendal::{Entry, Metakey};
+use opendal::Entry;
 use similar_asserts::assert_eq;
 use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
 use vector_lib::event::{Event, LogEvent};
@@ -77,9 +77,12 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     let mut objects: Vec<Entry> = op
         .list_with("/")
         .recursive(true)
-        .metakey(Metakey::Mode)
         .await
-        .unwrap();
+        .unwrap()
+        .into_iter()
+        // We need this because we are only interested in files.
+        .filter(|e| e.metadata().is_file())
+        .collect();
 
     // Sort file path in order, because we have the event id in path.
     objects.sort_by(|l, r| l.path().cmp(r.path()));
@@ -87,7 +90,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
 
     let mut response_lines: Vec<Vec<String>> = Vec::new();
     for o in objects {
-        let bs = op.read(o.path()).await.unwrap();
+        let bs = op.read(o.path()).await.unwrap().to_vec();
         let buf_read = BufReader::new(Cursor::new(bs));
 
         response_lines.push(buf_read.lines().map(|l| l.unwrap()).collect());

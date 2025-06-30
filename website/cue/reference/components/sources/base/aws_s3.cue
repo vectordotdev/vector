@@ -134,6 +134,14 @@ base: components: sources: aws_s3: configuration: {
 				required: false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				required: false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 		}
 	}
 	compression: {
@@ -157,8 +165,11 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -231,6 +242,8 @@ base: components: sources: aws_s3: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -238,6 +251,8 @@ base: components: sources: aws_s3: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -706,6 +721,29 @@ base: components: sources: aws_s3: configuration: {
 				type: uint: {
 					examples: [20]
 					unit: "seconds"
+				}
+			}
+			deferred: {
+				description: "Configuration for deferring events to another queue based on their age."
+				required:    false
+				type: object: options: {
+					max_age_secs: {
+						description: """
+																Event must have been emitted within the last `max_age_secs` seconds to be processed.
+
+																If the event is older, it is forwarded to the `queue_url` for later processing.
+																"""
+						required: true
+						type: uint: {
+							examples: [3600]
+							unit: "seconds"
+						}
+					}
+					queue_url: {
+						description: "The URL of the queue to forward events to when they are older than `max_age_secs`."
+						required:    true
+						type: string: examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+					}
 				}
 			}
 			delete_failed_message: {

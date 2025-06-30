@@ -19,8 +19,11 @@ base: components: sources: socket: configuration: {
 		type: uint: unit: "connections"
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -93,6 +96,8 @@ base: components: sources: socket: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -100,6 +105,8 @@ base: components: sources: socket: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -496,6 +503,27 @@ base: components: sources: socket: configuration: {
 			udp:           "Listen on UDP."
 			unix_datagram: "Listen on a Unix domain socket (UDS), in datagram mode."
 			unix_stream:   "Listen on a Unix domain socket (UDS), in stream mode."
+		}
+	}
+	multicast_groups: {
+		description: """
+			List of IPv4 multicast groups to join on socket's binding process.
+
+			In order to read multicast packets, this source's listening address should be set to `0.0.0.0`.
+			If any other address is used (such as `127.0.0.1` or an specific interface address), the
+			listening interface will filter out all multicast packets received,
+			as their target IP would be the one of the multicast group
+			and it will not match the socket's bound IP.
+
+			Note that this setting will only work if the source's address
+			is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
+			with multicast groups).
+			"""
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: array: {
+			default: []
+			items: type: string: examples: ["['224.0.0.2', '224.0.0.4']"]
 		}
 	}
 	path: {

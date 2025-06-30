@@ -38,8 +38,12 @@ base: components: sinks: mqtt: configuration: {
 		type: string: {}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -419,7 +423,7 @@ base: components: sinks: mqtt: configuration: {
 		type: bool: default: false
 	}
 	tls: {
-		description: "Configures the TLS options for incoming/outgoing connections."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

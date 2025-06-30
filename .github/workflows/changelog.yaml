@@ -6,63 +6,46 @@
 #   - new commits pushed
 #   - label is added or removed
 # Runs on merge queues, but just passes, because it is a required check.
-
 name: Changelog
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # Due to merge queue requiring same status checks as PRs, must pass by default
+
+  # Required by GitHub merge queue due to branch protection rules. Should always be successful
   merge_group:
     types: [checks_requested]
 
 jobs:
   validate-changelog:
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request'
+
     env:
-      PR_HAS_LABEL: ${{ contains( github.event.pull_request.labels.*.name, 'no-changelog') }}
+      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+
     steps:
       # Checkout full depth because in the check_changelog_fragments script, we need to specify a
       # merge base. If we only shallow clone the repo, git may not have enough history to determine
       # the base.
       - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'merge_group' }}
         with:
           fetch-depth: 0
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Generate authentication token
-        # Don't run this step if the PR is from a fork or dependabot since the secrets won't exist
-        if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
-        id: generate_token
-        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
-        with:
-          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
-          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
-
-      - run: |
-          if [[ $PR_HAS_LABEL == 'true' ]] ; then
-            echo "'no-changelog' label detected."
-            exit 0
-          fi
-
-          # Helper script needs to reference the master branch to compare against
-          git fetch origin master:refs/remotes/origin/master
-
-          ./scripts/check_changelog_fragments.sh
-
-  check-changelog:
-    name: Changelog
-    runs-on: ubuntu-24.04
-    needs: validate-changelog
-    if: always()
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
-    steps:
-      - name: exit
+      - name: Bypass when no‑changelog label is present
+        if: env.PR_HAS_LABEL == 'true'
         run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
-            exit 1
-          else
-            exit 0
-          fi
+          echo "'no-changelog' label detected – skipping changelog validation."
+          exit 0
+
+      - name: Merge queue
+        if: ${{ github.event_name == 'merge_group' }}
+        run: |
+          echo "merge_group event – passing without running changelog validation."
+          exit 0
+
+      - name: Run changelog fragment checker
+        if: ${{ env.PR_HAS_LABEL == 'false' && github.event_name != 'merge_group' }}
+        run: ./scripts/check_changelog_fragments.sh

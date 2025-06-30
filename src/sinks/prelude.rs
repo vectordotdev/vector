@@ -41,6 +41,6 @@ pub use crate::{
         },
         Healthcheck, HealthcheckError,
     },
-    template::{Template, TemplateParseError},
+    template::{Template, TemplateParseError, UnsignedIntTemplate},
     tls::TlsConfig,
 };

@@ -116,6 +116,45 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
+#### Pre-push
+
+To reduce iterations you can create do the following:
+
+```shell
+touch .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+You can use the following as a starting point:
+
+```shell
+#!/bin/sh
+set -e
+echo "Running pre-push checks..."
+
+# We recommend always running all the following checks.
+make check-licenses
+make check-fmt
+make check-clippy
+make check-component-docs
+
+# Some other checks that in our experience rarely fail on PRs.
+make check-deny
+make check-docs
+make check-version
+make check-examples
+make check-scripts
+
+./scripts/check_changelog_fragments.sh
+
+# The following check is very slow.
+# make check-component-features
+```
+
+Please note that `make check-all` covers all checks, but it is slow and may runs checks not
+relevant to your PR. This command is defined
+[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
+
 ### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).

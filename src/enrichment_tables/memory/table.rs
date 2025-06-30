@@ -3,21 +3,24 @@ use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
 use crate::enrichment_tables::memory::MemoryConfig;
+use crate::SourceSender;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use evmap::shallow_copy::CopyValue;
 use evmap::{self};
 use evmap_derive::ShallowCopy;
+use futures::StreamExt;
 use thread_local::ThreadLocal;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
+use vector_lib::config::LogNamespace;
+use vector_lib::shutdown::ShutdownSignal;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use tokio_stream::StreamExt;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
 use vector_lib::event::{Event, EventStatus, Finalizable};
 use vector_lib::internal_event::{
@@ -25,6 +28,8 @@ use vector_lib::internal_event::{
 };
 use vector_lib::sink::StreamSink;
 use vrl::value::{KeyString, ObjectMap, Value};
+
+use super::source::MemorySource;
 
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
@@ -40,7 +45,12 @@ impl ByteSizeOf for MemoryEntry {
 }
 
 impl MemoryEntry {
-    fn as_object_map(&self, now: Instant, total_ttl: u64, key: &str) -> Result<ObjectMap, String> {
+    pub(super) fn as_object_map(
+        &self,
+        now: Instant,
+        total_ttl: u64,
+        key: &str,
+    ) -> Result<ObjectMap, String> {
         let ttl = total_ttl.saturating_sub(now.duration_since(*self.update_time).as_secs());
         Ok(ObjectMap::from([
             (
@@ -70,17 +80,17 @@ struct MemoryMetadata {
 }
 
 // Used to ensure that these 2 are locked together
-struct MemoryWriter {
-    write_handle: evmap::WriteHandle<String, MemoryEntry>,
+pub(super) struct MemoryWriter {
+    pub(super) write_handle: evmap::WriteHandle<String, MemoryEntry>,
     metadata: MemoryMetadata,
 }
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
 pub struct Memory {
-    read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
-    read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
-    write_handle: Arc<Mutex<MemoryWriter>>,
-    config: MemoryConfig,
+    pub(super) read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
+    pub(super) read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
+    pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
+    pub(super) config: MemoryConfig,
 }
 
 impl Memory {
@@ -98,7 +108,7 @@ impl Memory {
         }
     }
 
-    fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
+    pub(super) fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
         self.read_handle
             .get_or(|| self.read_handle_factory.handle())
     }
@@ -198,6 +208,20 @@ impl Memory {
                 new_objects_count: reader.len(),
                 new_byte_size: byte_size
             });
+        }
+    }
+
+    pub(crate) fn as_source(
+        &self,
+        shutdown: ShutdownSignal,
+        out: SourceSender,
+        log_namespace: LogNamespace,
+    ) -> MemorySource {
+        MemorySource {
+            memory: self.clone(),
+            shutdown,
+            out,
+            log_namespace,
         }
     }
 }
@@ -347,7 +371,8 @@ impl StreamSink<Event> for Memory {
 mod tests {
     use futures::{future::ready, StreamExt};
     use futures_util::stream;
-    use std::time::Duration;
+    use std::{num::NonZeroU64, time::Duration};
+    use tokio::time;
 
     use vector_lib::{
         event::{EventContainer, MetricValue},
@@ -357,9 +382,14 @@ mod tests {
 
     use super::*;
     use crate::{
-        enrichment_tables::memory::internal_events::InternalMetricsConfig,
+        enrichment_tables::memory::{
+            internal_events::InternalMetricsConfig, source::MemorySourceConfig,
+        },
         event::{Event, LogEvent},
-        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
+        test_util::components::{
+            run_and_assert_sink_compliance, run_and_assert_source_compliance, SINK_TAGS,
+            SOURCE_TAGS,
+        },
     };
 
     fn build_memory_config(modfn: impl Fn(&mut MemoryConfig)) -> MemoryConfig {
@@ -825,5 +855,31 @@ mod tests {
             .expect("Insertions metric is missing!");
 
         assert!(insertions_counter.tag_value("key").is_none());
+    }
+
+    #[tokio::test]
+    async fn source_spec_compliance() {
+        let mut memory_config = MemoryConfig::default();
+        memory_config.source_config = Some(MemorySourceConfig {
+            export_interval: NonZeroU64::try_from(1).unwrap(),
+            export_batch_size: None,
+            remove_after_export: false,
+            source_key: "test".to_string(),
+        });
+        let memory = memory_config.get_or_build_memory().await;
+        memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
+
+        let mut events: Vec<Event> = run_and_assert_source_compliance(
+            memory_config,
+            time::Duration::from_secs(5),
+            &SOURCE_TAGS,
+        )
+        .await;
+
+        assert!(!events.is_empty());
+        let event = events.remove(0);
+        let log = event.as_log();
+
+        assert!(!log.value().is_empty());
     }
 }

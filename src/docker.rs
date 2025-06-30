@@ -2,10 +2,13 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use bollard::{
-    container::{Config, CreateContainerOptions},
     errors::Error as DockerError,
-    image::{CreateImageOptions, ListImagesOptions},
     models::HostConfig,
+    query_parameters::{
+        CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
+        RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
+    },
+    secret::ContainerCreateBody,
     Docker, API_DEFAULT_VERSION,
 };
 use futures::StreamExt;
@@ -110,19 +113,17 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
         vec![format!("{}:{}", image, tag)],
     );
 
-    let options = Some(ListImagesOptions {
-        filters,
-        ..Default::default()
-    });
+    let options = Some(ListImagesOptionsBuilder::new().filters(&filters).build());
 
     let images = docker.list_images(options).await.unwrap();
     if images.is_empty() {
         // If not found, pull it
-        let options = Some(CreateImageOptions {
-            from_image: image,
-            tag,
-            ..Default::default()
-        });
+        let options = Some(
+            CreateImageOptionsBuilder::new()
+                .from_image(image)
+                .tag(tag)
+                .build(),
+        );
 
         docker
             .create_image(options, None, None)
@@ -140,7 +141,7 @@ async fn remove_container(docker: &Docker, id: &str) {
     trace!("Stopping container.");
 
     _ = docker
-        .stop_container(id, None)
+        .stop_container(id, None::<StopContainerOptions>)
         .await
         .map_err(|e| error!(%e));
 
@@ -148,7 +149,7 @@ async fn remove_container(docker: &Docker, id: &str) {
 
     // Don't panic, as this is unrelated to the test
     _ = docker
-        .remove_container(id, None)
+        .remove_container(id, None::<RemoveContainerOptions>)
         .await
         .map_err(|e| error!(%e));
 }
@@ -186,12 +187,11 @@ impl Container {
 
         pull_image(&docker, self.image, self.tag).await;
 
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_{}", uuid::Uuid::new_v4()),
-            platform: None,
-        });
+        let options = CreateContainerOptionsBuilder::new()
+            .name(&format!("vector_test_{}", uuid::Uuid::new_v4()))
+            .build();
 
-        let config = Config {
+        let config = ContainerCreateBody {
             image: Some(format!("{}:{}", &self.image, &self.tag)),
             cmd: self.cmd,
             host_config: Some(HostConfig {
@@ -203,10 +203,13 @@ impl Container {
             ..Default::default()
         };
 
-        let container = docker.create_container(options, config).await.unwrap();
+        let container = docker
+            .create_container(Some(options), config)
+            .await
+            .unwrap();
 
         docker
-            .start_container::<String>(&container.id, None)
+            .start_container(&container.id, None::<StartContainerOptions>)
             .await
             .unwrap();
 

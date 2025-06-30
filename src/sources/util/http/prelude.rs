@@ -132,7 +132,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
                         let events = auth_matcher
                             .as_ref()
-                            .map_or(Ok(()), |a| a.handle_auth(&headers))
+                            .map_or(Ok(()), |a| {
+                                a.handle_auth(
+                                    addr.as_ref().map(|a| a.0).as_ref(),
+                                    &headers,
+                                    path.as_str(),
+                                )
+                            })
                             .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
                                 emit!(HttpBytesReceived {
@@ -155,7 +161,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     path.as_str(),
                                     &headers,
                                     &query_parameters,
-                                    addr.map(|PeerAddr(inner_addr)| inner_addr).as_ref(),
+                                    addr.and_then(|a| enable_source_ip.then_some(a))
+                                        .map(|PeerAddr(inner_addr)| inner_addr)
+                                        .as_ref(),
                                 );
 
                                 events
@@ -182,7 +190,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
-                let remote_addr_ref = enable_source_ip.then_some(remote_addr);
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -193,11 +200,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         )
                     }))
                     .map_request(move |mut request: hyper::Request<_>| {
-                        if let Some(remote_addr_inner) = remote_addr_ref.as_ref() {
-                            request
-                                .extensions_mut()
-                                .insert(PeerAddr::new(*remote_addr_inner));
-                        }
+                        request.extensions_mut().insert(PeerAddr::new(remote_addr));
 
                         request
                     })

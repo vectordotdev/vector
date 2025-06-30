@@ -42,7 +42,7 @@ data_dir = "."
 [sources.file]
   type = "file"
   include = ["*.csv"]
-  start_at_beginning = true
+  ignore_checkpoints = true
 
 [transforms.lua]
   inputs = ["file"]

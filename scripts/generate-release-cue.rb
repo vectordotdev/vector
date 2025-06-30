@@ -15,17 +15,33 @@
 require "json"
 require "time"
 require "optparse"
+require 'pathname'
 require_relative "util/commit"
 require_relative "util/git_log_commit"
 require_relative "util/printer"
 require_relative "util/release"
 require_relative "util/version"
 
+# Function to find the repository root by looking for .git directory
+def find_repo_root
+  # Get the absolute path of the current script
+  script_path = File.expand_path(__FILE__)
+  dir = Pathname.new(script_path).dirname
+
+  # Walk up the directory tree until we find .git or reach the filesystem root
+  loop do
+    return dir.to_s if File.exist?(File.join(dir, '.git'))
+    parent = dir.parent
+    raise "Could not find repository root (no .git directory found)" if parent == dir # Reached filesystem root
+    dir = parent
+  end
+end
+
 #
 # Constants
 #
 
-ROOT = ".."
+ROOT = find_repo_root
 RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
 CHANGELOG_DIR = File.join(ROOT, "changelog.d")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]

@@ -34,13 +34,13 @@ pub mod config {
         clone_input_definitions, init_log_schema, init_telemetry, log_schema, proxy, telemetry,
         AcknowledgementsConfig, DataType, GlobalOptions, Input, LegacyKey, LogNamespace, LogSchema,
         OutputId, SourceAcknowledgementsConfig, SourceOutput, Tags, Telemetry, TransformOutput,
-        MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
+        WildcardMatching, MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
     };
 }
 
 #[cfg(feature = "opentelemetry")]
 pub mod opentelemetry {
-    pub use opentelemetry_proto::{convert, proto};
+    pub use opentelemetry_proto::{common, logs, metrics, proto, spans};
 }
 
 #[cfg(feature = "prometheus")]

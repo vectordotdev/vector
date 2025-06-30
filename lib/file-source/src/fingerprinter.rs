@@ -1,8 +1,9 @@
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs::{self, metadata, File},
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    time,
 };
 
 use crc::Crc;
@@ -200,7 +201,7 @@ impl Fingerprinter {
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-        known_small_files: &mut HashSet<PathBuf>,
+        known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         metadata(path)
@@ -211,21 +212,30 @@ impl Fingerprinter {
                     self.get_fingerprint_of_file(path, buffer).map(Some)
                 }
             })
-            .map_err(|error| match error.kind() {
-                io::ErrorKind::UnexpectedEof => {
-                    if !known_small_files.contains(path) {
-                        emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.to_path_buf());
+            .inspect(|_| {
+                // Drop the path from the small files map if we've got enough data to fingerprint it.
+                known_small_files.remove(&path.to_path_buf());
+            })
+            .map_err(|error| {
+                match error.kind() {
+                    io::ErrorKind::UnexpectedEof => {
+                        if !known_small_files.contains_key(path) {
+                            emitter.emit_file_checksum_failed(path);
+                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
+                        }
+                        return;
                     }
-                }
-                io::ErrorKind::NotFound => {
-                    if !self.ignore_not_found {
+                    io::ErrorKind::NotFound => {
+                        if !self.ignore_not_found {
+                            emitter.emit_file_fingerprint_read_error(path, error);
+                        }
+                    }
+                    _ => {
                         emitter.emit_file_fingerprint_read_error(path, error);
                     }
-                }
-                _ => {
-                    emitter.emit_file_fingerprint_read_error(path, error);
-                }
+                };
+                // For scenarios other than UnexpectedEOF, remove the path from the small files map.
+                known_small_files.remove(&path.to_path_buf());
             })
             .ok()
             .flatten()
@@ -375,13 +385,14 @@ fn fingerprinter_read_until(
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashSet,
+        collections::HashMap,
         fs,
         io::{Error, Read, Write},
         path::Path,
         time::Duration,
     };
 
+    use bytes::BytesMut;
     use flate2::write::GzEncoder;
     use tempfile::{tempdir, TempDir};
 
@@ -744,7 +755,7 @@ mod test {
         };
 
         let mut buf = Vec::new();
-        let mut small_files = HashSet::new();
+        let mut small_files = HashMap::new();
         assert!(fingerprinter
             .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
             .is_none());
@@ -803,5 +814,7 @@ mod test {
         fn emit_files_open(&self, _: usize) {}
 
         fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
     }
 }

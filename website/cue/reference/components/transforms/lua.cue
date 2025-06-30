@@ -53,6 +53,15 @@ components: transforms: lua: {
 		traces: false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Add, rename, and remove log fields"

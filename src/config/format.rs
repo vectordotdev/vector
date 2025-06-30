@@ -6,13 +6,28 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde::de;
+use serde::{de, Deserialize, Serialize};
+use vector_config_macros::Configurable;
 
 /// A type alias to better capture the semantics.
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Serialize,
+    Deserialize,
+    Configurable,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Format {
     /// TOML format is used.
     #[default]
