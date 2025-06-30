@@ -409,6 +409,7 @@ nkeys,https://github.com/wasmcloud/nkeys,Apache-2.0,wasmCloud Team
 no-proxy,https://github.com/jdrouet/no-proxy,MIT,Jérémie Drouet <jeremie.drouet@gmail.com>
 nohash,https://github.com/tetcoin/nohash,Apache-2.0 OR MIT,Parity Technologies <admin@parity.io>
 nom,https://github.com/Geal/nom,MIT,contact@geoffroycouprie.com
+nom,https://github.com/rust-bakery/nom,MIT,contact@geoffroycouprie.com
 nonzero_ext,https://github.com/antifuchs/nonzero_ext,Apache-2.0,Andreas Fuchs <asf@boinkor.net>
 notify,https://github.com/notify-rs/notify,CC0-1.0,"Félix Saparelli <me@passcod.name>, Daniel Faust <hessijames@gmail.com>, Aron Heinecke <Ox0p54r36@t-online.de>"
 notify-types,https://github.com/notify-rs/notify,MIT OR Apache-2.0,Daniel Faust <hessijames@gmail.com>
