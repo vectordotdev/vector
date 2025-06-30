@@ -92,7 +92,9 @@ Automated steps include:
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
-- [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
-- [ ] Bump the release number in the `Cargo.toml` on master to the next major release.
-  - Also, update `Cargo.lock` with: `cargo update -p vector`
+- [ ] Create a new PR with title starting as `chore(releasing):`
+  - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
+  - [ ] Bump the release number in the `Cargo.toml` on master to the next major release.
+  - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`
+  - [ ] If there is a vrl version update revert it to use the git tag and then run `cargo update -p vrl`
 - [ ] Kick-off post-mortems for any regressions resolved by the release
