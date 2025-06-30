@@ -5,7 +5,7 @@ regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-perform
 docs/ @vectordotdev/ux-team @vectordotdev/documentation
 website/ @vectordotdev/ux-team
 website/content  @vectordotdev/documentation
-website/cue/reference/remap @vectordotdev/documentation
+website/cue/reference @vectordotdev/documentation
 
 website/js @vectordotdev/vector-website
 website/layouts @vectordotdev/vector-website

@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 set -e -o verbose
 
 # We want to ensure we're building using "full" release capabilities when possible, which

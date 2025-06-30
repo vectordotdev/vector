@@ -9,6 +9,7 @@ use regex::Regex;
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    sources::statsd::ConversionUnit,
     sources::util::extract_tag_key_and_value,
 };
 
@@ -18,12 +19,14 @@ static NONALPHANUM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z_\-0
 #[derive(Clone)]
 pub struct Parser {
     sanitize: bool,
+    convert_to: ConversionUnit,
 }
 
 impl Parser {
-    pub const fn new(sanitize_keys: bool) -> Self {
+    pub const fn new(sanitize_keys: bool, convert_to: ConversionUnit) -> Self {
         Self {
             sanitize: sanitize_keys,
+            convert_to,
         }
     }
 
@@ -78,12 +81,22 @@ impl Parser {
             }
             unit @ "h" | unit @ "ms" | unit @ "d" => {
                 let val: f64 = parts[0].parse()?;
+                let converted_val = match unit {
+                    "ms" => match self.convert_to {
+                        ConversionUnit::Seconds => val / 1000.0,
+                        ConversionUnit::Milliseconds => val,
+                    },
+                    _ => val,
+                };
                 Metric::new(
-                name, MetricKind::Incremental, MetricValue::Distribution {
-                    samples: vector_lib::samples![convert_to_base_units(unit, val) => sample_rate as u32],
-                    statistic: convert_to_statistic(unit),
-                },
-            ).with_tags(tags)
+                    name,
+                    MetricKind::Incremental,
+                    MetricValue::Distribution {
+                        samples: vector_lib::samples![converted_val => sample_rate as u32],
+                        statistic: convert_to_statistic(unit),
+                    },
+                )
+                .with_tags(tags)
             }
             "g" => {
                 let value = if parts[0]
@@ -185,13 +198,6 @@ fn sanitize_sampling(sampling: f64) -> f64 {
     }
 }
 
-fn convert_to_base_units(unit: &str, val: f64) -> f64 {
-    match unit {
-        "ms" => val / 1000.0,
-        _ => val,
-    }
-}
-
 fn convert_to_statistic(unit: &str) -> StatisticKind {
     match unit {
         "d" => StatisticKind::Summary,
@@ -237,13 +243,19 @@ mod test {
 
     use super::{sanitize_key, sanitize_sampling, ParseError, Parser};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use crate::sources::statsd::ConversionUnit;
 
-    const SANITIZING_PARSER: Parser = Parser::new(true);
+    const SANITIZING_PARSER: Parser = Parser::new(true, ConversionUnit::Seconds);
     fn parse(packet: &str) -> Result<Metric, ParseError> {
         SANITIZING_PARSER.parse(packet)
     }
 
-    const NON_SANITIZING_PARSER: Parser = Parser::new(false);
+    const NON_CONVERTING_PARSER: Parser = Parser::new(true, ConversionUnit::Milliseconds);
+    fn parse_non_converting(packet: &str) -> Result<Metric, ParseError> {
+        NON_CONVERTING_PARSER.parse(packet)
+    }
+
+    const NON_SANITIZING_PARSER: Parser = Parser::new(false, ConversionUnit::Seconds);
     fn unsanitized_parse(packet: &str) -> Result<Metric, ParseError> {
         NON_SANITIZING_PARSER.parse(packet)
     }
@@ -345,6 +357,21 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_lib::samples![0.320 => 10],
+                    statistic: StatisticKind::Histogram
+                },
+            )),
+        );
+    }
+
+    #[test]
+    fn sampled_timer_non_converting() {
+        assert_event_data_eq!(
+            parse_non_converting("glork:320|ms|@0.1"),
+            Ok(Metric::new(
+                "glork",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: vector_lib::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )),

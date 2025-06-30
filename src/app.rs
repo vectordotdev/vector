@@ -18,7 +18,7 @@ use crate::extra_context::ExtraContext;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
-    config::{self, ComponentConfig, ComponentKey, Config, ConfigPath},
+    config::{self, ComponentConfig, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -336,8 +336,11 @@ async fn handle_signal(
     allow_empty_config: bool,
 ) -> Option<SignalTo> {
     match signal {
-        Ok(SignalTo::ReloadComponents(component_keys)) => {
+        Ok(SignalTo::ReloadComponents(components_to_reload)) => {
             let mut topology_controller = topology_controller.lock().await;
+            topology_controller
+                .topology
+                .extend_reload_set(components_to_reload);
 
             // Reload paths
             if let Some(paths) = config::process_paths(config_paths) {
@@ -352,16 +355,11 @@ async fn handle_signal(
             )
             .await;
 
-            reload_config_from_result(
-                topology_controller,
-                new_config,
-                Some(component_keys.iter().map(AsRef::as_ref).collect()),
-            )
-            .await
+            reload_config_from_result(topology_controller, new_config).await
         }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
-            reload_config_from_result(topology_controller, config_builder.build(), None).await
+            reload_config_from_result(topology_controller, config_builder.build()).await
         }
         Ok(SignalTo::ReloadFromDisk) => {
             let mut topology_controller = topology_controller.lock().await;
@@ -379,7 +377,7 @@ async fn handle_signal(
             )
             .await;
 
-            reload_config_from_result(topology_controller, new_config, None).await
+            reload_config_from_result(topology_controller, new_config).await
         }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
@@ -393,13 +391,9 @@ async fn handle_signal(
 async fn reload_config_from_result(
     mut topology_controller: MutexGuard<'_, TopologyController>,
     config: Result<Config, Vec<String>>,
-    components_to_reload: Option<Vec<&ComponentKey>>,
 ) -> Option<SignalTo> {
     match config {
-        Ok(new_config) => match topology_controller
-            .reload(new_config, components_to_reload)
-            .await
-        {
+        Ok(new_config) => match topology_controller.reload(new_config).await {
             ReloadOutcome::FatalError(error) => Some(SignalTo::Shutdown(Some(error))),
             _ => None,
         },
@@ -539,6 +533,13 @@ pub async fn load_configs(
     let mut watched_component_paths = Vec::new();
 
     if let Some(watcher_conf) = watcher_conf {
+        for (name, transform) in config.transforms() {
+            let files = transform.inner.files_to_watch();
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_component_paths.push(component_config);
+        }
+
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
             let component_config =
@@ -549,6 +550,10 @@ pub async fn load_configs(
         info!(
             message = "Starting watcher.",
             paths = ?watched_paths
+        );
+        info!(
+            message = "Components to watch.",
+            paths = ?watched_component_paths
         );
 
         // Start listening for config changes.
@@ -585,10 +590,7 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(
-        message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
-    );
+    debug!(message = "Internal log rate limit configured.",);
     info!(message = "Log level is enabled.", level = ?level);
 }
 

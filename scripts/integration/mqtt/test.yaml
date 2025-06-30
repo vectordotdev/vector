@@ -10,3 +10,4 @@ paths:
 - "src/internal_events/mqtt.rs"
 - "src/sinks/mqtt/**"
 - "src/sinks/util/**"
+- "src/sources/mqtt/**"

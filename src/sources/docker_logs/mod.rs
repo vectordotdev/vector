@@ -904,12 +904,12 @@ impl ContainerState {
         }
     }
 
-    fn running(&mut self) {
+    const fn running(&mut self) {
         self.running = true;
         self.generation += 1;
     }
 
-    fn stopped(&mut self) {
+    const fn stopped(&mut self) {
         self.running = false;
     }
 

@@ -2,6 +2,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
+    fs,
     hash::Hash,
     net::SocketAddr,
     path::PathBuf,
@@ -21,7 +22,7 @@ use serde::Serialize;
 use vector_config::configurable_component;
 pub use vector_lib::config::{
     AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
-    SourceAcknowledgementsConfig, SourceOutput, TransformOutput,
+    SourceAcknowledgementsConfig, SourceOutput, TransformOutput, WildcardMatching,
 };
 pub use vector_lib::configurable::component::{
     GenerateConfig, SinkDescription, TransformDescription,
@@ -83,9 +84,14 @@ pub struct ComponentConfig {
 }
 
 impl ComponentConfig {
-    pub const fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+        let canonicalized_paths = config_paths
+            .into_iter()
+            .filter_map(|p| fs::canonicalize(p).ok())
+            .collect();
+
         Self {
-            config_paths,
+            config_paths: canonicalized_paths,
             component_key,
         }
     }
@@ -259,7 +265,7 @@ impl HealthcheckOptions {
         }
     }
 
-    fn merge(&mut self, other: Self) {
+    const fn merge(&mut self, other: Self) {
         self.enabled &= other.enabled;
         self.require_healthy |= other.require_healthy;
     }

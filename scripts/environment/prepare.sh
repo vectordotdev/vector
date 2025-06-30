@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 set -e -o verbose
 
 git config --global --add safe.directory /git/vectordotdev/vector
@@ -11,11 +11,11 @@ fi
 if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
   rustup run stable cargo install cross --version 0.2.5 --force --locked
 fi
-if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.72" ]] ; then
-  rustup run stable cargo install cargo-nextest --version 0.9.72 --force --locked
+if [[ "$(cargo-nextest --version)" != "cargo-nextest 0.9.95" ]] ; then
+  rustup run stable cargo install cargo-nextest --version 0.9.95 --force --locked
 fi
-if [[ "$(cargo-deny --version)" != "cargo-deny 0.16.1" ]] ; then
-  rustup run stable cargo install cargo-deny --version 0.16.1 --force --locked
+if [[ "$(cargo-deny --version)" != "cargo-deny 0.16.2" ]] ; then
+  rustup run stable cargo install cargo-deny --version 0.16.2 --force --locked
 fi
 if ! dd-rust-license-tool --help >& /dev/null ; then
   rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked

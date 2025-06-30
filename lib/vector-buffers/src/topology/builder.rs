@@ -129,7 +129,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
                     }
                 }
-            };
+            }
 
             // Create the buffer usage handle for this stage and initialize it as we create the
             // sender/receiver.  This is slightly awkward since we just end up actually giving

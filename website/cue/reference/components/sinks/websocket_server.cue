@@ -66,6 +66,10 @@ components: sinks: websocket_server: {
 	}
 
 	input: {
+		description: """
+			The supported input types depend on the encoding configuration.
+			This sink accepts any input type supported by the specified encoder.
+			"""
 		logs: true
 		metrics: {
 			counter:      true
@@ -191,12 +195,47 @@ components: sinks: websocket_server: {
 						type: websocket_server
 						inputs: ["demo_logs_test"]
 						address: "0.0.0.0:1234"
-							message_buffering:
-								max_events: 1000
-								message_id_path: "message_id"
+						message_buffering:
+							max_events: 1000
+							message_id_path: "message_id"
 						encoding:
 							codec: "json"
 				```
+				"""
+		}
+		message_buffering_ack_support: {
+			title: "Message buffering ACK support"
+			body: """
+				The `message_buffering` can be made easier for clients by enabling ACK support. This
+				changes the responsibility of tracking last received message from the clients to
+				this component.
+
+				To enable this, use `client_ack_config` configuration option for
+				`message_buffering`.
+
+				Example config:
+				```yaml
+				sinks:
+				  websocket_sink:
+					type: "websocket_server"
+					inputs: ["demo_logs_test"]
+					address: "0.0.0.0:1234"
+					message_buffering:
+						max_events: 1000
+					  message_id_path: "message_id"
+					  client_ack_config:
+						ack_decoding:
+						  codec: "json"
+					    message_id_path: "id"
+					encoding:
+					  codec: "json"
+				```
+
+				This configuration will expect clients to send messages in format `{"id": "{message_id}"}`,
+				and received message IDs will be stored in the component as the last received
+				message for that client. By default, clients are identified by their IP address, but the
+				`client_key` configuration option can be used to use different identification for
+				clients.
 				"""
 		}
 	}

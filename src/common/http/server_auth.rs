@@ -1,5 +1,5 @@
 //! Shared authentication config between components that use HTTP.
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
 use headers::{authorization::Credentials, Authorization};
@@ -194,7 +194,12 @@ pub enum HttpServerAuthMatcher {
 
 impl HttpServerAuthMatcher {
     /// Compares passed headers to the matcher
-    pub fn handle_auth(&self, headers: &HeaderMap<HeaderValue>) -> Result<(), ErrorMessage> {
+    pub fn handle_auth(
+        &self,
+        address: Option<&SocketAddr>,
+        headers: &HeaderMap<HeaderValue>,
+        path: &str,
+    ) -> Result<(), ErrorMessage> {
         match self {
             HttpServerAuthMatcher::AuthHeader(expected, err_message) => {
                 if let Some(header) = headers.get(AUTHORIZATION) {
@@ -213,31 +218,42 @@ impl HttpServerAuthMatcher {
                     ))
                 }
             }
-            HttpServerAuthMatcher::Vrl { program } => self.handle_vrl_auth(headers, program),
+            HttpServerAuthMatcher::Vrl { program } => {
+                self.handle_vrl_auth(address, headers, path, program)
+            }
         }
     }
 
     fn handle_vrl_auth(
         &self,
+        address: Option<&SocketAddr>,
         headers: &HeaderMap<HeaderValue>,
+        path: &str,
         program: &Program,
     ) -> Result<(), ErrorMessage> {
         let mut target = VrlTarget::new(
             Event::Log(LogEvent::from_map(
-                ObjectMap::from([(
-                    "headers".into(),
-                    Value::Object(
-                        headers
-                            .iter()
-                            .map(|(k, v)| {
-                                (
-                                    KeyString::from(k.to_string()),
-                                    Value::Bytes(Bytes::copy_from_slice(v.as_bytes())),
-                                )
-                            })
-                            .collect::<ObjectMap>(),
+                ObjectMap::from([
+                    (
+                        "headers".into(),
+                        Value::Object(
+                            headers
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        KeyString::from(k.to_string()),
+                                        Value::Bytes(Bytes::copy_from_slice(v.as_bytes())),
+                                    )
+                                })
+                                .collect::<ObjectMap>(),
+                        ),
                     ),
-                )]),
+                    (
+                        "address".into(),
+                        address.map_or(Value::Null, |a| Value::from(a.ip().to_string())),
+                    ),
+                    ("path".into(), Value::from(path.to_owned())),
+                ]),
                 Default::default(),
             )),
             program.info(),
@@ -270,7 +286,7 @@ impl HttpServerAuthMatcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::random_string;
+    use crate::test_util::{next_addr, random_string};
     use indoc::indoc;
 
     use super::*;
@@ -426,7 +442,7 @@ mod tests {
 
         let matcher = basic_auth.build(&Default::default()).unwrap();
 
-        let result = matcher.handle_auth(&HeaderMap::new());
+        let result = matcher.handle_auth(Some(&next_addr()), &HeaderMap::new(), "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -445,7 +461,7 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
-        let result = matcher.handle_auth(&headers);
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -469,7 +485,7 @@ mod tests {
             AUTHORIZATION,
             Authorization::basic(&username, &password).0.encode(),
         );
-        let result = matcher.handle_auth(&headers);
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
 
         assert!(result.is_ok());
     }
@@ -484,9 +500,69 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
-        let result = matcher.handle_auth(&headers);
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn custom_auth_matcher_should_be_able_to_check_address() {
+        let addr = next_addr();
+        let addr_string = addr.ip().to_string();
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: format!(".address == \"{addr_string}\""),
+        };
+
+        let matcher = custom_auth.build(&Default::default()).unwrap();
+
+        let headers = HeaderMap::new();
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn custom_auth_matcher_should_work_with_missing_address_too() {
+        let addr = next_addr();
+        let addr_string = addr.ip().to_string();
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: format!(".address == \"{addr_string}\""),
+        };
+
+        let matcher = custom_auth.build(&Default::default()).unwrap();
+
+        let headers = HeaderMap::new();
+        let result = matcher.handle_auth(None, &headers, "/");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn custom_auth_matcher_should_be_able_to_check_path() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: r#".path == "/ok""#.to_string(),
+        };
+
+        let matcher = custom_auth.build(&Default::default()).unwrap();
+
+        let headers = HeaderMap::new();
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/ok");
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn custom_auth_matcher_should_return_401_with_wrong_path() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: r#".path == "/ok""#.to_string(),
+        };
+
+        let matcher = custom_auth.build(&Default::default()).unwrap();
+
+        let headers = HeaderMap::new();
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/bad");
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -499,7 +575,7 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("wrong value"));
-        let result = matcher.handle_auth(&headers);
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -517,7 +593,7 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
-        let result = matcher.handle_auth(&headers);
+        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();

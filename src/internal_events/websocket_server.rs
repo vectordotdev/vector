@@ -1,9 +1,7 @@
 use std::error::Error;
 use std::fmt::Debug;
 
-use futures::channel::mpsc::TrySendError;
 use metrics::{counter, gauge};
-use tokio_tungstenite::tungstenite::Message;
 use vector_lib::internal_event::InternalEvent;
 
 use vector_lib::internal_event::{error_stage, error_type};
@@ -16,7 +14,12 @@ pub struct WsListenerConnectionEstablished {
 
 impl InternalEvent for WsListenerConnectionEstablished {
     fn emit(self) {
-        debug!(message = "Websocket client connected. Client count: {self.client_count}");
+        debug!(
+            message = format!(
+                "Websocket client connected. Client count: {}",
+                self.client_count
+            )
+        );
         counter!("connection_established_total", &self.extra_tags).increment(1);
         gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
     }
@@ -40,7 +43,7 @@ impl InternalEvent for WsListenerConnectionFailedError {
             error_code = "ws_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         let mut all_tags = self.extra_tags.clone();
         all_tags.extend([
@@ -69,7 +72,12 @@ pub struct WsListenerConnectionShutdown {
 
 impl InternalEvent for WsListenerConnectionShutdown {
     fn emit(self) {
-        info!(message = "Client connection closed. Client count: {self.client_count}.");
+        info!(
+            message = format!(
+                "Client connection closed. Client count: {}.",
+                self.client_count
+            )
+        );
         counter!("connection_shutdown_total", &self.extra_tags).increment(1);
         gauge!("active_clients", &self.extra_tags).set(self.client_count as f64);
     }
@@ -81,7 +89,7 @@ impl InternalEvent for WsListenerConnectionShutdown {
 
 #[derive(Debug)]
 pub struct WsListenerSendError {
-    pub error: TrySendError<Message>,
+    pub error: Box<dyn Error>,
 }
 
 impl InternalEvent for WsListenerSendError {
@@ -92,7 +100,7 @@ impl InternalEvent for WsListenerSendError {
             error_code = "ws_server_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",

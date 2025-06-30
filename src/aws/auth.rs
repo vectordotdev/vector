@@ -23,7 +23,7 @@ const DEFAULT_PROFILE_NAME: &str = "default";
 /// IMDS Client Configuration for authenticating with AWS.
 #[serde_as]
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
+#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ImdsAuthentication {
@@ -57,7 +57,7 @@ const fn default_timeout() -> Duration {
 
 /// Configuration of the authentication strategy for interacting with AWS services.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
@@ -70,6 +70,11 @@ pub enum AwsAuthentication {
         /// The AWS secret access key.
         #[configurable(metadata(docs::examples = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))]
         secret_access_key: SensitiveString,
+
+        /// The AWS session token.
+        /// See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+        #[configurable(metadata(docs::examples = "AQoDYXdz...AQoDYXdz..."))]
+        session_token: Option<SensitiveString>,
 
         /// The ARN of an [IAM role][iam_role] to assume.
         ///
@@ -118,6 +123,15 @@ pub enum AwsAuthentication {
         #[configurable(metadata(docs::examples = "develop"))]
         #[serde(default = "default_profile")]
         profile: String,
+
+        /// The [AWS region][aws_region] to send STS requests to.
+        ///
+        /// If not set, this defaults to the configured region
+        /// for the service itself.
+        ///
+        /// [aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+        #[configurable(metadata(docs::examples = "us-west-2"))]
+        region: Option<String>,
     },
 
     /// Assume the given role ARN.
@@ -266,11 +280,12 @@ impl AwsAuthentication {
                 external_id,
                 region,
                 session_name,
+                session_token,
             } => {
                 let provider = SharedCredentialsProvider::new(Credentials::from_keys(
                     access_key_id.inner(),
                     secret_access_key.inner(),
-                    None,
+                    session_token.clone().map(|v| v.inner().into()),
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
@@ -292,6 +307,7 @@ impl AwsAuthentication {
             AwsAuthentication::File {
                 credentials_file,
                 profile,
+                region,
             } => {
                 let connector = super::connector(proxy, tls_options)?;
 
@@ -301,7 +317,10 @@ impl AwsAuthentication {
                     .with_file(EnvConfigFileKind::Credentials, credentials_file)
                     .build();
 
-                let provider_config = ProviderConfig::empty().with_http_client(connector);
+                let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let provider_config = ProviderConfig::empty()
+                    .with_region(Option::from(auth_region))
+                    .with_http_client(connector);
 
                 let profile_provider = ProfileFileCredentialsProvider::builder()
                     .profile_files(profile_files)
@@ -359,6 +378,7 @@ impl AwsAuthentication {
             external_id: None,
             region: None,
             session_name: None,
+            session_token: None,
         }
     }
 }
@@ -685,6 +705,7 @@ mod tests {
             r#"
             auth.credentials_file = "/path/to/file"
             auth.profile = "foo"
+            auth.region = "us-west-2"
         "#,
         )
         .unwrap();
@@ -693,9 +714,11 @@ mod tests {
             AwsAuthentication::File {
                 credentials_file,
                 profile,
+                region,
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
                 assert_eq!(&profile, "foo");
+                assert_eq!(region.unwrap(), "us-west-2");
             }
             _ => panic!(),
         }
@@ -711,6 +734,7 @@ mod tests {
             AwsAuthentication::File {
                 credentials_file,
                 profile,
+                ..
             } => {
                 assert_eq!(&credentials_file, "/path/to/file");
                 assert_eq!(profile, "default".to_string());

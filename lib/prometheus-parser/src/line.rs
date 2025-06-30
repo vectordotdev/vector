@@ -6,7 +6,7 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
     character::complete::{char, digit1},
-    combinator::{map, opt, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
@@ -151,9 +151,16 @@ impl Metric {
 
     fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
         let input = trim_space(input);
-        opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
-            s.parse().unwrap()
-        }))(input)
+        opt(map_res(
+            recognize(pair(opt(char('-')), digit1)),
+            |s: &str| s.parse(),
+        ))(input)
+        .map_err(|_: NomError| {
+            ErrorKind::ParseTimestampError {
+                input: input.to_owned(),
+            }
+            .into()
+        })
     }
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
@@ -667,6 +674,24 @@ mod test {
         assert_eq!(Metric::parse_timestamp(""), Ok(("", None)));
         assert_eq!(Metric::parse_timestamp("123"), Ok(("", Some(123))));
         assert_eq!(Metric::parse_timestamp(" -23"), Ok(("", Some(-23))));
+        // Edge cases
+        assert_eq!(
+            Metric::parse_timestamp("9223372036854775807"),
+            Ok(("", Some(9223372036854775807i64)))
+        );
+        assert_eq!(
+            Metric::parse_timestamp("-9223372036854775808"),
+            Ok(("", Some(-9223372036854775808i64)))
+        );
+        // overflow
+        assert_eq!(
+            Metric::parse_timestamp("9223372036854775809"),
+            Ok(("9223372036854775809", None))
+        );
+        assert_eq!(
+            Metric::parse_timestamp("-9223372036854775809"),
+            Ok(("-9223372036854775809", None))
+        );
     }
 
     #[test]

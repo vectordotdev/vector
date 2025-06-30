@@ -126,7 +126,8 @@ pub trait ClientBuilder {
     fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
-fn region_provider(
+/// Provides the configured AWS region.
+pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
 ) -> crate::Result<impl ProvideRegion> {

@@ -9,6 +9,6 @@ packages:
   - name: crates.io/cargo-deb@2.9.1
   - name: cross-rs/cross@v0.2.5
   - name: nextest-rs/nextest/cargo-nextest@cargo-nextest-0.9.47
-  - name: EmbarkStudios/cargo-deny@0.16.1
+  - name: EmbarkStudios/cargo-deny@0.16.2
   - name: foresterre/cargo-msrv@v0.15.1
   - name: crates.io/dd-rust-license-tool@1.0.1

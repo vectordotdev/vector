@@ -4,18 +4,16 @@ use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, Environment, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
+    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
+    INTEGRATION_TESTS_DIR,
 };
-use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
-};
+use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::testing::config::get_rust_version;
+use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
+use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
-
-const INTEGRATION_FEATURE_FLAG: &str = "all-integration-tests";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
 pub(crate) struct ComposeTest {
@@ -197,7 +195,7 @@ pub(crate) struct IntegrationTest;
 impl ComposeTestT for IntegrationTest {
     const DIRECTORY: &'static str = INTEGRATION_TESTS_DIR;
 
-    const FEATURE_FLAG: &'static str = INTEGRATION_FEATURE_FLAG;
+    const FEATURE_FLAG: &'static str = ALL_INTEGRATIONS_FEATURE_FLAG;
 }
 
 /// E2E tests are located in the `scripts/e2e` dir,
@@ -299,7 +297,7 @@ impl Compose {
         command.env(NETWORK_ENV_VAR, &self.network);
 
         // some services require this in order to build Vector
-        command.env("RUST_VERSION", get_rust_version());
+        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
 
         for (key, value) in &self.env {
             if let Some(value) = value {
@@ -338,9 +336,9 @@ mod unix {
     use std::os::unix::fs::PermissionsExt as _;
     use std::path::{Path, PathBuf};
 
-    use anyhow::{Context, Result};
-
     use super::super::config::ComposeConfig;
+    use crate::testing::config::VolumeMount;
+    use anyhow::{Context, Result};
 
     /// Unix permissions mask to allow everybody to read a file
     const ALL_READ: u32 = 0o444;
@@ -350,14 +348,17 @@ mod unix {
     /// Fix up potential issues before starting a compose container
     pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
         for service in config.services.values() {
-            // Make sure all volume files are world readable
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
-                    let source = volume
-                        .split_once(':')
-                        .expect("Invalid volume in compose file")
-                        .0;
-                    // Only fixup relative paths, i.e. within our source tree.
+                    let source = match volume {
+                        VolumeMount::Short(s) => {
+                            s.split_once(':').map(|(s, _)| s).ok_or_else(|| {
+                                anyhow::anyhow!("Invalid short volume mount format: {s}")
+                            })?
+                        }
+                        VolumeMount::Long { source, .. } => source,
+                    };
+
                     if !config.volumes.contains_key(source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')

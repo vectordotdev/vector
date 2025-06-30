@@ -35,6 +35,10 @@ pub struct WebSocketListenerSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
+    #[serde(default)]
+    pub subprotocol: SubProtocolConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -100,6 +104,31 @@ pub enum ExtraMetricTagsConfig {
     },
 }
 
+/// Configuration of websocket subprotocol handling.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "type")]
+#[configurable(metadata(docs::enum_tag_description = "Enum for websocket subprotocol handling."))]
+pub enum SubProtocolConfig {
+    /// Supports any subprotocol that the client sends. First of the requested subprotocols will be accepted.
+    Any,
+    /// Supports only listed subprotocols. If client doesn't send any of these, server will skip
+    /// `Sec-WebSocket-Protocol` header and the client can choose to close the connection then.
+    Specific {
+        /// List of supported `Sec-WebSocket-Protocol` values. First match out of requested
+        /// subprotocols will be accepted.
+        supported_subprotocols: Vec<String>,
+    },
+}
+
+impl Default for SubProtocolConfig {
+    fn default() -> Self {
+        Self::Specific {
+            supported_subprotocols: Vec::default(),
+        }
+    }
+}
+
 impl Default for WebSocketListenerSinkConfig {
     fn default() -> Self {
         Self {
@@ -108,6 +137,7 @@ impl Default for WebSocketListenerSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             message_buffering: None,
+            subprotocol: Default::default(),
             auth: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
