@@ -5,26 +5,30 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
 }
 
-#[test]
-fn exclude_self() {
-    let (tx, _rx) = SourceSender::new_test();
-    let mut source = DockerLogsSource::new(
-        DockerLogsConfig::default(),
-        tx,
-        ShutdownSignal::noop(),
-        LogNamespace::Legacy,
-    )
-    .unwrap();
-    source.hostname = Some("451062c59603".to_owned());
-    assert!(source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3"));
-
-    // hostname too short
-    source.hostname = Some("a".to_owned());
-    assert!(!source.exclude_self("a29d569bd46c"));
-}
-
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
+    #[test]
+    /// Should only run when docker daemon is up. DockerLogsSource::new will fail if docker socket
+    /// is not present even though it is not used.
+    fn exclude_self() {
+        let (tx, _rx) = SourceSender::new_test();
+        let mut source = DockerLogsSource::new(
+            DockerLogsConfig::default(),
+            tx,
+            ShutdownSignal::noop(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        source.hostname = Some("451062c59603".to_owned());
+        assert!(
+            source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
+        );
+
+        // hostname too short
+        source.hostname = Some("a".to_owned());
+        assert!(!source.exclude_self("a29d569bd46c"));
+    }
+
     use bollard::{
         query_parameters::{
             CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
