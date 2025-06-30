@@ -332,7 +332,7 @@ fn should_retry_error(
     }
 }
 
-/// S3 Error retry logic.
+/// Retry strategy for S3 service calls.
 ///
 /// Specifies a retry policy for S3 service calls.
 ///
@@ -340,45 +340,31 @@ fn should_retry_error(
 ///
 /// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 #[configurable_component]
-#[derive(Debug, Clone)]
-pub struct S3RetryLogic {
-    /// Retry all errors.
-    ///
-    /// The sink retries all failed service calls.
-    pub retry_all_errors: Option<bool>,
+#[derive(Debug, Clone, Default)]
+pub enum RetryStrategy {
+    /// Don't retry any errors
+    #[default]
+    None,
 
-    /// Retry specific errors.
-    ///
-    /// A list of HTTP status codes matching specific error types that trigger failed
-    /// service retry attempts. This list is ignored if `retry_all_errors` is true.
-    pub errors_to_retry: Option<Vec<u16>>,
+    /// Retry on *all* errors
+    All,
+
+    /// Retry only on these HTTP status codes
+    StatusCodes(Vec<u16>),
 }
 
-impl S3RetryLogic {
-    pub const fn new() -> Self {
-        Self {
-            retry_all_errors: None,
-            errors_to_retry: Some(Vec::new()),
-        }
-    }
-}
-
-impl Default for S3RetryLogic {
-    fn default() -> Self {
-        S3RetryLogic::new()
-    }
-}
-
-impl RetryLogic for S3RetryLogic {
+impl RetryLogic for RetryStrategy {
     type Error = SdkError<PutObjectError, HttpResponse>;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        let retry_all_errors = self.retry_all_errors.unwrap_or(false);
-
-        retry_all_errors
-            || is_retriable_error(error)
-            || should_retry_error(self.errors_to_retry.clone(), error)
+        match self {
+            RetryStrategy::None => false,
+            RetryStrategy::All => true,
+            RetryStrategy::StatusCodes(codes) => {
+                is_retriable_error(error) || should_retry_error(Some(codes.clone()), error)
+            }
+        }
     }
 }
 

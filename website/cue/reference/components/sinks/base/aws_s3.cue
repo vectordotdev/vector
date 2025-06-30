@@ -1048,7 +1048,7 @@ base: components: sinks: aws_s3: configuration: {
 			}
 		}
 	}
-	retry_logic: {
+	retry_strategy: {
 		description: """
 			Specifies errors to retry
 
@@ -1056,25 +1056,17 @@ base: components: sinks: aws_s3: configuration: {
 			These settings override the default behavior.
 			"""
 		required: false
-		type: object: options: {
-			errors_to_retry: {
-				description: """
-					Retry specific errors.
-
-					A list of HTTP status codes matching specific error types that trigger failed
-					service retry attempts. This list is ignored if `retry_all_errors` is true.
-					"""
-				required: false
+		type: {
+			object: options: StatusCodes: {
+				required: true
 				type: array: items: type: uint: {}
 			}
-			retry_all_errors: {
-				description: """
-					Retry all errors.
-
-					The sink retries all failed service calls.
-					"""
-				required: false
-				type: bool: {}
+			string: {
+				default: "None"
+				enum: {
+					All:  "Retry on *all* errors"
+					None: "Don't retry any errors"
+				}
 			}
 		}
 	}

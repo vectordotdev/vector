@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         s3_common::{
             self,
-            config::{S3Options, S3RetryLogic},
+            config::{S3Options, RetryStrategy},
             partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
@@ -152,7 +152,7 @@ pub struct S3SinkConfig {
     /// These settings override the default behavior.
     #[configurable(derived)]
     #[serde(default)]
-    pub retry_logic: Option<S3RetryLogic>,
+    pub retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -182,7 +182,7 @@ impl GenerateConfig for S3SinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
-            retry_logic: Default::default(),
+            retry_strategy: Default::default(),
         })
         .unwrap()
     }
@@ -218,9 +218,9 @@ impl S3SinkConfig {
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.into_settings();
-        let retry_logic = self.retry_logic.clone();
+        let retry_strategy = self.retry_strategy.clone();
         let service = ServiceBuilder::new()
-            .settings(request_limits, retry_logic.unwrap_or_default())
+            .settings(request_limits, retry_strategy)
             .service(service);
 
         let offset = self
