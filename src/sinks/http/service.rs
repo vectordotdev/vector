@@ -58,7 +58,6 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
         mut request: HttpRequest<PartitionKey>,
     ) -> Result<Request<Bytes>, crate::Error> {
         let metadata = request.get_additional_metadata();
-        // TODO: should we emit some other error here? How is this error handled?
         let uri_serde = UriSerde::from_str(&metadata.uri)?;
         let uri_auth = uri_serde.auth;
         let uri = uri_serde.uri;
