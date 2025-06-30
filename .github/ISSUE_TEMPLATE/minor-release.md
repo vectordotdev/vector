@@ -8,15 +8,17 @@ labels: "domain: releasing"
 
 # Setup and Automation
 
-Note the preparation steps are now automated. First, prepare your environment:
+Note the preparation steps are now automated. First, alter/create release.env
 
 ```shell
-export NEW_VERSION=<new Vector version> # replace this with the actual new version
+export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version
 export MINOR_VERSION=$(echo "NEW_VECTOR_VERSION" | cut -d. -f2)
-export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
+export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VECTOR_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version
 ```
+
+and then source it by running `source ./release.env`
 
 # The week before the release
 
@@ -77,9 +79,9 @@ Automated steps include:
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
   - [ ] `git push origin v"${NEW_VECTOR_VERSION}"`
 - [ ] Wait for release workflow to complete
-  - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+  - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"{RELEASE_BRANCH}" && git push`
+  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - The deployment is done by Amplify. You can see
       the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
