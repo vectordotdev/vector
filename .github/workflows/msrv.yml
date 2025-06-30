@@ -1,7 +1,13 @@
-name: Check minimum supported Rust version
+name: Check minimum supported Rust version (MSRV)
 
 on:
   workflow_call:
+  workflow_dispatch:
+    inputs:
+      checkout_ref:         # optional, manual-only
+        description: "Git ref (branch, tag or SHA) to check out"
+        required: false
+        type: string
 
 env:
   RUST_BACKTRACE: full
@@ -17,6 +23,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref }}
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: |
           # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
