@@ -44,7 +44,7 @@ where
                     encoder: encoder.clone(),
                 })
             })
-            .filter_map(|(key, batch)| async { key.map(|k| (k, batch)) })
+            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             // Build requests with default concurrency limit.
             .request_builder(
                 default_request_builder_concurrency_limit(),

@@ -33,7 +33,9 @@ use crate::{
         },
     },
     test_util::{
-        components::{self, run_and_assert_sink_compliance, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
+        components::{
+            self, init_test, run_and_assert_sink_compliance, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+        },
         next_addr, random_lines_with_stream,
     },
 };
@@ -531,23 +533,29 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     .await;
 }
 
-fn create_event_with_id(id: i64) -> Event {
-    let mut event = LogEvent::from("test event");
-    event.insert("id", id);
-    event.into()
-}
-
-fn create_events_with_id(id: i64, num_events: usize) -> (Vec<Event>, BatchStatusReceiver) {
+fn create_events_with_fn<F: Fn() -> Event>(
+    create_event_fn: F,
+    num_events: usize,
+) -> (Vec<Event>, BatchStatusReceiver) {
     let mut events = (0..num_events)
-        .map(|_| create_event_with_id(id))
+        .map(|_| create_event_fn())
         .collect::<Vec<_>>();
     let receiver = BatchNotifier::apply_to(&mut events);
     (events, receiver)
 }
 
 #[tokio::test]
-async fn templateable_uri() {
+async fn templateable_uri_path() {
+    init_test();
+    fn create_event_with_id(id: i64) -> Event {
+        let mut event = LogEvent::from("test event");
+        event.insert("id", id);
+        event.into()
+    }
+
     let num_events_per_id = 100;
+    let an_id = 1;
+    let another_id = 2;
     let in_addr = next_addr();
 
     let config = format!(
@@ -564,13 +572,13 @@ async fn templateable_uri() {
     let (sink, _) = config.build(cx).await.unwrap();
     let (rx, trigger, server) = build_test_server(in_addr);
 
-    let (some_events_with_an_id, mut a_receiver) = create_events_with_id(1, num_events_per_id);
+    let (some_events_with_an_id, mut a_receiver) =
+        create_events_with_fn(|| create_event_with_id(an_id), num_events_per_id);
     let (some_events_with_another_id, mut another_receiver) =
-        create_events_with_id(2, num_events_per_id);
+        create_events_with_fn(|| create_event_with_id(another_id), num_events_per_id);
     let all_events = some_events_with_an_id
         .into_iter()
         .chain(some_events_with_another_id);
-
     let event_stream = stream::iter(all_events);
 
     tokio::spawn(server);
@@ -603,12 +611,168 @@ async fn templateable_uri() {
         })
         .collect::<Vec<_>>()
         .await;
-    // Assert that only two event batches were sent
     assert_eq!(request_batches.len(), 2)
 }
 
-// TODO: test for auth in the uri template
-// TODO: failing test for both auth at `auth` section & uri auth
+#[tokio::test]
+async fn templateable_uri_auth() {
+    init_test();
+
+    fn create_event_with_user_and_pass(user: &str, pass: &str) -> Event {
+        let mut event = LogEvent::from("test event");
+        event.insert("user", user.to_string());
+        event.insert("pass", pass.to_string());
+        event.into()
+    }
+
+    let num_events_per_auth = 100;
+    let an_user = "an_user";
+    let a_pass = "a_pass";
+    let another_user = "another_user";
+    let another_pass = "another_pass";
+    let in_addr = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
+        encoding.codec = "json"
+        "#
+    );
+
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (some_events_with_an_auth, mut a_receiver) = create_events_with_fn(
+        || create_event_with_user_and_pass(an_user, a_pass),
+        num_events_per_auth,
+    );
+    let (some_events_with_another_auth, mut another_receiver) = create_events_with_fn(
+        || create_event_with_user_and_pass(another_user, another_pass),
+        num_events_per_auth,
+    );
+    let all_events = some_events_with_an_auth
+        .into_iter()
+        .chain(some_events_with_another_auth);
+    let event_stream = stream::iter(all_events);
+
+    tokio::spawn(server);
+
+    run_and_assert_sink_compliance(sink, event_stream, &HTTP_SINK_TAGS).await;
+
+    drop(trigger);
+
+    assert_eq!(a_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(another_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let request_batches = rx
+        .inspect(|(parts, body)| {
+            let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+            // Assert that all the events are received
+            assert_eq!(events.len(), num_events_per_auth);
+
+            // Assert that all events have the same user & pass
+            let expected_user = events[0]["user"].as_str().unwrap().to_string();
+            let expected_pass = events[0]["pass"].as_str().unwrap().to_string();
+
+            for event in events {
+                let event_user = event["user"].as_str().unwrap();
+                let event_pass = event["pass"].as_str().unwrap();
+                assert_eq!(event_user, expected_user);
+                assert_eq!(event_pass, expected_pass);
+            }
+
+            // Assert that the auth is the expected one for the given user & pass
+            let expected_auth = Authorization::basic(&expected_user, &expected_pass);
+            assert_eq!(parts.headers.typed_get(), Some(expected_auth));
+        })
+        .collect::<Vec<_>>()
+        .await;
+    assert_eq!(request_batches.len(), 2);
+}
+
+#[tokio::test]
+async fn missing_field_in_uri_template() {
+    init_test();
+
+    let in_addr = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://{in_addr}/{{{{missing_field}}}}"
+        encoding.codec = "json"
+        "#
+    );
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = Event::Log(LogEvent::from("test event")).with_batch_notifier(&batch);
+
+    tokio::spawn(server);
+
+    // TODO: fix hang-up
+    sink.run_events([event]).await.unwrap();
+
+    drop(trigger);
+
+    // TODO: Currently, When the KeyPartitioner fails to build the batch key from
+    // an event, the finalizer is not notified with
+    // EventStatus::Rejected. The error is silently ignored.
+    // See src/sinks/http/sink.rs:47
+    assert!(matches!(receiver.try_recv(), Err(_)));
+
+    // No requests should have been made to the server
+    let requests = rx.collect::<Vec<_>>().await;
+    assert!(requests.is_empty());
+}
+
+#[tokio::test]
+async fn http_uri_auth_conflict() {
+    init_test();
+
+    let in_addr = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://user:pass@{in_addr}/"
+        encoding.codec = "json"
+        auth.strategy = "basic"
+        auth.user = "user"
+        auth.password = "pass"
+        "#
+    );
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = Event::Log(LogEvent::from("test event")).with_batch_notifier(&batch);
+
+    tokio::spawn(server);
+
+    sink.run_events([event]).await.unwrap();
+
+    drop(trigger);
+
+    // TODO: Currently, When the request builder fails to build a request from
+    // an event/batch of events, the finalizer is not notified with
+    // EventStatus::Rejected. The error is silently ignored
+    // See src/sinks/http/sink.rs:54
+    assert!(matches!(receiver.try_recv(), Err(_)));
+
+    // No requests should have been made to the server
+    let requests = rx.collect::<Vec<_>>().await;
+    assert!(requests.is_empty());
+}
 
 fn parse_compressed_json<T>(compression: &str, buf: Bytes) -> T
 where
