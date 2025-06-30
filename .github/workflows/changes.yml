@@ -10,10 +10,10 @@ on:
     # merge_group context.
     inputs:
       base_ref:
-        required: true
+        required: false
         type: string
       head_ref:
-        required: true
+        required: false
         type: string
       int_tests:
         required: false
@@ -40,12 +40,12 @@ on:
         value: ${{ jobs.source.outputs.component_docs }}
       markdown:
         value: ${{ jobs.source.outputs.markdown }}
+      website_only:
+        value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
-      all-int:
-        value: ${{ jobs.int_tests.outputs.all-tests }}
       amqp:
         value: ${{ jobs.int_tests.outputs.amqp }}
       appsignal:
@@ -119,12 +119,13 @@ on:
       all-changes-json:
         value: ${{ jobs.int_tests.outputs.all-changes-json }}
       # e2e tests
-      all-e2e:
-        value: ${{ jobs.e2e_tests.outputs.all-tests }}
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
+env:
+  BASE_REF: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
+  HEAD_REF: ${{ inputs.head_ref  || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
 
 jobs:
   # Detects changes that are not specific to integration tests
@@ -141,15 +142,15 @@ jobs:
       markdown: ${{ steps.filter.outputs.markdown }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
-      website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.other == 'false' }}
+      website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
     steps:
     - uses: actions/checkout@v4
 
     - uses: dorny/paths-filter@v3
       id: filter
       with:
-        base: ${{ inputs.base_ref }}
-        ref: ${{ inputs.head_ref }}
+        base: ${{ env.BASE_REF }}
+        ref:  ${{ env.HEAD_REF }}
         filters: |
           source:
             - ".github/workflows/test.yml"
@@ -171,7 +172,6 @@ jobs:
             - 'Cargo.toml'
             - 'Cargo.lock'
             - 'rust-toolchain.toml'
-            - '.github/workflows/pr.yml'
             - 'Makefile'
             - 'scripts/cross/**'
             - "vdev/**"
@@ -198,7 +198,6 @@ jobs:
             - "src/sources/kubernetes_logs/**"
           website:
             - "website/**"
-          # any change _not_ under website/
           not_website:
             - "**"
             - "!website/**"
@@ -209,7 +208,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
       aws: ${{ steps.filter.outputs.aws }}
@@ -258,8 +256,8 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          base: ${{ inputs.base_ref }}
-          ref: ${{ inputs.head_ref }}
+          base: ${{ env.BASE_REF }}
+          ref:  ${{ env.HEAD_REF }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -322,7 +320,6 @@ jobs:
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
-      all-tests: ${{ steps.filter.outputs.all-tests}}
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
@@ -337,6 +334,6 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          base: ${{ inputs.base_ref }}
-          ref: ${{ inputs.head_ref }}
+          base: ${{ env.BASE_REF }}
+          ref:  ${{ env.HEAD_REF }}
           filters: int_test_filters.yaml
