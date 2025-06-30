@@ -2,6 +2,7 @@ name: Check minimum supported Rust version
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 env:
   RUST_BACKTRACE: full
