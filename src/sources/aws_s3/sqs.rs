@@ -79,28 +79,10 @@ pub(super) struct DeferredConfig {
     pub(super) max_age_secs: u64,
 }
 
-/// Configuration of the authentication strategy for interacting with AWS SQS.
-#[serde_as]
-#[configurable_component]
-#[derive(Clone, Debug, Derivative)]
-#[serde(untagged)]
-#[derivative(Default)]
-pub(super) enum AwsAuthenticationOrDefault {
-    /// Specified authentication for AWS SQS
-    #[derivative(Default)]
-    Auth(AwsAuthentication),
-
-    /// Use the default system authentication strategy
-    #[configurable(metadata(
-        docs::examples = "default"))]
-    Default(String),
-}
-
-
 /// SQS configuration options.
-///
-/// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
-/// way, given the near 100% overlap in configurable values.
+//
+// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
+// way, given the near 100% overlap in configurable values.
 #[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
@@ -108,9 +90,13 @@ pub(super) enum AwsAuthenticationOrDefault {
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
 
+    /// AWS configuration options for SQS
+    /// If not included, the values of the source's `auth` configuration will be used.
+    /// Can be reverted to the AWS SDK's default authentication strategy by setting this to
+    /// the string "default"
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) auth: Option<AwsAuthenticationOrDefault>,
+    pub(super) auth: Option<AwsAuthentication>,
 
     /// The URL of the SQS queue to poll for bucket notifications.
     #[configurable(metadata(
