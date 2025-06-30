@@ -1,5 +1,5 @@
 use crate::internal_events::{
-    HttpClientEventsReceived, HttpClientHttpError, HttpClientHttpResponseError,
+    DecoderDeserializeError, HttpClientEventsReceived, HttpClientHttpError, HttpClientHttpResponseError
 };
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -68,7 +68,7 @@ pub struct OktaConfig {
 
     /// The timeout for each scrape request.
     #[serde(default = "default_timeout")]
-    #[serde_as(as = "serde_with:: DurationSecondsWithFrac<f64>")]
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
     #[serde(rename = "scrape_timeout_secs")]
     #[configurable(metadata(docs::human_name = "Scrape Timeout"))]
     pub timeout: Duration,
@@ -219,16 +219,20 @@ pub(crate) async fn run(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let url_mutex = Arc::new(Mutex::new(url));
+    let url_mutex = Arc::new(Mutex::new(url.clone()));
     let decoder = DecodingConfig::new(
         FramingConfig::Bytes,
         DeserializerConfig::Json(JsonDeserializerConfig::default()),
         log_namespace.clone(),
     )
     .build()
-    .unwrap();
+    .map_err(|ref e| {
+        emit!(DecoderDeserializeError { error: e });
+    })?;
 
-    let client = HttpClient::new(tls, &proxy).expect("Building HTTP client failed");
+    let client = HttpClient::new(tls, &proxy).map_err(|e| {
+        emit!(HttpClientHttpError { error: Box::new(e), url: url.to_string() });
+    })?;
 
     let mut stream = IntervalStream::new(tokio::time::interval(interval))
         .take_until(shutdown)
@@ -249,115 +253,123 @@ pub(crate) async fn run(
                     let client = client.clone();
 
                     async move {
-                        // We update the actual URL based on the response the API returns
-                        // so the critical section is between here & when the request finishes
-                        let mut url_lock = url_mutex.lock().await;
-                        let url = url_lock.to_string();
+                        let (run_url, response): (String, Result<_, Box<dyn std::error::Error + Send + Sync>>) = {
+                            // We update the actual URL based on the response the API returns
+                            // so the critical section is between here & when the request finishes
+                            let mut url_lock = url_mutex.lock().await;
+                            let url = url_lock.to_string();
 
-                        let mut request = Request::get(&url)
-                            .body(Body::empty())
-                            .expect("error creating request");
-
-                        let headers = request.headers_mut();
-                        headers.insert(
-                            http::header::AUTHORIZATION,
-                            format!("SSWS {}", token).parse().unwrap(),
-                        );
-                        headers.insert(http::header::ACCEPT, "application/json".parse().unwrap());
-                        headers.insert(
-                            http::header::CONTENT_TYPE,
-                            "application/json".parse().unwrap(),
-                        );
-
-                        let client = client.clone();
-                        let timeout = timeout.clone();
-                        let decoder = decoder.clone();
-
-                        tokio::time::timeout(timeout.clone(), client.send(request))
-                            .then({
-                                let url = url.clone();
-                                move |result| async move {
-                                    match result {
-                                        Ok(Ok(response)) => {
-                                            let (header, body) = response.into_parts();
-                                            if let Some(next) = header
-                                                .headers
-                                                .get_all("link")
-                                                .iter()
-                                                .filter_map(|v| v.to_str().ok())
-                                                .filter_map(|v| find_rel_next_link(v))
-                                                .next()
-                                                .and_then(|next| Uri::try_from(next).ok())
-                                            {
-                                                *url_lock = next;
-                                            };
-
-                                            let body = hyper::body::to_bytes(body).await?;
-
-                                            emit!(EndpointBytesReceived {
-                                                byte_size: body.len(),
-                                                protocol: "http",
-                                                endpoint: url.as_str(),
-                                            });
-                                            Ok((header, body))
-                                        }
-                                        Ok(Err(error)) => Err(error.into()),
-                                        Err(_) => Err(format!(
-                                            "Timeout error: request exceeded {}s",
-                                            timeout.as_secs_f64()
-                                        )
-                                        .into()),
-                                    }
-                                    .inspect(|_| {
-                                        drop(url_lock);
-                                    })
+                            let mut request = match Request::get(&url).body(Body::empty()) {
+                                Ok(request) => request,
+                                Err(e) => {
+                                    emit!(HttpClientHttpError {
+                                        error: e.into(),
+                                        url: url.clone(),
+                                    });
+                                    return None;
                                 }
-                            })
-                            .then(move |response| {
-                                let decoder = decoder.clone();
-                                async move {
-                                    match response {
-                                        Ok((header, body))
-                                            if header.status == hyper::StatusCode::OK =>
-                                        {
-                                            let mut buf = BytesMut::new();
-                                            buf.extend_from_slice(&body);
-                                            let mut events = decode_events(&mut buf, decoder);
-                                            let byte_size = if events.is_empty() {
-                                                JsonSize::zero()
-                                            } else {
-                                                events.estimated_json_encoded_size_of()
-                                            };
+                            };
 
-                                            emit!(HttpClientEventsReceived {
-                                                byte_size,
-                                                count: events.len(),
-                                                url: url
-                                            });
+                            let headers = request.headers_mut();
+                            headers.insert(
+                                http::header::AUTHORIZATION,
+                                format!("SSWS {}", token).parse().unwrap(),
+                            );
+                            headers.insert(http::header::ACCEPT, "application/json".parse().unwrap());
+                            headers.insert(
+                                http::header::CONTENT_TYPE,
+                                "application/json".parse().unwrap(),
+                            );
 
-                                            if events.is_empty() {
-                                                return None;
+                            let client = client.clone();
+                            let timeout = timeout.clone();
+
+                            let response = tokio::time::timeout(timeout.clone(), client.send(request))
+                                .then({
+                                    let url = url.clone();
+                                    let mut next: Option<Uri> = None;
+                                    move |result| async move {
+                                        match result {
+                                            Ok(Ok(response)) => {
+                                                let (header, body) = response.into_parts();
+                                                if let Some(next_url) = header
+                                                    .headers
+                                                    .get_all("link")
+                                                    .iter()
+                                                    .filter_map(|v| v.to_str().ok())
+                                                    .filter_map(|v| find_rel_next_link(v))
+                                                    .next()
+                                                    .and_then(|next| Uri::try_from(next).ok())
+                                                {
+                                                    next = Some(next_url);
+                                                };
+
+                                                let body = hyper::body::to_bytes(body).await?;
+
+                                                emit!(EndpointBytesReceived {
+                                                    byte_size: body.len(),
+                                                    protocol: "http",
+                                                    endpoint: url.as_str(),
+                                                });
+                                                Ok((header, body, next))
                                             }
-
-                                            enrich_events(&mut events, &log_namespace);
-
-                                            Some((stream::iter(events), ()))
-                                        }
-                                        Ok((header, _)) => {
-                                            emit!(HttpClientHttpResponseError {
-                                                code: header.status,
-                                                url: url
-                                            });
-                                            None
-                                        }
-                                        Err(error) => {
-                                            emit!(HttpClientHttpError { error, url: url });
-                                            None
+                                            Ok(Err(error)) => Err(error.into()),
+                                            Err(_) => Err(format!(
+                                                "Timeout error: request exceeded {}s",
+                                                timeout.as_secs_f64()
+                                            )
+                                            .into()),
                                         }
                                     }
+                                })
+                            .await;
+
+                            if let Ok((_, _, Some(ref next))) = response {
+                                *url_lock = next.clone();
+                            }
+
+                            (url, response)
+                        };
+
+                        match response {
+                            Ok((header, body, _))
+                                if header.status == hyper::StatusCode::OK =>
+                            {
+                                let mut buf = BytesMut::new();
+                                buf.extend_from_slice(&body);
+                                let mut events = decode_events(&mut buf, decoder);
+                                let byte_size = if events.is_empty() {
+                                    JsonSize::zero()
+                                } else {
+                                    events.estimated_json_encoded_size_of()
+                                };
+
+                                emit!(HttpClientEventsReceived {
+                                    byte_size,
+                                    count: events.len(),
+                                    url: run_url,
+                                });
+
+                                if events.is_empty() {
+                                    return None;
                                 }
-                            })
-                            .await
+
+                                enrich_events(&mut events, &log_namespace);
+
+                                Some((stream::iter(events), ()))
+                            }
+                            Ok((header, _, _)) => {
+                                emit!(HttpClientHttpResponseError {
+                                    code: header.status,
+                                    url: run_url,
+                                });
+                                None
+                            }
+                            Err(error) => {
+                                emit!(HttpClientHttpError { error, url: run_url });
+                                None
+                            }
+                        }
                     }
                 })
                 .flatten()
