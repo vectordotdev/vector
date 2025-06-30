@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         s3_common::{
             self,
-            config::{S3Options, RetryStrategy},
+            config::{RetryStrategy, S3Options},
             partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
