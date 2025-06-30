@@ -634,6 +634,6 @@ mod test {
 
     #[cfg(unix)]
     fn temp_uds_path(name: &str) -> PathBuf {
-        tempfile::tempdir().unwrap().into_path().join(name)
+        tempfile::tempdir().unwrap().keep().join(name)
     }
 }

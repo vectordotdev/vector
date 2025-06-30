@@ -58,36 +58,44 @@ components: sources: socket: {
 
 	configuration: base.components.sources.socket.configuration
 
-	output: logs: line: {
-		description: "A single socket event."
-		fields: {
-			host: {
-				description: "The peer host IP address."
-				required:    true
-				type: string: {
-					examples: ["129.21.31.122"]
+	output: {
+		logs: line: {
+			description: "A single socket event."
+			fields: {
+				host: {
+					description: "The peer host IP address."
+					required:    true
+					type: string: {
+						examples: ["129.21.31.122"]
+					}
 				}
-			}
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["socket"]
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["socket"]
+					}
 				}
-			}
-			port: {
-				description: "The peer source port."
-				required:    false
-				common:      true
-				type: uint: {
-					default: null
-					unit:    null
-					examples: [2838]
+				port: {
+					description: "The peer source port."
+					required:    false
+					common:      true
+					type: uint: {
+						default: null
+						unit:    null
+						examples: [2838]
+					}
 				}
+				client_metadata: fields._client_metadata
 			}
-			client_metadata: fields._client_metadata
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

@@ -39,6 +39,18 @@ components: transforms: filter: {
 		traces: true
 	}
 
+	output: {
+		logs: "": {
+			description: "The input `log` event."
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Drop debug logs"
