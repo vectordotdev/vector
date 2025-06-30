@@ -717,7 +717,6 @@ async fn missing_field_in_uri_template() {
 
     tokio::spawn(server);
 
-    // TODO: fix hang-up
     sink.run_events([event]).await.unwrap();
 
     drop(trigger);
