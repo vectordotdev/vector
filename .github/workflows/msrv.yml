@@ -4,7 +4,7 @@ on:
   workflow_call:
   workflow_dispatch:
     inputs:
-      checkout_ref:         # optional, manual-only
+      checkout_ref:
         description: "Git ref (branch, tag or SHA) to check out"
         required: false
         type: string
