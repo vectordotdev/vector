@@ -156,39 +156,33 @@ weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
-name = "About"
-identifier = "about"
+name = "Introduction"
+identifier = "introduction"
 weight = 1
 
 [[languages.en.menus.footer]]
 name = "Vector"
-url = "/docs/about"
-parent = "about"
+url = "/docs/introduction"
+parent = "introduction"
 weight = 1
-
-[[languages.en.menus.footer]]
-name = "Observability Pipelines"
-url = "/docs/about/observability-pipelines"
-parent = "about"
-weight = 2
 
 [[languages.en.menus.footer]]
 name = "Contact us"
 url = "/community"
-parent = "about"
-weight = 3
+parent = "introduction"
+weight = 2
 
 [[languages.en.menus.footer]]
 name = "Privacy"
 url = "https://www.datadoghq.com/legal/privacy/"
-parent = "about"
-weight = 4
+parent = "introduction"
+weight = 3
 
 [[languages.en.menus.footer]]
 name = "Cookies"
 url = "https://www.datadoghq.com/legal/cookies/"
-parent = "about"
-weight = 5
+parent = "introduction"
+weight = 4
 
 [[languages.en.menus.footer]]
 name = "Components"

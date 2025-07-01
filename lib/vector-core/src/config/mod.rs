@@ -304,7 +304,7 @@ Enabling or disabling acknowledgements at the source level has **no effect** on 
 See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-[e2e_acks]: https://vector.dev/docs/about/introduction/architecture/end-to-end-acknowledgements/"
+[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/"
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SourceAcknowledgementsConfig {
@@ -352,7 +352,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 #[configurable(
     description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-[e2e_acks]: https://vector.dev/docs/about/introduction/architecture/end-to-end-acknowledgements/"
+[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/"
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {

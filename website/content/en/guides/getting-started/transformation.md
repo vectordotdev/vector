@@ -14,7 +14,7 @@ Before you begin, this guide assumes the following:
 * You understand the [basic Vector concepts][concepts]
 * You understand [how to set up a basic pipeline][pipeline]
 
-[concepts]: /docs/about/concepts
+[concepts]: /docs/introduction/concepts
 [pipeline]: /docs/setup/quickstart
 {{< /requirement >}}
 
@@ -209,7 +209,7 @@ using it only when truly necessary, for several reasons:
    but best avoided if possible.
 3. It imposes a performance penalty vis-à-vis VRL.
 
-[docs.architecture.pipeline-model]: /docs/about/introduction/architecture/pipeline-model/
+[docs.architecture.pipeline-model]: /docs/architecture/pipeline-model/
 [docs.lua]: /docs/reference/configuration/transforms/lua/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/

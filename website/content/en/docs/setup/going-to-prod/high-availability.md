@@ -78,7 +78,7 @@ Support for `dropped` channels in other components is forthcoming.
 
 #### Data Send Failure
 
-Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/introduction/under-the-hood/networking/arc/) and buffers.
+Mitigate data send failures with [Adaptive Request Concurrency (ARC)](/docs/architecture/arc/) and buffers.
 
 ARC automatically scales down the number of outgoing connections when Vector cannot send data. ARC minimizes the amount of in-flight data, appropriately applies backpressure, and prevents the stampede effect that often prohibits downstream services from recovering.
 

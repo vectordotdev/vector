@@ -7,7 +7,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/introduction/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -252,7 +252,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		description: """
 			Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
 
-			[dist_metric_docs]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/#distribution
+			[dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
 			"""
 		required: false
 		type: array: {
@@ -321,7 +321,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 		description: """
 			Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
 
-			[dist_metric_docs]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/#distribution
+			[dist_metric_docs]: https://vector.dev/docs/architecture/data-model/metric/#distribution
 			"""
 		required: false
 		type: array: {
@@ -424,7 +424,7 @@ base: components: sinks: prometheus_remote_write: configuration: {
 							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.

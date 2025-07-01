@@ -120,23 +120,23 @@ Vector is an end-to-end, unified, open data platform.
   Developed with ❤️ by <strong><a href="https://datadoghq.com">Datadog</a></strong> - <a href="https://github.com/vectordotdev/vector/security/policy">Security Policy</a> - <a href="https://github.com/vectordotdev/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
-[docs.about.concepts]: https://vector.dev/docs/about/concepts/
-[docs.about.introduction]: https://vector.dev/docs/about/introduction/
+[docs.about.concepts]: https://vector.dev/docs/introduction/concepts/
+[docs.about.introduction]: https://vector.dev/docs/introduction/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.administration.management]: https://vector.dev/docs/administration/management/
 [docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
-[docs.architecture.concurrency-model]: https://vector.dev/docs/about/introduction/architecture/concurrency-model/
-[docs.architecture.data-model]: https://vector.dev/docs/about/introduction/architecture/data-model/
-[docs.architecture.pipeline-model]: https://vector.dev/docs/about/introduction/architecture/pipeline-model/
-[docs.architecture.runtime-model]: https://vector.dev/docs/about/introduction/architecture/runtime-model/
+[docs.architecture.concurrency-model]: https://vector.dev/docs/architecture/concurrency-model/
+[docs.architecture.data-model]: https://vector.dev/docs/architecture/data-model/
+[docs.architecture.pipeline-model]: https://vector.dev/docs/architecture/pipeline-model/
+[docs.architecture.runtime-model]: https://vector.dev/docs/architecture/runtime-model/
 [docs.configuration.sinks]: https://vector.dev/docs/reference/configuration/sinks/
 [docs.configuration.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.configuration.tests]: https://vector.dev/docs/reference/configuration/tests/
 [docs.configuration.transforms]: https://vector.dev/docs/reference/configuration/transforms/
 [docs.configuration.enrichment_tables]: https://vector.dev/docs/reference/configuration/global-options/#enrichment_tables
-[docs.data-model.log]: https://vector.dev/docs/about/introduction/architecture/data-model/log/
-[docs.data-model.metric]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/
+[docs.data-model.log]: https://vector.dev/docs/architecture/data-model/log/
+[docs.data-model.metric]: https://vector.dev/docs/architecture/data-model/metric/
 [docs.deployment.roles]: https://vector.dev/docs/setup/deployment/roles/
 [docs.deployment.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
@@ -145,7 +145,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.installation.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
 [docs.installation.platforms]: https://vector.dev/docs/setup/installation/platforms/
 [docs.installation]: https://vector.dev/docs/setup/installation/
-[docs.architecture.adaptive-request-concurrency]: https://vector.dev/docs/about/introduction/architecture/arc/
+[docs.architecture.adaptive-request-concurrency]: https://vector.dev/docs/architecture/arc/
 [docs.platforms.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
 [docs.quickstart]: https://vector.dev/docs/setup/quickstart/
 [docs.reference.api]: https://vector.dev/docs/reference/api/
@@ -174,9 +174,9 @@ Vector is an end-to-end, unified, open data platform.
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/
 [docs.transforms]: https://vector.dev/docs/reference/configuration/transforms/
-[docs.introduction.architecture]: https://vector.dev/docs/about/introduction/architecture/
-[docs.introduction.guarantees]: https://vector.dev/docs/about/introduction/guarantees/
-[docs.introduction.architecture]: https://vector.dev/docs/about/introduction/architecture/
+[docs.introduction.architecture]: https://vector.dev/docs/architecture/
+[docs.introduction.guarantees]: https://vector.dev/docs/introduction/guarantees/
+[docs.introduction.architecture]: https://vector.dev/docs/architecture/
 [urls.production_users]: https://github.com/vectordotdev/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_calendar]: https://calendar.vector.dev

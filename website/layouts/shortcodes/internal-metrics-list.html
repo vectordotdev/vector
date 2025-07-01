@@ -26,7 +26,7 @@
           {{ .description | markdownify }}
         </td>
         <td>
-          {{ $href := printf "/docs/about/introduction/architecture/data-model/metric/#%s" .type }}
+          {{ $href := printf "/docs/architecture/data-model/metric/#%s" .type }}
           <a href="{{ $href }}">
             {{ .type }}
           </a>

@@ -199,7 +199,7 @@ VRL has some core concepts that you should be aware of as you dive in.
 [dedupe]: /docs/reference/configuration/transforms/dedupe
 [del]: /docs/reference/vrl/functions#del
 [errors]: /docs/reference/vrl/errors
-[events]: /docs/introduction/under-the-hood-architecture/data-model
+[events]: /docs/introduction/architecture/data-model
 [fail_safe]: https://en.wikipedia.org/wiki/Fail-safe
 [ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
 [filter]: /docs/reference/configuration/transforms/filter

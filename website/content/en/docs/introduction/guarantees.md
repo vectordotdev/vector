@@ -133,4 +133,4 @@ filters.
 
 [bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
 [components]: /components
-[event]: /docs/introduction/architecture/data-model
+[event]: /docs/architecture/data-model
