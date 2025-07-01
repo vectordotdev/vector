@@ -17,9 +17,10 @@ use vector_buffers::{
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Message<const N: usize> {
     id: u64,
+    heap_allocated: Vec<u64>,
     _padding: [u64; N],
 }
 
@@ -27,6 +28,7 @@ impl<const N: usize> Message<N> {
     fn new(id: u64) -> Self {
         Message {
             id,
+            heap_allocated: vec![0; N],
             _padding: [0; N],
         }
     }
@@ -40,7 +42,7 @@ impl<const N: usize> AddBatchNotifier for Message<N> {
 
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
-        0
+        self.heap_allocated.len() * 8
     }
 }
 
@@ -88,8 +90,9 @@ impl<const N: usize> FixedEncodable for Message<N> {
         Self: Sized,
     {
         buffer.put_u64(self.id);
-        for _ in 0..N {
-            // this covers self._padding
+        for _ in 0..(N * 2) {
+            // this covers self._padding and self.heap_allocated
+            // if self.heap_allocated can ever have a len other than N, this must change
             buffer.put_u64(0);
         }
         Ok(())
@@ -101,8 +104,9 @@ impl<const N: usize> FixedEncodable for Message<N> {
         Self: Sized,
     {
         let id = buffer.get_u64();
-        for _ in 0..N {
-            // this covers self._padding
+        for _ in 0..(N * 2) {
+            // this covers self._padding and self.heap_allocated
+            // if self.heap_allocated can ever have a len other than N, this must change
             _ = buffer.get_u64();
         }
         Ok(Message::new(id))

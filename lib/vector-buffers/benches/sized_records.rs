@@ -37,6 +37,11 @@ struct PathGuard {
     inner: PathBuf,
 }
 
+enum BoundBy {
+    Bytes,
+    NumberEvents,
+}
+
 impl DataDir {
     fn new(name: &str) -> Self {
         let mut base_dir = PathBuf::new();
@@ -79,11 +84,17 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
     }
 }
 
-fn create_in_memory_variant(max_events: usize, _max_size: u64) -> BufferType {
-    BufferType::Memory {
-        size: MemoryBufferSize::MaxEvents {
+fn create_in_memory_variant(bound_by: BoundBy, max_events: usize, max_size: u64) -> BufferType {
+    let size = match bound_by {
+        BoundBy::Bytes => MemoryBufferSize::MaxSize {
+            max_bytes: NonZeroUsize::new(max_size as usize).unwrap(),
+        },
+        BoundBy::NumberEvents => MemoryBufferSize::MaxEvents {
             max_size: NonZeroUsize::new(max_events).unwrap(),
         },
+    };
+    BufferType::Memory {
+        size,
         when_full: WhenFull::DropNewest,
     }
 }
@@ -148,13 +159,24 @@ fn write_then_read(c: &mut Criterion) {
         create_disk_v2_variant
     );
 
+    let f = |a, b| create_in_memory_variant(BoundBy::NumberEvents, a, b);
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
         "buffer-in-memory-v2",
         "write-then-read",
         wtr_measurement,
-        create_in_memory_variant
+        f
+    );
+
+    let f = |a, b| create_in_memory_variant(BoundBy::Bytes, a, b);
+    experiment!(
+        c,
+        [32, 64, 128, 256, 512, 1024],
+        "buffer-in-memory-bytes-v2",
+        "write-then-read",
+        wtr_measurement,
+        f
     );
 }
 
@@ -169,13 +191,24 @@ fn write_and_read(c: &mut Criterion) {
         create_disk_v2_variant
     );
 
+    let f = |a, b| create_in_memory_variant(BoundBy::NumberEvents, a, b);
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
         "buffer-in-memory-v2",
         "write-and-read",
         war_measurement,
-        create_in_memory_variant
+        f
+    );
+
+    let f = |a, b| create_in_memory_variant(BoundBy::Bytes, a, b);
+    experiment!(
+        c,
+        [32, 64, 128, 256, 512, 1024],
+        "buffer-in-memory-bytes-v2",
+        "write-and-read",
+        war_measurement,
+        f
     );
 }
 
