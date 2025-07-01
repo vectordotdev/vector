@@ -102,7 +102,11 @@ pub struct MetricEntry {
 
 impl MetricEntry {
     /// Creates a new MetricEntry with the given data, metadata, and timestamp.
-    pub fn new(data: MetricData, metadata: EventMetadata, timestamp: Option<Instant>) -> Self {
+    pub const fn new(
+        data: MetricData,
+        metadata: EventMetadata,
+        timestamp: Option<Instant>,
+    ) -> Self {
         Self {
             data,
             metadata,
@@ -123,7 +127,7 @@ impl MetricEntry {
     }
 
     /// Updates this entry's timestamp.
-    pub fn update_timestamp(&mut self, timestamp: Option<Instant>) {
+    pub const fn update_timestamp(&mut self, timestamp: Option<Instant>) {
         self.timestamp = timestamp;
     }
 }
