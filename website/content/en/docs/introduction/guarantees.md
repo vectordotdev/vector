@@ -1,7 +1,7 @@
 ---
 title: Guarantees
 weight: 2
-aliases: ["/docs/introductionguarantees"]
+aliases: ["/docs/introduction/guarantees"]
 ---
 
 Vector attempts to make it clear which guarantees you can expect from it. We categorize all
