@@ -71,9 +71,7 @@ jobs:
 
       - name: Run setup steps required by the IT suite
         run: |
-          sudo npm -g install @datadog/datadog-ci
           sudo -E bash scripts/ci-free-disk-space.sh
-          docker image prune -af && docker container prune -f
 
   integration-tests:
     runs-on: ubuntu-24.04
@@ -100,7 +98,9 @@ jobs:
         with:
           submodules: "recursive"
 
-      - run: docker image prune -af ; docker container prune -f
+      - run: |
+          sudo npm -g install @datadog/datadog-ci
+          docker image prune -af ; docker container prune -f
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
