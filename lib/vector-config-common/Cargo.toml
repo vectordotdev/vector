@@ -5,7 +5,7 @@ edition = "2021"
 license = "MPL-2.0"
 
 [dependencies]
-convert_case = { version = "0.7", default-features = false }
+convert_case = { version = "0.8", default-features = false }
 darling.workspace = true
 proc-macro2 = { version = "1.0", default-features = false }
 serde.workspace = true

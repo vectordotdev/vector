@@ -139,7 +139,7 @@ impl SinkConfig for AxiomConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

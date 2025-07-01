@@ -533,6 +533,13 @@ pub async fn load_configs(
     let mut watched_component_paths = Vec::new();
 
     if let Some(watcher_conf) = watcher_conf {
+        for (name, transform) in config.transforms() {
+            let files = transform.inner.files_to_watch();
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_component_paths.push(component_config);
+        }
+
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
             let component_config =
@@ -543,6 +550,10 @@ pub async fn load_configs(
         info!(
             message = "Starting watcher.",
             paths = ?watched_paths
+        );
+        info!(
+            message = "Components to watch.",
+            paths = ?watched_component_paths
         );
 
         // Start listening for config changes.
@@ -579,10 +590,7 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(
-        message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
-    );
+    debug!(message = "Internal log rate limit configured.",);
     info!(message = "Log level is enabled.", level = ?level);
 }
 

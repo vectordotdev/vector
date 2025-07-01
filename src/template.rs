@@ -228,6 +228,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src

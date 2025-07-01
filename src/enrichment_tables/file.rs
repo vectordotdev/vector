@@ -317,6 +317,20 @@ impl File {
                     _ => false,
                 },
             },
+            Condition::FromDate { field, from } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => from <= &date,
+                    _ => false,
+                },
+            },
+            Condition::ToDate { field, to } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => &date <= to,
+                    _ => false,
+                },
+            },
         })
     }
 
@@ -1030,7 +1044,7 @@ mod tests {
     }
 
     #[test]
-    fn finds_row_with_dates() {
+    fn finds_row_between_dates() {
         let mut file = File::new(
             Default::default(),
             FileData {
@@ -1087,6 +1101,132 @@ mod tests {
                     Value::Timestamp(
                         chrono::Utc
                             .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_from_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::FromDate {
+                field: "field2",
+                from: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_to_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::ToDate {
+                field: "field2",
+                to: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
                             .single()
                             .expect("invalid timestamp")
                     )

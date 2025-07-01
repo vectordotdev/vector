@@ -39,7 +39,7 @@ impl<S, F> AllowReadUntil<S, F> {
         &self.reader
     }
 
-    pub fn get_mut(&mut self) -> &mut S {
+    pub const fn get_mut(&mut self) -> &mut S {
         &mut self.reader
     }
 }

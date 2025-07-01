@@ -33,6 +33,12 @@ components: transforms: reduce: {
 		traces:  false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Merge Ruby exceptions"
@@ -133,17 +139,16 @@ components: transforms: reduce: {
 				{log: {timestamp: "2020-10-07T12:33:22.742322Z", message: "Sent 200 in 15.2ms", request_id: "abcd1234", response_status: 200, response_duration_ms: 5.2}},
 			]
 			output: log: {
-				message:       "Received GET /path"
-				timestamp:     "2020-10-07T12:33:21.223543Z"
-				timestamp_end: "2020-10-07T12:33:22.742322Z"
-				request_id:    "abcd1234"
-				request_path:  "/path"
-				template:      "_partial.erb"
+				message:      "Received GET /path"
+				timestamp:    "2020-10-07T12:33:21.223543Z"
+				request_id:   "abcd1234"
+				request_path: "/path"
+				template:     "_partial.erb"
 				request_params: {"key": "val"}
 				query:                "SELECT * FROM table"
 				query_duration_ms:    13.0
 				render_duration_ms:   2.3
-				status:               200
+				response_status:      200
 				response_duration_ms: 5.2
 			}
 		},

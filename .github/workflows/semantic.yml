@@ -4,11 +4,10 @@
 name: "PR Title Semantic Check"
 
 on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
   pull_request:
-    types:
-      - opened
-      - edited
-      - synchronize
+    types: [opened, edited, synchronize]
 
 jobs:
   main:
@@ -49,8 +48,10 @@ jobs:
             deployment
             deps
             dev
+            vdev
             durability
             enriching
+            enrichment tables
             enterprise
             exceptions
             external
@@ -145,7 +146,7 @@ jobs:
             gcp_pubsub source
             heroku_logs source
             host_metrics source
-            http source
+            http_client source
             http_scrape source
             internal_logs source
             internal_metrics source
@@ -192,6 +193,7 @@ jobs:
             aws_kinesis_streams sink
             aws_s3 sink
             aws_sqs sink
+            axiom sink
             azure_blob sink
             azure_monitor_logs sink
             blackhole sink
