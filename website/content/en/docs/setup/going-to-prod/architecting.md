@@ -122,7 +122,7 @@ Notice that these functions collect and forward existing data, unchanged. There 
 
 Vector should not replace agents that produce vendor-specific data that Vector cannot replicate.
 
-For example, the Datadog Agent powers [Network Performance Monitoring](https://www.datadoghq.com/product/network-monitoring/network-performance-monitoring/). In this case, the Datadog Agent integrates with vendor-specific systems and produces vendor-specific data. Vector should not be involved with this process. Instead, the Datadog Agent should collect the data and send it directly to Datadog since the data is not one of [Vector’s supported data types](docs/introductionunder-the-hood/architecture/data-model/).
+For example, the Datadog Agent powers [Network Performance Monitoring](https://www.datadoghq.com/product/network-monitoring/network-performance-monitoring/). In this case, the Datadog Agent integrates with vendor-specific systems and produces vendor-specific data. Vector should not be involved with this process. Instead, the Datadog Agent should collect the data and send it directly to Datadog since the data is not one of [Vector’s supported data types](docs/introduction/under-the-hood/architecture/data-model/).
 
 As another example, the Datadog Agent collects service metrics and enriches them with vendor-specific Datadog tags. In this case, the Datadog Agent should send the metrics directly to Datadog or route them through Vector. Vector should not replace the Datadog Agent because the data being produced is enriched in a vendor-specific way.
 
@@ -153,7 +153,7 @@ Alternatively, you can deploy Vector [on separate nodes as an aggregator](/docs/
 
 ##### Reducing Agent Risk
 
-When integrating with an agent, you should configure the agent to be a simple data forwarder, and route [supported data types](docs/introductionunder-the-hood/architecture/data-model/) through Vector. This strategy reduces the risk of data loss and service disruption due to misbehaving agents by minimizing their responsibilities.
+When integrating with an agent, you should configure the agent to be a simple data forwarder, and route [supported data types](docs/introduction/under-the-hood/architecture/data-model/) through Vector. This strategy reduces the risk of data loss and service disruption due to misbehaving agents by minimizing their responsibilities.
 
 #### Replacing Agents
 
@@ -173,7 +173,7 @@ Data processing deals with everything in between your Vector sources and sinks. 
 
 #### Choosing Which Data to Process
 
-Primitive data types that [Vector’s data model](docs/introductionunder-the-hood/architecture/data-model/) supports should be processed by Vector (i.e., logs, metrics, and traces). Real-time, vendor-specific data, such as continuous profiling data, should not flow through Vector since it is not interoperable and typically does not benefit from processing.
+Primitive data types that [Vector’s data model](docs/introduction/under-the-hood/architecture/data-model/) supports should be processed by Vector (i.e., logs, metrics, and traces). Real-time, vendor-specific data, such as continuous profiling data, should not flow through Vector since it is not interoperable and typically does not benefit from processing.
 
 #### Choosing Where to Process Data
 
