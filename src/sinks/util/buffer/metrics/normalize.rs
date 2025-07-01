@@ -206,13 +206,11 @@ impl MetricSet {
 
     /// Perform periodic cleanup if enough time has passed since the last cleanup
     fn maybe_cleanup(&mut self) {
-        // Check if cleanup is needed
-        let should_cleanup = match self.ttl_policy() {
-            Some(config) => config.should_cleanup(),
-            _ => false,
-        };
-
-        if !should_cleanup {
+        // Return early if no cleanup is needed
+        if !self
+            .ttl_policy()
+            .is_some_and(|config| config.should_cleanup())
+        {
             return;
         }
         self.cleanup_expired();
