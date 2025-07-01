@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         s3_common::{
             self,
-            config::{S3Options, S3RetryLogic},
+            config::{RetryStrategy, S3Options},
             partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
@@ -145,6 +145,14 @@ pub struct S3SinkConfig {
     /// This controls if the bucket name is in the hostname or part of the URL.
     #[serde(default = "crate::serde::default_true")]
     pub force_path_style: bool,
+
+    /// Specifies errors to retry
+    ///
+    /// By default, the sink only retries attempts it deems possible to retry.
+    /// These settings override the default behavior.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -174,6 +182,7 @@ impl GenerateConfig for S3SinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             force_path_style: Default::default(),
+            retry_strategy: Default::default(),
         })
         .unwrap()
     }
@@ -209,8 +218,9 @@ impl S3SinkConfig {
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.into_settings();
+        let retry_strategy = self.retry_strategy.clone();
         let service = ServiceBuilder::new()
-            .settings(request_limits, S3RetryLogic)
+            .settings(request_limits, retry_strategy)
             .service(service);
 
         let offset = self
