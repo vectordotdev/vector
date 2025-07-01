@@ -373,7 +373,7 @@ mod tests {
 
         assert_eq!(2, tx.available_capacity());
 
-        let msg = Sample(42);
+        let msg = Sample::new(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -392,7 +392,7 @@ mod tests {
 
         // Now our receive should have been woken up, and should immediately be ready.
         assert!(recv.is_woken());
-        assert_eq!(Some(msg), assert_ready!(recv.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
     }
 
     #[test]
@@ -403,8 +403,8 @@ mod tests {
 
         assert_eq!(1, tx.available_capacity());
 
-        let msg1 = Sample(42);
-        let msg2 = Sample(43);
+        let msg1 = Sample::new(42);
+        let msg2 = Sample::new(43);
 
         // Create our send and receive futures.
         let mut send1 = spawn(async { tx.send(msg1).await });
@@ -435,7 +435,7 @@ mod tests {
         assert_pending!(send2.poll());
 
         // Now if we receive the item, our second send should be woken up and be able to send in.
-        assert_eq!(Some(msg1), assert_ready!(recv1.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv1.poll()));
         drop(recv1);
 
         // Since the second send was already waiting for permits, the semaphore returns them
@@ -453,7 +453,7 @@ mod tests {
 
         // And the final receive to get our second send:
         assert!(recv2.is_woken());
-        assert_eq!(Some(msg2), assert_ready!(recv2.poll()));
+        assert_eq!(Some(Sample::new(43)), assert_ready!(recv2.poll()));
 
         assert_eq!(1, tx.available_capacity());
     }
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(1, tx.available_capacity());
 
         let tx2 = tx.clone();
-        let msg = Sample(42);
+        let msg = Sample::new(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -584,7 +584,7 @@ mod tests {
         drop(tx);
 
         assert!(recv.is_woken());
-        assert_eq!(Some(msg), assert_ready!(recv.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
         drop(recv);
 
         let mut recv2 = spawn(async { rx.next().await });
@@ -713,5 +713,3 @@ mod tests {
         assert_eq!(2, tx.available_capacity());
     }
 }
-
-
