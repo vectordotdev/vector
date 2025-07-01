@@ -169,7 +169,7 @@ async fn redis_sink_channel() {
     let client = redis::Client::open(redis_server()).unwrap();
     debug!("Get Redis async connection.");
     let conn = client
-        .get_async_connection()
+        .get_multiplexed_async_connection()
         .await
         .expect("Failed to get Redis async connection.");
     debug!("Get Redis async connection success.");
@@ -245,7 +245,7 @@ async fn redis_sink_channel_data_volume_tags() {
     let client = redis::Client::open(redis_server()).unwrap();
     debug!("Get Redis async connection.");
     let conn = client
-        .get_async_connection()
+        .get_multiplexed_async_connection()
         .await
         .expect("Failed to get Redis async connection.");
     debug!("Get Redis async connection success.");
@@ -438,7 +438,7 @@ async fn redis_sink_traces() {
         // Verify data in Redis
         let mut conn = redis::Client::open(redis_server())
             .unwrap()
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .unwrap();
 
