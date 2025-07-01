@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 # Refer to https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
 # for all runner information such as OS version and installed software.
 
