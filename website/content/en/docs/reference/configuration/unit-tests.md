@@ -599,8 +599,8 @@ assert!(!exists(.tags.host), "host tag included")
 [filter]: /docs/reference/configuration/transforms/filter
 [includes]: /docs/reference/vrl/functions/#includes
 [is_nullish]: /docs/reference/vrl/functions/#is_nullish
-[logs]: /docs/introduction/under-the-hood/architecture/data-model/log
-[metrics]: /docs/introduction/under-the-hood/architecture/data-model/metric
+[logs]: /docs/introduction/introduction/architecture/data-model/log
+[metrics]: /docs/introduction/introduction/architecture/data-model/metric
 [pipeline]: /docs/reference/glossary/#pipeline
 [remap]: /docs/reference/configuration/transforms/remap
 [transforms]: /docs/reference/glossary/#transform

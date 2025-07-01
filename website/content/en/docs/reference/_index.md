@@ -1,6 +1,6 @@
 ---
 title: Reference
-weight: 3
+weight: 4
 ---
 
 This section contains various forms of reference-style documentation for Vector. These docs tend to
