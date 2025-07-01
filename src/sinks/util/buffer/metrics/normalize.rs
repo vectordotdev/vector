@@ -89,7 +89,44 @@ impl<N> From<N> for MetricNormalizer<N> {
     }
 }
 
-type MetricEntry = (MetricData, EventMetadata, Option<Instant>);
+/// Represents a stored metric entry with its data, metadata, and optional timestamp.
+#[derive(Clone, Debug)]
+pub struct MetricEntry {
+    /// The metric data containing the value and kind
+    pub data: MetricData,
+    /// Event metadata associated with this metric
+    pub metadata: EventMetadata,
+    /// Optional timestamp for TTL tracking
+    pub timestamp: Option<Instant>,
+}
+
+impl MetricEntry {
+    /// Creates a new MetricEntry with the given data, metadata, and timestamp.
+    pub fn new(data: MetricData, metadata: EventMetadata, timestamp: Option<Instant>) -> Self {
+        Self {
+            data,
+            metadata,
+            timestamp,
+        }
+    }
+
+    /// Creates a new MetricEntry from a Metric and optional timestamp.
+    pub fn from_metric(metric: Metric, timestamp: Option<Instant>) -> (MetricSeries, Self) {
+        let (series, data, metadata) = metric.into_parts();
+        let entry = Self::new(data, metadata, timestamp);
+        (series, entry)
+    }
+
+    /// Converts this entry back to a Metric with the given series.
+    pub fn into_metric(self, series: MetricSeries) -> Metric {
+        Metric::from_parts(series, self.data, self.metadata)
+    }
+
+    /// Updates this entry's timestamp.
+    pub fn update_timestamp(&mut self, timestamp: Option<Instant>) {
+        self.timestamp = timestamp;
+    }
+}
 
 /// Configuration for automatic cleanup of expired entries.
 #[derive(Clone, Debug)]
@@ -163,7 +200,7 @@ impl MetricSet {
         self.ttl_policy.as_mut()
     }
 
-    // Perform periodic cleanup if enough time has passed since the last cleanup
+    /// Perform periodic cleanup if enough time has passed since the last cleanup
     fn maybe_cleanup(&mut self) {
         // Check if cleanup is needed
         let should_cleanup = match self.ttl_policy() {
@@ -171,13 +208,12 @@ impl MetricSet {
             _ => false,
         };
 
-        // Perform cleanup if needed
-        if should_cleanup {
-            self.cleanup_expired();
-            // Mark cleanup done
-            if let Some(config) = self.ttl_policy_mut() {
-                config.mark_cleanup_done();
-            }
+        if !should_cleanup {
+            return;
+        }
+        self.cleanup_expired();
+        if let Some(config) = self.ttl_policy_mut() {
+            config.mark_cleanup_done();
         }
     }
 
@@ -185,8 +221,8 @@ impl MetricSet {
     fn cleanup_expired(&mut self) {
         let now = Instant::now();
         if let Some(config) = &self.ttl_policy {
-            self.inner.retain(|_, (_, _, timestamp)| match timestamp {
-                Some(ts) => now.duration_since(*ts) < config.ttl,
+            self.inner.retain(|_, entry| match entry.timestamp {
+                Some(ts) => now.duration_since(ts) < config.ttl,
                 None => true,
             });
         }
@@ -215,7 +251,7 @@ impl MetricSet {
         self.cleanup_expired();
         self.inner
             .into_iter()
-            .map(|(series, (data, metadata, _))| Metric::from_parts(series, data, metadata))
+            .map(|(series, entry)| entry.into_metric(series))
             .collect()
     }
 
@@ -246,22 +282,18 @@ impl MetricSet {
         let timestamp = self.create_timestamp();
         match self.inner.get_mut(metric.series()) {
             Some(existing) => {
-                if existing.0.value.add(metric.value()) {
-                    metric = metric.with_value(existing.0.value.clone());
-                    existing.2 = timestamp; // Update timestamp
+                if existing.data.value.add(metric.value()) {
+                    metric = metric.with_value(existing.data.value.clone());
+                    existing.update_timestamp(timestamp);
                 } else {
                     // Metric changed type, store this as the new reference value
-                    self.inner.insert(
-                        metric.series().clone(),
-                        (metric.data().clone(), EventMetadata::default(), timestamp),
-                    );
+                    let (series, entry) = MetricEntry::from_metric(metric.clone(), timestamp);
+                    self.inner.insert(series, entry);
                 }
             }
             None => {
-                self.inner.insert(
-                    metric.series().clone(),
-                    (metric.data().clone(), EventMetadata::default(), timestamp),
-                );
+                let (series, entry) = MetricEntry::from_metric(metric.clone(), timestamp);
+                self.inner.insert(series, entry);
             }
         }
         metric.into_absolute()
@@ -294,9 +326,9 @@ impl MetricSet {
             Some(reference) => {
                 let new_value = metric.value().clone();
                 // From the stored reference value, emit an increment
-                if metric.subtract(&reference.0) {
-                    reference.0.value = new_value;
-                    reference.2 = timestamp; // Update timestamp
+                if metric.subtract(&reference.data) {
+                    reference.data.value = new_value;
+                    reference.update_timestamp(timestamp);
                     Some(metric.into_incremental())
                 } else {
                     // Metric changed type, store this and emit nothing
@@ -313,8 +345,8 @@ impl MetricSet {
     }
 
     fn insert(&mut self, metric: Metric, timestamp: Option<Instant>) {
-        let (series, data, metadata) = metric.into_parts();
-        self.inner.insert(series, (data, metadata, timestamp));
+        let (series, entry) = MetricEntry::from_metric(metric, timestamp);
+        self.inner.insert(series, entry);
     }
 
     pub fn insert_update(&mut self, metric: Metric) {
@@ -327,9 +359,9 @@ impl MetricSet {
                 match self.inner.get_mut(metric.series()) {
                     Some(existing) => {
                         let (series, data, metadata) = metric.into_parts();
-                        if existing.0.update(&data) {
-                            existing.1.merge(metadata);
-                            existing.2 = timestamp;
+                        if existing.data.update(&data) {
+                            existing.metadata.merge(metadata);
+                            existing.update_timestamp(timestamp);
                             None
                         } else {
                             warn!(message = "Metric changed type, dropping old value.", %series);
