@@ -11949,7 +11949,7 @@ dependencies = [
  "regex",
  "ryu",
  "schannel",
- "security-framework 2.10.0",
+ "security-framework 3.2.0",
  "serde",
  "serde_json",
  "serde_with 3.12.0",
