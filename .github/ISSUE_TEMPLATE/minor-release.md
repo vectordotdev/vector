@@ -8,15 +8,17 @@ labels: "domain: releasing"
 
 # Setup and Automation
 
-Note the preparation steps are now automated. First, prepare your environment:
+Note the preparation steps are now automated. First, alter/create release.env
 
 ```shell
-export NEW_VERSION=<new Vector version> # replace this with the actual new version
+export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version
 export MINOR_VERSION=$(echo "NEW_VECTOR_VERSION" | cut -d. -f2)
-export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
+export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VECTOR_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version
 ```
+
+and then source it by running `source ./release.env`
 
 # The week before the release
 
@@ -77,9 +79,9 @@ Automated steps include:
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
   - [ ] `git push origin v"${NEW_VECTOR_VERSION}"`
 - [ ] Wait for release workflow to complete
-  - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+  - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"{RELEASE_BRANCH}" && git push`
+  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - The deployment is done by Amplify. You can see
       the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
@@ -89,8 +91,10 @@ Automated steps include:
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
-- [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
-- [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
-- [ ] Bump the release number in the `Cargo.toml` on master to the next major release.
-  - Also, update `Cargo.lock` with: `cargo update -p vector`
+- [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally. ([Example PR](https://github.com/DataDog/images/pull/7104))
+- [ ] Create a new PR with title starting as `chore(releasing):`
+  - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
+  - [ ] Bump the release number in the `Cargo.toml` on master to the next minor release.
+  - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`
+  - [ ] If there is a VRL version update, revert it and make it track the git `main` branch and then run `cargo update -p vrl`.
 - [ ] Kick-off post-mortems for any regressions resolved by the release
