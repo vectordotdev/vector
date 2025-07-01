@@ -1,6 +1,6 @@
 ---
 title: Optimization
-weight: 5
+weight: 6
 tags: ["tuning", "rust", "performance", "optimization"]
 ---
 

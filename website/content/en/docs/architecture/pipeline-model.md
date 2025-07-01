@@ -31,6 +31,6 @@ Vector also includes an [API] that allows for real-time observation and manipula
 [configuration]: /docs/reference/configuration
 [cue]: https://cuelang.org
 [dag]: https://en.wikipedia.org/wiki/Directed_acyclic_graph
-[events]: /docs/introduction/architecture/data-model
+[events]: /docs/architecture/data-model
 [jsonnet]: https://jsonnet.org
 [reloading]: /docs/administration/management/#reloading

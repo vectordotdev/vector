@@ -116,7 +116,7 @@ A few details about the Datadog Agents & [Datadog metrics](https://docs.datadogh
   [here](https://github.com/DataDog/agent-payload/blob/master/proto/metrics/agent_payload.proto#L47-L81).
 
 Vector has a nice description of its [metrics data
-model](https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/) and a [concise enum for
+model](https://vector.dev/docs/architecture/data-model/metric/) and a [concise enum for
 representing it](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L135-L169).
 
 

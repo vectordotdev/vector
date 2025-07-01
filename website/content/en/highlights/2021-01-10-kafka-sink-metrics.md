@@ -37,4 +37,4 @@ source and sink will support. See [issue 5809] for more info.
 
 [issue 5809]: https://github.com/vectordotdev/vector/issues/5809
 [kafka_sink]: /docs/reference/configuration/sinks/kafka/
-[metrics data model]: /docs/about/under-the-hood/architecture/data-model/metric/#schema
+[metrics data model]: /docs/architecture/data-model/metric/#schema
