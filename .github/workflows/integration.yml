@@ -100,7 +100,6 @@ jobs:
 
       - run: |
           sudo npm -g install @datadog/datadog-ci
-          docker image prune -af ; docker container prune -f
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
