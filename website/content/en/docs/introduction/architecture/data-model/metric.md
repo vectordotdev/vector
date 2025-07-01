@@ -10,6 +10,6 @@ tags: ["metrics", "events", "schema"]
 
 {{< config/metric-schema >}}
 
-[logs]: /docs/introduction/under-the-hood/architecture/data-model/log
+[logs]: /docs/introduction/architecture/data-model/log
 [prometheus]: https://prometheus.io
 [statsd]: https://github.com/statsd/statsd
