@@ -13,8 +13,8 @@ The individual units of data flowing through Vector are known as **events**. Eve
 
 Vector defines subtypes for events. This is necessary to establish domain-specific requirements enabling interoperability with existing monitoring and observability systems.
 
-{{< jump "/docs/about/under-the-hood/architecture/data-model/log" >}}
-{{< jump "/docs/about/under-the-hood/architecture/data-model/metric" >}}
+{{< jump "/docs/introduction/architecture/data-model/log" >}}
+{{< jump "/docs/introduction/architecture/data-model/metric" >}}
 
 ## FAQ
 

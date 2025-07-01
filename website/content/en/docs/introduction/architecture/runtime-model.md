@@ -42,9 +42,9 @@ Vector uses the [Tokio][tokio] runtime for task scheduling.
 
 Nodes in Vector's [DAG topology][pipeline] communicate via channels. Edge nodes are customized channels with dynamic output control where back pressure is the default, but can be customized on a per-sink basis to shed load or persist to disk.
 
-[concurrency]: /docs/about/under-the-hood/architecture/concurrency-model
+[concurrency]: /docs/introduction/architecture/concurrency-model
 [dedupe]: /docs/reference/configuration/transforms/dedupe
-[pipeline]: /docs/about/under-the-hood/architecture/pipeline-model
+[pipeline]: /docs/introduction/architecture/pipeline-model
 [remap]: /docs/reference/configuration/transforms/remap
 [tokio]: https://tokio.rs
 [sinks]: /docs/reference/configuration/sinks
