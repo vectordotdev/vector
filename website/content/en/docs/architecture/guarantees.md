@@ -1,6 +1,6 @@
 ---
 title: Guarantees
-weight: 2
+weight: 6
 aliases: ["/docs/introduction/guarantees"]
 ---
 

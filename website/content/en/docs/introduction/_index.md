@@ -20,7 +20,3 @@ Vector is downloaded millions of times per month and relied on by companies like
 ## Pages
 
 {{< pages >}}
-
-## Sections
-
-{{< sections >}}
