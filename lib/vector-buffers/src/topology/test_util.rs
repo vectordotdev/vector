@@ -43,7 +43,6 @@ impl Sample {
         Self::SingleValue(value)
     }
 
-    #[allow(dead_code)]
     pub fn new_with_heap_allocated_values(n: usize) -> Self {
         Self::HeapAllocatedValues(vec![0; n])
     }

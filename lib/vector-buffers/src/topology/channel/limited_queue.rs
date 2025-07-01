@@ -357,6 +357,7 @@ mod tests {
     use std::num::NonZeroUsize;
 
     use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use vector_common::byte_size_of::ByteSizeOf;
 
     use super::limited;
     use crate::{
@@ -393,6 +394,47 @@ mod tests {
         // Now our receive should have been woken up, and should immediately be ready.
         assert!(recv.is_woken());
         assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
+    }
+
+    #[test]
+    fn test_limiting_by_byte_size() {
+        let max_elements = 10;
+        let msg = Sample::new_with_heap_allocated_values(50);
+        let msg_size = msg.allocated_bytes();
+        let max_allowed_bytes = msg_size * max_elements;
+
+        // With this configuration a maximum of exactly 10 messages can fit in the channel
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxSize {
+            max_bytes: NonZeroUsize::new(max_allowed_bytes).unwrap(),
+        });
+
+        assert_eq!(max_allowed_bytes, tx.available_capacity());
+
+        // Send 10 messages into the channel, filling it
+        for _ in 0..10 {
+            let msg_clone = msg.clone();
+            let mut f = spawn(async { tx.send(msg_clone).await });
+            assert_eq!(Ok(()), assert_ready!(f.poll()));
+        }
+        // With the 10th message in the channel no space should be left
+        assert_eq!(0, tx.available_capacity());
+
+        // Attemting to produce one more then the max capacity should block
+        let mut send_final = spawn({
+            let msg_clone = msg.clone();
+            async { tx.send(msg_clone).await }
+        });
+        assert_pending!(send_final.poll());
+
+        // Read all data from the channel, assert final states are as expected
+        for _ in 0..10 {
+            let mut f = spawn(async { rx.next().await });
+            let value = assert_ready!(f.poll());
+            assert_eq!(value.allocated_bytes(), msg_size);
+        }
+        // Channel should have no more data
+        let mut recv = spawn(async { rx.next().await });
+        assert_pending!(recv.poll());
     }
 
     #[test]
