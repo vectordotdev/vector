@@ -156,10 +156,10 @@ paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
 proptest = { version = "1.6" }
 proptest-derive = { version = "0.5.1" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
+prost = { version = "0.13", default-features = false, features = ["std"] }
+prost-build = { version = "0.13", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+prost-types = { version = "0.13", default-features = false }
 rand = { version = "0.9.1", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
