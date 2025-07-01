@@ -647,6 +647,7 @@ dependencies = [
  "portable-atomic",
  "rand 0.8.5",
  "regex",
+ "ring",
  "rustls-native-certs 0.7.0",
  "rustls-pemfile 2.1.0",
  "rustls-webpki 0.102.8",
@@ -659,6 +660,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.2",
  "tokio-util",
+ "tokio-websockets",
  "tracing 0.1.41",
  "tryhard",
  "url",
@@ -10696,6 +10698,27 @@ dependencies = [
  "pin-project-lite",
  "slab",
  "tokio",
+]
+
+[[package]]
+name = "tokio-websockets"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f591660438b3038dd04d16c938271c79e7e06260ad2ea2885a4861bfb238605d"
+dependencies = [
+ "base64 0.22.1",
+ "bytes 1.10.1",
+ "futures-core",
+ "futures-sink",
+ "http 1.1.0",
+ "httparse",
+ "rand 0.8.5",
+ "ring",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls 0.26.2",
+ "tokio-util",
+ "webpki-roots 0.26.1",
 ]
 
 [[package]]
