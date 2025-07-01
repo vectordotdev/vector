@@ -53,9 +53,20 @@ Vector is maintained by the Datadog's [Community Open Source Engineering team](h
 * Vector's largest user **processes over 500TB daily**.
 * Vector has **over 500 contributors** and growing.
 
-## [Documentation]
+## Documentation
 
-All documentation is available at [vector.dev/docs](https://vector.dev/docs).
+All user documentation is available at **[vector.dev/docs](https://vector.dev/docs)**.
+
+Other Resources:
+
+* [**Vector Calendar**][urls.vector_calendar]
+* **Policies**:
+  * [**Code of Conduct**][urls.vector_code_of_conduct]
+  * [**Contributing**][urls.vector_contributing_policy]
+  * [**Privacy**][urls.vector_privacy_policy]
+  * [**Releases**][urls.vector_releases_policy]
+  * [**Versioning**][urls.vector_versioning_policy]
+  * [**Security**][urls.vector_security_policy]
 
 ## Comparisons
 
@@ -182,6 +193,7 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_calendar]: https://calendar.vector.dev
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/vectordotdev/vector/blob/master/CODE_OF_CONDUCT.md
+[urls.vector_contributing_policy]: https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/vectordotdev/vector/blob/master/PRIVACY.md
 [urls.vector_release_policy]: https://github.com/vectordotdev/vector/blob/master/RELEASING.md
