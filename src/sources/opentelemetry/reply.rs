@@ -8,12 +8,13 @@ use super::status::Status;
 /// If a type fails to be encoded as Protobuf, the error is logged at the
 /// `error` level, and the returned `impl Reply` will be an empty
 /// `500 Internal Server Error` response.
-pub fn protobuf<T>(val: T) -> Protobuf
+pub fn protobuf<T>(status_code: hyper::StatusCode, val: T) -> Protobuf
 where
     T: Message,
 {
     let mut buf = BytesMut::with_capacity(1024);
     Protobuf {
+        status_code,
         inner: val.encode(&mut buf).map(|_| buf.to_vec()).map_err(|err| {
             error!("Failed to encode value: {}", err);
         }),
@@ -23,6 +24,7 @@ where
 /// A Protobuf formatted reply.
 #[allow(missing_debug_implementations)]
 pub struct Protobuf {
+    status_code: hyper::StatusCode,
     inner: Result<Vec<u8>, ()>,
 }
 
@@ -36,6 +38,7 @@ impl Reply for Protobuf {
                     CONTENT_TYPE,
                     HeaderValue::from_static("application/x-protobuf"),
                 );
+                *res.status_mut() = self.status_code;
                 res
             }
             Err(()) => {
@@ -48,6 +51,7 @@ impl Reply for Protobuf {
                     CONTENT_TYPE,
                     HeaderValue::from_static("application/x-protobuf"),
                 );
+                *res.status_mut() = self.status_code;
                 res
             }
         }
