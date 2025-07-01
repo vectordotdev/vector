@@ -169,7 +169,7 @@ snafu = { version = "0.8.6", default-features = false, features = ["futures", "s
 tempfile = "3.20.0"
 tokio = { version = "1.45.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.23", default-features = false, features = ["display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { version = "0.12", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }

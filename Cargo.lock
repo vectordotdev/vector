@@ -2328,7 +2328,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -4770,7 +4770,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -7050,7 +7050,7 @@ dependencies = [
  "ordered-float 4.6.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
- "tonic 0.11.0",
+ "tonic 0.12.3",
  "tonic-build 0.11.0",
  "vector-core",
  "vector-lookup",
@@ -7839,7 +7839,7 @@ checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes 1.10.1",
  "heck 0.5.0",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -7892,7 +7892,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "proc-macro2 1.0.95",
  "quote 1.0.40",
  "syn 2.0.104",
@@ -8999,6 +8999,7 @@ version = "0.23.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47796c98c480fce5406ef69d1c76378375492c3b0a0de587be0c1d9feb12f395"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -10817,6 +10818,7 @@ dependencies = [
  "axum 0.7.5",
  "base64 0.22.1",
  "bytes 1.10.1",
+ "flate2",
  "h2 0.4.11",
  "http 1.1.0",
  "http-body 1.0.0",
@@ -10827,8 +10829,11 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.13.5",
+ "rustls-native-certs 0.8.1",
+ "rustls-pemfile 2.1.0",
  "socket2 0.5.10",
  "tokio",
+ "tokio-rustls 0.26.2",
  "tokio-stream",
  "tower 0.4.13",
  "tower-layer",
@@ -11747,7 +11752,7 @@ dependencies = [
  "tokio-tungstenite 0.20.1",
  "tokio-util",
  "toml",
- "tonic 0.11.0",
+ "tonic 0.12.3",
  "tonic-build 0.11.0",
  "tower 0.5.2",
  "tower-http 0.4.4",
@@ -11977,7 +11982,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
- "tonic 0.11.0",
+ "tonic 0.12.3",
  "tracing 0.1.41",
  "tracing-subscriber",
  "url",
