@@ -156,7 +156,7 @@ weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
-name = "Introduction"
+name = "Abount"
 identifier = "introduction"
 weight = 1
 
@@ -173,16 +173,22 @@ parent = "introduction"
 weight = 2
 
 [[languages.en.menus.footer]]
+name = "The Team"
+url = "https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team"
+parent = "introduction"
+weight = 3
+
+[[languages.en.menus.footer]]
 name = "Privacy"
 url = "https://www.datadoghq.com/legal/privacy/"
 parent = "introduction"
-weight = 3
+weight = 4
 
 [[languages.en.menus.footer]]
 name = "Cookies"
 url = "https://www.datadoghq.com/legal/cookies/"
 parent = "introduction"
-weight = 4
+weight = 5
 
 [[languages.en.menus.footer]]
 name = "Components"
