@@ -251,6 +251,7 @@ jetbrains
 JetBrains
 Jia
 Jiayu
+jimmystewpot
 jndi
 Joda
 journalctl
