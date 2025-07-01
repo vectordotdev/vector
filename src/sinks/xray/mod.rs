@@ -11,7 +11,7 @@ use vector_lib::internal_event::{
     ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol,
 };
 
-#[configurable_component(sink("xray"))]
+#[configurable_component(sink("aws_xray"))]
 #[derive(Clone, Debug)]
 /// A sink that will send it's output to AWS X-Ray
 pub struct XRayConfig {
