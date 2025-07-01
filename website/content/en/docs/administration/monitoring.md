@@ -138,7 +138,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [sources]: /sources
 [starting]: /docs/administration/management
 [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
-[topology]: /docs/about/concepts/#topology
+[topology]: /docs/introductionconcepts/#topology
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting
 [vrl]: /docs/reference/vrl

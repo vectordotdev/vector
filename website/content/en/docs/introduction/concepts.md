@@ -10,19 +10,19 @@ In order to understand Vector, you must first understand the fundamental concept
 
 **Events** represent the individual units of data in Vector.
 
-{{< jump "/docs/about/under-the-hood/architecture/data-model" >}}
+{{< jump "/docs/introduction/under-the-hood/architecture/data-model" >}}
 
 ### Logs
 
 A **log** event is a generic key/value representation of an event.
 
-{{< jump "/docs/about/under-the-hood/architecture/data-model/log" >}}
+{{< jump "/docs/introduction/under-the-hood/architecture/data-model/log" >}}
 
 ### Metrics
 
 A **metric** event represents a numerical operation performed on a time series. Vector's metric events are fully interoperable.
 
-{{< jump "/docs/about/under-the-hood/architecture/data-model/metric" >}}
+{{< jump "/docs/introduction/under-the-hood/architecture/data-model/metric" >}}
 
 ### Traces
 
@@ -74,7 +74,7 @@ A **sink** is a destination for events. Each sink's design and transmission meth
 
 A **pipeline** is a [directed acyclic graph][dag] of [components]. Each component is a node in the graph with directed edges. Data must flow in one direction, from sources to sinks. Components can produce zero or more events.
 
-{{< jump "/docs/about/under-the-hood/architecture/pipeline-model" >}}
+{{< jump "/docs/introduction/under-the-hood/architecture/pipeline-model" >}}
 
 
 ## Buffers

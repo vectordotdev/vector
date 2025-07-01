@@ -1,7 +1,7 @@
 ---
-title: About
+title: Introduction
 weight: 1
-tags: ["about"]
+tags: ["introduction"]
 ---
 
 This section covers Vector's basic concepts and provides a foundation for the rest of the documentation.

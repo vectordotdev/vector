@@ -23,4 +23,4 @@ processing (we hope to improve this [in the future](https://github.com/vectordot
 [file]: /docs/reference/configuration/sources/file
 [socket]: /docs/reference/configuration/sources/socket
 [sources]: /docs/reference/configuration/sources/
-[pipeline]: /docs/about/under-the-hood/architecture/pipeline-model
+[pipeline]: /docs/introduction/under-the-hood/architecture/pipeline-model
