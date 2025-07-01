@@ -7,7 +7,7 @@ base: components: sinks: gcp_chronicle_unstructured: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/about/introduction/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {

@@ -204,9 +204,9 @@ VRL has some core concepts that you should be aware of as you dive in.
 [ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
 [filter]: /docs/reference/configuration/transforms/filter
 [log]: /docs/reference/vrl/functions#log
-[logs]: /docs/introduction/under-the-hood/architecture/data-model/log
+[logs]: /docs/introduction/introduction/architecture/data-model/log
 [memory_safety]: https://en.wikipedia.org/wiki/Memory_safety
-[metrics]: /docs/introduction/under-the-hood/architecture/data-model/metrics
+[metrics]: /docs/introduction/introduction/architecture/data-model/metrics
 [now]: /docs/reference/vrl/functions#now
 [remap]: /docs/reference/configuration/transforms/remap
 [route]: /docs/reference/configuration/transforms/route

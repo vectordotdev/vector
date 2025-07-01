@@ -63,14 +63,14 @@ pub struct RemoteWriteConfig {
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
     ///
-    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
+    /// [dist_metric_docs]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_histogram_buckets")]
     #[configurable(metadata(docs::advanced))]
     pub buckets: Vec<f64>,
 
     /// Quantiles to use for aggregating [distribution][dist_metric_docs] metrics into a summary.
     ///
-    /// [dist_metric_docs]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#distribution
+    /// [dist_metric_docs]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/#distribution
     #[serde(default = "crate::sinks::prometheus::default_summary_quantiles")]
     #[configurable(metadata(docs::advanced))]
     pub quantiles: Vec<f64>,

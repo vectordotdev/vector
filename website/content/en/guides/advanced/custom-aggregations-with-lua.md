@@ -286,7 +286,7 @@ in a [deployment topology][docs.setup.deployment.topologies] to perform various 
 alternatives to centralized logs aggregation.
 
 [docs.about.concepts#pipelines]: /docs/about/concepts/#pipeline
-[docs.architecture.data-model.metric#counter]: /docs/about/under-the-hood/architecture/data-model/metric/#counter
+[docs.architecture.data-model.metric#counter]: /docs/about/introduction/architecture/data-model/metric/#counter
 [docs.setup.deployment.topologies]: /docs/setup/deployment/topologies/
 [docs.transforms.lua#event-data-model]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source

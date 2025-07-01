@@ -50,50 +50,12 @@ Vector is maintained by the Datadog's [Community Open Source Engineering team](h
   **Tuple**, **Douban**, **Visa**, **Mambu**, **Blockfi**, **Claranet**,
   **Instacart**, **Forcepoint**, and [many more][urls.production_users].
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 30TB daily**.
-* Vector has **over 100 contributors** and growing.
+* Vector's largest user **processes over 500TB daily**.
+* Vector has **over 500 contributors** and growing.
 
-## [Documentation](https://vector.dev/docs/)
+## [Documentation]
 
-### About
-
-* [**Concepts**][docs.about.concepts]
-* [**Under the hood**][docs.about.under-the-hood]
-  * [**Architecture**][docs.under-the-hood.architecture] - [data model][docs.architecture.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [pipeline model][docs.architecture.pipeline-model], [concurrency model][docs.architecture.concurrency-model], [runtime model][docs.architecture.runtime-model]
-  * [**Networking**][docs.under-the-hood.networking] - [ARC][docs.networking.adaptive-request-concurrency]
-  * [**Guarantees**][docs.under-the-hood.guarantees]
-
-### Setup
-
-* [**Quickstart**][docs.setup.quickstart]
-* [**Installation**][docs.setup.installation] - [operating systems][docs.installation.operating_systems], [package managers][docs.installation.package_managers], [platforms][docs.installation.platforms] ([Kubernetes][docs.platforms.kubernetes]), [manual][docs.installation.manual]
-* [**Deployment**][docs.deployment] - [roles][docs.deployment.roles], [topologies][docs.deployment.topologies]
-
-### Reference
-
-* **Configuration**
-  * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [many more...][docs.sources]
-  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap],
-    and [many more...][docs.transforms]
-  * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [many more...][docs.sinks]
-  * [**Enrichment Tables**][docs.configuration.enrichment_tables]
-  * [**Unit tests**][docs.configuration.tests]
-* [**Remap Language**][docs.reference.vrl]
-* [**API**][docs.reference.api]
-* [**CLI**][docs.reference.cli]
-
-### Administration
-
-* [**Management**][docs.administration.management]
-* [**Monitoring & observing**][docs.administration.monitoring]
-* [**Upgrading**][docs.administration.upgrading]
-* [**Validating**][docs.administration.validating]
-
-### Resources
-
-* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [calendar][urls.vector_calendar], [@vectordotdev][urls.vector_twitter]
-* [**Releases**][urls.vector_releases]
-* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releases][urls.vector_releases_policy], [Security][urls.vector_security_policy], [Versioning][urls.vector_versioning_policy]
+All documentation is available at [vector.dev/docs](https://vector.dev/docs).
 
 ## Comparisons
 
@@ -159,22 +121,22 @@ Vector is an end-to-end, unified, open data platform.
 </p>
 
 [docs.about.concepts]: https://vector.dev/docs/about/concepts/
-[docs.about.under-the-hood]: https://vector.dev/docs/about/under-the-hood/
+[docs.about.introduction]: https://vector.dev/docs/about/introduction/
 [docs.administration.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.administration.management]: https://vector.dev/docs/administration/management/
 [docs.administration.upgrading]: https://vector.dev/docs/administration/upgrading/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
-[docs.architecture.concurrency-model]: https://vector.dev/docs/about/under-the-hood/architecture/concurrency-model/
-[docs.architecture.data-model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
-[docs.architecture.pipeline-model]: https://vector.dev/docs/about/under-the-hood/architecture/pipeline-model/
-[docs.architecture.runtime-model]: https://vector.dev/docs/about/under-the-hood/architecture/runtime-model/
+[docs.architecture.concurrency-model]: https://vector.dev/docs/about/introduction/architecture/concurrency-model/
+[docs.architecture.data-model]: https://vector.dev/docs/about/introduction/architecture/data-model/
+[docs.architecture.pipeline-model]: https://vector.dev/docs/about/introduction/architecture/pipeline-model/
+[docs.architecture.runtime-model]: https://vector.dev/docs/about/introduction/architecture/runtime-model/
 [docs.configuration.sinks]: https://vector.dev/docs/reference/configuration/sinks/
 [docs.configuration.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.configuration.tests]: https://vector.dev/docs/reference/configuration/tests/
 [docs.configuration.transforms]: https://vector.dev/docs/reference/configuration/transforms/
 [docs.configuration.enrichment_tables]: https://vector.dev/docs/reference/configuration/global-options/#enrichment_tables
-[docs.data-model.log]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/
-[docs.data-model.metric]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/
+[docs.data-model.log]: https://vector.dev/docs/about/introduction/architecture/data-model/log/
+[docs.data-model.metric]: https://vector.dev/docs/about/introduction/architecture/data-model/metric/
 [docs.deployment.roles]: https://vector.dev/docs/setup/deployment/roles/
 [docs.deployment.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
@@ -183,7 +145,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.installation.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
 [docs.installation.platforms]: https://vector.dev/docs/setup/installation/platforms/
 [docs.installation]: https://vector.dev/docs/setup/installation/
-[docs.networking.adaptive-request-concurrency]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+[docs.architecture.adaptive-request-concurrency]: https://vector.dev/docs/about/introduction/architecture/arc/
 [docs.platforms.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
 [docs.quickstart]: https://vector.dev/docs/setup/quickstart/
 [docs.reference.api]: https://vector.dev/docs/reference/api/
@@ -212,9 +174,9 @@ Vector is an end-to-end, unified, open data platform.
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/
 [docs.transforms]: https://vector.dev/docs/reference/configuration/transforms/
-[docs.under-the-hood.architecture]: https://vector.dev/docs/about/under-the-hood/architecture/
-[docs.under-the-hood.guarantees]: https://vector.dev/docs/about/under-the-hood/guarantees/
-[docs.under-the-hood.networking]: https://vector.dev/docs/about/under-the-hood/networking/
+[docs.introduction.architecture]: https://vector.dev/docs/about/introduction/architecture/
+[docs.introduction.guarantees]: https://vector.dev/docs/about/introduction/guarantees/
+[docs.introduction.architecture]: https://vector.dev/docs/about/introduction/architecture/
 [urls.production_users]: https://github.com/vectordotdev/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
 [urls.vector_calendar]: https://calendar.vector.dev

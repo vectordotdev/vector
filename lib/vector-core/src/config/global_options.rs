@@ -107,7 +107,7 @@ pub struct GlobalOptions {
     /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
     /// acknowledgement.
     ///
-    /// [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+    /// [e2e_acks]: https://vector.dev/docs/about/introduction/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
         deserialize_with = "bool_or_struct",

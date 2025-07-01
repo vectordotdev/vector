@@ -209,7 +209,7 @@ using it only when truly necessary, for several reasons:
    but best avoided if possible.
 3. It imposes a performance penalty vis-à-vis VRL.
 
-[docs.architecture.pipeline-model]: /docs/about/under-the-hood/architecture/pipeline-model/
+[docs.architecture.pipeline-model]: /docs/about/introduction/architecture/pipeline-model/
 [docs.lua]: /docs/reference/configuration/transforms/lua/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
