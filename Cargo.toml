@@ -154,7 +154,7 @@ metrics-util = { version = "0.18.0", default-features = false, features = ["regi
 nom = { version = "8.0.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.6" }
+proptest = { version = "1.7" }
 proptest-derive = { version = "0.5.1" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
