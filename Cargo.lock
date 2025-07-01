@@ -983,9 +983,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-kms"
-version = "1.65.0"
+version = "1.75.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5325c5e2badf4148e850017cc56cc205888c6e0b52c9e29d3501ec577005230"
+checksum = "bb89d6ae47f03ca664f604571d0f29165112543ba1a39878347815b8028c235b"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -999,7 +999,6 @@ dependencies = [
  "bytes 1.10.1",
  "fastrand 2.3.0",
  "http 0.2.9",
- "once_cell",
  "regex-lite",
  "tracing 0.1.41",
 ]
@@ -1041,9 +1040,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-secretsmanager"
-version = "1.68.0"
+version = "1.76.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c18fb03c6aad6a5de2a36e44eebc83640eea9a025bf407579f503b5dc4cd0b0"
+checksum = "eb99bf4d3be2b4598ad26eed5da8d0c930b8d47d76b279a03e47d160151eb0fb"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1057,16 +1056,15 @@ dependencies = [
  "bytes 1.10.1",
  "fastrand 2.3.0",
  "http 0.2.9",
- "once_cell",
  "regex-lite",
  "tracing 0.1.41",
 ]
 
 [[package]]
 name = "aws-sdk-sns"
-version = "1.65.0"
+version = "1.73.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61cedc4d189aa87ced9b8362cc453e3c3bdcdb73c1020578a0506ed75a280117"
+checksum = "9e936a9af3eccbd24452a57bb8206d2f8e1e483d38c52b1a2901fcb892d98866"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1081,7 +1079,6 @@ dependencies = [
  "aws-types",
  "fastrand 2.3.0",
  "http 0.2.9",
- "once_cell",
  "regex-lite",
  "tracing 0.1.41",
 ]
@@ -1157,9 +1154,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sts"
-version = "1.65.0"
+version = "1.73.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96a78a8f50a1630db757b60f679c8226a8a70ee2ab5f5e6e51dc67f6c61c7cfd"
+checksum = "f1e9c3c24e36183e2f698235ed38dcfbbdff1d09b9232dc866c4be3011e0b47e"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1174,7 +1171,6 @@ dependencies = [
  "aws-types",
  "fastrand 2.3.0",
  "http 0.2.9",
- "once_cell",
  "regex-lite",
  "tracing 0.1.41",
 ]
