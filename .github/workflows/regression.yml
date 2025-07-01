@@ -201,7 +201,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.10.0
+        uses: docker/setup-buildx-action@v3.11.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v6.18.0
@@ -240,7 +240,7 @@ jobs:
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v3.10.0
+        uses: docker/setup-buildx-action@v3.11.1
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@v6.18.0
