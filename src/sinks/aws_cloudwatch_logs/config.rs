@@ -1,6 +1,7 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
 use serde::{de, Deserialize, Deserializer};
+use std::collections::HashMap;
 use tower::ServiceBuilder;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
@@ -164,6 +165,24 @@ pub struct CloudwatchLogsSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    /// The [ARN][arn] (Amazon Resource Name) of the [KMS key][kms_key] to use when encrypting log data.
+    ///
+    /// [arn]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
+    /// [kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+    #[configurable(derived)]
+    #[serde(default)]
+    pub kms_key: Option<String>,
+
+    /// The Key-value pairs to be applied as [tags][tags] to the log group and stream.
+    ///
+    /// [tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
+    #[configurable(derived)]
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "A tag represented as a key-value pair"
+    ))]
+    pub tags: Option<HashMap<String, String>>,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -248,6 +267,8 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         assume_role: Default::default(),
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: Default::default(),
+        tags: Default::default(),
     }
 }
 

@@ -8,7 +8,7 @@ base: components: sinks: configuration: {
 			More information about the individual buffer types, and buffer behavior, can be found in the
 			[Buffering Model][buffering_model] section.
 
-			[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/
+			[buffering_model]: /docs/architecture/buffering-model/
 			"""
 		required: false
 		type: object: options: {
@@ -112,6 +112,14 @@ base: components: sinks: configuration: {
 				description: "Whether or not to check the health of the sink when Vector starts up."
 				required:    false
 				type: bool: default: true
+			}
+			timeout: {
+				description: "Timeout duration for healthcheck in seconds."
+				required:    false
+				type: float: {
+					default: 10.0
+					unit:    "seconds"
+				}
 			}
 			uri: {
 				description: """

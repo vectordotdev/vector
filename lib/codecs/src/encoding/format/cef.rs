@@ -195,7 +195,7 @@ impl std::fmt::Display for Version {
 #[derive(Debug, Clone)]
 pub struct CefSerializerOptions {
     /// CEF Version. Can be either 0 or 1.
-    /// Equals to "0" by default.
+    /// Set to "0" by default.
     pub version: Version,
 
     /// Identifies the vendor of the product.
@@ -208,7 +208,7 @@ pub struct CefSerializerOptions {
     /// The value length must be less than or equal to 63.
     pub device_product: String,
 
-    /// Identifies the version of the problem. In combination with device product and vendor, it composes the unique id of the device that sends messages.
+    /// Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
     /// The value length must be less than or equal to 31.
     pub device_version: String,
 
@@ -220,8 +220,8 @@ pub struct CefSerializerOptions {
     /// Reflects importance of the event.
     ///
     /// It must point to a number from 0 to 10.
-    /// 0 = Lowest, 10 = Highest.
-    /// Equals to "cef.severity" by default.
+    /// 0 = lowest_importance, 10 = highest_importance.
+    /// Set to "cef.severity" by default.
     pub severity: ConfigTargetPath,
 
     /// This is a path that points to the human-readable description of a log event.

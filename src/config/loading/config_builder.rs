@@ -63,7 +63,7 @@ impl Process for ConfigBuilderLoader {
             }
             Some(ComponentHint::EnrichmentTable) => {
                 self.builder.enrichment_tables.extend(deserialize_table::<
-                    IndexMap<ComponentKey, EnrichmentTableOuter>,
+                    IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
                 >(table)?);
             }
             Some(ComponentHint::Test) => {

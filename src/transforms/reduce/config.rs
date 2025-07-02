@@ -56,8 +56,11 @@ pub struct ReduceConfig {
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
-    /// you to keep independent event streams separate. When no fields are specified, all events
-    /// are combined in a single group.
+    /// you to keep independent event streams separate. Note that each field specified, will be reduced
+    /// with the default merge strategy based on its type unless a merge strategy is explicitly defined
+    /// in `merge_strategies`.
+    ///
+    /// This field is optional and when not specified, all events are reduced in a single group.
     ///
     /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
     /// host and region are grouped together before being reduced.

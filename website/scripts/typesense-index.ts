@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import cheerio from "cheerio";
-import { Element } from "domhandler";
+import {Element} from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
 import glob from "glob-promise";
@@ -222,8 +222,8 @@ async function buildIndex() {
   const sections: Section[] = [
     {
       name: "Docs",
-      path: `${publicPath}/docs/about/**/**.html`,
-      displayPath: "docs/about",
+      path: `${publicPath}/docs/introduction/**/**.html`,
+      displayPath: "docs/introduction",
       ranking: 50,
     },
     {
@@ -254,6 +254,12 @@ async function buildIndex() {
       name: "Level up guides",
       path: `${publicPath}/guides/level-up/**/**.html`,
       displayPath: "guides/level-up",
+      ranking: 40,
+    },
+    {
+      name: "Developer guides",
+      path: `${publicPath}/guides/developer/**/**.html`,
+      displayPath: "guides/developer",
       ranking: 40,
     }
   ];

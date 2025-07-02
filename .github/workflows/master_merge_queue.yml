@@ -49,9 +49,6 @@ jobs:
   changes:
     if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref }}
-      head_ref: ${{ github.event.merge_group.head_ref }}
     secrets: inherit
 
   test-cli:
@@ -107,7 +104,7 @@ jobs:
     name: Master Merge Queue Suite
     # Always run this so that pull_request triggers are marked as success.
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
       - changes

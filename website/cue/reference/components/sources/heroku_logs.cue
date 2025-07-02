@@ -22,6 +22,7 @@ components: sources: heroku_logs: {
 
 	features: {
 		auto_generated:   true
+		has_auth:         true
 		acknowledgements: true
 		multiline: enabled: false
 		codecs: {

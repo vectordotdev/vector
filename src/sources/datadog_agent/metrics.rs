@@ -14,6 +14,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 
+use crate::common::http::ErrorMessage;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::log_schema,
@@ -28,7 +29,7 @@ use crate::{
             ddmetric_proto::{metric_payload, Metadata, MetricPayload, SketchPayload},
             handle_request, ApiKeyQueryParams, DatadogAgentSource,
         },
-        util::{extract_tag_key_and_value, ErrorMessage},
+        util::extract_tag_key_and_value,
     },
     SourceSender,
 };
@@ -181,10 +182,7 @@ fn decode_datadog_sketches(
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.",);
         return Ok(Vec::new());
     }
 

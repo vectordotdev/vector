@@ -1,7 +1,6 @@
-use std::{collections::HashMap, num::NonZeroUsize, sync::LazyLock};
+use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vrl::path::parse_target_path;
@@ -13,6 +12,7 @@ use super::{
 };
 use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
+    common::expansion::pair_expansion,
     http::{get_http_scheme_from_uri, HttpClient},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
@@ -179,41 +179,13 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
-
-            if let Some(opening_prefix) = key_s.strip_suffix('*') {
-                let output: Result<
-                    serde_json::map::Map<String, serde_json::Value>,
-                    serde_json::Error,
-                > = serde_json::from_str(value_s.clone().as_str());
-
-                if output.is_err() {
-                    warn!(
-                        "Failed to expand dynamic label. value: {}, err: {}",
-                        value_s,
-                        output.err().unwrap()
-                    );
-                    continue;
-                }
-
-                // key_* -> key_one, key_two, key_three
-                // * -> one, two, three
-                for (k, v) in output.unwrap() {
-                    let key = slugify_text(format!("{}{}", opening_prefix, k));
-                    let val = Value::from(v).to_string_lossy().into_owned();
-                    if val == "<null>" {
-                        warn!("Encountered \"null\" value for dynamic label. key: {}", key);
-                        continue;
-                    }
-                    if let Some(prev) = dynamic_labels.insert(key.clone(), val.clone()) {
-                        warn!(
-                            "Encountered duplicated dynamic label. \
-                                key: {}, value: {}, discarded value: {}",
-                            key, val, prev
-                        );
-                    };
-                }
-            } else {
-                static_labels.insert(key_s, value_s);
+            let result = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
+            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
+            if let Err(err) = result {
+                warn!(
+                    "Failed to expand dynamic label. value: {}, err: {}",
+                    value_s, err
+                );
             }
         }
 
@@ -284,52 +256,25 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
-
-            if let Some(opening_prefix) = key_s.strip_suffix('*') {
-                let output: Result<
-                    serde_json::map::Map<String, serde_json::Value>,
-                    serde_json::Error,
-                > = serde_json::from_str(value_s.clone().as_str());
-
-                if output.is_err() {
-                    warn!(
-                        "Failed to expand dynamic structured metadata. value: {}, err: {}",
-                        value_s,
-                        output.err().unwrap()
-                    );
-                    continue;
-                }
-
-                // key_* -> key_one, key_two, key_three
-                // * -> one, two, three
-                for (k, v) in output.unwrap() {
-                    let key = slugify_text(format!("{}{}", opening_prefix, k));
-                    let val = Value::from(v).to_string_lossy().into_owned();
-                    if val == "<null>" {
-                        warn!(
-                            "Encountered \"null\" value for dynamic structured_metadata. key: {}",
-                            key
-                        );
-                        continue;
-                    }
-                    if let Some(prev) = dynamic_structured_metadata.insert(key.clone(), val.clone())
-                    {
-                        warn!(
-                            "Encountered duplicated dynamic structured_metadata. \
-                        key: {}, value: {}, discarded value: {}",
-                            key, val, prev
-                        );
-                    };
-                }
-            } else {
-                static_structured_metadata.insert(key_s, value_s);
+            let result = pair_expansion(
+                &key_s,
+                &value_s,
+                &mut static_structured_metadata,
+                &mut dynamic_structured_metadata,
+            );
+            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
+            if let Err(err) = result {
+                warn!(
+                    "Failed to expand dynamic structured metadata. value: {}, err: {}",
+                    value_s, err
+                );
             }
         }
 
         for (k, v) in static_structured_metadata {
             if let Some(discarded_v) = dynamic_structured_metadata.insert(k.clone(), v.clone()) {
                 warn!(
-                    "Static label overrides dynamic label. \
+                    "Static structured_metadata overrides dynamic structured_metadata. \
         key: {}, value: {}, discarded value: {}",
                     k, v, discarded_v
                 );
@@ -618,13 +563,6 @@ impl StreamSink<Event> for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
-}
-
-static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^0-9A-Za-z_]").unwrap());
-
-fn slugify_text(input: String) -> String {
-    let result = RE.replace_all(&input, "_");
-    result.to_lowercase()
 }
 
 #[cfg(test)]

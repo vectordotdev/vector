@@ -98,7 +98,7 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(&client).await {
+        let state = match metrics::init_components(&client, &opts.components).await {
             Ok(state) => state,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
@@ -116,7 +116,12 @@ async fn subscription(
         };
 
         // Subscribe to updated metrics
-        let finished = metrics::subscribe(subscription_client, tx.clone(), opts.interval as i64);
+        let finished = metrics::subscribe(
+            subscription_client,
+            tx.clone(),
+            opts.interval as i64,
+            opts.components.clone(),
+        );
 
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(

@@ -256,7 +256,14 @@ pub fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
-    for (component_key, source) in config.sources() {
+    let table_sources = config
+        .enrichment_tables()
+        .filter_map(|(k, e)| e.as_source(k))
+        .collect::<Vec<_>>();
+    for (component_key, source) in config
+        .sources()
+        .chain(table_sources.iter().map(|(k, s)| (k, s)))
+    {
         new_components.insert(
             component_key.clone(),
             Component::Source(source::Source(source::Data {
@@ -301,7 +308,14 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (component_key, sink) in config.sinks() {
+    let table_sinks = config
+        .enrichment_tables()
+        .filter_map(|(k, e)| e.as_sink(k))
+        .collect::<Vec<_>>();
+    for (component_key, sink) in config
+        .sinks()
+        .chain(table_sinks.iter().map(|(k, s)| (k, s)))
+    {
         new_components.insert(
             component_key.clone(),
             Component::Sink(sink::Sink(sink::Data {

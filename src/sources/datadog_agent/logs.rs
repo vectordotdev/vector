@@ -13,14 +13,12 @@ use vrl::core::Value;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::common::datadog::DDTAGS;
+use crate::common::http::ErrorMessage;
 use crate::{
     event::Event,
     internal_events::DatadogAgentJsonParseError,
-    sources::{
-        datadog_agent::{
-            handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
-        },
-        util::ErrorMessage,
+    sources::datadog_agent::{
+        handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
     },
     SourceSender,
 };

@@ -19,7 +19,7 @@ use futures::{
     future::{self, BoxFuture},
     stream, FutureExt, SinkExt,
 };
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
@@ -236,7 +236,7 @@ impl TestSink {
 
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
-            * thread_rng().sample::<f64, _>(Exp1).mul_add(
+            * rng().sample::<f64, _>(Exp1).mul_add(
                 self.params.jitter,
                 1.0 + self.params.concurrency_limit_params.scale(in_flight)
                     + self.params.rate.scale(rate),

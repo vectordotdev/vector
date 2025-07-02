@@ -22,6 +22,8 @@ use vector_lib::configurable::configurable_component;
 use warp::http::HeaderMap;
 
 use super::parser;
+use crate::common::http::server_auth::HttpServerAuthConfig;
+use crate::common::http::ErrorMessage;
 use crate::http::KeepaliveConfig;
 use crate::{
     config::{
@@ -31,7 +33,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{http::HttpMethod, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{http::HttpMethod, HttpSource},
     },
     tls::TlsEnableableConfig,
 };
@@ -54,7 +56,7 @@ pub struct PrometheusPushgatewayConfig {
 
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]

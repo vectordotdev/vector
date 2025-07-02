@@ -17,8 +17,11 @@ base: components: sources: redis: configuration: {
 		}
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -91,6 +94,8 @@ base: components: sources: redis: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -98,6 +103,8 @@ base: components: sources: redis: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -196,14 +203,23 @@ base: components: sources: redis: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}

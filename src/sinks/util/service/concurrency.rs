@@ -29,7 +29,7 @@ pub enum Concurrency {
 
     /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
-    /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+    /// [arc]: https://vector.dev/docs/architecture/arc/
     Adaptive,
 
     /// A fixed amount of concurrency is allowed.
@@ -144,10 +144,9 @@ a fixed concurrency limit.",
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
         let mut adaptive_metadata = Metadata::with_title(
-            "Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.",
+            "Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
-        adaptive_metadata
-            .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
+        adaptive_metadata.set_description("[arc]: https://vector.dev/docs/architecture/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
         apply_base_metadata(&mut adaptive_schema, adaptive_metadata);
 

@@ -198,33 +198,34 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
-                let expires_in = inner.token.read().unwrap().expires_in() as u64;
-                let mut deadline =
-                    Duration::from_secs(expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS);
+                let mut expires_in = inner.token.read().unwrap().expires_in() as u64;
                 loop {
+                    let deadline = Duration::from_secs(
+                        expires_in
+                            .saturating_sub(METADATA_TOKEN_EXPIRY_MARGIN_SECS)
+                            .max(METADATA_TOKEN_ERROR_RETRY_SECS),
+                    );
+                    debug!(
+                        deadline = deadline.as_secs(),
+                        "Sleeping before refreshing GCP authentication token.",
+                    );
                     tokio::time::sleep(deadline).await;
-                    debug!("Renewing GCP authentication token.");
                     match inner.regenerate_token().await {
                         Ok(()) => {
                             sender.send_replace(());
-                            let expires_in = inner.token.read().unwrap().expires_in() as u64;
+                            debug!("GCP authentication token renewed.");
                             // Rather than an expected fresh token, the Metadata Server may return
                             // the same (cached) token during the last 300 seconds of its lifetime.
                             // This scenario is handled by retrying the token refresh after the
                             // METADATA_TOKEN_ERROR_RETRY_SECS period when a fresh token is expected
-                            let new_deadline = if expires_in <= METADATA_TOKEN_EXPIRY_MARGIN_SECS {
-                                METADATA_TOKEN_ERROR_RETRY_SECS
-                            } else {
-                                expires_in - METADATA_TOKEN_EXPIRY_MARGIN_SECS
-                            };
-                            deadline = Duration::from_secs(new_deadline);
+                            expires_in = inner.token.read().unwrap().expires_in() as u64;
                         }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
                                 %error
                             );
-                            deadline = Duration::from_secs(METADATA_TOKEN_ERROR_RETRY_SECS);
+                            expires_in = METADATA_TOKEN_EXPIRY_MARGIN_SECS;
                         }
                     }
                 }

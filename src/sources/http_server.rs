@@ -1,3 +1,4 @@
+use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
@@ -31,7 +32,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         http::{add_headers, add_query_parameters, HttpMethod},
-        Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        Encoding, HttpSource,
     },
     tls::TlsEnableableConfig,
 };
@@ -114,7 +115,7 @@ pub struct SimpleHttpConfig {
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.
     ///
@@ -532,6 +533,9 @@ mod tests {
         Compression,
     };
     use futures::Stream;
+    use headers::authorization::Credentials;
+    use headers::Authorization;
+    use http::header::AUTHORIZATION;
     use http::{HeaderMap, Method, StatusCode, Uri};
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{
@@ -545,6 +549,7 @@ mod tests {
     use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind, ObjectMap};
 
+    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::sources::http_server::HttpMethod;
     use crate::{
         components::validation::prelude::*,
@@ -573,6 +578,7 @@ mod tests {
         path: &'a str,
         method: &'a str,
         response_code: StatusCode,
+        auth: Option<HttpServerAuthConfig>,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -599,7 +605,7 @@ mod tests {
                 query_parameters,
                 response_code,
                 tls: None,
-                auth: None,
+                auth,
                 strict_path,
                 path_key,
                 host_key,
@@ -711,6 +717,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -757,6 +764,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -796,6 +804,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -829,6 +838,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -867,6 +877,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -912,6 +923,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -963,6 +975,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1049,6 +1062,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1095,6 +1109,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1137,6 +1152,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1176,6 +1192,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1232,6 +1249,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1263,6 +1281,7 @@ mod tests {
                 "/event/path",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1304,6 +1323,7 @@ mod tests {
                 "/event",
                 "POST",
                 StatusCode::OK,
+                None,
                 false,
                 EventStatus::Delivered,
                 true,
@@ -1365,6 +1385,7 @@ mod tests {
             "/",
             "POST",
             StatusCode::OK,
+            None,
             true,
             EventStatus::Delivered,
             true,
@@ -1390,6 +1411,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::ACCEPTED,
+                None,
                 true,
                 EventStatus::Delivered,
                 true,
@@ -1424,6 +1446,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Rejected,
                 true,
@@ -1455,6 +1478,7 @@ mod tests {
                 "/",
                 "POST",
                 StatusCode::OK,
+                None,
                 true,
                 EventStatus::Rejected,
                 false,
@@ -1488,6 +1512,7 @@ mod tests {
             "/",
             "GET",
             StatusCode::OK,
+            None,
             true,
             EventStatus::Delivered,
             true,
@@ -1497,6 +1522,94 @@ mod tests {
         .await;
 
         assert_eq!(200, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_auth_is_missing() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "GET",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Basic {
+                username: "test".to_string(),
+                password: "test".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(401, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_auth_is_wrong() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Basic {
+                username: "test".to_string(),
+                password: "test".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::basic("wrong", "test").0.encode(),
+        );
+        assert_eq!(401, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn http_get_with_correct_auth() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Basic {
+                username: "test".to_string(),
+                password: "test".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::basic("test", "test").0.encode(),
+        );
+        assert_eq!(200, send_with_headers(addr, "", headers).await);
     }
 
     #[test]

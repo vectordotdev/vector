@@ -70,7 +70,7 @@ pub fn generate_human_friendly_string(input: &str) -> String {
     // respectively.
     let converter = Converter::new()
         .to_case(Case::Title)
-        .remove_boundaries(&[Boundary::LowerDigit, Boundary::UpperDigit]);
+        .remove_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT]);
     let normalized = converter.convert(input);
 
     let replaced_segments = normalized

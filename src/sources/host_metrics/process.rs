@@ -1,6 +1,6 @@
 use super::{default_all_processes, example_processes, FilterList, HostMetrics};
 use std::ffi::OsStr;
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 use vector_lib::configurable::configurable_component;
 #[cfg(target_os = "linux")]
 use vector_lib::metric_tags;
@@ -18,21 +18,21 @@ pub struct ProcessConfig {
 const RUNTIME: &str = "process_runtime";
 const CPU_USAGE: &str = "process_cpu_usage";
 const MEMORY_USAGE: &str = "process_memory_usage";
+const MEMORY_VIRTUAL_USAGE: &str = "process_memory_virtual_usage";
 
 impl HostMetrics {
-    pub async fn process_metrics(&self, output: &mut super::MetricsBuffer) {
-        let mut sys = System::new();
-        sys.refresh_processes_specifics(
+    pub async fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
+        self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
-            ProcessRefreshKind::new()
+            ProcessRefreshKind::default()
                 .with_memory()
                 .with_cpu()
                 .with_cmd(UpdateKind::OnlyIfNotSet),
         );
         output.name = "process";
         let sep = OsStr::new(" ");
-        for (pid, process) in sys.processes().iter().filter(|&(_, proc)| {
+        for (pid, process) in self.system.processes().iter().filter(|&(_, proc)| {
             self.config
                 .process
                 .processes
@@ -46,6 +46,11 @@ impl HostMetrics {
             };
             output.gauge(CPU_USAGE, process.cpu_usage().into(), tags());
             output.gauge(MEMORY_USAGE, process.memory() as f64, tags());
+            output.gauge(
+                MEMORY_VIRTUAL_USAGE,
+                process.virtual_memory() as f64,
+                tags(),
+            );
             output.counter(RUNTIME, process.run_time() as f64, tags());
         }
     }

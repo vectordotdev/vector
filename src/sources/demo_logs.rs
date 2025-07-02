@@ -1,21 +1,24 @@
 use chrono::Utc;
 use fakedata::logs::*;
 use futures::StreamExt;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -165,7 +168,7 @@ impl OutputFormat {
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because `lines` can't be empty
-        let line = lines.choose(&mut rand::thread_rng()).unwrap();
+        let line = lines.choose(&mut rand::rng()).unwrap();
 
         if sequence {
             format!("{} {}", n, line)
@@ -330,7 +333,7 @@ impl SourceConfig for DemoLogsConfig {
             );
 
         vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
+            DataType::Log,
             schema_definition,
         )]
     }

@@ -68,6 +68,9 @@ pub enum ElasticsearchMode {
     /// Ingests documents in bulk, using the bulk API `create` action.
     ///
     /// Elasticsearch Data Streams only support the `create` action.
+    ///
+    /// If the mode is set to `data_stream` and a `timestamp` field is present in a message,
+    /// Vector renames this field to the expected `@timestamp` to comply with the Elastic Common Schema.
     DataStream,
 }
 

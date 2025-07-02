@@ -36,7 +36,7 @@ base: components: sources: gcp_pubsub: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -78,8 +78,11 @@ base: components: sources: gcp_pubsub: configuration: {
 		type: string: {}
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -152,6 +155,8 @@ base: components: sources: gcp_pubsub: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -159,6 +164,8 @@ base: components: sources: gcp_pubsub: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -257,14 +264,23 @@ base: components: sources: gcp_pubsub: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}
@@ -574,7 +590,7 @@ base: components: sources: gcp_pubsub: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -596,7 +612,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -637,7 +653,7 @@ base: components: sources: gcp_pubsub: configuration: {
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

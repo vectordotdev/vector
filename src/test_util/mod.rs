@@ -21,7 +21,7 @@ use flate2::read::MultiGzDecoder;
 use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -65,7 +65,11 @@ pub mod metrics;
 #[cfg(test)]
 pub mod mock;
 
+pub mod compression;
 pub mod stats;
+
+#[cfg(test)]
+pub mod integration;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -118,6 +122,10 @@ pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
 
 pub fn next_addr() -> SocketAddr {
     next_addr_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))
+}
+
+pub fn next_addr_any() -> SocketAddr {
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
@@ -231,6 +239,10 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+pub fn random_table_name() -> String {
+    format!("test_{}", random_string(10).to_lowercase())
+}
+
 pub fn map_event_batch_stream(
     stream: impl Stream<Item = Event>,
     batch: Option<BatchNotifier>,
@@ -318,7 +330,7 @@ pub fn random_metrics_with_stream_timestamp(
             let ts = timestamp + (timestamp_offset * index as u32);
             Event::Metric(
                 Metric::new(
-                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: index as f64,
@@ -374,7 +386,7 @@ where
 }
 
 pub fn random_string(len: usize) -> String {
-    thread_rng()
+    rng()
         .sample_iter(&Alphanumeric)
         .take(len)
         .map(char::from)
@@ -386,7 +398,7 @@ pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
-    let size = thread_rng().gen_range(0..max_size);
+    let size = rng().random_range(0..max_size);
 
     (0..size)
         .map(move |_| (random_string(field_len), random_string(field_len)))

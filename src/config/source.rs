@@ -124,6 +124,7 @@ dyn_clone::clone_trait_object!(SourceConfig);
 pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -153,6 +154,7 @@ impl SourceContext {
             Self {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
+                enrichment_tables: Default::default(),
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
@@ -173,6 +175,7 @@ impl SourceContext {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
+            enrichment_tables: Default::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),

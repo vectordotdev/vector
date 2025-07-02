@@ -244,7 +244,6 @@ impl CloudWatchMetricsSvc {
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
-                            .take()
                             .unwrap_or_else(|| default_namespace.clone());
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(metric, namespace),

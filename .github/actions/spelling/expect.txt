@@ -78,7 +78,6 @@ bytesize
 califrag
 califragilistic
 CAROOT
-CBOR
 cddl
 cdylib
 cef
@@ -175,7 +174,6 @@ eeyun
 efgh
 Elhage
 emerg
-Enableable
 endianess
 endler
 eni
@@ -256,7 +254,6 @@ hostpath
 hoverable
 hoverbear
 httpdeliveryrequestresponse
-httpdump
 httpevent
 hugepages
 hugops
@@ -442,7 +439,6 @@ PIDs
 PII
 plainify
 ple
-plork
 podspec
 Ponge
 POSINT
@@ -468,6 +464,7 @@ rcode
 rdkafka
 rdparty
 readnone
+recordset
 rediss
 redoctober
 regexes
@@ -542,6 +539,7 @@ spencergilbert
 spinlock
 SPOF
 spog
+sqlx
 srcaddr
 srcport
 SREs
@@ -593,6 +591,7 @@ threatmanager
 Throughputs
 Tiltfile
 timberio
+TIMESTAMPTZ
 TKEY
 tlh
 tmpfs
@@ -673,7 +672,6 @@ wtimeout
 WTS
 xact
 xlarge
-XMODEM
 xxs
 YAMLs
 YBv

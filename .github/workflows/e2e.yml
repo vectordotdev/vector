@@ -44,23 +44,19 @@ jobs:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref  }}
       source: false
       e2e_tests: true
     secrets: inherit
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-20.04-8core
+    runs-on: ubuntu-24.04-8core
     timeout-minutes: 45
     needs: changes
     if: always() && (
-      github.event_name == 'schedule' || (
-          needs.changes.outputs.all-e2e == 'true'
-            || needs.changes.outputs.e2e-datadog-logs == 'true'
-            || needs.changes.outputs.e2e-datadog-metrics == 'true'
-        )
+      github.event_name == 'schedule' ||
+      needs.changes.outputs.e2e-datadog-logs == 'true' ||
+      needs.changes.outputs.e2e-datadog-metrics == 'true'
       )
     steps:
       - uses: actions/checkout@v4
@@ -82,23 +78,23 @@ jobs:
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
           fi
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-logs
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/int-e2e-test.sh e2e datadog-logs
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.all-e2e == 'true' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-metrics
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
+          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
 
 
   e2e-test-suite:

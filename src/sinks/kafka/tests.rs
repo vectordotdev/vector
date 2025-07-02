@@ -59,11 +59,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -83,11 +87,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -181,13 +189,15 @@ mod integration_test {
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone()).await?;
+        self::sink::healthcheck(config.clone(), Default::default()).await?;
         KafkaSink::new(config)
     }
 
@@ -330,6 +340,8 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),

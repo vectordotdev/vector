@@ -1,7 +1,12 @@
+#![allow(clippy::print_stderr)]
+#![allow(clippy::print_stdout)]
+
 use std::ffi::{OsStr, OsString};
 use std::io::IsTerminal;
 use std::process::{Command, Output};
-use std::{collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path, sync::LazyLock};
+use std::{
+    collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path, process, sync::LazyLock,
+};
 
 use anyhow::{Context as _, Result};
 use serde::Deserialize;
@@ -79,4 +84,22 @@ impl<T: AsRef<OsStr>> ChainArgs for [T] {
             .chain(args.into_iter().map(Into::into))
             .collect()
     }
+}
+
+pub fn run_command(cmd: &str) -> String {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(cmd)
+        .output()
+        .expect("Failed to execute command");
+
+    if !output.status.success() {
+        eprintln!(
+            "Command failed: {cmd} - Error: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        process::exit(1);
+    }
+
+    String::from_utf8_lossy(&output.stdout).to_string()
 }

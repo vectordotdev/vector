@@ -77,9 +77,16 @@ components: sinks: elasticsearch: {
 	configuration: base.components.sinks.elasticsearch.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 
 	how_it_works: {
@@ -132,6 +139,24 @@ components: sinks: elasticsearch: {
 
 				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
 				retry whole partially failed requests. As such it is advised to use `id_key` to avoid duplicates.
+				"""
+		}
+
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				Query params can either be single key value pair or a key with multiple values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							field: value
+							fruit:
+								- mango
+								- papaya
+								- kiwi
+				```
 				"""
 		}
 

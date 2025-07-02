@@ -27,8 +27,8 @@ pub enum QuoteStyle {
     Necessary,
 
     /// Puts quotes around all fields that are non-numeric.
-    /// Namely, when writing a field that does not parse as a valid float or integer,
-    /// then quotes are used even if they aren't strictly necessary.
+    /// This means that when writing a field that does not parse as a valid float or integer,
+    /// quotes are used even if they aren't strictly necessary.
     NonNumeric,
 
     /// Never writes quotes, even if it produces invalid CSV data.
@@ -84,9 +84,9 @@ pub struct CsvSerializerOptions {
     )]
     pub delimiter: u8,
 
-    /// Enable double quote escapes.
+    /// Enables double quote escapes.
     ///
-    /// This is enabled by default, but it may be disabled. When disabled, quotes in
+    /// This is enabled by default, but you can disable it. When disabled, quotes in
     /// field data are escaped instead of doubled.
     #[serde(
         default = "default_double_quote",
@@ -99,7 +99,7 @@ pub struct CsvSerializerOptions {
     /// In some variants of CSV, quotes are escaped using a special escape character
     /// like \ (instead of escaping quotes by doubling them).
     ///
-    /// To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+    /// To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
     #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(
         default = "default_escape",
@@ -121,18 +121,18 @@ pub struct CsvSerializerOptions {
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub quote_style: QuoteStyle,
 
-    /// Set the capacity (in bytes) of the internal buffer used in the CSV writer.
-    /// This defaults to a reasonable setting.
+    /// Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
+    /// This defaults to 8KB.
     #[serde(default = "default_capacity")]
     pub capacity: usize,
 
-    /// Configures the fields that will be encoded, as well as the order in which they
+    /// Configures the fields that are encoded, as well as the order in which they
     /// appear in the output.
     ///
-    /// If a field is not present in the event, the output will be an empty string.
+    /// If a field is not present in the event, the output for that field is an empty string.
     ///
-    /// Values of type `Array`, `Object`, and `Regex` are not supported and the
-    /// output will be an empty string.
+    /// Values of type `Array`, `Object`, and `Regex` are not supported, and the
+    /// output for any of these types is an empty string.
     pub fields: Vec<ConfigTargetPath>,
 }
 

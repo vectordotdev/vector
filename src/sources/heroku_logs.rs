@@ -9,11 +9,14 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
@@ -25,6 +28,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
+    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
     config::{
         log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
@@ -37,7 +41,7 @@ use crate::{
         http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
         util::{
             http::{add_query_parameters, HttpMethod},
-            ErrorMessage, HttpSource, HttpSourceAuthConfig,
+            HttpSource,
         },
     },
     tls::TlsEnableableConfig,
@@ -70,7 +74,7 @@ pub struct LogplexConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -209,10 +213,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
-            schema_def,
-        )]
+        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_def)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -406,7 +407,6 @@ fn line_to_events(
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -438,7 +438,8 @@ mod tests {
     };
     use vrl::value::{kind::Collection, Kind};
 
-    use super::{HttpSourceAuthConfig, LogplexConfig};
+    use super::LogplexConfig;
+    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
@@ -455,7 +456,7 @@ mod tests {
     }
 
     async fn source(
-        auth: Option<HttpSourceAuthConfig>,
+        auth: Option<HttpServerAuthConfig>,
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
@@ -488,13 +489,13 @@ mod tests {
     async fn send(
         address: SocketAddr,
         body: &str,
-        auth: Option<HttpSourceAuthConfig>,
+        auth: Option<HttpServerAuthConfig>,
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
-        if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password.inner()));
+        if let Some(HttpServerAuthConfig::Basic { username, password }) = auth {
+            req = req.basic_auth(username, Some(password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -507,8 +508,8 @@ mod tests {
             .as_u16()
     }
 
-    fn make_auth() -> HttpSourceAuthConfig {
-        HttpSourceAuthConfig {
+    fn make_auth() -> HttpServerAuthConfig {
+        HttpServerAuthConfig::Basic {
             username: random_string(16),
             password: random_string(16).into(),
         }

@@ -103,7 +103,7 @@ fn reparse_groups(
                     }
                     let drop_last = buckets
                         .last()
-                        .map_or(false, |bucket| bucket.bucket == f64::INFINITY);
+                        .is_some_and(|bucket| bucket.bucket == f64::INFINITY);
                     if drop_last {
                         buckets.pop();
                     }

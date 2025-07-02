@@ -108,7 +108,9 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
     if !path_matches(
         attr.path(),
         &[
+            attrs::API_COMPONENT,
             attrs::ENRICHMENT_TABLE_COMPONENT,
+            attrs::GLOBAL_OPTION_COMPONENT,
             attrs::PROVIDER_COMPONENT,
             attrs::SINK_COMPONENT,
             attrs::SOURCE_COMPONENT,

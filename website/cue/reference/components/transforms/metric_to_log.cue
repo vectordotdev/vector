@@ -40,6 +40,12 @@ components: transforms: metric_to_log: {
 		traces: false
 	}
 
+	output: {
+		logs: "": {
+			description: "The converted `log` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Metric To Log"

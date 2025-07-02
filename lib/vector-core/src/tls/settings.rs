@@ -41,6 +41,7 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct TlsEnableableConfig {
     /// Whether or not to require TLS for incoming or outgoing connections.
     ///
@@ -92,7 +93,7 @@ pub struct TlsConfig {
     /// If enabled, certificates must not be expired and must be issued by a trusted
     /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
     /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-    /// so on until the verification process reaches a root certificate.
+    /// so on, until the verification process reaches a root certificate.
     ///
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
@@ -109,7 +110,7 @@ pub struct TlsConfig {
 
     /// Sets the list of supported ALPN protocols.
     ///
-    /// Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+    /// Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
     /// that they are defined.
     #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
@@ -127,7 +128,7 @@ pub struct TlsConfig {
     /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
     /// an inline string in PEM format.
     ///
-    /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+    /// If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
     #[configurable(metadata(docs::human_name = "Certificate File Path"))]
@@ -330,8 +331,10 @@ impl TlsSettings {
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
                 let server_proto = alpn.clone();
+                // See https://github.com/sfackler/rust-openssl/pull/2360.
+                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
                 context.set_alpn_select_callback(move |_, client_proto| {
-                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                    select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
             } else {
                 context
@@ -368,7 +371,7 @@ impl TlsConfig {
                     |der| X509::from_der(&der).map(|x509| vec![x509]),
                     |pem| {
                         pem.match_indices(PEM_START_MARKER)
-                            .map(|(start, _)| X509::from_pem(pem[start..].as_bytes()))
+                            .map(|(start, _)| X509::from_pem(&pem.as_bytes()[start..]))
                             .collect()
                     },
                 )

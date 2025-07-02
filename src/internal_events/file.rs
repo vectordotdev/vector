@@ -83,7 +83,6 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -106,8 +105,10 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
+    use bytes::BytesMut;
     use metrics::counter;
     use vector_lib::file_source::FileSourceInternalEvents;
+    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -222,7 +223,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
+
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -262,7 +263,6 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -355,7 +355,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
-                internal_log_rate_limit = true,
+
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -457,7 +457,7 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true,
+
             );
             counter!(
                 "component_errors_total",
@@ -484,7 +484,6 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -493,6 +492,38 @@ mod source {
                 "stage" => error_stage::RECEIVING,
             )
             .increment(1);
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct FileLineTooBigError<'a> {
+        pub truncated_bytes: &'a BytesMut,
+        pub configured_limit: usize,
+        pub encountered_size_so_far: usize,
+    }
+
+    impl InternalEvent for FileLineTooBigError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Found line that exceeds max_line_bytes; discarding.",
+                truncated_bytes = ?self.truncated_bytes,
+                configured_limit = self.configured_limit,
+                encountered_size_so_far = self.encountered_size_so_far,
+                internal_log_rate_limit = true,
+                error_type = error_type::CONDITION_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                "component_errors_total",
+                "error_code" => "reading_line_from_file",
+                "error_type" => error_type::CONDITION_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Found line that exceeds max_line_bytes; discarding.",
+            });
         }
     }
 
@@ -577,6 +608,19 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+
+        fn emit_file_line_too_long(
+            &self,
+            truncated_bytes: &bytes::BytesMut,
+            configured_limit: usize,
+            encountered_size_so_far: usize,
+        ) {
+            emit!(FileLineTooBigError {
+                truncated_bytes,
+                configured_limit,
+                encountered_size_so_far
+            });
         }
     }
 }
