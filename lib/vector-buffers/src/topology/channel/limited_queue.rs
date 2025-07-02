@@ -61,57 +61,30 @@ trait QueueImpl<T>: Send + Sync + fmt::Debug {
     fn pop(&self) -> Option<T>;
 }
 
-#[derive(Debug)]
-struct CBArrayQueue<T> {
-    queue: ArrayQueue<T>,
-}
-
-impl<T: fmt::Debug> CBArrayQueue<T> {
-    fn new(size: usize) -> Self {
-        Self {
-            queue: ArrayQueue::new(size),
-        }
-    }
-}
-
-impl<T> QueueImpl<T> for CBArrayQueue<T>
+impl<T> QueueImpl<T> for ArrayQueue<T>
 where
     T: Send + Sync + fmt::Debug,
 {
     fn push(&self, item: T) {
-        self.queue
-            .push(item)
+        self.push(item)
             .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full."));
     }
 
     fn pop(&self) -> Option<T> {
-        self.queue.pop()
+        self.pop()
     }
 }
 
-#[derive(Debug)]
-struct CBSegQueue<T> {
-    queue: SegQueue<T>,
-}
-
-impl<T> CBSegQueue<T> {
-    fn new() -> Self {
-        Self {
-            queue: SegQueue::new(),
-        }
-    }
-}
-
-impl<T> QueueImpl<T> for CBSegQueue<T>
+impl<T> QueueImpl<T> for SegQueue<T>
 where
     T: Send + Sync + fmt::Debug,
 {
     fn push(&self, item: T) {
-        self.queue.push(item);
+        self.push(item);
     }
 
     fn pop(&self) -> Option<T> {
-        self.queue.pop()
+        self.pop()
     }
 }
 
@@ -328,14 +301,14 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
     let inner = match limit {
         MemoryBufferSize::MaxEvents { max_size } => Inner {
-            data: Arc::new(CBArrayQueue::new(max_size.get())),
+            data: Arc::new(ArrayQueue::new(max_size.get())),
             terms: SizeTerms::by_number_events(),
             limit: max_size.get(),
             limiter: Arc::new(Semaphore::new(max_size.get())),
             read_waker: Arc::new(Notify::new()),
         },
         MemoryBufferSize::MaxSize { max_bytes } => Inner {
-            data: Arc::new(CBSegQueue::new()),
+            data: Arc::new(SegQueue::new()),
             terms: SizeTerms::by_bytes_allocated(),
             limit: max_bytes.get(),
             limiter: Arc::new(Semaphore::new(max_bytes.get())),
