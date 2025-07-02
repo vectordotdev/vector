@@ -89,7 +89,7 @@ async fn prepare_config(
         .await
         .unwrap();
 
-    (cfg, table, Arc::from(client))
+    (cfg, table, client)
 }
 
 async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
