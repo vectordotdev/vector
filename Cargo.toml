@@ -287,7 +287,7 @@ prost-reflect = { workspace = true, optional = true }
 prost-types = { workspace = true, optional = true }
 
 # GCP
-goauth = { version = "0.14.0", optional = true }
+goauth = { version = "0.16.0", optional = true }
 smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
