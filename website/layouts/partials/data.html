@@ -266,7 +266,7 @@
           {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "output-metrics" "href" "#output-metrics") }}
 
 
-          <a href="/docs/about/under-the-hood/architecture/data-model/metric">
+          <a href="/docs/architecture/data-model/metric">
             {{/* Heroicon: solid/question-mark-circle */}}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -298,7 +298,7 @@
           {{ partial "heading.html" (dict "text" "Logs" "level" 3 "id" "output-logs" "href" "#output-logs") }}
 
 
-          <a href="/docs/about/under-the-hood/architecture/data-model/log">
+          <a href="/docs/architecture/data-model/log">
             {{/* Heroicon: solid/question-mark-circle */}}
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path
@@ -448,7 +448,7 @@
           {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "telemetry-metrics" "href" "#telemetry-metrics") }}
 
 
-          <a href="/docs/about/under-the-hood/architecture/data-model/metric"> link </a>
+          <a href="/docs/architecture/data-model/metric"> link </a>
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
@@ -461,7 +461,7 @@
           {{ partial "heading.html" (dict "text" "Logs" "id" "telemetry-logs" "href" "#telemetry-logs") }}
 
 
-          <a href="/docs/about/under-the-hood/architecture/data-model/log"> link </a>
+          <a href="/docs/architecture/data-model/log"> link </a>
         </span>
 
         <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
@@ -950,7 +950,7 @@
               {{ $code := highlight $json "json" "" }}
               <span>
                 Given this
-                <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+                <a href="/docs/architecture/data-model/log">Vector log event</a>...
               </span>
               {{ $code }}
             {{ end }}
@@ -960,7 +960,7 @@
               {{ $code := highlight $json "json" "" }}
               <span>
                 Given this
-                <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+                <a href="/docs/architecture/data-model/metric">Vector metric event</a>...
               </span>
               {{ $code }}
             {{ end }}
