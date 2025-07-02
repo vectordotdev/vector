@@ -39,7 +39,7 @@ Mitigate Vector process failures similarly to [node failures](#node-failure): Ve
 
 #### Data Receive Failure
 
-Mitigate data receive failures with Vector’s [end-to-end acknowledgements feature](/docs/introduction/introduction/architecture/end-to-end-acknowledgements/). When enabled, Vector only responds to the clients when data durably persists. Such as writing the data to the disk buffer or a downstream service.
+Mitigate data receive failures with Vector’s [end-to-end acknowledgements feature](/docs/architecture/end-to-end-acknowledgements/). When enabled, Vector only responds to the clients when data durably persists. Such as writing the data to the disk buffer or a downstream service.
 
 ![Failure](/img/going-to-prod/ha/receive-failure.png)
 
@@ -139,7 +139,7 @@ These actions mitigate [individual node failure](#node-failure) and [data center
 
 Mitigate software failures by configuring your Vector instances as follows:
 
-1. Able sources should enable [end-to-end acknowledgements](/docs/introduction/introduction/architecture/end-to-end-acknowledgements/).
+1. Able sources should enable [end-to-end acknowledgements](/docs/architecture/end-to-end-acknowledgements/).
 2. Sinks should implement disk or memory buffers that overflow to disk.
 3. Transforms should implement dropped event routing to your system of record.
 
