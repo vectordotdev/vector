@@ -139,7 +139,7 @@ impl SinkConfig for DatabendConfig {
             endpoint.set_path(&format!("/{}", database));
         }
         let endpoint = endpoint.to_string();
-        let health_client = Arc::from(DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?);
+        let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
         let healthcheck = select_one(health_client).boxed();
 
         let request_settings = self.request.into_settings();
