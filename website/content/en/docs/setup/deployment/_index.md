@@ -1,6 +1,6 @@
 ---
 title: Deployment
-weight: 2
+weight: 3
 ---
 
 ![Vector deployment diagram](/img/deployment.png)

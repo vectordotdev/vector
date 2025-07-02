@@ -155,7 +155,7 @@ impl Builder {
 
     pub fn build(self) -> SourceSender {
         SourceSender {
-            default_output: self.default_output.expect("no default output"),
+            default_output: self.default_output,
             named_outputs: self.named_outputs,
         }
     }
@@ -163,7 +163,9 @@ impl Builder {
 
 #[derive(Debug, Clone)]
 pub struct SourceSender {
-    default_output: Output,
+    // The default output is optional because some sources, e.g. `datadog_agent`
+    // and `opentelemetry`, can be configured to only output to named outputs.
+    default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
 }
 
@@ -183,7 +185,7 @@ impl SourceSender {
             Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
-                default_output,
+                default_output: Some(default_output),
                 named_outputs: Default::default(),
             },
             rx,
@@ -265,11 +267,16 @@ impl SourceSender {
         recv
     }
 
+    /// Get a mutable reference to the default output, panicking if none exists.
+    const fn default_output_mut(&mut self) -> &mut Output {
+        self.default_output.as_mut().expect("no default output")
+    }
+
     /// Send an event to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
-        self.default_output.send_event(event).await
+        self.default_output_mut().send_event(event).await
     }
 
     /// Send a stream of events to the default output.
@@ -280,7 +287,7 @@ impl SourceSender {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        self.default_output.send_event_stream(events).await
+        self.default_output_mut().send_event_stream(events).await
     }
 
     /// Send a batch of events to the default output.
@@ -292,7 +299,7 @@ impl SourceSender {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
-        self.default_output.send_batch(events).await
+        self.default_output_mut().send_batch(events).await
     }
 
     /// Send a batch of events event to a named output.
@@ -332,11 +339,11 @@ impl UnsentEventCount {
         }
     }
 
-    fn decr(&mut self, count: usize) {
+    const fn decr(&mut self, count: usize) {
         self.count = self.count.saturating_sub(count);
     }
 
-    fn discard(&mut self) {
+    const fn discard(&mut self) {
         self.count = 0;
     }
 }

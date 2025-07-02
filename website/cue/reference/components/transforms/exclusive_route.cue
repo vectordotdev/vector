@@ -41,6 +41,18 @@ components: transforms: exclusive_route: {
 		traces: true
 	}
 
+	output: {
+		logs: "": {
+			description: "The input `log` event."
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
+	}
+
 	outputs: [
 		{
 			name:        "<route_id>"

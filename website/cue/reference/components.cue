@@ -439,20 +439,21 @@ components: {
 	}
 
 	#Input: {
-		logs:    bool
-		metrics: #MetricInput | null
-		traces:  bool
+		description?: string
+		logs:         bool
+		metrics:      #MetricInput | null
+		traces:       bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
-		name:        Name
-		fields:      #Schema
+		name?:       Name
+		fields?:     #Schema
 	}
 
-	#TraceOutput: {
+	#TraceOutput: [Name=string]: {
 		description: string
-		fields:      #Schema
+		fields?:     #Schema
 	}
 
 	#MetricInput: {
@@ -465,12 +466,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:       string
-		relevant_when?:    string
-		tags:              #MetricTags
-		name:              Name
-		type:              #MetricType
-		default_namespace: string
+		description:        string
+		relevant_when?:     string
+		tags?:              #MetricTags
+		name?:              Name
+		type?:              #MetricType
+		default_namespace?: string
 	}
 
 	#OutputData: {
@@ -1289,8 +1290,8 @@ components: {
 					authorization code using VRL. Here is an example that looks up the token in an
 					enrichment table backed by a CSV file.
 
-					Currently custom VRL auth has access to `headers` and `address` (IP address of the
-					client).
+					Currently custom VRL auth has access to `headers`, `path`, and `address` (IP
+					address of the client).
 
 					```yaml
 					\(kind)s:

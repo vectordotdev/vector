@@ -101,7 +101,7 @@ impl TestEvent {
         }
     }
 
-    pub fn get_event(&mut self) -> &mut Event {
+    pub const fn get_event(&mut self) -> &mut Event {
         match self {
             Self::Passthrough(event) => event,
             Self::FailWithAlternateEncoder(event) => event,

@@ -364,6 +364,14 @@ base: configuration: configuration: {
 														"""
 						required: false
 					}
+					session_token: {
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						description: """
+														The AWS session token.
+														See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+														"""
+						required: false
+					}
 					credentials_file: {
 						type: string: examples: ["/my/aws/credentials"]
 						description: "Path to the credentials file."
@@ -600,7 +608,7 @@ base: configuration: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
 			acknowledgement.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {

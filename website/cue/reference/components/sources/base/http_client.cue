@@ -118,6 +118,14 @@ base: components: sources: http_client: configuration: {
 						required: false
 						type: string: examples: ["vector-indexer-role"]
 					}
+					session_token: {
+						description: """
+																The AWS session token.
+																See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+																"""
+						required: false
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+					}
 				}
 			}
 			password: {
@@ -166,8 +174,11 @@ base: components: sources: http_client: configuration: {
 		}
 	}
 	decoding: {
-		description: "Decoder to use on the HTTP responses."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -240,6 +251,8 @@ base: components: sources: http_client: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -247,6 +260,8 @@ base: components: sources: http_client: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -606,7 +621,7 @@ base: components: sources: http_client: configuration: {
 				"X-My-Custom-Header": ["a", "vector", "of", "values"]
 			}]
 			options: "*": {
-				description: "An HTTP request header and it's value(s)."
+				description: "An HTTP request header and its value(s)."
 				required:    true
 				type: array: items: type: string: {}
 			}
@@ -636,17 +651,45 @@ base: components: sources: http_client: configuration: {
 
 			The parameters provided in this option are appended to any parameters
 			manually provided in the `endpoint` option.
+
+			VRL functions are supported within query parameters. You can
+			use functions like `now()` to dynamically modify query
+			parameter values.
 			"""
 		required: false
 		type: object: {
 			examples: [{
 				field: "value"
 				fruit: ["mango", "papaya", "kiwi"]
+				start_time: {
+					type:  "vrl"
+					value: "now()"
+				}
 			}]
 			options: "*": {
-				description: "A query string parameter and it's value(s)."
+				description: "A query string parameter and its value(s)."
 				required:    true
-				type: string: {}
+				type: {
+					object: options: {
+						type: {
+							description: "The type of the parameter, indicating how the `value` should be treated."
+							required:    false
+							type: string: {
+								default: "string"
+								enum: {
+									string: "The parameter value is a plain string."
+									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								}
+							}
+						}
+						value: {
+							description: "The raw value of the parameter."
+							required:    true
+							type: string: {}
+						}
+					}
+					string: {}
+				}
 			}
 		}
 	}

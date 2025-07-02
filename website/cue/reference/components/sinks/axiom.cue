@@ -82,7 +82,7 @@ components: sinks: axiom: {
 			set:          true
 			summary:      true
 		}
-		traces: false
+		traces: true
 	}
 
 	how_it_works: {
