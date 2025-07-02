@@ -11,7 +11,7 @@ futures.workspace = true
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 pin-project.workspace = true
 tokio = { version = "1.45.1", default-features = false, features = ["net"] }
-tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
+tokio-util.workspace = true
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
 tracing = { version = "0.1.34", default-features = false }
 twox-hash = { version = "2.1.1", default-features = false, features = ["xxhash64"] }

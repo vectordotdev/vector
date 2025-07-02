@@ -31,8 +31,8 @@ serde_json.workspace = true
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
 syslog_loose = { version = "0.22", default-features = false, optional = true }
-tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio.workspace = true
+tokio-util.workspace = true
 tracing = { version = "0.1", default-features = false }
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
