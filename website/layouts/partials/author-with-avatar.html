@@ -1,6 +1,4 @@
 <div class="flex items-center">
-<pre>{{ jsonify .Params.authors }}</pre>
-
   {{ if or (not .Params.authors) (eq (len .Params.authors) 0) }}
     <div class="ml-4 flex flex-col space-y-1">
       <span class="text-md font-bold tracking-tight text-gray-700 dark:text-gray-200">
