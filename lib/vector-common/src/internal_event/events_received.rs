@@ -14,6 +14,7 @@ crate::registered_event!(
         let CountByteSize(count, byte_size) = data;
 
         trace!(message = "Events received.", count = %count, byte_size = %byte_size);
+        debug!(message = "Received data from upper layers to the current component.", count = %count, byte_size = %byte_size);
 
         #[allow(clippy::cast_precision_loss)]
         self.events_count.record(count as f64);

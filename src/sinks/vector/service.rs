@@ -122,8 +122,10 @@ impl Service<VectorRequest> for VectorService {
 
                     VectorResponse { events_byte_size }
                 })
-                .map_err(|source| VectorSinkError::Request { source }.into())
-                .await
+                .map_err(|source| {
+                    debug!("Sent data to down layers failed!, source: {:?}, byte_size: {:?}", source, byte_size);
+                    VectorSinkError::Request { source }.into()
+                }).await
         };
 
         Box::pin(future)

@@ -45,6 +45,7 @@ where
     pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub line_delimiter: Bytes,
+    pub eof_linger_timeout_sec: Option<u64>,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
@@ -291,27 +292,27 @@ where
                             }
                         }
                     }
+                    // full_content and update_time not need to get the increase data when file is update
+                    // every update of the file can be treated as a new file
+                    // so older watch will be sleep after read the full content
+                    let should_sleep = match file_id {
+                        crate::FileFingerprint::BytesChecksum(_) | 
+                        crate::FileFingerprint::FirstLinesChecksum(_) |
+                        crate::FileFingerprint::DevInode(_, _) | 
+                        crate::FileFingerprint::Unknown(_) |
+                        crate::FileFingerprint::ChecksumWithPathSalt(_, _) => false,
+                    
+                        crate::FileFingerprint::FullContentChecksum(_) |
+                        crate::FileFingerprint::ModificationTime(_, _) => true,
+                    };
+                    if  should_sleep && watcher.reached_eof() {
+                        watcher.set_sleep();
+                    }
                 }
 
                 // Do not move on to newer files if we are behind on an older file
                 if self.oldest_first && maxed_out_reading_single_file {
                     break;
-                }
-
-                // full_content and update_time not need to get the increase data when file is update
-                // every update of the file can be treated as a new file
-                // so older watch will be sleep after read the full content
-                let should_sleep = match file_id {
-                    crate::FileFingerprint::BytesChecksum(_) | 
-                    crate::FileFingerprint::FirstLinesChecksum(_) |
-                    crate::FileFingerprint::DevInode(_, _) | 
-                    crate::FileFingerprint::Unknown(_) => false,
-                
-                    crate::FileFingerprint::FullContentChecksum(_) |
-                    crate::FileFingerprint::ModificationTime(_, _) => true,
-                };
-                if should_sleep {
-                    watcher.set_sleep();
                 }
             }
 
@@ -432,6 +433,7 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
+            self.eof_linger_timeout_sec,
             self.trigger_wait_sec,
         ) {
             Ok(mut watcher) => {

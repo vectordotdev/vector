@@ -34,6 +34,10 @@ pub enum FingerprintStrategy {
         ignored_header_bytes: usize,
         lines: usize,
     },
+    ChecksumWithPathSalt {
+        ignored_header_bytes: usize,
+        lines: usize,
+    },
     DevInode,
     FullContentChecksum,
     ModificationTime,
@@ -46,6 +50,7 @@ pub enum FileFingerprint {
     BytesChecksum(u64),
     #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
+    ChecksumWithPathSalt(u64, u64),
     DevInode(u64, u64),
     FullContentChecksum(u64),
     ModificationTime(u64, u64),
@@ -65,6 +70,13 @@ impl FileFingerprint {
                 buf.write_all(&ino.to_be_bytes()).expect("writing to array");
                 FINGERPRINT_CRC.checksum(&buf[..])
             },
+            ChecksumWithPathSalt(c, salt) => {
+                let mut buf = Vec::with_capacity(std::mem::size_of_val(c));
+                buf.write_all(&c.to_be_bytes()).expect("writing to array");
+                let mut salt_buf = Vec::with_capacity(std::mem::size_of_val(salt));
+                salt_buf.write_all(&salt.to_be_bytes()).expect("writing to array");
+                crc64_with_salt(&buf[..], &salt_buf[..])
+            },
             FullContentChecksum(c) => *c,
             ModificationTime(path, update_timestamp) => {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(update_timestamp) + std::mem::size_of_val(path));
@@ -80,6 +92,7 @@ impl FileFingerprint {
         match self {
             BytesChecksum(_) => false,
             FirstLinesChecksum(_) => false,
+            ChecksumWithPathSalt(_, _) => false,
             DevInode(_, _) => false,
             FullContentChecksum(_) => false,
             ModificationTime(_, _) => false,
@@ -124,6 +137,18 @@ impl Fingerprinter {
                 let mut hasher = DefaultHasher::new();
                 path_str.hash(&mut hasher);
                 Ok(ModificationTime(hasher.finish(), update_timestamp))
+            }
+            FingerprintStrategy::ChecksumWithPathSalt{ignored_header_bytes, lines} => {
+                buffer.resize(self.max_line_length, 0u8);
+                let mut fp = fs::File::open(path)?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
+                let bytes_read = fingerprinter_read_until(fp, b'\n', lines, buffer)?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
+                // handle path salt
+                let path_str = path.to_str().unwrap();
+                let mut hasher = DefaultHasher::new();
+                path_str.hash(&mut hasher);
+                Ok(ChecksumWithPathSalt(fingerprint, hasher.finish()))
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -287,6 +312,22 @@ fn fingerprinter_read_until_and_zerofill_buf(
         buf = &mut buf[read..];
     }
     Ok(())
+}
+
+pub fn crc64_with_salt(data: &[u8], salt: &[u8]) -> u64 {
+    let crc = Crc::<u64>::new(&crc::CRC_64_XZ);
+
+    // First hash the original data
+    let mut digest = crc.digest();
+    digest.update(data);
+    let data_hash = digest.finalize();
+
+    // Then hash the combination of the first hash and the salt
+    let mut salted_digest = crc.digest();
+    salted_digest.update(&data_hash.to_be_bytes());
+    salted_digest.update(salt);
+
+    salted_digest.finalize()
 }
 
 fn fingerprinter_read_until(

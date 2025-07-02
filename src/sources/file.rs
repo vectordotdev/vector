@@ -219,6 +219,12 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
+    /// Last line without line delimiter return timeout,
+    /// if not set, then last line without delimiter will not be return
+    #[configurable(derived)]
+    #[serde(default)]
+    pub eof_linger_timeout_sec: Option<u64>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
@@ -318,6 +324,25 @@ pub enum FingerprintConfig {
         lines: usize,
     },
 
+    /// Read lines from the beginning of the file and compute a checksum and with the path as the random salt
+    ChecksumWithPathSalt {
+        /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+        ///
+        /// This can be helpful if all files share a common header that should be skipped.
+        #[serde(default = "default_ignored_header_bytes")]
+        #[configurable(metadata(docs::type_unit = "bytes"))]
+        ignored_header_bytes: usize,
+
+        /// The number of lines to read for generating the checksum.
+        ///
+        /// If your files share a common header that is not always a fixed size,
+        ///
+        /// If the file has less than this amount of lines, it won’t be read at all.
+        #[serde(default = "default_lines")]
+        #[configurable(metadata(docs::type_unit = "lines"))]
+        lines: usize,
+    },
+
     /// Use the [device and inode][inode] as the identifier.
     ///
     /// [inode]: https://en.wikipedia.org/wiki/Inode
@@ -374,6 +399,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
+            FingerprintConfig::ChecksumWithPathSalt{ ignored_header_bytes, lines } => FingerprintStrategy::ChecksumWithPathSalt { ignored_header_bytes, lines },
             FingerprintConfig::FullContentChecksum => FingerprintStrategy::FullContentChecksum,
             FingerprintConfig::ModificationTime => FingerprintStrategy::ModificationTime,
         }
@@ -410,6 +436,7 @@ impl Default for FileConfig {
             oldest_first: false,
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
+            eof_linger_timeout_sec: None,
             encoding: None,
             acknowledgements: Default::default(),
             log_namespace: None,
@@ -570,6 +597,7 @@ pub fn file_source(
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
+        eof_linger_timeout_sec: config.eof_linger_timeout_sec,
         data_dir,
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter {
