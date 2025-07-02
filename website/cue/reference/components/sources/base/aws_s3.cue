@@ -13,7 +13,7 @@ base: components: sources: aws_s3: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -165,8 +165,11 @@ base: components: sources: aws_s3: configuration: {
 		}
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -239,6 +242,8 @@ base: components: sources: aws_s3: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -246,6 +251,8 @@ base: components: sources: aws_s3: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 

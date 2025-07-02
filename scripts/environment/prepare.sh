@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 set -e -o verbose
 
 git config --global --add safe.directory /git/vectordotdev/vector

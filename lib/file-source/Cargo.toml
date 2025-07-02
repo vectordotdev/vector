@@ -38,7 +38,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.9.0"
+version = "2.10.0"
 default-features = false
 features = ["serde"]
 
