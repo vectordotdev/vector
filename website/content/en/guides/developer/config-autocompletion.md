@@ -12,7 +12,7 @@ weight: 2
 {{< requirement >}}
 This guide assumes you understand [basic Vector concepts][concepts]
 
-[concepts]: /docs/about/concepts
+[concepts]: /docs/introduction/concepts
 {{< /requirement >}}
 
 Vector provides CLI [subcommands][subcommands] to perform various tasks apart from running pipelines. This short guide focuses on how to
