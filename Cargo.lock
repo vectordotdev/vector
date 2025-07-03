@@ -7035,6 +7035,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "236e667b670a5cdf90c258f5a55794ec5ac5027e960c224bff8367a59e1e6426"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 2.0.3",
+ "tracing 0.1.41",
+]
+
+[[package]]
+name = "opentelemetry-http"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8863faf2910030d139fb48715ad5ff2f35029fc5f244f6d5f689ddcf4d26253"
+dependencies = [
+ "async-trait",
+ "bytes 1.10.1",
+ "http 1.1.0",
+ "opentelemetry",
+ "reqwest 0.12.9",
+ "tracing 0.1.41",
+]
+
+[[package]]
+name = "opentelemetry-otlp"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5bef114c6d41bea83d6dc60eb41720eedd0261a67af57b66dd2b84ac46c01d91"
+dependencies = [
+ "async-trait",
+ "futures-core",
+ "http 1.1.0",
+ "opentelemetry",
+ "opentelemetry-http",
+ "opentelemetry-proto 0.28.0",
+ "opentelemetry_sdk",
+ "prost 0.13.3",
+ "reqwest 0.12.9",
+ "thiserror 2.0.3",
+ "tokio",
+ "tonic 0.12.3",
+ "tracing 0.1.41",
+]
+
+[[package]]
 name = "opentelemetry-proto"
 version = "0.1.0"
 dependencies = [
@@ -7049,6 +7098,39 @@ dependencies = [
  "vector-core",
  "vector-lookup",
  "vrl",
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56f8870d3024727e99212eb3bb1762ec16e255e3e6f58eeb3dc8db1aa226746d"
+dependencies = [
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "prost 0.13.3",
+ "tonic 0.12.3",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84dfad6042089c7fc1f6118b7040dc2eb4ab520abbf410b79dc481032af39570"
+dependencies = [
+ "async-trait",
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "glob",
+ "opentelemetry",
+ "percent-encoding",
+ "rand 0.8.5",
+ "serde_json",
+ "thiserror 2.0.3",
+ "tokio",
+ "tokio-stream",
+ "tracing 0.1.41",
 ]
 
 [[package]]
@@ -8649,6 +8731,7 @@ checksum = "a77c62af46e79de0a562e1a9849205ffcb7fc1238876e9bd743357570e04046f"
 dependencies = [
  "base64 0.22.1",
  "bytes 1.10.1",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http 1.1.0",
@@ -11695,6 +11778,9 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "openssl-src",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
  "ordered-float 4.6.0",
  "paste",
  "percent-encoding",
@@ -12004,7 +12090,7 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
- "opentelemetry-proto",
+ "opentelemetry-proto 0.1.0",
  "prometheus-parser",
  "vector-api-client",
  "vector-buffers",
