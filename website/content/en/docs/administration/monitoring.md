@@ -113,9 +113,7 @@ sinks:
 ### Metrics catalogue
 
 The table below provides a list of internal metrics provided by Vector. See the docs for the [`internal_metrics`
-source][output] for more detailed information about the available metrics.
-
-{{< internal-metrics-list >}}
+source][output] for more detailed information about the available metrics and the [debugging guide][debugging_guide] on how to use them.
 
 ## Troubleshooting
 
@@ -151,3 +149,4 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting
 [vrl]: /docs/reference/vrl
+[debugging_guide]: /guides/developer/debugging#visualizing-and-querying-internal-metrics
