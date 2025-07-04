@@ -368,6 +368,16 @@ impl AwsAuthentication {
         }
     }
 
+    /// Returns the region for the credentials based on the authentication mechanism chosen.
+    pub fn region(&self) -> Option<Region> {
+        match self {
+            AwsAuthentication::AccessKey { region, .. }
+            | AwsAuthentication::File { region, .. }
+            | AwsAuthentication::Role { region, .. }
+            | AwsAuthentication::Default { region, .. } => region.clone().map(Region::new),
+        }
+    }
+
     #[cfg(test)]
     /// Creates dummy authentication for tests.
     pub fn test_auth() -> AwsAuthentication {

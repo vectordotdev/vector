@@ -9,7 +9,9 @@ use aws_config::{
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
+    http_request::{
+        PayloadChecksumKind, SignableBody, SignableRequest, SigningInstructions, SigningSettings,
+    },
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -288,6 +290,65 @@ pub async fn sign_request(
         SignableBody::Bytes(request.body().as_ref()),
     )?;
 
+    let signing_instructions = create_signing_instructions(
+        service_name,
+        signable_request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+    )
+    .await?;
+    signing_instructions.apply_to_request_http0x(request);
+
+    Ok(())
+}
+
+/// Sign the empty request prior to sending to AWS.
+/// The signature is added to the provided `request`.
+pub async fn sign_request_with_empty_body<T>(
+    service_name: &str,
+    request: &mut http::Request<T>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<()> {
+    let headers = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            Ok((
+                k.as_str(),
+                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, SigningError>>()?;
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        headers.into_iter(),
+        SignableBody::empty(),
+    )?;
+    let signing_instructions = create_signing_instructions(
+        service_name,
+        signable_request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+    )
+    .await?;
+    signing_instructions.apply_to_request_http0x(request);
+
+    Ok(())
+}
+
+/// Create the signing instructions for a request.
+pub async fn create_signing_instructions(
+    service_name: &str,
+    signable_request: SignableRequest<'_>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<SigningInstructions> {
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
 
@@ -312,9 +373,8 @@ pub async fn sign_request(
 
     let (signing_instructions, _signature) =
         aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
-    signing_instructions.apply_to_request_http0x(request);
 
-    Ok(())
+    Ok(signing_instructions)
 }
 
 #[derive(Debug)]
