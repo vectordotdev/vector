@@ -33,9 +33,9 @@ remap: functions: haversine: {
 			type: ["float"]
 		},
 		{
-			name: "measurement"
+			name:        "measurement"
 			description: "Measurement system to use for resulting distance."
-			required: false
+			required:    false
 			type: ["string"]
 			default: "kilometers"
 			enum: {
@@ -54,8 +54,8 @@ remap: functions: haversine: {
 				haversine(0, 0, 10, 10)
 				"""#
 			return: {
-				distance: 1568.5227233,
-				bearing: 44.561
+				distance: 1568.5227233
+				bearing:  44.561
 			}
 		},
 		{
@@ -64,8 +64,8 @@ remap: functions: haversine: {
 				haversine(0, 0, 10, 10, "miles")
 				"""#
 			return: {
-				distance: 974.6348468,
-				bearing: 44.561
+				distance: 974.6348468
+				bearing:  44.561
 			}
 		},
 	]
