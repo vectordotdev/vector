@@ -4,7 +4,7 @@ remap: functions: shannon_entropy: {
 	category:    "Map"
 	description: """
 		Calculates [haversine](\(urls.haversine)) distance and bearing between two points.
-		It can provide result in kilometers or miles.
+		Results are available in kilometers or miles.
 		"""
 
 	arguments: [
@@ -39,8 +39,8 @@ remap: functions: shannon_entropy: {
 			type: ["string"]
 			default: "kilometers"
 			enum: {
-				kilometers: "Use kilometers for resulting distance."
-				miles:      "Use miles for resulting distance."
+				kilometers: "Use kilometers for the resulting distance."
+				miles:      "Use miles for the resulting distance."
 			}
 		},
 	]
