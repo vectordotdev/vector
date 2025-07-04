@@ -116,7 +116,7 @@ mod tests {
         let stream = futures_util::stream::empty::<()>();
         let limit = Some(NonZeroUsize::new(2).unwrap());
         // The `as _` is required to construct a `dyn Future`
-        let f = |_| Box::pin(async move { () }) as _;
+        let f = |_| Box::pin(async move {}) as _;
         let mut concurrent_map = ConcurrentMap::new(stream, limit, f);
 
         // Assert that the stream does not hang
