@@ -83,11 +83,7 @@ where
         }
 
         match ready!(this.in_flight.poll_next_unpin(cx)) {
-            // If the stream is done and there is no futures managed by FuturesOrdered,
-            // we must end the stream by returning Poll::Ready(None).
-            None if this.stream.is_done() => Poll::Ready(None),
-            // If there are no in-flight futures managed by FuturesOrdered but the underlying
-            // stream is not done, then we must keep polling that stream.
+            // Either nothing is in-flight, or nothing is ready.
             None => Poll::Pending,
             Some(result) => match result {
                 Ok(item) => Poll::Ready(Some(item)),
