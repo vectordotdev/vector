@@ -149,6 +149,7 @@ pub(super) struct RemoteWriteSink<S> {
     pub(super) default_namespace: Option<String>,
     pub(super) buckets: Vec<f64>,
     pub(super) quantiles: Vec<f64>,
+    pub(super) expire_metrics_secs: Option<f64>,
     pub(super) service: S,
 }
 
@@ -172,10 +173,11 @@ where
         let batch_settings = self.batch_settings;
         let tenant_id = self.tenant_id.clone();
         let service = self.service;
+        let expire_metrics_secs = self.expire_metrics_secs;
 
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
-            .normalized_with_default::<PrometheusMetricNormalize>()
+            .normalized_with_ttl::<PrometheusMetricNormalize>(expire_metrics_secs)
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })

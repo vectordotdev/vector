@@ -1,3 +1,6 @@
+use futures_util::{stream::Map, Stream, StreamExt};
+use pin_project::pin_project;
+use std::time::Duration;
 use std::{
     convert::Infallible,
     fmt,
@@ -8,9 +11,6 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-
-use futures_util::{stream::Map, Stream, StreamExt};
-use pin_project::pin_project;
 use tower::Service;
 use tracing::Span;
 use vector_lib::stream::{
@@ -218,6 +218,20 @@ pub trait SinkBuilderExt: Stream {
         N: MetricNormalize + Default,
     {
         Normalizer::new(self, N::default())
+    }
+
+    /// Normalizes a stream of [`Metric`] events with a normalizer and an optional TTL.
+    fn normalized_with_ttl<N>(self, maybe_ttl_secs: Option<f64>) -> Normalizer<Self, N>
+    where
+        Self: Stream<Item = Metric> + Unpin + Sized,
+        N: MetricNormalize + Default,
+    {
+        match maybe_ttl_secs {
+            None => Normalizer::new(self, N::default()),
+            Some(ttl) => {
+                Normalizer::new_with_ttl(self, N::default(), Duration::from_secs(ttl as u64))
+            }
+        }
     }
 
     /// Creates a [`Driver`] that uses the configured event stream as the input to the given
