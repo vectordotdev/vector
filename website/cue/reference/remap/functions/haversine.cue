@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: shannon_entropy: {
+remap: functions: haversine: {
 	category:    "Map"
 	description: """
 		Calculates [haversine](\(urls.haversine)) distance and bearing between two points.
