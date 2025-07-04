@@ -1,9 +1,10 @@
-use std::{error::Error, num::NonZeroUsize};
+use std::error::Error;
 
 use async_trait::async_trait;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
+    config::MemoryBufferSize,
     topology::{
         builder::IntoBuffer,
         channel::{limited, ReceiverAdapter, SenderAdapter},
@@ -12,11 +13,11 @@ use crate::{
 };
 
 pub struct MemoryBuffer {
-    capacity: NonZeroUsize,
+    capacity: MemoryBufferSize,
 }
 
 impl MemoryBuffer {
-    pub fn new(capacity: NonZeroUsize) -> Self {
+    pub fn new(capacity: MemoryBufferSize) -> Self {
         MemoryBuffer { capacity }
     }
 }
@@ -30,9 +31,14 @@ where
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
-        usage_handle.set_buffer_limits(None, Some(self.capacity.get()));
+        let (max_bytes, max_size) = match self.capacity {
+            MemoryBufferSize::MaxSize { max_bytes } => (Some(max_bytes.get() as u64), None),
+            MemoryBufferSize::MaxEvents { max_size } => (None, Some(max_size.get())),
+        };
 
-        let (tx, rx) = limited(self.capacity.get());
+        usage_handle.set_buffer_limits(max_bytes, max_size);
+
+        let (tx, rx) = limited(self.capacity);
         Ok((tx.into(), rx.into()))
     }
 }
