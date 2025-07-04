@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use indexmap::IndexMap;
+use serde::Deserialize;
 use serde_with::serde_as;
 use vrl::path::{parse_target_path, PathPrefix};
 use vrl::prelude::{Collection, KeyString, Kind};
@@ -94,13 +95,111 @@ pub struct ReduceConfig {
     ///
     /// If this condition resolves to `true` for an event, the current transaction is immediately
     /// flushed with this event.
-    pub ends_when: Option<AnyCondition>,
+    pub ends_when: Option<ApplyTo>,
 
     /// A condition used to distinguish the first event of a transaction.
     ///
     /// If this condition resolves to `true` for an event, the previous transaction is flushed
     /// (without this event) and a new transaction is started.
-    pub starts_when: Option<AnyCondition>,
+    pub starts_when: Option<ApplyTo>,
+}
+
+/// Condition mode for ends_with
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
+#[serde(tag = "apply_to")]
+#[serde(deny_unknown_fields)]
+#[allow(clippy::large_enum_variant)] // just used for configuration
+pub enum ApplyTo {
+    /// Run condition on the incoming event
+    #[serde(rename = "incoming_event")]
+    IncomingEvent(AnyCondition),
+
+    /// Run condition on the merged event
+    #[serde(rename = "merged_event")]
+    MergedEvent(AnyCondition),
+}
+
+mod deser {
+    use super::*;
+
+    #[derive(Deserialize)]
+    #[serde(tag = "apply_to")]
+    enum ApplyToTagged {
+        #[serde(rename = "incoming_event")]
+        IncomingEvent(AnyCondition),
+
+        #[serde(rename = "merged_event")]
+        MergedEvent(AnyCondition),
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ApplyToDe {
+        Tagged(ApplyToTagged),
+
+        // Note: this must be last as serde attempts variants in order
+        Untagged(AnyCondition),
+    }
+
+    impl<'de> Deserialize<'de> for ApplyTo {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(match ApplyToDe::deserialize(deserializer)? {
+                ApplyToDe::Tagged(ApplyToTagged::IncomingEvent(any_condition)) => {
+                    ApplyTo::IncomingEvent(any_condition)
+                }
+                ApplyToDe::Tagged(ApplyToTagged::MergedEvent(any_condition)) => {
+                    ApplyTo::MergedEvent(any_condition)
+                }
+                ApplyToDe::Untagged(any_condition) => ApplyTo::IncomingEvent(any_condition),
+            })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::conditions::ConditionConfig;
+
+        #[test]
+        fn test_serde() {
+            let incoming = serde_json::json!({
+                "apply_to": "incoming_event",
+                "type": "vrl",
+                "source": "exists!(.)",
+            });
+            let s: ApplyTo = serde_json::from_value(incoming).unwrap();
+            match s {
+                ApplyTo::IncomingEvent(AnyCondition::Map(ConditionConfig::Vrl(vrl))) => {
+                    assert_eq!(vrl.source, "exists!(.)");
+                }
+                _ => panic!("Expected IncomingEvent with VRL condition"),
+            }
+
+            let merged = serde_json::json!({
+                "apply_to": "merged_event",
+                "type": "vrl",
+                "source": "exists!(.)",
+            });
+            let s: ApplyTo = serde_json::from_value(merged).unwrap();
+            match s {
+                ApplyTo::MergedEvent(AnyCondition::Map(ConditionConfig::Vrl(vrl))) => {
+                    assert_eq!(vrl.source, "exists!(.)");
+                }
+                _ => panic!("Expected MergedEvent with VRL condition"),
+            }
+
+            let short_string = serde_json::json!({
+                "apply_to": "incoming_event",
+                "vrl": "exists!(.)"
+            });
+            let result = serde_json::from_value::<ApplyTo>(short_string);
+            assert!(result.is_err(), "Should fail due to missing 'type'");
+        }
+    }
 }
 
 const fn default_expire_after_ms() -> Duration {
