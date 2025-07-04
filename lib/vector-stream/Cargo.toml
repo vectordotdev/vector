@@ -22,3 +22,4 @@ vector-core = { path = "../vector-core" }
 proptest = "1.7"
 rand.workspace = true
 rand_distr.workspace = true
+tokio = {workspace = true, features = ["test-util"] }
