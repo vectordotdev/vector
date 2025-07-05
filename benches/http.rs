@@ -8,9 +8,13 @@ use hyper::{
 };
 use tokio::runtime::Runtime;
 use vector::{
-    config, sinks,
-    sinks::util::{BatchConfig, Compression},
+    config,
+    sinks::{
+        self,
+        util::{BatchConfig, Compression},
+    },
     sources,
+    template::Template,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
 };
@@ -48,7 +52,7 @@ fn benchmark_http(c: &mut Criterion) {
                             "out",
                             &["in"],
                             sinks::http::config::HttpSinkConfig {
-                                uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
+                                uri: Template::try_from(out_addr.to_string()).unwrap(),
                                 compression: *compression,
                                 method: Default::default(),
                                 auth: Default::default(),
