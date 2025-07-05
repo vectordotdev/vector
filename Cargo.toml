@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.48.0"
+version = "0.49.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -145,15 +145,16 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.2.0", default-features = false }
-indexmap = { version = "2.9.0", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.10.0", default-features = false, features = ["serde", "std"] }
 inventory = { version = "0.3" }
 indoc = { version = "2.0.6" }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+nom = { version = "8.0.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.6" }
+proptest = { version = "1.7" }
 proptest-derive = { version = "0.5.1" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -164,7 +165,7 @@ rand_distr = { version = "0.5.1", default-features = false }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde_json = { version = "1.0.140", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-snafu = { version = "0.8.0", default-features = false, features = ["futures", "std"] }
+snafu = { version = "0.8.6", default-features = false, features = ["futures", "std"] }
 tempfile = "3.20.0"
 tokio = { version = "1.45.1", default-features = false, features = ["full"] }
 toml = { version = "0.8.23", default-features = false, features = ["display", "parse"] }
@@ -226,7 +227,7 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 
 # AWS - Official SDK
-aws-runtime = { version = "1.5.7", optional = true }
+aws-runtime = { version = "1.5.8", optional = true }
 aws-config = { version = "1.6.1", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
 aws-credential-types = { version = "1.2.3", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sdk-cloudwatch = { version = "1.70.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
@@ -234,17 +235,17 @@ aws-sdk-cloudwatchlogs = { version = "1.76.0", default-features = false, feature
 aws-sdk-elasticsearch = { version = "1.67.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-firehose = { version = "1.71.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-kinesis = { version = "1.66.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-kms = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-kms = { version = "1.75.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-s3 = { version = "1.15.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-secretsmanager = { version = "1.68.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-sns = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-secretsmanager = { version = "1.76.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sns = { version = "1.73.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-sdk-sqs = { version = "1.64.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 aws-types = { version = "1.3.7", default-features = false, optional = true }
 
 # The sts crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
 # is configured.
-aws-sdk-sts = { version = "1.65.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sts = { version = "1.73.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 
 # The `aws-sdk-sts` crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication is configured.
@@ -312,19 +313,19 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
-async-compression = { version = "0.4.24", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
+async-compression = { version = "0.4.25", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { version = "0.22.1", default-features = false, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
-bollard = { version = "0.16.1", default-features = false, features = ["ssl", "chrono"], optional = true }
+bollard = { version = "0.19.1", default-features = false, features = ["pipe", "ssl", "chrono"], optional = true }
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 bytesize = { version = "2.0.1", default-features = false }
 chrono.workspace = true
 chrono-tz.workspace = true
 colored = { version = "3.0.0", default-features = false }
 csv = { version = "1.3", default-features = false }
-databend-client = { version = "0.22.2", default-features = false, features = ["rustls"], optional = true }
+databend-client = { version = "0.27.1", default-features = false, features = ["rustls"], optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.19", default-features = false }
@@ -336,8 +337,8 @@ exitcode = { version = "1.1.2", default-features = false }
 flate2.workspace = true
 futures-util = { version = "0.3.29", default-features = false }
 glob.workspace = true
-governor = { version = "0.7.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
-h2 = { version = "0.4.10", default-features = false, optional = true }
+governor = { version = "0.10.0", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
+h2 = { version = "0.4.11", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
@@ -357,13 +358,13 @@ itertools = { version = "0.14.0", default-features = false, optional = false, fe
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
-lru = { version = "0.14.0", default-features = false, optional = true }
+lru = { version = "0.15.0", default-features = false, optional = true }
 maxminddb = { version = "0.26.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.4", default-features = false, optional = true }
-nom = { version = "7.1.3", default-features = false, optional = true }
+nom = { workspace = true, optional = true }
 notify = { version = "8.0.0", default-features = false, features = ["macos_fsevent"] }
 openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.6", default-features = false }
@@ -375,9 +376,9 @@ quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
 rdkafka = { version = "0.37.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.24.0", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.32.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-roaring = { version = "0.10.12", default-features = false, features = ["std"], optional = true }
+roaring = { version = "0.11.0", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
@@ -393,7 +394,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false, features = [
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
-thread_local = { version = "1.1.8", default-features = false, optional = true }
+thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 warp = { version = "0.3.7", default-features = false }
@@ -436,9 +437,9 @@ azure_identity = { version = "0.17", default-features = false, features = ["enab
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
-criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.6.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
-libc = "0.2.172"
+libc = "0.2.174"
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
@@ -452,7 +453,7 @@ tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
-wiremock = "0.6.3"
+wiremock = "0.6.4"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]

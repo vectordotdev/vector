@@ -147,8 +147,11 @@ const-oid,https://github.com/RustCrypto/formats/tree/master/const-oid,Apache-2.0
 const_fn,https://github.com/taiki-e/const_fn,Apache-2.0 OR MIT,The const_fn Authors
 convert_case,https://github.com/rutrum/convert-case,MIT,David Purdum <purdum41@gmail.com>
 convert_case,https://github.com/rutrum/convert-case,MIT,rutrum <dave@rutrum.net>
+cookie,https://github.com/SergioBenitez/cookie-rs,MIT OR Apache-2.0,"Sergio Benitez <sb@sergio.bz>, Alex Crichton <alex@alexcrichton.com>"
 cookie-factory,https://github.com/rust-bakery/cookie-factory,MIT,"Geoffroy Couprie <geo.couprie@gmail.com>, Pierre Chifflier <chifflier@wzdftpd.net>"
+cookie_store,https://github.com/pfernie/cookie_store,MIT OR Apache-2.0,Patrick Fernie <patrick.fernie@gmail.com>
 core-foundation,https://github.com/servo/core-foundation-rs,MIT  OR  Apache-2.0,The Servo Project Developers
+core-foundation,https://github.com/servo/core-foundation-rs,MIT OR Apache-2.0,The Servo Project Developers
 core2,https://github.com/bbqsrc/core2,Apache-2.0 OR MIT,Brendan Molloy <brendan@bbqsrc.net>
 cpufeatures,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 crc,https://github.com/mrhooray/crc-rs,MIT OR Apache-2.0,"Rui Hu <code@mrhooray.com>, Akhil Velagapudi <4@4khil.com>"
@@ -302,7 +305,7 @@ hyper-rustls,https://github.com/rustls/hyper-rustls,Apache-2.0 OR ISC OR MIT,The
 hyper-timeout,https://github.com/hjr3/hyper-timeout,MIT OR Apache-2.0,Herman J. Radtke III <herman@hermanradtke.com>
 hyper-tls,https://github.com/hyperium/hyper-tls,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 hyper-util,https://github.com/hyperium/hyper-util,MIT,Sean McArthur <sean@seanmonstar.com>
-hyperlocal-next,https://github.com/softprops/hyperlocal,MIT,softprops <d.tangren@gmail.com>
+hyperlocal,https://github.com/softprops/hyperlocal,MIT,softprops <d.tangren@gmail.com>
 iana-time-zone,https://github.com/strawlab/iana-time-zone,MIT OR Apache-2.0,"Andrew Straw <strawman@astraw.com>, René Kijewski <rene.kijewski@fu-berlin.de>, Ryan Lopopolo <rjl@hyperbo.la>"
 iana-time-zone-haiku,https://github.com/strawlab/iana-time-zone,MIT OR Apache-2.0,René Kijewski <crates.io@k6i.de>
 icu_collections,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers
@@ -407,9 +410,9 @@ nibble_vec,https://github.com/michaelsproul/rust_nibble_vec,MIT,Michael Sproul <
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
 nkeys,https://github.com/wasmcloud/nkeys,Apache-2.0,wasmCloud Team
 no-proxy,https://github.com/jdrouet/no-proxy,MIT,Jérémie Drouet <jeremie.drouet@gmail.com>
-no-std-compat,https://gitlab.com/jD91mZM2/no-std-compat,MIT,jD91mZM2 <me@krake.one>
 nohash,https://github.com/tetcoin/nohash,Apache-2.0 OR MIT,Parity Technologies <admin@parity.io>
 nom,https://github.com/Geal/nom,MIT,contact@geoffroycouprie.com
+nom,https://github.com/rust-bakery/nom,MIT,contact@geoffroycouprie.com
 nonzero_ext,https://github.com/antifuchs/nonzero_ext,Apache-2.0,Andreas Fuchs <asf@boinkor.net>
 notify,https://github.com/notify-rs/notify,CC0-1.0,"Félix Saparelli <me@passcod.name>, Daniel Faust <hessijames@gmail.com>, Aron Heinecke <Ox0p54r36@t-online.de>"
 notify-types,https://github.com/notify-rs/notify,MIT OR Apache-2.0,Daniel Faust <hessijames@gmail.com>

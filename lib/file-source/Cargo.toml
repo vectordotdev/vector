@@ -38,7 +38,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.9.0"
+version = "2.10.0"
 default-features = false
 features = ["serde"]
 
@@ -73,7 +73,7 @@ default-features = false
 features = ["full"]
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.6"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

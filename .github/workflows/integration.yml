@@ -18,8 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
@@ -62,24 +60,10 @@ jobs:
             echo "can_access_secrets=false" >> $GITHUB_OUTPUT
           fi
 
-  setup:
-    runs-on: ubuntu-latest
-    needs: check-secrets
-    if: ${{ github.event_name == 'merge_group' || needs.check-secrets.outputs.can_access_secrets == 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run setup steps required by the IT suite
-        run: |
-          sudo npm -g install @datadog/datadog-ci
-          sudo -E bash scripts/ci-free-disk-space.sh
-          docker image prune -af && docker container prune -f
-
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
       - changes
-      - setup
       - check-secrets
 
     if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
@@ -100,7 +84,8 @@ jobs:
         with:
           submodules: "recursive"
 
-      - run: docker image prune -af ; docker container prune -f
+      - run: |
+          sudo npm -g install @datadog/datadog-ci
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
@@ -140,7 +125,6 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs:
-      - setup
       - integration-tests
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}

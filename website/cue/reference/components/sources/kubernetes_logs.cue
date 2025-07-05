@@ -268,7 +268,7 @@ components: sources: kubernetes_logs: {
 			body:  """
 					Vector will enrich data with Kubernetes context. A comprehensive
 					list of fields can be found in the
-					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-data).
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-types).
 					"""
 		}
 

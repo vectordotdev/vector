@@ -37,7 +37,7 @@ ordered-float = { version = "4.6.0", default-features = false }
 openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.4", default-features = false }
 pin-project.workspace = true
-proptest = { version = "1.6", optional = true }
+proptest = { version = "1.7", optional = true }
 prost-types.workspace = true
 prost .workspace = true
 quanta = { version = "0.12.6", default-features = false }
@@ -67,7 +67,7 @@ vrl.workspace = true
 cfg-if.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.10.0"
+security-framework = "3.2.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.27"
@@ -78,11 +78,11 @@ prost-build.workspace = true
 [dev-dependencies]
 base64 = "0.22.1"
 chrono-tz.workspace = true
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.6.0", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"
-proptest = "1.6"
+proptest = "1.7"
 similar-asserts = "1.7.0"
 tokio-test = "0.4.4"
 toml.workspace = true

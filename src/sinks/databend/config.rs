@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use databend_client::APIClient as DatabendAPIClient;
 use futures::future::FutureExt;
@@ -204,8 +205,8 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
-    client.query("SELECT 1").await?;
+async fn select_one(client: Arc<DatabendAPIClient>) -> crate::Result<()> {
+    client.query_all("SELECT 1").await?;
     Ok(())
 }
 
