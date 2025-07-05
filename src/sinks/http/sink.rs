@@ -34,15 +34,13 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let batch_settings = self.batch_settings;
-        let encoder = self.request_builder.encoder.encoder.clone();
-
+        let batch_sizer = HttpBatchSizer {
+            encoder: self.request_builder.encoder.encoder.clone(),
+        };
         input
             // Batch the input stream with size calculation based on the configured codec
             .batched_partitioned(KeyPartitioner::new(self.uri), || {
-                batch_settings.as_item_size_config(HttpBatchSizer {
-                    encoder: encoder.clone(),
-                })
+                self.batch_settings.as_item_size_config(batch_sizer.clone())
             })
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             // Build requests with default concurrency limit.
