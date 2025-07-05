@@ -18,6 +18,7 @@ pub struct K8sPathsProvider {
     namespace_state: Store<Namespace>,
     include_paths: Vec<glob::Pattern>,
     exclude_paths: Vec<glob::Pattern>,
+    maybe_logs_dir: Option<String>,
 }
 
 impl K8sPathsProvider {
@@ -27,12 +28,14 @@ impl K8sPathsProvider {
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,
         exclude_paths: Vec<glob::Pattern>,
+        maybe_logs_dir: Option<String>,
     ) -> Self {
         Self {
             pod_state,
             namespace_state,
             include_paths,
             exclude_paths,
+            maybe_logs_dir,
         }
     }
 }
@@ -59,7 +62,8 @@ impl PathsProvider for K8sPathsProvider {
             })
             .flat_map(|pod| {
                 trace!(message = "Providing log paths for pod.", pod = ?pod.metadata.name);
-                let paths_iter = list_pod_log_paths(real_glob, pod.as_ref());
+                let paths_iter =
+                    list_pod_log_paths(self.maybe_logs_dir.as_deref(), real_glob, pod.as_ref());
                 filter_paths(
                     filter_paths(paths_iter, &self.include_paths, true),
                     &self.exclude_paths,
@@ -90,7 +94,7 @@ impl PathsProvider for K8sPathsProvider {
 /// See <https://github.com/vectordotdev/vector/issues/6001>
 /// See <https://github.com/kubernetes/kubernetes/blob/ef3337a443b402756c9f0bfb1f844b1b45ce289d/pkg/kubelet/pod/pod_manager.go#L30-L44>
 /// See <https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81>
-fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
+fn extract_pod_logs_directory(maybe_logs_dir: Option<&str>, pod: &Pod) -> Option<PathBuf> {
     let metadata = &pod.metadata;
     let namespace = metadata.namespace.as_ref()?;
     let name = metadata.name.as_ref()?;
@@ -103,7 +107,12 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
         metadata.uid.as_ref()?
     };
 
-    Some(build_pod_logs_directory(namespace, name, uid))
+    Some(build_pod_logs_directory(
+        maybe_logs_dir,
+        namespace,
+        name,
+        uid,
+    ))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
@@ -135,6 +144,7 @@ fn build_container_exclusion_patterns<'a>(
 }
 
 fn list_pod_log_paths<'a, G, GI>(
+    maybe_logs_dir: Option<&str>,
     mut glob_impl: G,
     pod: &'a Pod,
 ) -> impl Iterator<Item = PathBuf> + 'a
@@ -142,7 +152,7 @@ where
     G: FnMut(&str) -> GI + 'a,
     GI: Iterator<Item = PathBuf> + 'a,
 {
-    extract_pod_logs_directory(pod)
+    extract_pod_logs_directory(maybe_logs_dir, pod)
         .into_iter()
         .flat_map(move |dir| {
             let dir = dir
@@ -296,7 +306,7 @@ mod tests {
 
         for (pod, expected) in cases {
             assert_eq!(
-                extract_pod_logs_directory(&pod),
+                extract_pod_logs_directory(None, &pod),
                 expected.map(PathBuf::from)
             );
         }
@@ -453,7 +463,7 @@ mod tests {
                 paths_to_return.into_iter().map(PathBuf::from)
             };
 
-            let actual_paths: Vec<_> = list_pod_log_paths(mock_glob, &pod).collect();
+            let actual_paths: Vec<_> = list_pod_log_paths(None, mock_glob, &pod).collect();
             let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
             assert_eq!(actual_paths, expected_paths)
         }
