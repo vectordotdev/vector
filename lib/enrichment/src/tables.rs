@@ -35,7 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use vrl::value::ObjectMap;
+use vrl::value::{ObjectMap, Value};
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -216,13 +216,14 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(case, condition, select, index),
+                Some(table) => table.find_table_row(case, condition, select, wildcard, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -238,13 +239,14 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_rows(case, condition, select, index),
+                Some(table) => table.find_table_rows(case, condition, select, wildcard, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -337,6 +339,7 @@ mod tests {
                     value: Value::from("thang"),
                 }],
                 None,
+                None,
                 None
             )
         );
@@ -377,6 +380,7 @@ mod tests {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None,
                 None
             )
@@ -442,7 +446,7 @@ mod tests {
             tables
                 .get("dummy1")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None, None)
                 .unwrap()
                 .get("field")
                 .cloned()
@@ -455,7 +459,7 @@ mod tests {
             tables
                 .get("dummy2")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None, None)
                 .unwrap()
                 .get("thing")
                 .cloned()

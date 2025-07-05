@@ -57,6 +57,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String>;
 
@@ -68,6 +69,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String>;
 
