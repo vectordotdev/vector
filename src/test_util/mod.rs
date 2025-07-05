@@ -35,7 +35,9 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_lib::event::{BatchNotifier, Event, EventArray, LogEvent, MetricTags, MetricValue};
+use vector_lib::event::{
+    BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent, MetricTags, MetricValue,
+};
 use vector_lib::{
     buffers::topology::channel::LimitedReceiver,
     event::{Metric, MetricKind},
@@ -383,6 +385,17 @@ where
         batch,
     );
     (events, stream)
+}
+
+pub fn create_events_batch_with_fn<F: Fn() -> Event>(
+    create_event_fn: F,
+    num_events: usize,
+) -> (Vec<Event>, BatchStatusReceiver) {
+    let mut events = (0..num_events)
+        .map(|_| create_event_fn())
+        .collect::<Vec<_>>();
+    let receiver = BatchNotifier::apply_to(&mut events);
+    (events, receiver)
 }
 
 pub fn random_string(len: usize) -> String {

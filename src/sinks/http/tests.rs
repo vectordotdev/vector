@@ -8,12 +8,9 @@ use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{de, Deserialize};
-use vector_lib::{
-    codecs::{
-        encoding::{Framer, FramingConfig},
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    },
-    event::BatchStatusReceiver,
+use vector_lib::codecs::{
+    encoding::{Framer, FramingConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
 
 use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -21,6 +18,7 @@ use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use crate::{
     assert_downcast_matches,
     codecs::{EncodingConfigWithFraming, SinkType},
+    log_event,
     sinks::{
         prelude::*,
         util::{
@@ -36,7 +34,7 @@ use crate::{
         components::{
             self, init_test, run_and_assert_sink_compliance, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
         },
-        next_addr, random_lines_with_stream,
+        create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },
 };
 
@@ -533,24 +531,11 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     .await;
 }
 
-fn create_events_with_fn<F: Fn() -> Event>(
-    create_event_fn: F,
-    num_events: usize,
-) -> (Vec<Event>, BatchStatusReceiver) {
-    let mut events = (0..num_events)
-        .map(|_| create_event_fn())
-        .collect::<Vec<_>>();
-    let receiver = BatchNotifier::apply_to(&mut events);
-    (events, receiver)
-}
-
 #[tokio::test]
 async fn templateable_uri_path() {
     init_test();
     fn create_event_with_id(id: i64) -> Event {
-        let mut event = LogEvent::from("test event");
-        event.insert("id", id);
-        event.into()
+        log_event!["id" => id].into()
     }
 
     let num_events_per_id = 100;
@@ -573,9 +558,9 @@ async fn templateable_uri_path() {
     let (rx, trigger, server) = build_test_server(in_addr);
 
     let (some_events_with_an_id, mut a_receiver) =
-        create_events_with_fn(|| create_event_with_id(an_id), num_events_per_id);
+        create_events_batch_with_fn(|| create_event_with_id(an_id), num_events_per_id);
     let (some_events_with_another_id, mut another_receiver) =
-        create_events_with_fn(|| create_event_with_id(another_id), num_events_per_id);
+        create_events_batch_with_fn(|| create_event_with_id(another_id), num_events_per_id);
     let all_events = some_events_with_an_id
         .into_iter()
         .chain(some_events_with_another_id);
@@ -619,10 +604,7 @@ async fn templateable_uri_auth() {
     init_test();
 
     fn create_event_with_user_and_pass(user: &str, pass: &str) -> Event {
-        let mut event = LogEvent::from("test event");
-        event.insert("user", user.to_string());
-        event.insert("pass", pass.to_string());
-        event.into()
+        log_event!["user" => user, "pass" => pass].into()
     }
 
     let num_events_per_auth = 100;
@@ -645,11 +627,11 @@ async fn templateable_uri_auth() {
     let (sink, _) = config.build(cx).await.unwrap();
     let (rx, trigger, server) = build_test_server(in_addr);
 
-    let (some_events_with_an_auth, mut a_receiver) = create_events_with_fn(
+    let (some_events_with_an_auth, mut a_receiver) = create_events_batch_with_fn(
         || create_event_with_user_and_pass(an_user, a_pass),
         num_events_per_auth,
     );
-    let (some_events_with_another_auth, mut another_receiver) = create_events_with_fn(
+    let (some_events_with_another_auth, mut another_receiver) = create_events_batch_with_fn(
         || create_event_with_user_and_pass(another_user, another_pass),
         num_events_per_auth,
     );
@@ -713,7 +695,7 @@ async fn missing_field_in_uri_template() {
     let (rx, trigger, server) = build_test_server(in_addr);
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Event::Log(LogEvent::from("test event")).with_batch_notifier(&batch);
+    let event = Event::Log(LogEvent::default()).with_batch_notifier(&batch);
 
     tokio::spawn(server);
 
@@ -754,7 +736,7 @@ async fn http_uri_auth_conflict() {
     let (rx, trigger, server) = build_test_server(in_addr);
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Event::Log(LogEvent::from("test event")).with_batch_notifier(&batch);
+    let event = Event::Log(LogEvent::default()).with_batch_notifier(&batch);
 
     tokio::spawn(server);
 
