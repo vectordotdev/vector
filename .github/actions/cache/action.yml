@@ -39,5 +39,6 @@ runs:
 
     - name: Bootstrap environment
       if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
       run: |
         ./scripts/environment/prepare.sh
