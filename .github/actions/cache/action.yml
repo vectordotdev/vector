@@ -1,0 +1,43 @@
+name: "Cache and Bootstrap Environment Tools"
+description: "Composite action that caches and bootstraps Rust, Cargo, npm and other binaries provided in the prepare.sh script"
+
+env:
+  CI: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check prepare.sh
+      id: check-prepare-sh
+      shell: bash
+      run: |
+        if [ -f scripts/environment/prepare.sh ]; then
+          echo "has_prepare_sh=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_prepare_sh=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Fetch prepare.sh
+      if: steps.check-prepare.outputs.has_prepare_sh == 'false'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        sparse-checkout: |
+          scripts/environment/prepare.sh
+
+    - name: Cache environment
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo
+          ~/.rustup
+          ~/.npm
+        key: env-${{ runner.os }}-${{ hashFiles('scripts/environment/prepare.sh') }}
+        restore-keys: |
+          env-${{ runner.os }}-
+
+    - name: Bootstrap environment
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: |
+        ./scripts/environment/prepare.sh
