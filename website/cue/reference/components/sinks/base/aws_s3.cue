@@ -1057,15 +1057,15 @@ base: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: {
-			object: options: StatusCodes: {
+			object: options: status_codes: {
 				required: true
 				type: array: items: type: uint: {}
 			}
 			string: {
 				default: "None"
 				enum: {
-					All:  "Retry on *all* errors"
 					None: "Don't retry any errors"
+					all:  "Retry on *all* errors"
 				}
 			}
 		}
