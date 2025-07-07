@@ -347,9 +347,11 @@ pub enum RetryStrategy {
     None,
 
     /// Retry on *all* errors
+    #[serde(rename = "all")]
     All,
 
     /// Retry only on these HTTP status codes
+    #[serde(rename = "status_codes")]
     StatusCodes(Vec<u16>),
 }
 
