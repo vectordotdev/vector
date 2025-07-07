@@ -268,7 +268,7 @@ mod tests {
             test_util::{assert_current_send_capacity, Sample},
         },
         variants::MemoryBuffer,
-        MemoryBufferSize, WhenFull,
+        WhenFull,
     };
 
     #[tokio::test]
