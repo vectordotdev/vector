@@ -60,7 +60,7 @@ remap: functions: find_enrichment_table_records: {
 			]
 		},
 		{
-            title: "Exact match with wildcard"
+            title: "Wildcard match"
             source: #"""
                 find_enrichment_table_records!("test",
                   {
