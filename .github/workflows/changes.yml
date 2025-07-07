@@ -145,6 +145,7 @@ jobs:
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
     steps:
     - uses: actions/checkout@v4
+    - uses: ./.github/actions/cache
 
     - uses: dorny/paths-filter@v3
       id: filter
@@ -246,6 +247,7 @@ jobs:
       all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -324,6 +326,7 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
