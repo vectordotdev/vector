@@ -5,6 +5,7 @@ on:
     paths:
       - './scripts/environment/prepare.sh'
       - './.github/actions/cache/**'
+  workflow_call:
 
 # Wrapper workflow
 concurrency:
