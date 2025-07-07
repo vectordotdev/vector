@@ -1,13 +1,14 @@
 use std::{
     pin::Pin,
     task::{ready, Context, Poll},
+    time::Duration,
 };
 
 use futures_util::{stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use vector_lib::event::Metric;
 
-use super::buffer::metrics::{MetricNormalize, MetricNormalizer};
+use super::buffer::metrics::{MetricNormalize, MetricNormalizer, TtlPolicy};
 
 #[pin_project]
 pub struct Normalizer<St, N>
@@ -27,6 +28,13 @@ where
         Self {
             stream: stream.fuse(),
             normalizer: MetricNormalizer::from(normalizer),
+        }
+    }
+
+    pub fn new_with_ttl(stream: St, normalizer: N, ttl: Duration) -> Self {
+        Self {
+            stream: stream.fuse(),
+            normalizer: MetricNormalizer::with_ttl(normalizer, TtlPolicy::new(ttl)),
         }
     }
 }
