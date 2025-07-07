@@ -1,0 +1,25 @@
+name: Ensure Cache
+
+on:
+  push:
+    paths:
+      - './scripts/environment/prepare.sh'
+      - './.github/actions/cache/**'
+
+# Wrapper workflow
+concurrency:
+  group: cache-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ensure-cache:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run cache action
+        uses: ./.github/actions/cache
+        with:
+          check-only: true

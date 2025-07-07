@@ -202,19 +202,11 @@ jobs:
             - "**"
             - "!website/**"
 
-  cache:
-    runs-on: ubuntu-24.04
-    if: ${{ inputs.int_tests || inputs.e2e_tests }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/cache
-
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
-    needs: cache
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -254,6 +246,7 @@ jobs:
       all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each integration,
@@ -328,12 +321,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
-    needs: cache
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each test,

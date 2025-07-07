@@ -6,6 +6,11 @@ env:
 
 runs:
   using: "composite"
+  inputs:
+    check-only:
+      description: 'If true, only check cache existence and exit on hit. On cache miss, create it'
+      required: false
+      default: 'false'
   steps:
     - name: Check prepare.sh
       id: check-prepare-sh
@@ -25,8 +30,9 @@ runs:
         sparse-checkout: |
           scripts/environment/prepare.sh
 
-    - name: Cache environment
-      id: cache
+    - name: Pull cached environment
+      if: ${{ inputs.check-only != 'true' }}
+      id: pull-cache
       uses: actions/cache@v4
       with:
         path: |
@@ -37,8 +43,18 @@ runs:
         restore-keys: |
           env-${{ runner.os }}-
 
+    - name: Check if cache exists
+      if: ${{ inputs.check-only == 'true' }}
+      id: check-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/i-do-not-exist
+        key: env-${{ runner.os }}-${{ hashFiles('scripts/environment/prepare.sh') }}
+        restore-keys: |
+          env-${{ runner.os }}-
+
     - name: Bootstrap environment
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: ${{ steps.pull-cache.outputs.cache-hit != 'true' || steps.check-cache.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         ./scripts/environment/prepare.sh
