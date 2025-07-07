@@ -145,7 +145,6 @@ jobs:
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
     steps:
     - uses: actions/checkout@v4
-    - uses: ./.github/actions/cache
 
     - uses: dorny/paths-filter@v3
       id: filter
@@ -203,11 +202,18 @@ jobs:
             - "**"
             - "!website/**"
 
+  cache:
+    runs-on: ubuntu-24.04
+    if: ${{ inputs.int_tests || inputs.e2e_tests }}
+    steps:
+      - uses: ./.github/actions/cache
+
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
+    needs: cache
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -321,6 +327,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
+    needs: cache
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
