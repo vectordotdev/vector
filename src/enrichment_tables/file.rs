@@ -515,10 +515,9 @@ impl File {
         // If lookup fails and a wildcard is provided, compute hash for the wildcard
         let mut wildcard_hash = seahash::SeaHasher::default();
         for header in self.headers.iter() {
-            if condition
-                .iter()
-                .any(|condition| matches!(condition, Condition::Equals { field, .. } if field == header))
-            {
+            if condition.iter().any(
+                |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
+            ) {
                 hash_value(&mut wildcard_hash, case, wildcard)?;
             }
         }
