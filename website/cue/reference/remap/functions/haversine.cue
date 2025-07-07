@@ -9,25 +9,25 @@ remap: functions: haversine: {
 
 	arguments: [
 		{
-			name:        "lat1"
+			name:        "latitude1"
 			description: "Latitude of the first point."
 			required:    true
 			type: ["float"]
 		},
 		{
-			name:        "lon1"
+			name:        "longitude1"
 			description: "Longitude of the first point."
 			required:    true
 			type: ["float"]
 		},
 		{
-			name:        "lat2"
+			name:        "latitude2"
 			description: "Latitude of the second point."
 			required:    true
 			type: ["float"]
 		},
 		{
-			name:        "lon2"
+			name:        "longitude2"
 			description: "Longitude of the second point."
 			required:    true
 			type: ["float"]
