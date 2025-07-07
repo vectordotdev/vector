@@ -206,6 +206,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ inputs.int_tests || inputs.e2e_tests }}
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/cache
 
   # Detects changes that are specific to integration tests
