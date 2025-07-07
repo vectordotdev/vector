@@ -6,7 +6,7 @@ git config --global --add safe.directory /git/vectordotdev/vector
 rustup show active-toolchain || rustup toolchain install
 rustup show
 if [[ "$(cargo-deb --version)" != "2.0.2" ]] ; then
-  rustup run stable cargo install cargo-deb --version 2.0.0 --force --locked
+  rustup run stable cargo install cargo-deb --version 2.0.2 --force --locked
 fi
 if [[ "$(cross --version | grep cross)" != "cross 0.2.5" ]] ; then
   rustup run stable cargo install cross --version 0.2.5 --force --locked
