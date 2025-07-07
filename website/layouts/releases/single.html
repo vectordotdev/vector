@@ -126,12 +126,13 @@
                 {{ if gt (len .contributors) 0 }}
                 <br>
                 <span class="prose dark:prose-dark italic">
-                    Thanks to
-                    {{ range .contributors}}
-                    <a href="https://github.com/{{ replace . "@" "" }}" rel="noopener" target="_blank">{{ . }}</a>
+                  Thanks to
+                  {{ $len := len .contributors }}
+                  {{ range $i, $contributor := .contributors }}
+                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
                   {{ end }}
-                    for contributing this change!
-                  </span>
+                  for contributing this change!
+                </span>
                 {{ end }}
               </li>
               {{ end }}

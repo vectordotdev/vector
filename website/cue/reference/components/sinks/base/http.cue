@@ -7,7 +7,7 @@ base: components: sinks: http: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -149,6 +149,14 @@ base: components: sinks: http: configuration: {
 						required: false
 						type: string: examples: ["vector-indexer-role"]
 					}
+					session_token: {
+						description: """
+																The AWS session token.
+																See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+																"""
+						required: false
+						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+					}
 				}
 			}
 			password: {
@@ -263,8 +271,12 @@ base: components: sinks: http: configuration: {
 		}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -675,12 +687,8 @@ base: components: sinks: http: configuration: {
 		}
 	}
 	method: {
-		description: """
-			HTTP method.
-
-			The HTTP method to use when making the request.
-			"""
-		required: false
+		description: "The HTTP method to use when making the request."
+		required:    false
 		type: string: {
 			default: "post"
 			enum: {
@@ -814,7 +822,7 @@ base: components: sinks: http: configuration: {
 							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.

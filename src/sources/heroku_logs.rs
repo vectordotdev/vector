@@ -9,11 +9,14 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
@@ -210,10 +213,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
-            schema_def,
-        )]
+        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_def)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -407,7 +407,6 @@ fn line_to_events(
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())

@@ -1,7 +1,7 @@
 ---
 title: MQTT
 description: Receive logs from an [MQTT](https://mqtt.org) broker
-kind: source
+component_kind: source
 layout: component
 tags: ["mqtt", "component", "source"]
 ---

@@ -4,7 +4,7 @@ components: transforms: "remap": {
 	title: "Remap"
 
 	description: """
-		Is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
+		This is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
 		observability data (logs and metrics) in a safe and performant manner.
 
@@ -47,6 +47,18 @@ components: transforms: "remap": {
 			summary:      true
 		}
 		traces: true
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+		traces: "": {
+			description: "The modified input `trace` event."
+		}
 	}
 
 	examples: [
@@ -98,7 +110,8 @@ components: transforms: "remap": {
 				`type` | Read only |
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
 				`name` | Read/write |
-				`timestamp` | Read/write/delete | You assign only a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`timestamp` | Read/write/delete | You can only assign a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`interval_ms` | Read/write/delete | You can assign it a non zero 32 byte unsigned interval
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
 

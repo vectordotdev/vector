@@ -29,9 +29,6 @@ jobs:
   changes:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
   checks:
     name: Checks
