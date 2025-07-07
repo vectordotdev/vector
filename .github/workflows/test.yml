@@ -30,12 +30,12 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  checks:
+  checks-source:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 60
     needs: changes
-    if: ${{ matrix.condition || 'true' }}
+    if: needs.changes.outputs.source == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -45,27 +45,73 @@ jobs:
 
           - job_name: "Check clippy"
             command: "make check-clippy"
-            condition: needs.changes.outputs.source == 'true'
 
           - job_name: "Unit - x86_64-unknown-linux-gnu"
             command: "make test"
             env:
               CARGO_BUILD_JOBS: 5
-            condition: needs.changes.outputs.source == 'true'
             post: upload-test-results
 
           - job_name: "Check Component Spec"
             command: "make test-component-validation"
 
+          - job_name: "Check events"
+            command: "make check-events"
+
+          - job_name: "Check Rust Docs"
+            command: "cd rust-doc && make docs"
+
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/cache@v4
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+
+      - uses: ruby/setup-ruby@v1
+
+      - run: bash scripts/environment/prepare.sh
+
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: Run ${{ matrix.job_name }}
+        run: ${{ matrix.command }}
+        env: ${{ matrix.env || '{}' }}
+
+      - name: Upload test results
+        if: always() && matrix.post == 'upload-test-results'
+        run: scripts/upload-test-results.sh
+
+  checks-non-code:
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 60
+    needs: changes
+    if: ${{ matrix.condition || 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - job_name: "Check version"
             command: "make check-version"
 
           - job_name: "Check scripts"
             command: "make check-scripts"
-
-          - job_name: "Check events"
-            command: "make check-events"
-            condition: needs.changes.outputs.source == 'true'
 
           - job_name: "Check that the 3rd-party license file is up to date"
             command: "make check-licenses"
@@ -82,10 +128,6 @@ jobs:
           - job_name: "Check Component Docs"
             command: "make check-component-docs"
             condition: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-
-          - job_name: "Check Rust Docs"
-            command: "cd rust-doc && make docs"
-            condition: needs.changes.outputs.source == 'true'
 
           - job_name: "VRL - Linux"
             command: "cargo vdev test-vrl"
@@ -140,7 +182,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
-    needs: [changes, checks]
+    needs: [changes, checks-source, checks-non-code]
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
