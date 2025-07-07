@@ -479,7 +479,6 @@ impl File {
     fn indexed<'a>(
         &'a self,
         case: Case,
-        wildcard: Option<&'a Value>,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
     ) -> Result<Option<&'a Vec<usize>>, String> {
@@ -488,7 +487,6 @@ impl File {
         // being passed in the condition.
         let mut hash = seahash::SeaHasher::default();
 
-        // Compute hash for the condition value
         for header in self.headers.iter() {
             if let Some(Condition::Equals { value, .. }) = condition.iter().find(
                 |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
@@ -500,29 +498,34 @@ impl File {
         let key = hash.finish();
 
         let IndexHandle(handle) = handle;
+        Ok(self.indexes[handle].2.get(&key))
+    }
 
-        // Attempt lookup with the condition value's hash
-        if let Some(result) = self.indexes[handle].2.get(&key) {
+    fn indexed_with_wildcard<'a>(
+        &'a self,
+        case: Case,
+        wildcard: &'a Value,
+        condition: &'a [Condition<'a>],
+        handle: IndexHandle,
+    ) -> Result<Option<&'a Vec<usize>>, String> {
+        if let Some(result) = self.indexed(case, condition, handle)? {
             return Ok(Some(result));
         }
 
         // If lookup fails and a wildcard is provided, compute hash for the wildcard
-        if let Some(wildcard_value) = wildcard {
-            let mut wildcard_hash = seahash::SeaHasher::default();
-            for header in self.headers.iter() {
-                if condition.iter().any(|condition| matches!(condition, Condition::Equals { field, .. } if field == header)) {
-                    hash_value(&mut wildcard_hash, case, wildcard_value)?;
-                }
-            }
-
-            let wildcard_key = wildcard_hash.finish();
-            if let Some(result) = self.indexes[handle].2.get(&wildcard_key) {
-                return Ok(Some(result));
+        let mut wildcard_hash = seahash::SeaHasher::default();
+        for header in self.headers.iter() {
+            if condition
+                .iter()
+                .any(|condition| matches!(condition, Condition::Equals { field, .. } if field == header))
+            {
+                hash_value(&mut wildcard_hash, case, wildcard)?;
             }
         }
 
-        // Return None if neither lookup succeeds
-        Ok(None)
+        let wildcard_key = wildcard_hash.finish();
+        let IndexHandle(handle) = handle;
+        Ok(self.indexes[handle].2.get(&wildcard_key))
     }
 }
 
@@ -580,11 +583,14 @@ impl Table for File {
                 single_or_err(self.sequential(self.data.iter(), case, condition, select, wildcard))
             }
             Some(handle) => {
-                let result = self
-                    .indexed(case, wildcard, condition, handle)?
-                    .ok_or_else(|| "no rows found in index".to_string())?
-                    .iter()
-                    .map(|idx| &self.data[*idx]);
+                let result = if let Some(wildcard) = wildcard {
+                    self.indexed_with_wildcard(case, wildcard, condition, handle)?
+                } else {
+                    self.indexed(case, condition, handle)?
+                }
+                .ok_or_else(|| "no rows found in index".to_string())?
+                .iter()
+                .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
                 single_or_err(self.sequential(result, case, condition, select, wildcard))
@@ -609,9 +615,15 @@ impl Table for File {
             }
             Some(handle) => {
                 // Perform a sequential scan over the indexed result.
+                let indexed_result = if let Some(wildcard) = wildcard {
+                    self.indexed_with_wildcard(case, wildcard, condition, handle)?
+                } else {
+                    self.indexed(case, condition, handle)?
+                };
+
                 Ok(self
                     .sequential(
-                        self.indexed(case, wildcard, condition, handle)?
+                        indexed_result
                             .iter()
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                         case,
