@@ -58,7 +58,7 @@ option = "year=%Y/month=%m/day=%d/"
 ```
 
 {{< info >}}
-The value is derived from the [`timestamp` field](/docs/about/under-the-hood/architecture/data-model/log/#timestamps)
+The value is derived from the [`timestamp` field](/docs/architecture/data-model/log/#timestamps)
 and the name of this field can be changed via the [global `timestamp_key` option](/docs/reference/configuration/global-options/#log_schema.timestamp_key).
 {{< /info >}}
 
@@ -109,7 +109,7 @@ metric is incremented with an `error_type` tag of `template_failed`.
 
 [1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
-[log]: /docs/about/under-the-hood/architecture/data-model/log
+[log]: /docs/architecture/data-model/log
 [path_expression]: /docs/reference/vrl/expressions/#path
 [path_expression_examples]: /docs/reference/vrl/expressions/#path-examples
 [remap]: /docs/reference/configuration/transforms/remap

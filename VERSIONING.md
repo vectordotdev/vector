@@ -122,7 +122,7 @@ here. Each minor release bump will include an upgrade guide in the
 [CLI]: https://vector.dev/docs/reference/cli/
 [configuration schema]: https://vector.dev/docs/reference/configuration/
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
-[data model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
+[data model]: https://vector.dev/docs/architecture/data-model/
 [GitHub repository]: https://github.com/vectordotdev/vector
 [GraphQL API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
