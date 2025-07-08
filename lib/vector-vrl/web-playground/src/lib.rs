@@ -35,11 +35,11 @@ impl Input {
 pub struct VrlCompileResult {
     pub output: Value,
     pub result: Value,
-    pub elapsed_time: f64,
+    pub elapsed_time: Option<f64>,
 }
 
 impl VrlCompileResult {
-    fn new(output: Value, result: Value, elapsed_time: f64) -> Self {
+    fn new(output: Value, result: Value, elapsed_time: Option<f64>) -> Self {
         Self {
             output,
             result,
@@ -91,17 +91,22 @@ fn compile(mut input: Input, tz_str: &str) -> Result<VrlCompileResult, VrlDiagno
     let mut runtime = Runtime::default();
     let config = CompileConfig::default();
 
-    // Parse timezone
-    let timezone = match tz_str.parse() {
-        Ok(tz) => TimeZone::Named(tz),
-        Err(_) => {
-            let error_message = format!("Invalid timezone identifier: '{}'", tz_str);
-            return Err(VrlDiagnosticResult {
-                list: vec![error_message.clone()],
-                msg: error_message.clone(),
-                msg_colorized: error_message,
-            });
-        }
+    let timezone = match tz_str {
+        // Empty or "Default" tz string will default to tz default
+        "" | "Default" => TimeZone::default(),
+        other => match other.parse() {
+            Ok(tz) => TimeZone::Named(tz),
+            Err(_) => {
+                // Returns error message if tz parsing has failed.
+                // This avoids head scratching, instead of it silently using the default timezone.
+                let error_message = format!("Invalid timezone identifier: '{}'", tz_str);
+                return Err(VrlDiagnosticResult {
+                    list: vec![error_message.clone()],
+                    msg: error_message.clone(),
+                    msg_colorized: error_message,
+                });
+            }
+        },
     };
 
     let mut target_value = TargetValue {
@@ -115,25 +120,22 @@ fn compile(mut input: Input, tz_str: &str) -> Result<VrlCompileResult, VrlDiagno
         Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };
 
-    // Access the browser's performance API to measure time.
-    let window = web_sys::window().expect("should have a window in this context");
-    let performance = window
-        .performance()
-        .expect("performance should be available");
-
-    // Start the timer.
-    let start_time = performance.now();
-
-    let result = runtime.resolve(&mut target_value, &program.program, &timezone);
-
-    // End the timer.
-    let end_time = performance.now();
-
-    // Calculate the elapsed time in milliseconds
-    let elapsed = end_time - start_time;
+    let (result, elapsed_time) =
+        if let Some(performance) = web_sys::window().and_then(|w| w.performance()) {
+            let start_time = performance.now();
+            let result = runtime.resolve(&mut target_value, &program.program, &timezone);
+            let end_time = performance.now();
+            (result, Some(end_time - start_time))
+        } else {
+            // If performance API is not available, run the program without timing.
+            let result = runtime.resolve(&mut target_value, &program.program, &timezone);
+            (result, None)
+        };
 
     match result {
-        Ok(result) => Ok(VrlCompileResult::new(result, target_value.value, elapsed)),
+        // The final event is in `target_value.value`.
+        // The value of the last expression is in `res`.
+        Ok(res) => Ok(VrlCompileResult::new(res, target_value.value, elapsed_time)),
         Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
