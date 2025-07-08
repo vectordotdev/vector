@@ -42,7 +42,7 @@ impl<const N: usize> AddBatchNotifier for Message<N> {
 
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
-        self.heap_allocated.len() * 8
+        self.heap_allocated.len() * std::mem::size_of::<u64>()
     }
 }
 
