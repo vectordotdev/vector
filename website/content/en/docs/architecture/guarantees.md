@@ -1,6 +1,7 @@
 ---
 title: Guarantees
-aliases: ["/docs/about/guarantees"]
+weight: 6
+aliases: ["/docs/introduction/guarantees"]
 ---
 
 Vector attempts to make it clear which guarantees you can expect from it. We categorize all
@@ -132,4 +133,4 @@ filters.
 
 [bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22
 [components]: /components
-[event]: /docs/about/under-the-hood/architecture/data-model
+[event]: /docs/architecture/data-model

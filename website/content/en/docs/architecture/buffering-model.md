@@ -1,6 +1,6 @@
 ---
 title: Buffering model
-weight: 2
+weight: 4
 tags: ["buffering", "buffers", "disk"]
 ---
 
@@ -258,5 +258,5 @@ rather than force the client to wait, which could cause issues further up the st
 [sinks]: /docs/reference/configuration/sinks/
 [transforms]: /docs/reference/configuration/transforms/
 [sources]: /docs/reference/configuration/sources/
-[e2e_acks]: /docs/about/under-the-hood/architecture/end-to-end-acknowledgements
+[e2e_acks]: /docs/architecture/end-to-end-acknowledgements
 [global_data_dir]: /docs/reference/configuration/global-options/#data_dir

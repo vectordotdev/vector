@@ -14,7 +14,7 @@ tags: ["lua", "merge", "multiline", "multi-line", "advanced", "guides", "guide"]
 * You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a basic pipeline][docs.setup.quickstart].
 * You know how to [parse CSV logs with Lua][guides.parsing-csv-logs-with-lua].
 
-[docs.about.concepts]: /docs/about/concepts
+[docs.about.concepts]: /docs/introduction/concepts
 [docs.setup.quickstart]: /docs/setup/quickstart
 [docs.transforms.lua]: /docs/reference/configuration/transforms/lua
 [guides.parsing-csv-logs-with-lua]: /guides/advanced/parsing-csv-logs-with-lua
@@ -148,7 +148,7 @@ in checking out the following guides:
 * [Unit Testing Your Configs][guides.unit-testing]
 * [Custom Aggregations with Lua][guides.advanced.custom-aggregations-with-lua]
 
-[docs.about.concepts]: /docs/about/concepts/
+[docs.about.concepts]: /docs/introduction/concepts/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source
