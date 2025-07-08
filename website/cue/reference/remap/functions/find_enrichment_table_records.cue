@@ -64,14 +64,13 @@ remap: functions: find_enrichment_table_records: {
 			source: #"""
 				find_enrichment_table_records!("test",
 				  {
-				    "surname": "Doe",
+				    "firstname": "Bob",
 				  },
-				  wildcard: "smith",
+				  wildcard: "fred",
 				  case_sensitive: false)
 				"""#
 			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
 				{"id": 2, "firstname": "Fred", "surname": "Smith"},
-				{"id": 3, "firstname": "Jane", "surname": "Doe"},
 			]
 		},
 		{
