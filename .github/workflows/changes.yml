@@ -246,7 +246,7 @@ jobs:
       all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/cache.yml@main
+      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each integration,
@@ -326,7 +326,7 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/cache.yml@main
+      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each test,
