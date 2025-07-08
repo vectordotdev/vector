@@ -3,11 +3,14 @@ package metadata
 remap: functions: validate_json_schema: {
 	category: "Type"
 	description: """
-		Check if `value` conforms to a JSON Schema definition.
-
-        This function validates a JSON payload against a JSON Schema definition. It can be used to ensure that the data structure and types in `value` match the expectations defined in `schema_definition`.
+		Check if `value` conforms to a JSON Schema definition. This function validates a JSON payload against a JSON Schema definition. It can be used to ensure that the data structure and types in `value` match the expectations defined in `schema_definition`.
 		"""
-
+	notices: [
+		"""
+			This function uses a compiled schema cache. The first time it is called with a specific `schema_definition`, it will compile the schema and cache it for subsequent calls. This improves performance when validating multiple values against the same schema.
+			The cache implementation is fairly naive and does not support refreshing the schema if it changes. If you update the schema definition file, you must restart Vector to clear the cache.
+			""",
+	]
 	arguments: [
 		{
 			name:        "value"
@@ -65,7 +68,7 @@ remap: functions: validate_json_schema: {
 				"""
 			return: false
 		},
-        {
+		{
 			title: "Payload contains a custom format declaration, with ignore_unknown_formats set to true."
 			source: """
 				validate_json_schema!(s'{{ "productUser": "a-custom-formatted-string" }}', "resources/json-schema_definition.json", true)
