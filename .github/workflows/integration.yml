@@ -34,6 +34,9 @@ env:
   CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
+  ensure-cache:
+    uses: ./.github/workflows/cache.yml
+
   changes:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
@@ -65,6 +68,7 @@ jobs:
     needs:
       - changes
       - check-secrets
+      - ensure-cache
 
     if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
     strategy:
@@ -81,11 +85,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-
-      - run: |
-          sudo npm -g install @datadog/datadog-ci
+      - uses: ./.github/actions/cache
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@v4
