@@ -155,7 +155,7 @@ releases: "0.24.0": {
 			scopes: ["enrichment tables"]
 			description: """
 				A new enrichment table type was added,
-				[`geoip`](/docs/reference/configuration/global-options/#enrichment_tables.geoip).
+				[`geoip`](/docs/reference/configuration/global-options/#enrichment_tables.type).
 				This can be used with [VRL's enrichment table
 				functions](/docs/reference/vrl/functions/#enrichment-functions) to enrich events
 				using a [GeoIP database](https://www.maxmind.com/en/geoip2-databases).

@@ -19,6 +19,6 @@ vector-common = { path = "../vector-common" }
 vector-core = { path = "../vector-core" }
 
 [dev-dependencies]
-proptest = "1.6"
+proptest = "1.7"
 rand.workspace = true
 rand_distr.workspace = true
