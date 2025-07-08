@@ -9,7 +9,7 @@ on:
 
 # Wrapper workflow
 concurrency:
-  group: cache-${{ github.workflow }}-${{ github.ref }}
+  group: cache-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
