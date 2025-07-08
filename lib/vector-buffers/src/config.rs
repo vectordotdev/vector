@@ -97,7 +97,11 @@ impl BufferTypeVisitor {
                     } else {
                         return Err(de::Error::invalid_value(
                             de::Unexpected::Unsigned(max_bytes.into()),
-                            &"For memory buffers max_bytes expects an integer within the range of 268435488 and your architecture dependent usize",
+                            &format!(
+                                "Value for max_bytes must be a positive integer <= {}",
+                                usize::MAX
+                            )
+                            .as_str(),
                         ));
                     }
                 } else {
