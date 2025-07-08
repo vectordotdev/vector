@@ -1,5 +1,5 @@
 use std::{
-    num::{NonZeroU64, NonZeroUsize},
+    num::{NonZeroU16, NonZeroU64},
     path::PathBuf,
 };
 
@@ -101,8 +101,8 @@ impl Arbitrary for Variant {
         let use_memory_buffer = bool::arbitrary(g);
 
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
-        let max_events = NonZeroUsize::arbitrary(g);
-        let max_size = NonZeroU64::arbitrary(g);
+        let max_events = NonZeroU16::arbitrary(g).into();
+        let max_size = NonZeroU16::arbitrary(g).into();
         let size = MemoryBufferSize::MaxEvents(max_events);
 
         let when_full = WhenFull::arbitrary(g);
