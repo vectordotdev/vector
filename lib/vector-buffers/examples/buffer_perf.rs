@@ -260,7 +260,6 @@ where
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
-            // TODO(rob) edit benchmarks to work with new buffer impls
             BufferType::Memory {
                 max_events: Some(max_size_events),
                 max_size: None,
