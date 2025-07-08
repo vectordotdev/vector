@@ -69,7 +69,7 @@ remap: functions: get_enrichment_table_record: {
 				  {
 				    "surname": "Doe",
 				  },
-				  wildcard: "smith"
+				  wildcard: "smith",
 				  case_sensitive: false)
 				"""#
 			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
