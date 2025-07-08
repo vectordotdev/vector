@@ -20,7 +20,7 @@ dunce = "1.0.5"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.18.0", features = ["improved_unicode"] }
+indicatif = { version = "0.17.12", features = ["improved_unicode"] }
 itertools = "0.14.0"
 log = "0.4.27"
 # watch https://github.com/epage/anstyle for official interop with Clap
