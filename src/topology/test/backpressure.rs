@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::time::Duration;
-use vector_lib::buffers::{config::MemoryBufferSize, BufferConfig, BufferType, WhenFull};
+use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
 use vector_lib::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
 use crate::{config::Config, test_util, test_util::start_topology};
@@ -98,9 +98,8 @@ async fn buffer_drop_fan_out() {
         backpressure_sink(events_to_sink / 2),
     );
     sink_outer.buffer = BufferConfig::Single(BufferType::Memory {
-        size: MemoryBufferSize::MaxEvents {
-            max_size: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
-        },
+        max_events: Some(MEMORY_BUFFER_DEFAULT_MAX_EVENTS),
+        max_size: None,
         when_full: WhenFull::DropNewest,
     });
     config.add_sink_outer("out2", sink_outer);

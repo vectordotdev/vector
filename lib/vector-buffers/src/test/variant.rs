@@ -103,9 +103,7 @@ impl Arbitrary for Variant {
         // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
         let max_events = NonZeroUsize::arbitrary(g);
         let max_size = NonZeroU64::arbitrary(g);
-        let size = MemoryBufferSize::MaxEvents {
-            max_size: max_events,
-        };
+        let size = MemoryBufferSize::MaxEvents(max_events);
 
         let when_full = WhenFull::arbitrary(g);
 
@@ -128,15 +126,15 @@ impl Arbitrary for Variant {
             } => {
                 let when_full = *when_full;
                 match size {
-                    MemoryBufferSize::MaxEvents { max_size } => {
+                    MemoryBufferSize::MaxEvents(max_size) => {
                         Box::new(max_size.shrink().map(move |me| Variant::Memory {
-                            size: MemoryBufferSize::MaxEvents { max_size: me },
+                            size: MemoryBufferSize::MaxEvents(me),
                             when_full,
                         }))
                     }
-                    MemoryBufferSize::MaxSize { max_bytes } => {
+                    MemoryBufferSize::MaxSize(max_bytes) => {
                         Box::new(max_bytes.shrink().map(move |me| Variant::Memory {
-                            size: MemoryBufferSize::MaxSize { max_bytes: me },
+                            size: MemoryBufferSize::MaxSize(me),
                             when_full,
                         }))
                     }

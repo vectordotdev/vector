@@ -192,26 +192,13 @@ impl DiskUsage {
 
 /// Enumeration to define exactly what terms the bounds of the buffer is expressed in: length, or
 /// `byte_size`.
-#[configurable_component(no_deser)]
-#[serde(rename_all = "snake_case", tag = "type")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[configurable(metadata(
-    docs::enum_tag_description = "Size configuration parameter for the Buffer."
-))]
 pub enum MemoryBufferSize {
     /// Express the maximum size of the buffer as number of elements.
-    MaxEvents {
-        /// The maximum number of events the buffer can hold.
-        #[serde(default = "memory_buffer_default_max_events")]
-        max_size: NonZeroUsize,
-    },
+    MaxEvents(NonZeroUsize),
 
-    /// Express the maximum size of the buffer in terms of bytes allocated.
-    MaxSize {
-        /// The maximum allowed amount of allocated memory the buffer can hold.
-        #[configurable(metadata(docs::type_unit = "bytes"))]
-        max_bytes: NonZeroUsize,
-    },
+    /// The maximum allowed amount of allocated memory the buffer can hold.
+    MaxSize(NonZeroUsize),
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -358,13 +345,11 @@ impl BufferType {
             } => {
                 let size = match (max_events, max_size) {
                     (Some(max_events), None) => {
-                        Ok(MemoryBuffer::new(MemoryBufferSize::MaxEvents {
-                            max_size: max_events,
-                        }))
+                        Ok(MemoryBuffer::new(MemoryBufferSize::MaxEvents(max_events)))
                     }
-                    (None, Some(max_size)) => Ok(MemoryBuffer::new(MemoryBufferSize::MaxSize {
-                        max_bytes: max_size,
-                    })),
+                    (None, Some(max_size)) => {
+                        Ok(MemoryBuffer::new(MemoryBufferSize::MaxSize(max_size)))
+                    }
                     _ => Err(BufferBuildError::RequiresDataDir),
                 };
                 builder.stage(size?, when_full);

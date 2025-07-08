@@ -393,9 +393,7 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents {
-            max_size: NonZeroUsize::new(n).unwrap(),
-        });
+        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
         (
             Self {
                 sender: tx,
