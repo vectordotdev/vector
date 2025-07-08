@@ -12,42 +12,16 @@ base: components: sinks: configuration: {
 			"""
 		required: false
 		type: object: options: {
-			max_size: {
-				description: """
-					The maximum size of the buffer on disk.
-
-					Must be at least ~256 megabytes (268435488 bytes).
-					"""
-				relevant_when: "type = \"disk\""
-				required:      true
-				type: uint: unit: "bytes"
-			}
-			size: {
-				description:   "The terms around how to express buffering limits, can be in size or bytes_size."
+			max_events: {
+				description:   "The maximum number of events allowed in the buffer."
 				relevant_when: "type = \"memory\""
-				required:      true
-				type: object: options: {
-					max_bytes: {
-						description:   "The maximum allowed amount of allocated memory the buffer can hold."
-						relevant_when: "type = \"max_size\""
-						required:      true
-						type: uint: unit: "bytes"
-					}
-					max_size: {
-						description:   "The maximum number of events the buffer can hold."
-						relevant_when: "type = \"max_events\""
-						required:      false
-						type: uint: default: 500
-					}
-					type: {
-						description: "Size configuration parameter for the Buffer."
-						required:    true
-						type: string: enum: {
-							max_events: "Express the maximum size of the buffer as number of elements."
-							max_size:   "Express the maximum size of the buffer in terms of bytes allocated."
-						}
-					}
-				}
+				required:      false
+				type: uint: default: 500
+			}
+			max_size: {
+				description: "The maximum size across all events allowed in the buffer."
+				required:    false
+				type: uint: unit: "bytes"
 			}
 			type: {
 				description: "The type of buffer to use."
