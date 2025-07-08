@@ -128,6 +128,10 @@ env:
   HEAD_REF: ${{ inputs.head_ref  || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
 
 jobs:
+  # Ensure caches are available before running any jobs that rely on them
+  ensure-cache:
+    uses: ./.github/workflows/cache.yml
+
   # Detects changes that are not specific to integration tests
   source:
     runs-on: ubuntu-24.04
@@ -206,6 +210,7 @@ jobs:
   int_tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    needs: ensure-cache
     if: ${{ inputs.int_tests }}
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
@@ -246,7 +251,6 @@ jobs:
       all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each integration,
@@ -320,13 +324,13 @@ jobs:
   e2e_tests:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    needs: ensure-cache
     if: ${{ inputs.e2e_tests }}
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/cache.yml
       - uses: ./.github/actions/cache
 
       # creates a yaml file that contains the filters for each test,
