@@ -309,7 +309,7 @@ impl DorisSinkClient {
     }
 
     pub async fn healthcheck_fenode(&self, endpoint: String) -> crate::Result<()> {
-        // Use Doris bootstrap API endpoint for health check, don't need auth, GET method
+        // Use Doris bootstrap API endpoint for health check, GET method
         let query_path = "/api/bootstrap";
         let endpoint_str = endpoint.trim_end_matches('/');
         let uri_str = format!("{}{}", endpoint_str, query_path);
@@ -328,11 +328,15 @@ impl DorisSinkClient {
             uri = %uri
         );
 
-        let request = Request::builder()
+        let mut request = Request::builder()
             .method(Method::GET)
             .uri(uri)
             .body(Body::empty())
             .map_err(|e| format!("Failed to build health check request: {}", e))?;
+
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
 
         let response = self.http_client.send(request).await?;
         let status = response.status();
