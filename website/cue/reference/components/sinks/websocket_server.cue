@@ -120,7 +120,7 @@ components: sinks: websocket_server: {
 				sinks:
 					websocket_sink:
 						inputs: ["demo_logs_test"]
-						type: "websocket_listener"
+						type: "websocket_server"
 						address: "0.0.0.0:1234"
 						auth:
 							username: "test"
