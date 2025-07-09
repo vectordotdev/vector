@@ -90,8 +90,9 @@ components: _kafka: {
 			body:  """
 				It is possible to use the `kafka` source and sink with [Azure Event Hubs](\(urls.azure_event_hubs))
 				for all tiers other than the [Basic tier](\(urls.azure_event_hubs_tiers)). More details
-				can be found [here](\(urls.azure_event_hubs_kafka)). To configure the source and
-				sink to connect to Azure Event Hubs set the following options:
+				can be found in [_What is Azure Event Hubs for Apache Kafka?_](\(urls.azure_event_hubs_kafka)).
+				and [Recommended configurations for Apache Kafka clients](\(urls.azure_event_hubs_kafka_config)).
+				To configure the source and sink to connect to Azure Event Hubs set the following options:
 				- `bootstrap_servers` - `<namespace name>.servicebus.windows.net:9093`
 				- `group_id` - The consumer group. Note that if the default group (`$Default`) is used it must
 				  be specified as `$$Default` to escape the `$` used for environment variables.
@@ -103,6 +104,9 @@ components: _kafka: {
 				- `tls.enabled` - Set to `true`.
 				- `tls.ca_file` - The certificate authority file.
 				- `tls.verify_certificate` - Set to `true`.
+				If you see AllBrokerDown errors every 5 minutes (the default interval between rebootstrap), that may
+				just mean there are no new records to process: if you were expecting new records, check your `group_id`.
+				If there are networking errors, check the `keepalive`, timeout and various `interval` settings.
 				"""
 		}
 	}
