@@ -89,41 +89,9 @@ where
 }
 
 #[derive(Debug)]
-struct SizeTerms<T> {
-    method: fn(&T) -> usize,
-}
-
-impl<T> Clone for SizeTerms<T> {
-    fn clone(&self) -> Self {
-        Self {
-            method: self.method,
-        }
-    }
-}
-
-impl<T: InMemoryBufferable> SizeTerms<T> {
-    fn apply(&self, item: &T) -> usize {
-        (self.method)(item)
-    }
-
-    fn by_bytes_allocated() -> Self {
-        Self {
-            method: |item: &T| -> usize { item.allocated_bytes() },
-        }
-    }
-
-    fn by_number_events() -> Self {
-        Self {
-            method: |item: &T| -> usize { item.event_count() },
-        }
-    }
-}
-
-#[derive(Debug)]
 struct Inner<T> {
     data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
-    terms: SizeTerms<T>,
-    limit: usize,
+    limit: MemoryBufferSize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
 }
@@ -132,7 +100,6 @@ impl<T> Clone for Inner<T> {
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
-            terms: self.terms.clone(),
             limit: self.limit,
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
@@ -152,7 +119,11 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         // We have to limit the number of permits we ask for to the overall limit since we're always
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
-        cmp::min(self.inner.limit, self.inner.terms.apply(item)) as u32
+        let (limit, value) = match self.inner.limit {
+            MemoryBufferSize::MaxSize(max_size) => (max_size, item.allocated_bytes()),
+            MemoryBufferSize::MaxEvents(max_events) => (max_events, item.event_count()),
+        };
+        cmp::min(limit.get(), value) as u32
     }
 
     /// Gets the number of items that this channel could accept.
@@ -302,15 +273,13 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     let inner = match limit {
         MemoryBufferSize::MaxEvents(max_size) => Inner {
             data: Arc::new(ArrayQueue::new(max_size.get())),
-            terms: SizeTerms::by_number_events(),
-            limit: max_size.get(),
+            limit,
             limiter: Arc::new(Semaphore::new(max_size.get())),
             read_waker: Arc::new(Notify::new()),
         },
         MemoryBufferSize::MaxSize(max_bytes) => Inner {
             data: Arc::new(SegQueue::new()),
-            terms: SizeTerms::by_bytes_allocated(),
-            limit: max_bytes.get(),
+            limit,
             limiter: Arc::new(Semaphore::new(max_bytes.get())),
             read_waker: Arc::new(Notify::new()),
         },

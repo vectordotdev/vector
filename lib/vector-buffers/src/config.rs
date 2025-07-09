@@ -86,29 +86,31 @@ impl BufferTypeVisitor {
         let when_full = when_full.unwrap_or_default();
         match kind {
             BufferTypeKind::Memory => {
-                let (max_events, max_size) = if let Some(max_bytes) = max_size {
-                    if max_events.is_some() {
+                let (max_events, max_size) = match (max_events, max_size) {
+                    (Some(_), Some(_)) => {
                         return Err(de::Error::unknown_field(
                             "max_events",
                             &["type", "max_size", "when_full"],
                         ));
-                    } else if let Ok(bounded_max_bytes) = usize::try_from(max_bytes.get()) {
-                        (None, NonZeroUsize::new(bounded_max_bytes))
-                    } else {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Unsigned(max_bytes.into()),
-                            &format!(
-                                "Value for max_bytes must be a positive integer <= {}",
-                                usize::MAX
-                            )
-                            .as_str(),
-                        ));
                     }
-                } else {
-                    (
+                    (_, Some(max_size)) => {
+                        if let Ok(bounded_max_bytes) = usize::try_from(max_size.get()) {
+                            (None, NonZeroUsize::new(bounded_max_bytes))
+                        } else {
+                            return Err(de::Error::invalid_value(
+                                de::Unexpected::Unsigned(max_size.into()),
+                                &format!(
+                                    "Value for max_bytes must be a positive integer <= {}",
+                                    usize::MAX
+                                )
+                                .as_str(),
+                            ));
+                        }
+                    }
+                    _ => (
                         max_events.or(Some(memory_buffer_default_max_events())),
                         None,
-                    )
+                    ),
                 };
                 Ok(BufferType::Memory {
                     max_events,
@@ -216,10 +218,7 @@ fn serialize_memory_config<S>(
 where
     S: Serializer,
 {
-    let size: usize = 1 + [max_events, max_size]
-        .iter()
-        .map(|f| usize::from((*f).is_some()))
-        .sum::<usize>();
+    let size = 1 + usize::from(max_events.is_some()) + usize::from(max_size.is_some());
     // Skip serializing null options as "null", to maintain backwards compat with schema before
     // max_events was made Option.
     let mut sv = serializer.serialize_map(Some(size))?;
