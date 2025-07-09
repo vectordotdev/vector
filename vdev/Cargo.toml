@@ -27,7 +27,7 @@ log = "0.4.27"
 owo-colors = { version = "4.2.2", features = ["supports-colors"] }
 paste.workspace = true
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml = "0.9.34"
