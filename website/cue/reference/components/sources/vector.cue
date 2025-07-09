@@ -97,6 +97,9 @@ components: sources: vector: {
 				tags: _extra_tags
 			}
 		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	telemetry: metrics: {

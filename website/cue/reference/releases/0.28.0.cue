@@ -101,7 +101,7 @@ releases: "0.28.0": {
 			scopes: ["buffers"]
 			description: """
 				The deprecated `disk_v1` buffer type was removed. See [the upgrade
-				guide](#disk_v1-removal) for details and how to migrate if you are using this buffer
+				guide](/highlights/2023-02-28-0-28-0-upgrade-guide/#disk_v1-removal) for details and how to migrate if you are using this buffer
 				type.
 				"""
 			breaking: true

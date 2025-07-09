@@ -9,7 +9,7 @@ remap: functions: replace: {
 
 		**Note when using capture groups**:
 		- You will need to escape the `$` by using `$$` to avoid Vector interpreting it as an
-		  [environment variable when loading configuration](/docs/reference/configuration/#escaping)
+		  [environment variable when loading configuration](/docs/reference/environment_variables/#escaping)
 		- If you want a literal `$` in the replacement pattern, you will also need to escape this
 		  with `$$`. When combined with environment variable interpolation in config files this
 		  means you will need to use `$$$$` to have a literal `$` in the replacement pattern.

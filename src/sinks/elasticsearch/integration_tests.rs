@@ -16,7 +16,7 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
-    http::{HttpClient, QueryParameterValue},
+    http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         util::{auth::Auth, BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
@@ -135,7 +135,7 @@ async fn ensure_pipeline_in_params() {
 
     assert_eq!(
         common.query_params["pipeline"],
-        QueryParameterValue::SingleParam(pipeline)
+        QueryParameterValue::SingleParam(ParameterValue::String(pipeline))
     );
 }
 

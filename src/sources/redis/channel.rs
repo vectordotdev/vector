@@ -22,15 +22,14 @@ impl InputHandler {
         mut self,
         connection_info: ConnectionInfo,
     ) -> crate::Result<Source> {
-        let conn = self
+        let mut pubsub_conn = self
             .client
-            .get_async_connection()
+            .get_async_pubsub()
             .await
             .context(ConnectionSnafu {})?;
 
         trace!(endpoint = %connection_info.endpoint.as_str(), "Connected.");
 
-        let mut pubsub_conn = conn.into_pubsub();
         pubsub_conn
             .subscribe(&self.key)
             .await

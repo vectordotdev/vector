@@ -77,7 +77,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -144,8 +144,12 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		type: string: {}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -657,7 +661,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.

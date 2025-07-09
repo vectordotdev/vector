@@ -7,7 +7,7 @@ base: components: sinks: socket: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -40,8 +40,12 @@ base: components: sinks: socket: configuration: {
 		type: string: examples: ["92.12.333.224:5000", "https://somehost:5000"]
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."

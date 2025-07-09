@@ -7,7 +7,7 @@ base: components: sinks: elasticsearch: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -182,6 +182,15 @@ base: components: sinks: elasticsearch: configuration: {
 				required:      false
 				type: string: examples: ["vector-indexer-role"]
 			}
+			session_token: {
+				description: """
+					The AWS session token.
+					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+					"""
+				relevant_when: "strategy = \"aws\""
+				required:      false
+				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+			}
 			strategy: {
 				description: """
 					The authentication strategy to use.
@@ -231,7 +240,7 @@ base: components: sinks: elasticsearch: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -605,7 +614,27 @@ base: components: sinks: elasticsearch: configuration: {
 			options: "*": {
 				description: "A query string parameter."
 				required:    true
-				type: string: {}
+				type: {
+					object: options: {
+						type: {
+							description: "The type of the parameter, indicating how the `value` should be treated."
+							required:    false
+							type: string: {
+								default: "string"
+								enum: {
+									string: "The parameter value is a plain string."
+									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								}
+							}
+						}
+						value: {
+							description: "The raw value of the parameter."
+							required:    true
+							type: string: {}
+						}
+					}
+					string: {}
+				}
 			}
 		}
 	}
@@ -698,7 +727,7 @@ base: components: sinks: elasticsearch: configuration: {
 							adaptive: """
 															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.

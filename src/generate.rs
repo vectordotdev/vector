@@ -672,13 +672,13 @@ mod tests {
             sources:
               source0:
                 count: 9223372036854775807
-                format: json
-                interval: 1.0
-                type: demo_logs
                 decoding:
                   codec: bytes
+                format: json
                 framing:
                   method: bytes
+                interval: 1.0
+                type: demo_logs
             transforms:
               transform0:
                 inputs:
@@ -693,12 +693,12 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
-                target: stdout
-                type: console
                 encoding:
                   codec: json
                   json:
                     pretty: false
+                target: stdout
+                type: console
                 healthcheck:
                   enabled: true
                   uri: null
@@ -732,15 +732,15 @@ mod tests {
               "sources": {
                 "source0": {
                   "count": 9223372036854775807,
-                  "format": "json",
-                  "interval": 1.0,
-                  "type": "demo_logs",
                   "decoding": {
                     "codec": "bytes"
                   },
+                  "format": "json",
                   "framing": {
                     "method": "bytes"
-                  }
+                  },
+                  "interval": 1.0,
+                  "type": "demo_logs"
                 }
               },
               "transforms": {
@@ -761,14 +761,14 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
-                  "target": "stdout",
-                  "type": "console",
                   "encoding": {
                     "codec": "json",
                     "json": {
                       "pretty": false
                     }
                   },
+                  "target": "stdout",
+                  "type": "console",
                   "healthcheck": {
                     "enabled": true,
                     "uri": null

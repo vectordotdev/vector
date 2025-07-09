@@ -3,6 +3,7 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
+    sinks::amqp::channel::new_channel_pool,
     template::{Template, UnsignedIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -12,7 +13,7 @@ use crate::{
 };
 use config::AmqpPropertiesConfig;
 use futures::StreamExt;
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, time::Duration};
 use vector_lib::{config::LogNamespace, event::LogEvent};
 
 pub fn make_config() -> AmqpSinkConfig {
@@ -37,8 +38,8 @@ async fn healthcheck() {
     let mut config = make_config();
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     await_connection(&config.connection).await;
-    let (_conn, channel) = config.connection.connect().await.unwrap();
-    super::config::healthcheck(Arc::new(channel)).await.unwrap();
+    let channels = new_channel_pool(&config).unwrap();
+    super::config::healthcheck(channels).await.unwrap();
 }
 
 #[tokio::test]
