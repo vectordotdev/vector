@@ -3,7 +3,8 @@ use std::{
     num::NonZeroU32,
 };
 
-use azure_core::{error::HttpError, prelude::Range};
+use azure_core::error::HttpError;
+use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;

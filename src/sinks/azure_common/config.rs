@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use azure_core::{error::HttpError, RetryOptions};
+use azure_core::error::HttpError;
+use azure_core_for_storage::RetryOptions;
 use azure_identity::DefaultAzureCredentialBuilder;
 use azure_storage::{prelude::*, CloudLocation, ConnectionString};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
@@ -18,6 +19,8 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{util::retries::RetryLogic, Healthcheck},
 };
+
+use super::azure_credential_interop::TokenCredentialInterop;
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
@@ -159,8 +162,9 @@ pub fn build_client(
             .container_client(container_name);
         }
         (None, Some(storage_account_p)) => {
-            let creds = azure_identity::create_default_credential()?;
-            let storage_credentials = StorageCredentials::token_credential(creds);
+            let creds = DefaultAzureCredentialBuilder::default().build()?;
+            let storage_credentials =
+                StorageCredentials::token_credential(Arc::new(TokenCredentialInterop::new(creds)));
 
             client = match endpoint {
                 // If a blob_endpoint is provided in the configuration, use it with a Custom

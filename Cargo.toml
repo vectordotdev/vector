@@ -258,10 +258,16 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest"], optional = true }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"], optional = true }
+
+# Azure Storage
 azure_storage = { version = "0.21", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
+
+# Needed to bridge with outdated version of azure_core used in azure_storage*
+azure_core_for_storage = { package = "azure_core", version = "0.21.0" }
+
 
 # OpenDAL
 opendal = { version = "0.53", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -432,8 +438,8 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.21", default-features = false, features = ["enable_reqwest"] }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest", "azurite_workaround"] }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
 azure_storage_blobs = { version = "0.21", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.21", default-features = false }
 base64 = "0.22.1"
