@@ -660,7 +660,7 @@ generated: components: sinks: redis: configuration: {
 		type: object: options: {
 			connections: {
 				description: """
-					Connetion independent information used to establish a connection
+					Connection independent information used to establish a connection
 					to a redis instance sentinel owns.
 					"""
 				required: false
