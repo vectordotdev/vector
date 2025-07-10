@@ -265,7 +265,7 @@ impl From<TlsSettings> for Option<TlsMode> {
     }
 }
 
-/// Connetion independent information used to establish a connection
+/// Connection independent information used to establish a connection
 /// to a redis instance sentinel owns.
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
