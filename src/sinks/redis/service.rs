@@ -1,14 +1,12 @@
 use std::task::{Context, Poll};
 
-use redis::aio::ConnectionManager;
-
 use crate::sinks::prelude::*;
 
-use super::{config::Method, RedisRequest, RedisSinkError};
+use super::{config::Method, sink::RedisConnection, RedisRequest, RedisSinkError};
 
 #[derive(Clone)]
 pub struct RedisService {
-    pub(super) conn: ConnectionManager,
+    pub(super) conn: RedisConnection,
     pub(super) data_type: super::DataType,
 }
 
@@ -26,7 +24,7 @@ impl Service<RedisRequest> for RedisService {
     fn call(&mut self, kvs: RedisRequest) -> Self::Future {
         let count = kvs.request.len();
 
-        let mut conn = self.conn.clone();
+        let redis_conn = self.conn.clone();
         let mut pipe = redis::pipe();
 
         for kv in kvs.request {
@@ -60,6 +58,11 @@ impl Service<RedisRequest> for RedisService {
         let byte_size = kvs.metadata.events_byte_size();
 
         Box::pin(async move {
+            let mut conn = match redis_conn.get_connection_manager().await {
+                Ok(conn) => conn,
+                Err(error) => return Err(RedisSinkError::SendError { source: error }),
+            };
+
             match pipe.query_async(&mut conn).await {
                 Ok(event_status) => Ok(RedisResponse {
                     event_status,
