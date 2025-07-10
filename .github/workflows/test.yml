@@ -30,18 +30,43 @@ jobs:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
-  checks:
-    name: Checks
+  checks-source:
+    name: ${{ matrix.job_name }}
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 60
     needs: changes
+    if: needs.changes.outputs.source == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: "Check code format"
+            command: "make check-fmt"
+
+          - job_name: "Check clippy"
+            command: "make check-clippy"
+
+          - job_name: "Unit - x86_64-unknown-linux-gnu"
+            command: "make test"
+            env:
+              CARGO_BUILD_JOBS: 5
+            post: upload-test-results
+
+          - job_name: "Check Component Spec"
+            command: "make test-component-validation"
+
+          - job_name: "Check events"
+            command: "make check-events"
+
+          - job_name: "Check Rust Docs"
+            command: "cd rust-doc && make docs"
+
     env:
       CARGO_INCREMENTAL: 0
     steps:
       - uses: actions/checkout@v4
         with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
+          fetch-depth: 0
 
       - uses: actions/cache@v4
         name: Cache Cargo registry + index
@@ -64,67 +89,92 @@ jobs:
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
 
-      - name: Check code format
-        run: make check-fmt
-
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
-
-      - name: Unit - x86_64-unknown-linux-gnu
-        if: needs.changes.outputs.source == 'true'
-        run: make test
-        env:
-          CARGO_BUILD_JOBS: 5
-
-      # Validates components for adherence to the Component Specification
-      - name: Check Component Spec
-        run: make test-component-validation
+      - name: Run ${{ matrix.job_name }}
+        run: ${{ matrix.command }}
+        env: ${{ matrix.env || '{}' }}
 
       - name: Upload test results
+        if: always() && matrix.post == 'upload-test-results'
         run: scripts/upload-test-results.sh
-        if: always()
 
-      - name: Check version
-        run: make check-version
+  checks-non-code:
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 60
+    needs: changes
+    if: ${{ matrix.condition || 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: "Check version"
+            command: "make check-version"
 
-      - name: Check scripts
-        run: make check-scripts
+          - job_name: "Check scripts"
+            command: "make check-scripts"
 
-      - name: Check events
-        if: needs.changes.outputs.source == 'true'
-        run: make check-events
+          - job_name: "Check that the 3rd-party license file is up to date"
+            command: "make check-licenses"
+            condition: needs.changes.outputs.dependencies == 'true'
 
-      - name: Check that the 3rd-party license file is up to date
-        if: needs.changes.outputs.dependencies == 'true'
-        run: make check-licenses
+          - job_name: "Check Cue docs"
+            command: "make check-docs"
+            condition: needs.changes.outputs.cue == 'true'
 
-      - name: Check Cue docs
-        if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
+          - job_name: "Check Markdown"
+            command: "make check-markdown"
+            condition: needs.changes.outputs.markdown == 'true'
 
-      - name: Check Markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
+          - job_name: "Check Component Docs"
+            command: "make check-component-docs"
+            condition: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
 
-      - name: Check Component Docs
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+          - job_name: "VRL - Linux"
+            command: "cargo vdev test-vrl"
+            condition: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
 
-      - name: Check Rust Docs
-        if: needs.changes.outputs.source == 'true'
-        run: cd rust-doc && make docs
+          - job_name: "Build VRL Playground"
+            command: |
+              cd lib/vector-vrl/web-playground/
+              ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+              wasm-pack build --target web --out-dir public/pkg
+            condition: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
 
-      - name: VRL - Linux
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
-        run: cargo vdev test-vrl
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Build VRL Playground
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
-        run: |
-          cd lib/vector-vrl/web-playground/
-          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
-          wasm-pack build --target web --out-dir public/pkg
+      - uses: actions/cache@v4
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+
+      - uses: ruby/setup-ruby@v1
+
+      - run: bash scripts/environment/prepare.sh
+
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+
+      - name: Run ${{ matrix.job_name }}
+        run: ${{ matrix.command }}
+        env: ${{ matrix.env || '{}' }}
+
+      - name: Upload test results
+        if: always() && matrix.post == 'upload-test-results'
+        run: scripts/upload-test-results.sh
 
   # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
@@ -132,7 +182,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: always()
-    needs: [changes, checks]
+    needs: [changes, checks-source, checks-non-code]
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
