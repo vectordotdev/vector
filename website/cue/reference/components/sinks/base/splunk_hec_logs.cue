@@ -9,9 +9,9 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: """
 					Whether or not end-to-end acknowledgements are enabled.
 
-					When enabled for a sink, any source connected to that sink, where the source supports
-					end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-					before acknowledging them at the source.
+					When enabled for a sink, any source that supports end-to-end
+					acknowledgements that is connected to that sink waits for events
+					to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 					Enabling or disabling acknowledgements at the sink level takes precedence over any global
 					[`acknowledgements`][global_acks] configuration.
@@ -77,7 +77,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -116,6 +116,11 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
 					[Zlib][zlib] compression.
 
@@ -139,8 +144,12 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		type: string: {}
 	}
 	encoding: {
-		description: "Configures how events are encoded into raw bytes."
-		required:    true
+		description: """
+			Encoding configuration.
+			Configures how events are encoded into raw bytes.
+			The selected encoding also determines which input types (logs, metrics, traces) are supported.
+			"""
+		required: true
 		type: object: options: {
 			avro: {
 				description:   "Apache Avro-specific encoder options."
@@ -152,6 +161,91 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 				}
 			}
+			cef: {
+				description:   "The CEF Serializer Options."
+				relevant_when: "codec = \"cef\""
+				required:      true
+				type: object: options: {
+					device_event_class_id: {
+						description: """
+																Unique identifier for each event type. Identifies the type of event reported.
+																The value length must be less than or equal to 1023.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_product: {
+						description: """
+																Identifies the product of a vendor.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_vendor: {
+						description: """
+																Identifies the vendor of the product.
+																The part of a unique device identifier. No two products can use the same combination of device vendor and device product.
+																The value length must be less than or equal to 63.
+																"""
+						required: true
+						type: string: {}
+					}
+					device_version: {
+						description: """
+																Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
+																The value length must be less than or equal to 31.
+																"""
+						required: true
+						type: string: {}
+					}
+					extensions: {
+						description: """
+																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
+																The event can have any number of key-value pairs in any order.
+																"""
+						required: false
+						type: object: options: "*": {
+							description: "This is a path that points to the extension value of a log event."
+							required:    true
+							type: string: {}
+						}
+					}
+					name: {
+						description: """
+																This is a path that points to the human-readable description of a log event.
+																The value length must be less than or equal to 512.
+																Equals "cef.name" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					severity: {
+						description: """
+																This is a path that points to the field of a log event that reflects importance of the event.
+																Reflects importance of the event.
+
+																It must point to a number from 0 to 10.
+																0 = lowest_importance, 10 = highest_importance.
+																Set to "cef.severity" by default.
+																"""
+						required: true
+						type: string: {}
+					}
+					version: {
+						description: """
+																CEF Version. Can be either 0 or 1.
+																Set to "0" by default.
+																"""
+						required: true
+						type: string: enum: {
+							V0: "CEF specification version 0.1."
+							V1: "CEF specification version 1.x."
+						}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for encoding events."
 				required:    true
@@ -161,6 +255,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 
 						[apache_avro]: https://avro.apache.org/
 						"""
+					cef: "Encodes an event as a CEF (Common Event Format) formatted message."
 					csv: """
 						Encodes an event as a CSV message.
 
@@ -169,7 +264,20 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					gelf: """
 						Encodes an event as a [GELF][gelf] message.
 
+						This codec is experimental for the following reason:
+
+						The GELF specification is more strict than the actual Graylog receiver.
+						Vector's encoder currently adheres more strictly to the GELF spec, with
+						the exception that some characters such as `@`  are allowed in field names.
+
+						Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+						by Graylog and is much more relaxed than the GELF spec.
+
+						Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+						the codec might continue to relax the enforcement of the specification.
+
 						[gelf]: https://docs.graylog.org/docs/gelf
+						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 						"""
 					json: """
 						Encodes an event as [JSON][json].
@@ -230,8 +338,8 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				type: object: options: {
 					capacity: {
 						description: """
-																Set the capacity (in bytes) of the internal buffer used in the CSV writer.
-																This defaults to a reasonable setting.
+																Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
+																This defaults to 8KB.
 																"""
 						required: false
 						type: uint: default: 8192
@@ -239,13 +347,13 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					delimiter: {
 						description: "The field delimiter to use when writing CSV."
 						required:    false
-						type: uint: default: 44
+						type: ascii_char: default: ","
 					}
 					double_quote: {
 						description: """
-																Enable double quote escapes.
+																Enables double quote escapes.
 
-																This is enabled by default, but it may be disabled. When disabled, quotes in
+																This is enabled by default, but you can disable it. When disabled, quotes in
 																field data are escaped instead of doubled.
 																"""
 						required: false
@@ -258,20 +366,20 @@ base: components: sinks: splunk_hec_logs: configuration: {
 																In some variants of CSV, quotes are escaped using a special escape character
 																like \\ (instead of escaping quotes by doubling them).
 
-																To use this, `double_quotes` needs to be disabled as well otherwise it is ignored.
+																To use this, `double_quotes` needs to be disabled as well; otherwise, this setting is ignored.
 																"""
 						required: false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					fields: {
 						description: """
-																Configures the fields that will be encoded, as well as the order in which they
+																Configures the fields that are encoded, as well as the order in which they
 																appear in the output.
 
-																If a field is not present in the event, the output will be an empty string.
+																If a field is not present in the event, the output for that field is an empty string.
 
-																Values of type `Array`, `Object`, and `Regex` are not supported and the
-																output will be an empty string.
+																Values of type `Array`, `Object`, and `Regex` are not supported, and the
+																output for any of these types is an empty string.
 																"""
 						required: true
 						type: array: items: type: string: {}
@@ -279,7 +387,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					quote: {
 						description: "The quote character to use when writing CSV."
 						required:    false
-						type: uint: default: 34
+						type: ascii_char: default: "\""
 					}
 					quote_style: {
 						description: "The quoting style to use when writing CSV data."
@@ -297,8 +405,8 @@ base: components: sinks: splunk_hec_logs: configuration: {
 								never: "Never writes quotes, even if it produces invalid CSV data."
 								non_numeric: """
 																			Puts quotes around all fields that are non-numeric.
-																			Namely, when writing a field that does not parse as a valid float or integer,
-																			then quotes are used even if they aren't strictly necessary.
+																			This means that when writing a field that does not parse as a valid float or integer,
+																			quotes are used even if they aren't strictly necessary.
 																			"""
 							}
 						}
@@ -309,6 +417,16 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			json: {
+				description:   "Options for the JsonSerializer."
+				relevant_when: "codec = \"json\""
+				required:      false
+				type: object: options: pretty: {
+					description: "Whether to use pretty JSON formatting."
+					required:    false
+					type: bool: default: false
+				}
 			}
 			metric_tag_values: {
 				description: """
@@ -345,7 +463,9 @@ base: components: sinks: splunk_hec_logs: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -o <path> ...`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
 						required: true
 						type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -361,8 +481,12 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: "Format used for timestamp fields."
 				required:    false
 				type: string: enum: {
-					rfc3339: "Represent the timestamp as a RFC 3339 timestamp."
-					unix:    "Represent the timestamp as a Unix timestamp."
+					rfc3339:    "Represent the timestamp as a RFC 3339 timestamp."
+					unix:       "Represent the timestamp as a Unix timestamp."
+					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
+					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
+					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
 		}
@@ -410,12 +534,13 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: """
 			Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
 
-			By default, the [global `log_schema.host_key` option][global_host_key] is used.
+			By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+			events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
 
 			[global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
 			"""
 		required: false
-		type: string: default: "host"
+		type: string: {}
 	}
 	index: {
 		description: """
@@ -445,7 +570,9 @@ base: components: sinks: splunk_hec_logs: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -465,7 +592,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -485,14 +612,23 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
 						required: false
 						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
 					}
 					rtt_deviation_scale: {
 						description: """
@@ -523,9 +659,9 @@ base: components: sinks: splunk_hec_logs: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.
@@ -554,12 +690,8 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -577,11 +709,31 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -631,15 +783,13 @@ base: components: sinks: splunk_hec_logs: configuration: {
 			Overrides the name of the log field used to retrieve the timestamp to send to Splunk HEC.
 			When set to `“”`, a timestamp is not set in the events sent to Splunk HEC.
 
-			By default, the [global `log_schema.timestamp_key` option][global_timestamp_key] is used.
+			By default, either the [global `log_schema.timestamp_key` option][global_timestamp_key] is used
+			if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
 
 			[global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
 			"""
 		required: false
-		type: string: {
-			default: "timestamp"
-			examples: ["timestamp", ""]
-		}
+		type: string: examples: ["timestamp", ""]
 	}
 	tls: {
 		description: "TLS configuration."
@@ -649,7 +799,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -671,7 +821,7 @@ base: components: sinks: splunk_hec_logs: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -694,16 +844,25 @@ base: components: sinks: splunk_hec_logs: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

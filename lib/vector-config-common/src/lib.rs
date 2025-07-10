@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 // TODO: `darling` is currently strict about accepting only matching literal types for scalar fields i.e. a `f64` field
 // can only be parsed from a string or float literal, but not an integer literal... and float literals have to be in the
 // form of `1000.0`, not `1000`.
@@ -10,7 +12,6 @@
 // `#[configurable(validation(length(min = 1)))]` to indicate the string cannot be empty, when
 // something like `#[configurable(validation(not_empty)]` is a bit more self-evident, and shorter to boot
 
-#![deny(warnings)]
 pub mod attributes;
 pub mod constants;
 pub mod human_friendly;

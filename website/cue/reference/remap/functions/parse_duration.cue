@@ -33,7 +33,7 @@ remap: functions: parse_duration: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted duration",
+		"`value` is not a properly formatted duration.",
 	]
 	return: types: ["float"]
 
@@ -44,6 +44,13 @@ remap: functions: parse_duration: {
 				parse_duration!("1005ms", unit: "s")
 				"""#
 			return: 1.005
+		},
+		{
+			title: "Parse multiple durations (seconds & milliseconds)"
+			source: #"""
+				parse_duration!("1s 1ms", unit: "ms")
+				"""#
+			return: 1001.0
 		},
 	]
 }

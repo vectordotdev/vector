@@ -9,15 +9,16 @@ use crate::{
         prelude::*,
         util::{
             http::{http_response_retry_logic, HttpService},
+            service::TowerRequestConfigDefaults,
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
         },
     },
 };
 use http::{Request, Uri};
 use hyper::Body;
-use lookup::lookup_v2::ConfigValuePath;
 use snafu::Snafu;
 use std::collections::HashMap;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
@@ -29,6 +30,13 @@ use super::{
 enum HealthcheckError {
     #[snafu(display("Resource not found"))]
     NotFound,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct StackdriverTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
+    const RATE_LIMIT_NUM: u64 = 1_000;
 }
 
 /// Configuration for the `gcp_stackdriver_logs` sink.
@@ -53,6 +61,9 @@ pub(super) struct StackdriverConfig {
     /// The monitored resource to associate the logs with.
     pub(super) resource: StackdriverResource,
 
+    #[serde(flatten)]
+    pub(super) label_config: StackdriverLabelConfig,
+
     /// The field of the log event from which to take the outgoing log’s `severity` field.
     ///
     /// The named field is removed from the log event if present, and must be either an integer
@@ -73,10 +84,7 @@ pub(super) struct StackdriverConfig {
     pub(super) auth: GcpAuthConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) encoding: Transformer,
 
     #[configurable(derived)]
@@ -85,7 +93,7 @@ pub(super) struct StackdriverConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig<StackdriverTowerRequestConfigDefaults>,
 
     #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
@@ -94,7 +102,7 @@ pub(super) struct StackdriverConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -151,6 +159,37 @@ pub(super) enum StackdriverLogName {
     Project(String),
 }
 
+/// Label Configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+pub(super) struct StackdriverLabelConfig {
+    /// The value of this field is used to retrieve the associated labels from the `jsonPayload`
+    /// and extract their values to set as LogEntry labels.
+    #[configurable(metadata(docs::examples = "logging.googleapis.com/labels"))]
+    #[serde(default = "default_labels_key")]
+    pub(super) labels_key: Option<String>,
+
+    /// A map of key, value pairs that provides additional information about the log entry.
+    #[configurable(metadata(
+        docs::additional_props_description = "A key, value pair that describes a log entry."
+    ))]
+    #[configurable(metadata(docs::examples = "labels_examples()"))]
+    #[serde(default)]
+    pub(super) labels: HashMap<String, Template>,
+}
+
+fn labels_examples() -> HashMap<String, String> {
+    let mut example = HashMap::new();
+    example.insert("label_1".to_string(), "value_1".to_string());
+    example.insert("label_2".to_string(), "{{ template_value_2 }}".to_string());
+    example
+}
+
+pub(super) fn default_labels_key() -> Option<String> {
+    Some("logging.googleapis.com/labels".to_string())
+}
+
 /// A monitored resource.
 ///
 /// Monitored resources in GCP allow associating logs and metrics specifically with native resources
@@ -203,6 +242,7 @@ impl SinkConfig for StackdriverConfig {
                 self.encoding.clone(),
                 self.log_id.clone(),
                 self.log_name.clone(),
+                self.label_config.clone(),
                 self.resource.clone(),
                 self.severity_key.clone(),
             ),
@@ -214,13 +254,9 @@ impl SinkConfig for StackdriverConfig {
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(
-            &TowerRequestConfig::default()
-                .rate_limit_duration_secs(1)
-                .rate_limit_num(1000),
-        );
+        let request_limits = self.request.into_settings();
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let uri: Uri = self.endpoint.parse()?;

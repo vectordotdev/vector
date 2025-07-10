@@ -1,22 +1,32 @@
 mod event;
 mod http;
 
-use codecs::{
-    decoding::{self, DeserializerConfig},
-    encoding::{
-        self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig, TextSerializerConfig,
+use std::sync::Arc;
+
+use tokio::sync::{mpsc, Mutex};
+use vector_lib::{
+    codecs::{
+        decoding::{self, DeserializerConfig},
+        encoding::{
+            self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
+            TextSerializerConfig,
+        },
+        BytesEncoder,
     },
-    BytesEncoder,
+    config::LogNamespace,
 };
-use tokio::sync::mpsc;
-use vector_core::{config::DataType, event::Event};
+use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 pub use self::event::{encode_test_event, TestEvent};
 pub use self::http::HttpResourceConfig;
+use self::http::HttpResourceOutputContext;
 
-use super::sync::{Configuring, TaskCoordinator};
+use super::{
+    sync::{Configuring, TaskCoordinator},
+    RunnerMetrics,
+};
 
 /// The codec used by the external resource.
 ///
@@ -68,7 +78,7 @@ impl ResourceCodec {
     pub fn into_encoder(&self) -> Encoder<encoding::Framer> {
         let (framer, serializer) = match self {
             Self::Encoding(config) => (
-                Framer::Bytes(BytesEncoder::new()),
+                Framer::Bytes(BytesEncoder),
                 config.build().expect("should not fail to build serializer"),
             ),
             Self::EncodingWithFraming(config) => {
@@ -96,7 +106,7 @@ impl ResourceCodec {
     ///
     /// The decoder is generated as an inverse to the input codec: if an encoding configuration was
     /// given, we generate a decoder that satisfies that encoding configuration, and vice versa.
-    pub fn into_decoder(&self) -> vector_common::Result<Decoder> {
+    pub fn into_decoder(&self, log_namespace: LogNamespace) -> vector_lib::Result<Decoder> {
         let (framer, deserializer) = match self {
             Self::Decoding(config) => return config.build(),
             Self::Encoding(config) => (
@@ -113,7 +123,7 @@ impl ResourceCodec {
             }
         };
 
-        Ok(Decoder::new(framer, deserializer))
+        Ok(Decoder::new(framer, deserializer).with_log_namespace(log_namespace))
     }
 }
 
@@ -143,8 +153,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Bytes => SerializerConfig::Text(TextSerializerConfig::default()),
         DeserializerConfig::Json { .. } => SerializerConfig::Json(JsonSerializerConfig::default()),
         DeserializerConfig::Protobuf(config) => {
-            SerializerConfig::Protobuf(codecs::encoding::ProtobufSerializerConfig {
-                protobuf: codecs::encoding::ProtobufSerializerOptions {
+            SerializerConfig::Protobuf(vector_lib::codecs::encoding::ProtobufSerializerConfig {
+                protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
@@ -158,6 +168,10 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Native => SerializerConfig::Native,
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
+        DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
+        // TODO: Influxdb has no serializer yet
+        DeserializerConfig::Influxdb { .. } => todo!(),
+        DeserializerConfig::Vrl { .. } => unimplemented!(),
     };
 
     serializer_config
@@ -175,11 +189,17 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
                 },
             })
         }
-        decoding::FramingConfig::LengthDelimited => encoding::FramingConfig::LengthDelimited,
+        decoding::FramingConfig::LengthDelimited(config) => {
+            encoding::FramingConfig::LengthDelimited(encoding::LengthDelimitedEncoderConfig {
+                length_delimited: config.length_delimited.clone(),
+            })
+        }
         decoding::FramingConfig::NewlineDelimited(_) => encoding::FramingConfig::NewlineDelimited,
         // TODO: There's no equivalent octet counting framer for encoding... although
         // there's no particular reason that would make it hard to write.
         decoding::FramingConfig::OctetCounting(_) => todo!(),
+        // TODO: chunked gelf is not supported yet in encoding
+        decoding::FramingConfig::ChunkedGelf(_) => todo!(),
     };
 
     framing_config.build()
@@ -187,9 +207,10 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
 
 fn serializer_config_to_deserializer(
     config: &SerializerConfig,
-) -> vector_common::Result<decoding::Deserializer> {
+) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
         SerializerConfig::Avro { .. } => todo!(),
+        SerializerConfig::Cef { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
         SerializerConfig::Gelf => DeserializerConfig::Gelf(Default::default()),
         SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
@@ -197,8 +218,8 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
         SerializerConfig::Protobuf(config) => {
-            DeserializerConfig::Protobuf(codecs::decoding::ProtobufDeserializerConfig {
-                protobuf: codecs::decoding::ProtobufDeserializerOptions {
+            DeserializerConfig::Protobuf(vector_lib::codecs::decoding::ProtobufDeserializerConfig {
+                protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
                 },
@@ -221,7 +242,11 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
                 },
             })
         }
-        encoding::FramingConfig::LengthDelimited => decoding::FramingConfig::LengthDelimited,
+        encoding::FramingConfig::LengthDelimited(config) => {
+            decoding::FramingConfig::LengthDelimited(decoding::LengthDelimitedDecoderConfig {
+                length_delimited: config.length_delimited.clone(),
+            })
+        }
         encoding::FramingConfig::NewlineDelimited => {
             decoding::FramingConfig::NewlineDelimited(Default::default())
         }
@@ -291,7 +316,7 @@ impl From<HttpResourceConfig> for ResourceDefinition {
 /// the external resource must pull the data from the sink.
 #[derive(Clone)]
 pub struct ExternalResource {
-    direction: ResourceDirection,
+    pub direction: ResourceDirection,
     definition: ResourceDefinition,
     pub codec: ResourceCodec,
 }
@@ -315,11 +340,16 @@ impl ExternalResource {
         self,
         input_rx: mpsc::Receiver<TestEvent>,
         task_coordinator: &TaskCoordinator<Configuring>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     ) {
         match self.definition {
-            ResourceDefinition::Http(http_config) => {
-                http_config.spawn_as_input(self.direction, self.codec, input_rx, task_coordinator)
-            }
+            ResourceDefinition::Http(http_config) => http_config.spawn_as_input(
+                self.direction,
+                self.codec,
+                input_rx,
+                task_coordinator,
+                runner_metrics,
+            ),
         }
     }
 
@@ -328,10 +358,21 @@ impl ExternalResource {
         self,
         output_tx: mpsc::Sender<Vec<Event>>,
         task_coordinator: &TaskCoordinator<Configuring>,
-    ) -> vector_common::Result<()> {
+        input_events: Vec<TestEvent>,
+        runner_metrics: &Arc<Mutex<RunnerMetrics>>,
+        log_namespace: LogNamespace,
+    ) -> vector_lib::Result<()> {
         match self.definition {
             ResourceDefinition::Http(http_config) => {
-                http_config.spawn_as_output(self.direction, self.codec, output_tx, task_coordinator)
+                http_config.spawn_as_output(HttpResourceOutputContext {
+                    direction: self.direction,
+                    codec: self.codec,
+                    output_tx,
+                    task_coordinator,
+                    input_events,
+                    runner_metrics,
+                    log_namespace,
+                })
             }
         }
     }

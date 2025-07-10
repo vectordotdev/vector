@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::event_path;
 
 use super::Region;
@@ -43,10 +43,7 @@ pub struct SematextLogsConfig {
     token: SensitiveString,
 
     #[configurable(derived)]
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
     #[configurable(derived)]
@@ -61,7 +58,7 @@ pub struct SematextLogsConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }

@@ -52,7 +52,7 @@ impl DataDir {
 
     fn next(&mut self) -> PathGuard {
         let mut nxt = self.base.clone();
-        nxt.push(&self.index.to_string());
+        nxt.push(self.index.to_string());
         self.index += 1;
         std::fs::create_dir_all(&nxt).expect("could not make next dir");
 

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test_proto;
+
+// Define a User message
+message User {
+  string id = 1;
+  string name = 2;
+  int32 age = 3;
+  repeated string emails = 4;
+}

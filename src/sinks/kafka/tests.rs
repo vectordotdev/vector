@@ -3,38 +3,27 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use std::{
-        collections::{BTreeMap, HashMap},
-        future::ready,
-        thread,
-        time::Duration,
-    };
+    use std::{collections::HashMap, future::ready, thread, time::Duration};
 
     use bytes::Bytes;
-    use codecs::TextSerializerConfig;
     use futures::StreamExt;
-    use lookup::lookup_v2::ConfigTargetPath;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
+    use vector_lib::codecs::TextSerializerConfig;
+    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+    use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };
 
+    use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
-        event::Value,
+        event::{ObjectMap, Value},
         kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
-        sinks::{
-            kafka::{
-                config::{KafkaRole, KafkaSinkConfig},
-                sink::KafkaSink,
-                *,
-            },
-            prelude::*,
-        },
+        sinks::prelude::*,
         test_util::{
             components::{
                 assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
@@ -62,6 +51,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
             topic: Template::try_from(topic.clone()).unwrap(),
+            healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
@@ -69,11 +59,43 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn healthcheck_topic() {
+        crate::test_util::trace_init();
+
+        let topic = format!("{{ {} }}", random_string(10));
+
+        let config = KafkaSinkConfig {
+            bootstrap_servers: kafka_address(9091),
+            topic: Template::try_from(topic.clone()).unwrap(),
+            healthcheck_topic: Some(String::from("topic-1234")),
+            key_field: None,
+            encoding: TextSerializerConfig::default().into(),
+            batch: BatchConfig::default(),
+            compression: KafkaCompression::None,
+            auth: KafkaAuthConfig::default(),
+            socket_timeout_ms: Duration::from_millis(60000),
+            message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
+            librdkafka_options: HashMap::new(),
+            headers_key: None,
+            acknowledgements: Default::default(),
+        };
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -158,6 +180,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
             compression: KafkaCompression::None,
+            healthcheck_topic: None,
             encoding: TextSerializerConfig::default().into(),
             key_field: None,
             auth: KafkaAuthConfig {
@@ -166,14 +189,15 @@ mod integration_test {
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        config.clone().to_rdkafka(KafkaRole::Consumer)?;
-        config.clone().to_rdkafka(KafkaRole::Producer)?;
-        self::sink::healthcheck(config.clone()).await?;
+        config.clone().to_rdkafka()?;
+        self::sink::healthcheck(config.clone(), Default::default()).await?;
         KafkaSink::new(config)
     }
 
@@ -308,6 +332,7 @@ mod integration_test {
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
             topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
             batch: BatchConfig::default(),
@@ -315,6 +340,8 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
@@ -330,9 +357,9 @@ mod integration_test {
         let header_1_value = "header-1-value";
         let input_events = events.map(move |mut events| {
             let headers_key = headers_key.clone();
-            let mut header_values = BTreeMap::new();
+            let mut header_values = ObjectMap::new();
             header_values.insert(
-                header_1_key.to_owned(),
+                header_1_key.into(),
                 Value::Bytes(Bytes::from(header_1_value)),
             );
             events.iter_logs_mut().for_each(move |log| {
@@ -363,7 +390,7 @@ mod integration_test {
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
         client_config.set("bootstrap.servers", server.as_str());
-        client_config.set("group.id", &random_string(10));
+        client_config.set("group.id", random_string(10));
         client_config.set("enable.partition.eof", "true");
         kafka_auth.apply(&mut client_config).unwrap();
 

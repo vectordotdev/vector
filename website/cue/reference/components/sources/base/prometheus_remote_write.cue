@@ -13,7 +13,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -32,18 +32,83 @@ base: components: sources: prometheus_remote_write: configuration: {
 		type: string: examples: ["0.0.0.0:9090"]
 	}
 	auth: {
-		description: "HTTP Basic authentication configuration."
-		required:    false
+		description: """
+			Configuration of the authentication strategy for server mode sinks and sources.
+
+			Use the HTTP authentication with HTTPS only. The authentication credentials are passed as an
+			HTTP header without any additional encryption beyond what is provided by the transport itself.
+			"""
+		required: false
 		type: object: options: {
 			password: {
-				description: "The password for basic authentication."
+				description:   "The basic authentication password."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${PASSWORD}", "password"]
+			}
+			source: {
+				description:   "The VRL boolean expression."
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: {}
+			}
+			strategy: {
+				description: "The authentication strategy to use."
 				required:    true
-				type: string: examples: ["hunter2", "${PASSWORD}"]
+				type: string: enum: {
+					basic: """
+						Basic authentication.
+
+						The username and password are concatenated and encoded using [base64][base64].
+
+						[base64]: https://en.wikipedia.org/wiki/Base64
+						"""
+					custom: """
+						Custom authentication using VRL code.
+
+						Takes in request and validates it using VRL code.
+						"""
+				}
 			}
 			username: {
-				description: "The username for basic authentication."
-				required:    true
-				type: string: examples: ["AzureDiamond", "admin"]
+				description:   "The basic authentication username."
+				relevant_when: "strategy = \"basic\""
+				required:      true
+				type: string: examples: ["${USERNAME}", "username"]
+			}
+		}
+	}
+	keepalive: {
+		description: "Configuration of HTTP server keepalive parameters."
+		required:    false
+		type: object: options: {
+			max_connection_age_jitter_factor: {
+				description: """
+					The factor by which to jitter the `max_connection_age_secs` value.
+
+					A value of 0.1 means that the actual duration will be between 90% and 110% of the
+					specified maximum duration.
+					"""
+				required: false
+				type: float: default: 0.1
+			}
+			max_connection_age_secs: {
+				description: """
+					The maximum amount of time a connection may exist before it is closed by sending
+					a `Connection: close` header on the HTTP response. Set this to a large value like
+					`100000000` to "disable" this feature
+
+					Only applies to HTTP/0.9, HTTP/1.0, and HTTP/1.1 requests.
+
+					A random jitter configured by `max_connection_age_jitter_factor` is added
+					to the specified duration to spread out connection storms.
+					"""
+				required: false
+				type: uint: {
+					default: 300
+					examples: [600]
+					unit: "seconds"
+				}
 			}
 		}
 	}
@@ -55,7 +120,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -77,7 +142,7 @@ base: components: sources: prometheus_remote_write: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -110,16 +175,25 @@ base: components: sources: prometheus_remote_write: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

@@ -15,7 +15,7 @@ remap: functions: parse_aws_alb_log: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted AWS ALB log",
+		"`value` is not a properly formatted AWS ALB log.",
 	]
 	return: types: ["object"]
 
@@ -48,6 +48,7 @@ remap: functions: parse_aws_alb_log: {
 				ssl_protocol:             null
 				target_group_arn:         "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067"
 				trace_id:                 "Root=1-58337364-23a8c76965a2ef7629b185e3"
+				traceability_id:          null
 				domain_name:              null
 				chosen_cert_arn:          null
 				matched_rule_priority:    "0"

@@ -12,10 +12,7 @@ use super::BoxedFramingError;
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct OctetCountingDecoderConfig {
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     /// Options for the octet counting decoder.
     pub octet_counting: OctetCountingDecoderOptions,
 }
@@ -37,7 +34,7 @@ impl OctetCountingDecoderConfig {
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
     /// The maximum length of the byte buffer.
-    #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
+    #[serde(skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
 }
 

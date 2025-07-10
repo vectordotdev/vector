@@ -323,10 +323,6 @@ pub struct CommandServerStatusWiredTigerBlockManager {
 pub struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes currently in the cache")]
     pub bytes_total: i64,
-    #[serde(rename = "bytes read into cache")]
-    pub bytes_read_into: i64,
-    #[serde(rename = "bytes written from cache")]
-    pub bytes_written_from: i64,
     #[serde(rename = "maximum bytes configured")]
     pub max_bytes: f64,
     #[serde(rename = "modified pages evicted")]
@@ -389,10 +385,6 @@ pub struct CommandServerStatusWiredTigerLog {
     pub log_writes: i64,
     #[serde(rename = "records processed by log scan")]
     pub records_processed_log_scan: i64,
-    #[serde(rename = "total log buffer size")]
-    pub total_buffer_size: i64,
-    #[serde(rename = "total size of compressed records")]
-    pub total_size_compressed: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -413,8 +405,6 @@ pub struct CommandServerStatusWiredTigerTransaction {
     pub checkpoint_max_ms: i64,
     #[serde(rename = "transaction checkpoint min time (msecs)")]
     pub checkpoint_min_ms: i64,
-    #[serde(rename = "transaction checkpoint most recent time (msecs)")]
-    pub checkpoint_last_ms: i64,
     #[serde(rename = "transaction checkpoint total time (msecs)")]
     pub checkpoint_total_ms: i64,
     #[serde(rename = "transactions committed")]

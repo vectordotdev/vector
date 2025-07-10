@@ -2,7 +2,7 @@
 title: GCP Chronicle Unstructured
 description: Store unstructured log events in [Google Chronicle](https://cloud.google.com/chronicle/docs/overview)
 short: GCP Chronicle Unstructured
-kind: sink
+component_kind: sink
 layout: component
 tags: ["gcp", "chronicle", "component", "sink"]
 ---

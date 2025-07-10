@@ -1,14 +1,14 @@
 use chrono::Utc;
-use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, StreamExt};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -51,6 +51,9 @@ pub struct NatsSourceConfig {
     /// If the port is not specified it defaults to 4222.
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
+    #[configurable(metadata(
+        docs::examples = "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"
+    ))]
     url: String,
 
     /// A [name][nats_connection_name] assigned to the NATS connection.
@@ -97,10 +100,26 @@ pub struct NatsSourceConfig {
     /// The `NATS` subject key.
     #[serde(default = "default_subject_key_field")]
     subject_key_field: OptionalValuePath,
+
+    /// The buffer capacity of the underlying NATS subscriber.
+    ///
+    /// This value determines how many messages the NATS subscriber buffers
+    /// before incoming messages are dropped.
+    ///
+    /// See the [async_nats documentation][async_nats_subscription_capacity] for more information.
+    ///
+    /// [async_nats_subscription_capacity]: https://docs.rs/async-nats/latest/async_nats/struct.ConnectOptions.html#method.subscription_capacity
+    #[serde(default = "default_subscription_capacity")]
+    #[derivative(Default(value = "default_subscription_capacity()"))]
+    subscriber_capacity: usize,
 }
 
 fn default_subject_key_field() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("subject"))
+}
+
+const fn default_subscription_capacity() -> usize {
+    65536
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -155,7 +174,7 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -169,7 +188,21 @@ impl SourceConfig for NatsSourceConfig {
 impl NatsSourceConfig {
     async fn connect(&self) -> Result<async_nats::Client, BuildError> {
         let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
-        options.connect(&self.url).await.context(ConnectSnafu)
+
+        let server_addrs = self.parse_server_addresses()?;
+        options.connect(server_addrs).await.context(ConnectSnafu)
+    }
+
+    fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, BuildError> {
+        self.url
+            .split(',')
+            .map(|url| {
+                url.parse::<async_nats::ServerAddr>()
+                    .map_err(|_| BuildError::Connect {
+                        source: async_nats::ConnectErrorKind::ServerParse.into(),
+                    })
+            })
+            .collect()
     }
 }
 
@@ -178,6 +211,7 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
 
     fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
         from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
+            .map(|options| options.subscription_capacity(config.subscriber_capacity))
     }
 }
 
@@ -270,8 +304,8 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use lookup::{owned_value_path, OwnedTargetPath};
-    use vector_core::schema::Definition;
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::schema::Definition;
     use vrl::value::{kind::Collection, Kind};
 
     use super::*;
@@ -346,7 +380,7 @@ mod integration_tests {
     #![allow(clippy::print_stdout)] //tests
 
     use bytes::Bytes;
-    use vector_core::config::log_schema;
+    use vector_lib::config::log_schema;
 
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
@@ -415,6 +449,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -447,6 +482,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -479,6 +515,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -510,6 +547,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -541,6 +579,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -573,6 +612,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -605,6 +645,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -638,6 +679,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -665,6 +707,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -700,6 +743,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -733,6 +777,7 @@ mod integration_tests {
             auth: None,
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -770,6 +815,7 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
@@ -807,12 +853,65 @@ mod integration_tests {
             }),
             log_namespace: None,
             subject_key_field: default_subject_key_field(),
+            ..Default::default()
         };
 
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
             "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_multiple_urls_valid() {
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://nats:4222,nats://demo.nats.io:4222".to_string(),
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: None,
+            log_namespace: None,
+            subject_key_field: default_subject_key_field(),
+            ..Default::default()
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed for multiple URLs, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_multiple_urls_invalid() {
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "http://invalid-url,nats://:invalid@localhost:4222".to_string(),
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: None,
+            log_namespace: None,
+            subject_key_field: default_subject_key_field(),
+            ..Default::default()
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed for bad URLs, expected BuildError::Connect, got: {:?}",
             r
         );
     }

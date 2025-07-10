@@ -3,14 +3,14 @@ package metadata
 remap: functions: is_null: {
 	category:    "Type"
 	description: """
-		Check if the type of a `value` is `null` or not. For a more relaxed function please
-		check [`is_nullish`](\(urls.vrl_functions)#\(remap.functions.is_nullish.anchor)).
+		Check if `value`'s type is `null`. For a more relaxed function,
+		see [`is_nullish`](\(urls.vrl_functions)#\(remap.functions.is_nullish.anchor)).
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is `null`."#
 			required:    true
 			type: ["any"]
 		},

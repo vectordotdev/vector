@@ -2,21 +2,15 @@ package metadata
 
 base: components: sinks: axiom: configuration: {
 	acknowledgements: {
-		description: """
-			Controls how acknowledgements are handled for this sink.
-
-			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
-
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
-			"""
-		required: false
+		description: "Controls how acknowledgements are handled for this sink."
+		required:    false
 		type: object: options: enabled: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -27,15 +21,43 @@ base: components: sinks: axiom: configuration: {
 			type: bool: {}
 		}
 	}
-	compression: {
-		description: """
-			Compression configuration.
+	batch: {
+		description: "The batch settings for the sink."
+		required:    false
+		type: object: options: {
+			max_bytes: {
+				description: """
+					The maximum size of a batch that is processed by a sink.
 
-			All compression algorithms use the default compression level unless otherwise specified.
-			"""
-		required: false
+					This is based on the uncompressed size of the batched events, before they are
+					serialized or compressed.
+					"""
+				required: false
+				type: uint: {
+					default: 10000000
+					unit:    "bytes"
+				}
+			}
+			max_events: {
+				description: "The maximum size of a batch before it is flushed."
+				required:    false
+				type: uint: unit: "events"
+			}
+			timeout_secs: {
+				description: "The maximum age of a batch before it is flushed."
+				required:    false
+				type: float: {
+					default: 1.0
+					unit:    "seconds"
+				}
+			}
+		}
+	}
+	compression: {
+		description: "The compression algorithm to use."
+		required:    false
 		type: string: {
-			default: "none"
+			default: "zstd"
 			enum: {
 				gzip: """
 					[Gzip][gzip] compression.
@@ -43,6 +65,11 @@ base: components: sinks: axiom: configuration: {
 					[gzip]: https://www.gzip.org/
 					"""
 				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
 				zlib: """
 					[Zlib][zlib] compression.
 
@@ -59,7 +86,7 @@ base: components: sinks: axiom: configuration: {
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
-		type: string: examples: ["${AXIOM_DATASET}", "vector.dev"]
+		type: string: examples: ["${AXIOM_DATASET}", "vector_rocks"]
 	}
 	org_id: {
 		description: """
@@ -90,7 +117,7 @@ base: components: sinks: axiom: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -110,14 +137,23 @@ base: components: sinks: axiom: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
 						required: false
 						type: uint: default: 1
+					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
 					}
 					rtt_deviation_scale: {
 						description: """
@@ -148,9 +184,9 @@ base: components: sinks: axiom: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.
@@ -194,12 +230,8 @@ base: components: sinks: axiom: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -217,11 +249,31 @@ base: components: sinks: axiom: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -241,14 +293,18 @@ base: components: sinks: axiom: configuration: {
 		}
 	}
 	tls: {
-		description: "TLS configuration."
-		required:    false
+		description: """
+			The TLS settings for the connection.
+
+			Optional, constrains TLS settings for this sink.
+			"""
+		required: false
 		type: object: options: {
 			alpn_protocols: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -270,7 +326,7 @@ base: components: sinks: axiom: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -293,16 +349,25 @@ base: components: sinks: axiom: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

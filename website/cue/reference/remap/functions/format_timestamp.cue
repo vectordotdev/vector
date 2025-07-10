@@ -3,7 +3,7 @@ package metadata
 remap: functions: format_timestamp: {
 	category: "Timestamp"
 	description: #"""
-		Formats the `value` into a string representation of the timestamp.
+		Formats `value` into a string representation of the timestamp.
 		"""#
 
 	arguments: [
@@ -21,7 +21,7 @@ remap: functions: format_timestamp: {
 		},
 		{
 			name:        "timezone"
-			description: "The timezone to use when formatting the timestamp. The uses the TZ identifier, or 'local'"
+			description: "The timezone to use when formatting the timestamp. The parameter uses the TZ identifier or `local`."
 			required:    false
 			type: ["string"]
 		},

@@ -52,7 +52,7 @@ pub trait MetricsFilter<'a> {
     fn sent_events_total(&self) -> Option<SentEventsTotal>;
 }
 
-impl<'a> MetricsFilter<'a> for Vec<Metric> {
+impl MetricsFilter<'_> for Vec<Metric> {
     fn received_bytes_total(&self) -> Option<ReceivedBytesTotal> {
         let sum = sum_metrics(
             self.iter()
@@ -379,10 +379,13 @@ fn component_to_filtered_metrics(
         m.into_iter()
             .filter(filter_fn)
             .filter_map(|m| m.tag_value("component_id").map(|id| (id, m)))
-            .fold(BTreeMap::new(), |mut map, (id, m)| {
-                map.entry(id).or_insert_with(Vec::new).push(m);
-                map
-            })
+            .fold(
+                BTreeMap::new(),
+                |mut map: BTreeMap<String, Vec<Metric>>, (id, m)| {
+                    map.entry(id).or_default().push(m);
+                    map
+                },
+            )
     })
 }
 

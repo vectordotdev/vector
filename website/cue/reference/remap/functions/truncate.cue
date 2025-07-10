@@ -22,20 +22,20 @@ remap: functions: truncate: {
 		{
 			name: "ellipsis"
 			description: """
-				This argument is deprecated. An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string
-				ends up being truncated because it's exceeded the `limit`.
+				This argument is deprecated. An ellipsis (`...`) is appended if the parameter is set to `true` _and_ the `value` string
+				is truncated because it exceeded the `limit`.
 				"""
-			required: true
+			required: false
 			type: ["boolean"]
 		},
 		{
 			name: "suffix"
 			description: """
-				A custom suffix (`...`) will be appended to truncated strings.
-				This is ignored if "ellipsis" is set to true for backwards compatibility.
+				A custom suffix (`...`) is appended to truncated strings.
+				If `ellipsis` is set to `true`, this parameter is ignored for backwards compatibility.
 				"""
-			required: true
-			type: ["boolean"]
+			required: false
+			type: ["string"]
 		},
 	]
 	internal_failure_reasons: []

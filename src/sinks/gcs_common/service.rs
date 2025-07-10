@@ -8,8 +8,8 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::stream::DriverResponse;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_lib::stream::DriverResponse;
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -112,9 +112,9 @@ impl Service<GcsRequest> for GcsService {
         let settings = request.settings;
         let metadata = request.metadata;
 
-        let uri = format!("{}{}", self.base_url, request.key)
-            .parse::<Uri>()
-            .unwrap();
+        let uri = merge_url_and_key(&self.base_url, &request.key);
+
+        let uri = uri.parse::<Uri>().unwrap();
 
         let mut builder = Request::put(uri);
         let headers = builder.headers_mut().unwrap();
@@ -140,5 +140,37 @@ impl Service<GcsRequest> for GcsService {
             let result = client.call(http_request).await;
             result.map(|inner| GcsResponse { inner, metadata })
         })
+    }
+}
+
+/// converts // to / between the base url and the key if necessary
+fn merge_url_and_key(base_url: &str, key: &str) -> String {
+    let base_url = base_url.strip_suffix('/').unwrap_or(base_url);
+    let key = key.strip_prefix('/').unwrap_or(key);
+    format!("{base_url}/{key}")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sinks::gcs_common::service::merge_url_and_key;
+
+    #[test]
+    fn merge_base_url_and_key() {
+        assert_eq!(
+            "https://baseurl/key",
+            merge_url_and_key("https://baseurl/", "/key")
+        );
+        assert_eq!(
+            "https://baseurl/key",
+            merge_url_and_key("https://baseurl/", "key")
+        );
+        assert_eq!(
+            "https://baseurl/key",
+            merge_url_and_key("https://baseurl", "/key")
+        );
+        assert_eq!(
+            "https://baseurl/key",
+            merge_url_and_key("https://baseurl", "key")
+        );
     }
 }

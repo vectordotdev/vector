@@ -5,7 +5,7 @@ administration: {
 		name:        #OperatingSystemFamily
 		highlighter: "powershell" | *"shell"
 		interfaces: [administration.management.#Interface, ...administration.management.#Interface]
-		interface_names: [string, ...string] & [ for i in interfaces {i.title}]
+		interface_names: [string, ...string] & [for i in interfaces {i.title}]
 	}
 
 	#UI: {
@@ -53,7 +53,7 @@ administration: {
 		management: {
 			families: _families
 
-			family_names: [ for f in _families {f.name}]
+			family_names: [for f in _families {f.name}]
 		}
 	}
 }

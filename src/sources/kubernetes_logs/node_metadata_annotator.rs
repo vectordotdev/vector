@@ -5,10 +5,10 @@
 use crate::event::{Event, LogEvent};
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use lookup::lookup_v2::OptionalTargetPath;
-use lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
 
 use super::Config;
 
@@ -95,8 +95,8 @@ fn annotate_from_metadata(
 
 #[cfg(test)]
 mod tests {
-    use lookup::{event_path, lookup_v2::parse_target_path, metadata_path};
     use similar_asserts::assert_eq;
+    use vector_lib::lookup::{event_path, lookup_v2::parse_target_path, metadata_path};
 
     use super::*;
 

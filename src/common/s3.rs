@@ -1,21 +1,17 @@
+use aws_sdk_s3::config;
+
 use crate::aws::ClientBuilder;
 
-pub(crate) struct S3ClientBuilder;
+pub(crate) struct S3ClientBuilder {
+    pub force_path_style: Option<bool>,
+}
 
 impl ClientBuilder for S3ClientBuilder {
-    type Config = aws_sdk_s3::config::Config;
     type Client = aws_sdk_s3::client::Client;
-    type DefaultMiddleware = aws_sdk_s3::middleware::DefaultMiddleware;
 
-    fn default_middleware() -> Self::DefaultMiddleware {
-        aws_sdk_s3::middleware::DefaultMiddleware::new()
-    }
-
-    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
-        let config = aws_sdk_s3::config::Builder::from(config)
-            .force_path_style(true)
-            .build();
-
-        aws_sdk_s3::client::Client::with_config(client, config)
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
+        let builder =
+            config::Builder::from(config).force_path_style(self.force_path_style.unwrap_or(true));
+        aws_sdk_s3::client::Client::from_conf(builder.build())
     }
 }

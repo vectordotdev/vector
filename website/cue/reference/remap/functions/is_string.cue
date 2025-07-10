@@ -3,13 +3,13 @@ package metadata
 remap: functions: is_string: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is a string or not.
+		Check if `value`'s type is a string.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: #"The value to check"#
+			description: #"The value to check if it is a string."#
 			required:    true
 			type: ["any"]
 		},

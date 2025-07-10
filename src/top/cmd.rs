@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use vector_api_client::{connect_subscription_client, Client};
+use vector_lib::api_client::{connect_subscription_client, Client};
 
 use super::{
     dashboard::{init_dashboard, is_tty},
@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
             Have you enabled the API?
 
-            To enable the API, add the following to your `vector.toml` config file:
+            To enable the API, add the following to your Vector config file:
 
             [api]
                 enabled = true"},
@@ -98,7 +98,7 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(&client).await {
+        let state = match metrics::init_components(&client, &opts.components).await {
             Ok(state) => state,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
@@ -116,7 +116,12 @@ async fn subscription(
         };
 
         // Subscribe to updated metrics
-        let finished = metrics::subscribe(subscription_client, tx.clone(), opts.interval as i64);
+        let finished = metrics::subscribe(
+            subscription_client,
+            tx.clone(),
+            opts.interval as i64,
+            opts.components.clone(),
+        );
 
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(

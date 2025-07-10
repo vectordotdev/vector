@@ -9,6 +9,7 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 #![allow(clippy::must_use_candidate)]
+#![allow(async_fn_in_trait)]
 
 #[macro_use]
 extern crate tracing;
@@ -74,7 +75,7 @@ pub enum WhenFull {
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
         // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
-        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // supports handling it, and will be defaulted to using "block" if they encounter
         // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
@@ -84,37 +85,29 @@ impl Arbitrary for WhenFull {
     }
 }
 
-/// An item that can be buffered.
+/// An item that can be buffered in memory.
 ///
-/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
-pub trait Bufferable:
-    AddBatchNotifier
-    + ByteSizeOf
-    + Encodable
-    + EventCount
-    + Debug
-    + Send
-    + Sync
-    + Unpin
-    + Sized
-    + 'static
+/// This supertrait serves as the base trait for any item that can be pushed into a memory buffer.
+/// It is a relaxed version of `Bufferable` that allows for items that are not `Encodable` (e.g., `Instant`),
+/// which is an unnecessary constraint for memory buffers.
+pub trait InMemoryBufferable:
+    AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
-// Blanket implementation for anything that is already bufferable.
-impl<T> Bufferable for T where
-    T: AddBatchNotifier
-        + ByteSizeOf
-        + Encodable
-        + EventCount
-        + Debug
-        + Send
-        + Sync
-        + Unpin
-        + Sized
-        + 'static
+// Blanket implementation for anything that is already in-memory bufferable.
+impl<T> InMemoryBufferable for T where
+    T: AddBatchNotifier + ByteSizeOf + EventCount + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
+
+/// An item that can be buffered.
+///
+/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
+pub trait Bufferable: InMemoryBufferable + Encodable {}
+
+// Blanket implementation for anything that is already bufferable.
+impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
@@ -129,7 +122,7 @@ where
     }
 }
 
-impl<'a, T> EventCount for &'a T
+impl<T> EventCount for &T
 where
     T: EventCount,
 {
@@ -147,7 +140,10 @@ where
     T: Send + 'static,
 {
     #[cfg(tokio_unstable)]
-    return tokio::task::Builder::new().name(_name).spawn(task);
+    return tokio::task::Builder::new()
+        .name(_name)
+        .spawn(task)
+        .expect("tokio task should spawn");
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)

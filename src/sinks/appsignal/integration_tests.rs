@@ -3,7 +3,7 @@ use futures::{channel::mpsc::Receiver, stream, StreamExt};
 use http::header::AUTHORIZATION;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::event::{
+use vector_lib::event::{
     BatchNotifier, BatchStatus, Event, LogEvent, Metric, MetricKind, MetricValue,
 };
 

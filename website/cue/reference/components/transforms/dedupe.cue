@@ -32,6 +32,12 @@ components: transforms: dedupe: {
 		traces:  false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+	}
+
 	how_it_works: {
 		cache_behavior: {
 			title: "Cache Behavior"

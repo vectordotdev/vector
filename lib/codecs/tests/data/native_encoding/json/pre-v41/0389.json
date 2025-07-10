@@ -1,0 +1,1 @@
+{"metric":{"name":"z","namespace":"s","timestamp":"1970-01-01T03:39:57.000011952Z","interval_ms":1650674211,"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2176],"n":[1]},"count":1,"min":441088.0,"max":441088.0,"sum":-971712.0,"avg":586432.0}}}}}

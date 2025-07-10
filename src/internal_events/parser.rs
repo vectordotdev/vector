@@ -1,12 +1,8 @@
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";
@@ -34,14 +30,14 @@ impl InternalEvent for ParserMatchError<'_> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
-            internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "no_match_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -67,12 +63,13 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "field_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "field" => self.field.to_string(),
-        );
+        )
+        .increment(1);
 
         if DROP_EVENT {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
@@ -86,7 +83,7 @@ pub struct ParserConversionError<'a> {
     pub error: crate::types::Error,
 }
 
-impl<'a> InternalEvent for ParserConversionError<'a> {
+impl InternalEvent for ParserConversionError<'_> {
     fn emit(self) {
         error!(
             message = "Could not convert types.",
@@ -98,12 +95,13 @@ impl<'a> InternalEvent for ParserConversionError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "type_conversion",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
             "name" => self.name.to_string(),
-        );
+        )
+        .increment(1);
     }
 }
 

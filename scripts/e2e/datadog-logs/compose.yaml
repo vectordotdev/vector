@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # Generates random log data for consumption by the custom Agent check
+  log_generator:
+    image: docker.io/mingrammer/flog
+    depends_on:
+      - datadog-agent-vector
+      - datadog-agent
+    command:
+      - "-f"
+      - "json"
+      - "-n"
+      - "1000"
+      - "-t"
+      - "log"
+      - "-o"
+      - "/var/log/a_custom.log"
+    volumes:
+      - type: volume
+        source: log_path
+        target: /var/log/
+
+  # Tails a custom log created by `log_generator` and sends log data to
+  # the `fakeintake-agent` service
+  datadog-agent:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    depends_on:
+      - fakeintake-agent
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+    - DD_CONTAINER_EXCLUDE="name:.*"
+    volumes:
+      # The Agent config file
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/agent_only.yaml
+        target: /etc/datadog-agent/datadog.yaml
+        read_only: true
+
+      # The custom logs check
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        target: /conf.d
+        read_only: true
+
+      # The custom log to tail, created by the `log_generator` service
+      - type: volume
+        source: log_path
+        target: /var/log/
+
+  # Tails a custom log created by `log_generator` and sends log data to
+  # the `vector` service
+  datadog-agent-vector:
+    image: docker.io/datadog/agent:${CONFIG_AGENT_VERSION}
+    depends_on:
+      - vector
+    environment:
+    - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
+    - DD_HOSTNAME=datadog-agent-vector
+    - DD_ENABLE_PAYLOADS_EVENTS=false
+    - DD_ENABLE_PAYLOADS_SERVICE_CHECKS=false
+    - DD_CONTAINER_EXCLUDE="name:.*"
+    volumes:
+      # The Agent config file
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/agent_vector.yaml
+        target: /etc/datadog-agent/datadog.yaml
+        read_only: true
+
+      # The custom logs check
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        target: /conf.d
+        read_only: true
+
+      # The custom log to tail, created by the `log_generator` service
+      - type: volume
+        source: log_path
+        target: /var/log/
+
+  # Receives log data from the `datadog-agent-vector` service and sends
+  # to the `fakeintake-vector` service.
+  vector:
+    depends_on:
+      - fakeintake-vector
+    build:
+      context: ../../..
+    # re-using the integration test runner image since it already has
+    # compiled vector on it.
+    image: ${CONFIG_VECTOR_IMAGE}
+    environment:
+      - FEATURES=e2e-tests-datadog
+    working_dir: /home/vector
+    network_mode: host
+    command:
+      - "/usr/bin/vector"
+      - "-vvv"
+      - "-c"
+      - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
+    volumes:
+      - type: bind
+        source: ../../..
+        target: /home/vector
+
+  # Receives log data from the `datadog-agent` service. Is queried by the test runner
+  # which does the validation of consistency with the other fakeintake service.
+  fakeintake-agent:
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:ved764626
+
+  # Receives log data from the `datadog-agent-vector` service. Is queried by the test runner
+  # which does the validation of consistency with the other fakeintake service.
+  fakeintake-vector:
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:ved764626
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+
+volumes:
+  log_path: {}
+  target: {}

@@ -1,7 +1,7 @@
-use codecs::TextSerializerConfig;
 use std::time::Duration;
+use vector_lib::codecs::TextSerializerConfig;
 
-use super::{config::NatsSinkConfig, sink::NatsSink, NatsError};
+use super::{config::NatsSinkConfig, sink::NatsSink, ConfigSnafu, NatsError};
 use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
@@ -13,6 +13,7 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
+use snafu::ResultExt;
 
 async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     // Publish `N` messages to NATS.
@@ -26,9 +27,10 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
 
     // Establish the consumer subscription.
     let subject = conf.subject.clone();
+    let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect()
+        .connect(options)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
@@ -78,6 +80,7 @@ async fn nats_no_auth() {
         tls: None,
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -110,6 +113,7 @@ async fn nats_userpass_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     publish_and_check(conf)
@@ -139,6 +143,7 @@ async fn nats_userpass_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -170,6 +175,7 @@ async fn nats_token_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -201,6 +207,7 @@ async fn nats_token_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -233,6 +240,7 @@ async fn nats_nkey_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -265,6 +273,7 @@ async fn nats_nkey_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -298,6 +307,7 @@ async fn nats_tls_valid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -325,6 +335,7 @@ async fn nats_tls_invalid() {
         tls: None,
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -360,6 +371,7 @@ async fn nats_tls_client_cert_valid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -393,6 +405,7 @@ async fn nats_tls_client_cert_invalid() {
         }),
         auth: None,
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -430,6 +443,7 @@ async fn nats_tls_jwt_auth_valid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;
@@ -467,6 +481,7 @@ async fn nats_tls_jwt_auth_invalid() {
             },
         }),
         request: Default::default(),
+        jetstream: false,
     };
 
     let r = publish_and_check(conf).await;

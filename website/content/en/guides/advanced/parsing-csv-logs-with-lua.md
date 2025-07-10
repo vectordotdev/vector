@@ -11,12 +11,12 @@ tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 {{< requirement title="Pre-requisites" >}}
 
 * You understand the <a href="/docs/reference/configuration/transforms/lua">basic Lua concepts</a>.
-* You understand the <a href="/docs/about/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
+* You understand the <a href="/docs/introduction/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
 
 {{< /requirement >}}
 
-Vector has many built-in [parsers][urls.vector_parsing_transforms] for structured logs formats. However, when you need
-to ship logs in a custom or application-specific format, [programmable transforms][urls.vector_programmable_transforms]
+Vector has many built-in [parsers][docs.transforms.parser] for structured logs formats. However, when you need
+to ship logs in a custom or application-specific format, [programmable transforms][docs.transforms.lua]
 have got you covered.
 
 This guide walks through reading CSV logs using [`file`][docs.sources.file] source and parsing them using the [`lua`][docs.transforms.lua] transform with a loadable Lua module.
@@ -42,7 +42,7 @@ data_dir = "."
 [sources.file]
   type = "file"
   include = ["*.csv"]
-  start_at_beginning = true
+  ignore_checkpoints = true
 
 [transforms.lua]
   inputs = ["file"]
@@ -155,6 +155,10 @@ the whole transform:
       "query_pos",
       "location",
       "application_name",
+      -- available only in postgres > 13, to remove for postgres <= 13
+      "backend_type",
+      "leader_pid",
+      "query_id"
     }
   """
   hooks.process = """
@@ -162,8 +166,8 @@ the whole transform:
       fields = csv.openstring(event.log.message):lines()() -- parse the `message` field
       event.log.message = nil -- drop the `message` field
 
-      for column, value in ipairs(fields) do -- iterate over CSV columns
-        column_name = column_names[column] -- get column name
+      for column, column_name in ipairs(column_names) do -- iterate over column names
+        value = fields[column] -- get field value
         event.log[column_name] = value -- set the corresponding field in the event
       end
 
@@ -176,9 +180,9 @@ the whole transform:
 Trying to run `vector --config vector.toml` with the same input file results in structured events being output:
 
 ```json
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"Future log output will go to log destination \"csvlog\".","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.661 UTC","message":"ending log output to stderr","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.669 UTC","message":"database system was shut down at 2020-04-09 12:48:25 UTC","process_id":"27","query":"","query_pos":"","session_id":"localhost.1b","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
-{"application_name":"","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","location":"","log_time":"2020-04-09 12:48:49.683 UTC","message":"database system is ready to accept connections","process_id":"1","query":"","query_pos":"","session_id":"localhost.1","session_line_num":"2","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","backend_type":"not initialized","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"Future log output will go to log destination \"csvlog\".","host":"localhost","internal_query":"","internal_query_pos":"","leader_pid":"","location":"","log_time":"2020-04-09 12:48:49.661 UTC","message":"ending log output to stderr","process_id":"1","query":"","query_id":"0","query_pos":"","session_id":"localhost.1","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","backend_type":"not initialized","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","leader_pid":"","location":"","log_time":"2020-04-09 12:48:49.669 UTC","message":"database system was shut down at 2020-04-09 12:48:25 UTC","process_id":"27","query":"","query_id":"0","query_pos":"","session_id":"localhost.1b","session_line_num":"1","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
+{"application_name":"","backend_type":"not initialized","command_tag":"","connection_from":"","context":"","database_name":"","detail":"","error_severity":"LOG","file":"log.csv","hint":"","host":"localhost","internal_query":"","internal_query_pos":"","leader_pid":"","location":"","log_time":"2020-04-09 12:48:49.683 UTC","message":"database system is ready to accept connections","process_id":"1","query":"","query_id":"0","query_pos":"","session_id":"localhost.1","session_line_num":"2","session_start_time":"2020-04-09 12:48:49 UTC","sql_state_code":"00000","timestamp":"2020-04-09T19:49:07Z","transaction_id":"0","user_name":"","virtual_transaction_id":""}
 ```
 
 Or, applying pretty formatting to one of the output events:
@@ -186,6 +190,7 @@ Or, applying pretty formatting to one of the output events:
 ```json
 {
   "application_name": "",
+  "backend_type":"not initialized",
   "command_tag": "",
   "connection_from": "",
   "context": "",
@@ -197,11 +202,13 @@ Or, applying pretty formatting to one of the output events:
   "host": "localhost",
   "internal_query": "",
   "internal_query_pos": "",
+  "leader_pid":"",
   "location": "",
   "log_time": "2020-04-09 12:48:49.661 UTC",
   "message": "ending log output to stderr",
   "process_id": "1",
   "query": "",
+  "query_id":"0",
   "query_pos": "",
   "session_id": "localhost.1",
   "session_line_num": "1",
@@ -242,6 +249,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/
 [docs.transforms.coercer]: /docs/reference/vrl/functions/#coerce-functions
+[docs.transforms.parser]: /docs/reference/vrl/functions/#parse-functions
 [docs.transforms.lua#data-types]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#process]: /docs/reference/configuration/transforms/lua/#hooks.process
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source
@@ -252,5 +260,3 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [urls.lua_require]: https://www.lua.org/manual/5.3/manual.html#pdf-require
 [urls.lua_tonumber]: https://www.lua.org/manual/5.3/manual.html#pdf-tonumber
 [urls.postgresql_csvlog]: https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-LOGGING-CSVLOG
-[urls.vector_parsing_transforms]: /components/?functions%5B%5D=parse
-[urls.vector_programmable_transforms]: /components/?functions%5B%5D=program

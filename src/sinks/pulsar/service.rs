@@ -106,7 +106,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             let mut properties = HashMap::new();
             if let Some(props) = request.metadata.properties {
                 for (key, value) in props {
-                    properties.insert(key, String::from_utf8_lossy(&value).to_string());
+                    properties.insert(key.into(), String::from_utf8_lossy(&value).to_string());
                 }
             }
 
@@ -129,7 +129,11 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             // `poll_ready()`. This sink is already limited to sequential request handling due to
             // the pulsar API, so this shouldn't impact performance from a concurrent requests
             // standpoint.
-            let fut = producer.lock().await.send(topic, message).await;
+            let fut = producer
+                .lock()
+                .await
+                .send_non_blocking(topic, message)
+                .await;
 
             match fut {
                 Ok(resp) => match resp.await {

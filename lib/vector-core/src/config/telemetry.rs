@@ -1,33 +1,77 @@
-use std::sync::OnceLock;
-
-use once_cell::sync::Lazy;
+use cfg_if::cfg_if;
 use vector_common::request_metadata::GroupedCountByteSize;
 use vector_config::configurable_component;
 
-static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
-static TELEMETRY_DEFAULT: Lazy<Telemetry> = Lazy::new(Telemetry::default);
+cfg_if! {
+    // The telemetry code assumes a process wide singleton. When running `cargo test`,
+    // multiple threads might try to read/write this global.
+    if #[cfg(any(test, feature = "test"))] {
+        use std::sync::{Arc, Mutex};
 
-/// Loads the telemetry options from configurations and sets the global options.
-/// Once this is done, configurations can be correctly loaded using configured
-/// log schema defaults.
-///
-/// # Errors
-///
-/// This function will fail if the `builder` fails.
-///
-/// # Panics
-///
-/// If deny is set, will panic if telemetry has already been set.
-pub fn init_telemetry(telemetry: Telemetry, deny_if_set: bool) {
-    assert!(
-        !(TELEMETRY.set(telemetry).is_err() && deny_if_set),
-        "Couldn't set telemetry"
-    );
-}
+        thread_local! {
+            static TELEMETRY: Arc<Mutex<Option<Telemetry>>> = Arc::new(Mutex::new(None));
+        }
 
-/// Returns the telemetry configuration options.
-pub fn telemetry() -> &'static Telemetry {
-    TELEMETRY.get().unwrap_or(&TELEMETRY_DEFAULT)
+        /// Test implementation.
+        ///
+        /// # Panics
+        ///
+        /// If deny is set, will panic if telemetry has already been set.
+        /// Also, panics if the lock is poisoned.
+        pub fn init_telemetry(telemetry: Telemetry, deny_if_set: bool) {
+            TELEMETRY.with(|tl| {
+                let mut tl = tl.lock().expect("telemetry lock poisoned");
+                assert!(!(tl.is_some() && deny_if_set), "Couldn't set telemetry");
+                *tl = Some(telemetry);
+            });
+        }
+
+        /// Test implementation.
+        ///
+        /// # Panics
+        ///
+        /// If the lock is poisoned.
+         pub fn telemetry() -> Telemetry {
+            TELEMETRY.with(|tl| {
+               let mut tl = tl.lock().expect("telemetry lock poisoned");
+                // For non-test code we return `TELEMETRY_DEFAULT`.
+                // For test code, we will instantiate a default instance per thread.
+                if tl.is_none() {
+                    *tl = Some(Telemetry::default());
+                }
+                tl.clone().unwrap()
+            })
+        }
+    }
+    else {
+        use std::sync::{LazyLock, OnceLock};
+
+        static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
+        static TELEMETRY_DEFAULT: LazyLock<Telemetry> = LazyLock::new(Telemetry::default);
+
+        /// Loads the telemetry options from configurations and sets the global options.
+        /// Once this is done, configurations can be correctly loaded using configured
+        /// log schema defaults.
+        ///
+        /// # Errors
+        ///
+        /// This function will fail if the `builder` fails.
+        ///
+        /// # Panics
+        ///
+        /// If deny is set, will panic if telemetry has already been set.
+        pub fn init_telemetry(telemetry: Telemetry, deny_if_set: bool) {
+            assert!(
+                !(TELEMETRY.set(telemetry).is_err() && deny_if_set),
+                "Couldn't set telemetry"
+            );
+        }
+
+        /// Returns the telemetry configuration options.
+        pub fn telemetry() -> &'static Telemetry {
+            TELEMETRY.get().unwrap_or(&TELEMETRY_DEFAULT)
+        }
+    }
 }
 
 /// Sets options for the telemetry that Vector emits.
@@ -87,9 +131,9 @@ mod test {
 
     #[test]
     fn partial_telemetry() {
-        let toml = r#"
+        let toml = r"
             emit_source = true
-        "#;
+        ";
         toml::from_str::<Telemetry>(toml).unwrap();
     }
 }

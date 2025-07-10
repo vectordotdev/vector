@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{config::SecretBackend, signal};
 
@@ -15,7 +15,7 @@ pub struct TestBackend {
 impl_generate_config_from_default!(TestBackend);
 
 impl SecretBackend for TestBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         _: &mut signal::SignalRx,

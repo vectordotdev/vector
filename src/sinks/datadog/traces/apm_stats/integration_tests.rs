@@ -16,11 +16,10 @@ use tokio::time::{sleep, Duration};
 
 use crate::{
     config::ConfigBuilder,
-    signal::ShutdownError,
     sinks::datadog::traces::{apm_stats::StatsPayload, DatadogTracesConfig},
     sources::datadog_agent::DatadogAgentConfig,
     test_util::{start_topology, trace_init},
-    topology::RunningTopology,
+    topology::{RunningTopology, ShutdownErrorReceiver},
 };
 
 /// The port on which the Agent will send traces to vector, and vector `datadog_agent` source will
@@ -320,13 +319,7 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
 /// This creates a scenario where the stats payload that is output by the sink after processing the
 /// *second* batch of events (the second event) *should* contain the aggregated statistics of both
 /// of the trace events. i.e , the hit count for that bucket should be equal to "2" , not "1".
-async fn start_vector() -> (
-    RunningTopology,
-    (
-        tokio::sync::mpsc::UnboundedSender<ShutdownError>,
-        tokio::sync::mpsc::UnboundedReceiver<ShutdownError>,
-    ),
-) {
+async fn start_vector() -> (RunningTopology, ShutdownErrorReceiver) {
     let dd_agent_address = format!("0.0.0.0:{}", vector_receive_port());
 
     let source_config = toml::from_str::<DatadogAgentConfig>(&format!(

@@ -1,11 +1,11 @@
-use metrics::counter;
-use vector_common::{
+use std::net::Ipv4Addr;
+
+use metrics::{counter, histogram};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use vector_lib::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-
-use crate::emit;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(dead_code)] // some features only use some variants
@@ -39,9 +39,11 @@ impl InternalEvent for SocketBytesReceived {
             %protocol,
         );
         counter!(
-            "component_received_bytes_total", self.byte_size as u64,
+            "component_received_bytes_total",
             "protocol" => protocol,
-        );
+        )
+        .increment(self.byte_size as u64);
+        histogram!("component_received_bytes").record(self.byte_size as f64);
     }
 }
 
@@ -61,8 +63,10 @@ impl InternalEvent for SocketEventsReceived {
             byte_size = self.byte_size.get(),
             %mode,
         );
-        counter!("component_received_events_total", self.count as u64, "mode" => mode);
-        counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "mode" => mode);
+        counter!("component_received_events_total", "mode" => mode).increment(self.count as u64);
+        counter!("component_received_event_bytes_total", "mode" => mode)
+            .increment(self.byte_size.get() as u64);
+        histogram!("component_received_bytes", "mode" => mode).record(self.byte_size.get() as f64);
     }
 }
 
@@ -81,9 +85,10 @@ impl InternalEvent for SocketBytesSent {
             %protocol,
         );
         counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
+            "component_sent_bytes_total",
             "protocol" => protocol,
-        );
+        )
+        .increment(self.byte_size as u64);
     }
 }
 
@@ -97,8 +102,9 @@ pub struct SocketEventsSent {
 impl InternalEvent for SocketEventsSent {
     fn emit(self) {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size.get());
-        counter!("component_sent_events_total", self.count, "mode" => self.mode.as_str());
-        counter!("component_sent_event_bytes_total", self.byte_size.get() as u64, "mode" => self.mode.as_str());
+        counter!("component_sent_events_total", "mode" => self.mode.as_str()).increment(self.count);
+        counter!("component_sent_event_bytes_total", "mode" => self.mode.as_str())
+            .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -116,19 +122,56 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             error = %self.error,
             error_code = "socket_bind",
             error_type = error_type::IO_FAILED,
-            stage = error_stage::RECEIVING,
+            stage = error_stage::INITIALIZING,
             %mode,
+
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "socket_bind",
+            "error_type" => error_type::IO_FAILED,
+            "stage" => error_stage::INITIALIZING,
+            "mode" => mode,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug)]
+pub struct SocketMulticastGroupJoinError<E> {
+    pub error: E,
+    pub group_addr: Ipv4Addr,
+    pub interface: Ipv4Addr,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
+    fn emit(self) {
+        // Multicast groups are only used in UDP mode
+        let mode = SocketMode::Udp.as_str();
+        let group_addr = self.group_addr.to_string();
+        let interface = self.interface.to_string();
+
+        error!(
+            message = "Error joining multicast group.",
+            error = %self.error,
+            error_code = "socket_multicast_group_join",
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::INITIALIZING,
+            %mode,
+            %group_addr,
+            %interface,
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
-            "error_code" => "socket_bind",
+            "component_errors_total",
+            "error_code" => "socket_multicast_group_join",
             "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::RECEIVING,
+            "stage" => error_stage::INITIALIZING,
             "mode" => mode,
-        );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
+            "group_addr" => group_addr,
+            "interface" => interface,
+        )
+        .increment(1);
     }
 }
 
@@ -148,17 +191,16 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "socket_receive",
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
             "mode" => mode,
-        );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
+        )
+        .increment(1);
     }
 }
 
@@ -179,17 +221,16 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             %mode,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "socket_send",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
             "mode" => mode,
-        );
-        // deprecated
-        counter!("connection_errors_total", 1, "mode" => mode);
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

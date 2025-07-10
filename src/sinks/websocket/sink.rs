@@ -24,7 +24,8 @@ use tokio_tungstenite::{
     WebSocketStream as WsStream,
 };
 use tokio_util::codec::Encoder as _;
-use vector_core::{
+use vector_lib::{
+    emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -33,7 +34,7 @@ use vector_core::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    dns, emit,
+    dns,
     event::{Event, EventStatus, Finalizable},
     http::Auth,
     internal_events::{
@@ -234,13 +235,13 @@ impl WebSocketSink {
     }
 
     const fn should_encode_as_binary(&self) -> bool {
-        use codecs::encoding::Serializer::{
-            Avro, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
+        use vector_lib::codecs::encoding::Serializer::{
+            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
         };
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
 
@@ -388,7 +389,6 @@ const fn is_closed(error: &WsError) -> bool {
 mod tests {
     use std::net::SocketAddr;
 
-    use codecs::JsonSerializerConfig;
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
     use tokio::time::timeout;
@@ -397,6 +397,7 @@ mod tests {
         tungstenite::error::{Error as WsError, ProtocolError},
         tungstenite::handshake::server::{Request, Response},
     };
+    use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
     use crate::{
@@ -456,7 +457,7 @@ mod tests {
 
         let addr = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
-        let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
             uri: format!("wss://{}", addr),
@@ -585,6 +586,8 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            #[cfg(feature = "aws-core")]
+                                            _ => {}
                                         }
                                     }
                                     Ok(res)

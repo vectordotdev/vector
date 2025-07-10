@@ -1,0 +1,51 @@
+# Changelog
+#
+# Validates that a changelog entry was added.
+# Runs on PRs when:
+#   - opened/re-opened
+#   - new commits pushed
+#   - label is added or removed
+# Runs on merge queues, but just passes, because it is a required check.
+name: Changelog
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+  # Required by GitHub merge queue due to branch protection rules. Should always be successful
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  validate-changelog:
+    runs-on: ubuntu-24.04
+
+    env:
+      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+
+    steps:
+      # Checkout full depth because in the check_changelog_fragments script, we need to specify a
+      # merge base. If we only shallow clone the repo, git may not have enough history to determine
+      # the base.
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'merge_group' }}
+        with:
+          fetch-depth: 0
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Bypass when no‑changelog label is present
+        if: env.PR_HAS_LABEL == 'true'
+        run: |
+          echo "'no-changelog' label detected – skipping changelog validation."
+          exit 0
+
+      - name: Merge queue
+        if: ${{ github.event_name == 'merge_group' }}
+        run: |
+          echo "merge_group event – passing without running changelog validation."
+          exit 0
+
+      - name: Run changelog fragment checker
+        if: ${{ env.PR_HAS_LABEL == 'false' && github.event_name != 'merge_group' }}
+        run: ./scripts/check_changelog_fragments.sh

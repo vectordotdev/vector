@@ -1,7 +1,7 @@
 ---
 title: AWS Cloudwatch logs
 description: Publish log events to [AWS Cloudwatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["aws", "cloudwatch", "component", "sink", "logs"]
 ---

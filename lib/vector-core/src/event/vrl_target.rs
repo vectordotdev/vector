@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::{NonZero, TryFromIntError};
 use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::lookup_v2::OwnedSegment;
@@ -7,17 +8,17 @@ use snafu::Snafu;
 use vrl::compiler::value::VrlValueConvert;
 use vrl::compiler::{ProgramInfo, SecretTarget, Target};
 use vrl::prelude::Collection;
-use vrl::value::{Kind, Value};
+use vrl::value::{Kind, ObjectMap, Value};
 
-use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent};
+use super::{metric::TagValue, Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent};
 use crate::config::{log_schema, LogNamespace};
-use crate::event::metric::TagValue;
 use crate::schema::Definition;
 
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
+const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set it.
-const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
+const VALID_METRIC_PATHS_GET: &str =
+    ".name, .namespace, .interval_ms, .timestamp, .kind, .tags, .type";
 
 /// Metrics aren't interested in paths that have a length longer than 3.
 ///
@@ -283,9 +284,7 @@ impl Target for VrlTarget {
                         return Err(MetricPathError::SetPathError.to_string());
                     }
 
-                    if let Some(paths) =
-                        path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0)
-                    {
+                    if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
                         match paths.as_slice() {
                             ["tags"] => {
                                 let value =
@@ -294,7 +293,7 @@ impl Target for VrlTarget {
                                 metric.remove_tags();
                                 for (field, value) in &value {
                                     set_metric_tag_values(
-                                        field.as_str().to_owned(),
+                                        field[..].into(),
                                         value,
                                         metric,
                                         *multi_value_tags,
@@ -318,6 +317,15 @@ impl Target for VrlTarget {
                                 let value = value.clone().try_bytes().map_err(|e| e.to_string())?;
                                 metric.series.name.namespace =
                                     Some(String::from_utf8_lossy(&value).into_owned());
+                            }
+                            ["interval_ms"] => {
+                                let value: i64 =
+                                    value.clone().try_into_i64().map_err(|e| e.to_string())?;
+                                let value: u32 = value
+                                    .try_into()
+                                    .map_err(|e: TryFromIntError| e.to_string())?;
+                                let value = NonZero::try_from(value).map_err(|e| e.to_string())?;
+                                metric.data.time.interval_ms = Some(value);
                             }
                             ["timestamp"] => {
                                 let value =
@@ -407,11 +415,17 @@ impl Target for VrlTarget {
                     if let Some(paths) = target_path
                         .path
                         .to_alternative_components(MAX_METRIC_PATH_DEPTH)
-                        .get(0)
                     {
                         let removed_value = match paths.as_slice() {
                             ["namespace"] => metric.series.name.namespace.take().map(Into::into),
                             ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
+                            ["interval_ms"] => metric
+                                .data
+                                .time
+                                .interval_ms
+                                .take()
+                                .map(u32::from)
+                                .map(Into::into),
                             ["tags"] => metric.series.tags.take().map(|map| {
                                 map.into_iter_single()
                                     .map(|(k, v)| (k, v.into()))
@@ -429,10 +443,10 @@ impl Target for VrlTarget {
 
                         value.remove(&target_path.path, false);
 
-                        return Ok(removed_value);
+                        Ok(removed_value)
+                    } else {
+                        Ok(None)
                     }
-
-                    Ok(None)
                 }
             },
             PathPrefix::Metadata => Ok(self
@@ -459,13 +473,14 @@ impl SecretTarget for VrlTarget {
 
 /// Retrieves a value from a the provided metric using the path.
 /// Currently the root path and the following paths are supported:
-/// - name
-/// - namespace
-/// - timestamp
-/// - kind
-/// - tags
-/// - tags.<tagname>
-/// - type
+/// - `name`
+/// - `namespace`
+/// - `interval_ms`
+/// - `timestamp`
+/// - `kind`
+/// - `tags`
+/// - `tags.<tagname>`
+/// - `type`
 ///
 /// Any other paths result in a `MetricPathError::InvalidPath` being returned.
 fn target_get_metric<'a>(
@@ -478,27 +493,25 @@ fn target_get_metric<'a>(
 
     let value = value.get(path);
 
-    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-        match paths.as_slice() {
-            ["name"] | ["kind"] | ["type"] | ["tags", _] => return Ok(value),
-            ["namespace"] | ["timestamp"] | ["tags"] => {
-                if let Some(value) = value {
-                    return Ok(Some(value));
-                }
-            }
-            _ => {
-                return Err(MetricPathError::InvalidPath {
-                    path: &path.to_string(),
-                    expected: VALID_METRIC_PATHS_GET,
-                }
-                .to_string())
-            }
-        }
-    }
+    let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
+        return Ok(None);
+    };
 
-    // We only reach this point if we have requested a tag that doesn't exist or an empty
-    // field.
-    Ok(None)
+    match paths.as_slice() {
+        ["name"]
+        | ["kind"]
+        | ["type"]
+        | ["tags", _]
+        | ["namespace"]
+        | ["timestamp"]
+        | ["interval_ms"]
+        | ["tags"] => Ok(value),
+        _ => Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_GET,
+        }
+        .to_string()),
+    }
 }
 
 fn target_get_mut_metric<'a>(
@@ -511,27 +524,24 @@ fn target_get_mut_metric<'a>(
 
     let value = value.get_mut(path);
 
-    for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
-        match paths.as_slice() {
-            ["name"] | ["kind"] | ["tags", _] => return Ok(value),
-            ["namespace"] | ["timestamp"] | ["tags"] => {
-                if let Some(value) = value {
-                    return Ok(Some(value));
-                }
-            }
-            _ => {
-                return Err(MetricPathError::InvalidPath {
-                    path: &path.to_string(),
-                    expected: VALID_METRIC_PATHS_SET,
-                }
-                .to_string())
-            }
-        }
-    }
+    let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH) else {
+        return Ok(None);
+    };
 
-    // We only reach this point if we have requested a tag that doesn't exist or an empty
-    // field.
-    Ok(None)
+    match paths.as_slice() {
+        ["name"]
+        | ["kind"]
+        | ["tags", _]
+        | ["namespace"]
+        | ["timestamp"]
+        | ["interval_ms"]
+        | ["tags"] => Ok(value),
+        _ => Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_SET,
+        }
+        .to_string()),
+    }
 }
 
 /// pre-compute the `Value` structure of the metric.
@@ -539,7 +549,7 @@ fn target_get_mut_metric<'a>(
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
 fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
-    let mut map = BTreeMap::default();
+    let mut map = ObjectMap::default();
 
     let mut set_name = false;
     let mut set_kind = false;
@@ -552,36 +562,36 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
         // Accessing a root path requires us to pre-populate all fields.
         if target_path == &OwnedTargetPath::event_root() {
             if !set_name {
-                map.insert("name".to_owned(), metric.name().to_owned().into());
+                map.insert("name".into(), metric.name().to_owned().into());
             }
 
             if !set_kind {
-                map.insert("kind".to_owned(), metric.kind().into());
+                map.insert("kind".into(), metric.kind().into());
             }
 
             if !set_type {
-                map.insert("type".to_owned(), metric.value().clone().into());
+                map.insert("type".into(), metric.value().clone().into());
             }
 
             if !set_namespace {
                 if let Some(namespace) = metric.namespace() {
-                    map.insert("namespace".to_owned(), namespace.to_owned().into());
+                    map.insert("namespace".into(), namespace.to_owned().into());
                 }
             }
 
             if !set_timestamp {
                 if let Some(timestamp) = metric.timestamp() {
-                    map.insert("timestamp".to_owned(), timestamp.into());
+                    map.insert("timestamp".into(), timestamp.into());
                 }
             }
 
             if !set_tags {
                 if let Some(tags) = metric.tags().cloned() {
                     map.insert(
-                        "tags".to_owned(),
+                        "tags".into(),
                         tags.into_iter_single()
-                            .map(|(tag, value)| (tag, value.into()))
-                            .collect::<BTreeMap<_, _>>()
+                            .map(|(tag, value)| (tag.into(), value.into()))
+                            .collect::<ObjectMap>()
                             .into(),
                     );
                 }
@@ -596,38 +606,38 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             match field.as_ref() {
                 "name" if !set_name => {
                     set_name = true;
-                    map.insert("name".to_owned(), metric.name().to_owned().into());
+                    map.insert("name".into(), metric.name().to_owned().into());
                 }
                 "kind" if !set_kind => {
                     set_kind = true;
-                    map.insert("kind".to_owned(), metric.kind().into());
+                    map.insert("kind".into(), metric.kind().into());
                 }
                 "type" if !set_type => {
                     set_type = true;
-                    map.insert("type".to_owned(), metric.value().clone().into());
+                    map.insert("type".into(), metric.value().clone().into());
                 }
                 "namespace" if !set_namespace && metric.namespace().is_some() => {
                     set_namespace = true;
                     map.insert(
-                        "namespace".to_owned(),
+                        "namespace".into(),
                         metric.namespace().unwrap().to_owned().into(),
                     );
                 }
                 "timestamp" if !set_timestamp && metric.timestamp().is_some() => {
                     set_timestamp = true;
-                    map.insert("timestamp".to_owned(), metric.timestamp().unwrap().into());
+                    map.insert("timestamp".into(), metric.timestamp().unwrap().into());
                 }
                 "tags" if !set_tags && metric.tags().is_some() => {
                     set_tags = true;
                     map.insert(
-                        "tags".to_owned(),
+                        "tags".into(),
                         metric
                             .tags()
                             .cloned()
                             .unwrap()
                             .into_iter_single()
-                            .map(|(tag, value)| (tag, value.into()))
-                            .collect::<BTreeMap<_, _>>()
+                            .map(|(tag, value)| (tag.into(), value.into()))
+                            .collect::<ObjectMap>()
                             .into(),
                     );
                 }
@@ -785,13 +795,13 @@ mod test {
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                owned_value_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
+                owned_value_path!("foo", r"bar baz", "baz"),
                 Ok(Some(2.into())),
             ),
         ];
 
         for (value, path, expect) in cases {
-            let value: BTreeMap<String, Value> = value;
+            let value: ObjectMap = value;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -895,7 +905,7 @@ mod test {
         ];
 
         for (object, path, value, expect, result) in cases {
-            let object: BTreeMap<String, Value> = object;
+            let object: ObjectMap = object;
             let info = ProgramInfo {
                 fallible: false,
                 abortable: false,
@@ -940,9 +950,9 @@ mod test {
             ),
             (
                 BTreeMap::from([("foo".into(), "bar".into())]),
-                owned_value_path!(vec![r#"foo bar"#, "foo"]),
+                owned_value_path!(r"foo bar", "foo"),
                 false,
-                Some(BTreeMap::new().into()),
+                Some(btreemap! { "foo" => "bar"}.into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
@@ -973,7 +983,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r"bar baz", 0),
                 false,
                 Some(
                     btreemap! {
@@ -988,7 +998,7 @@ mod test {
                     "foo" => btreemap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", r"bar baz", 0),
                 true,
                 Some(btreemap! { "bar" => "baz" }.into()),
             ),
@@ -1125,6 +1135,13 @@ mod test {
 
     #[test]
     fn metric_fields() {
+        struct Case {
+            path: OwnedValuePath,
+            current: Option<Value>,
+            new: Value,
+            delete: bool,
+        }
+
         let metric = Metric::new(
             "name",
             MetricKind::Absolute,
@@ -1133,39 +1150,46 @@ mod test {
         .with_tags(Some(metric_tags!("tig" => "tog")));
 
         let cases = vec![
-            (
-                owned_value_path!("name"), // Path
-                Some(Value::from("name")), // Current value
-                Value::from("namefoo"),    // New value
-                false,                     // Test deletion
-            ),
-            (
-                owned_value_path!("namespace"),
-                None,
-                "namespacefoo".into(),
-                true,
-            ),
-            (
-                owned_value_path!("timestamp"),
-                None,
-                Utc.with_ymd_and_hms(2020, 12, 8, 12, 0, 0)
+            Case {
+                path: owned_value_path!("name"),
+                current: Some(Value::from("name")),
+                new: Value::from("namefoo"),
+                delete: false,
+            },
+            Case {
+                path: owned_value_path!("namespace"),
+                current: None,
+                new: "namespacefoo".into(),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("timestamp"),
+                current: None,
+                new: Utc
+                    .with_ymd_and_hms(2020, 12, 8, 12, 0, 0)
                     .single()
                     .expect("invalid timestamp")
                     .into(),
-                true,
-            ),
-            (
-                owned_value_path!("kind"),
-                Some(Value::from("absolute")),
-                "incremental".into(),
-                false,
-            ),
-            (
-                owned_value_path!("tags", "thing"),
-                None,
-                "footag".into(),
-                true,
-            ),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("interval_ms"),
+                current: None,
+                new: 123_456.into(),
+                delete: true,
+            },
+            Case {
+                path: owned_value_path!("kind"),
+                current: Some(Value::from("absolute")),
+                new: "incremental".into(),
+                delete: false,
+            },
+            Case {
+                path: owned_value_path!("tags", "thing"),
+                current: None,
+                new: "footag".into(),
+                delete: true,
+            },
         ];
 
         let info = ProgramInfo {
@@ -1175,13 +1199,20 @@ mod test {
                 OwnedTargetPath::event(owned_value_path!("name")),
                 OwnedTargetPath::event(owned_value_path!("namespace")),
                 OwnedTargetPath::event(owned_value_path!("timestamp")),
+                OwnedTargetPath::event(owned_value_path!("interval_ms")),
                 OwnedTargetPath::event(owned_value_path!("kind")),
             ],
             target_assignments: vec![],
         };
         let mut target = VrlTarget::new(Event::Metric(metric), &info, false);
 
-        for (path, current, new, delete) in cases {
+        for Case {
+            path,
+            current,
+            new,
+            delete,
+        } in cases
+        {
             let path = OwnedTargetPath::event(path);
 
             assert_eq!(
@@ -1249,13 +1280,21 @@ mod test {
         let validpaths_get = [
             ".name",
             ".namespace",
+            ".interval_ms",
             ".timestamp",
             ".kind",
             ".tags",
             ".type",
         ];
 
-        let validpaths_set = [".name", ".namespace", ".timestamp", ".kind", ".tags"];
+        let validpaths_set = [
+            ".name",
+            ".namespace",
+            ".interval_ms",
+            ".timestamp",
+            ".kind",
+            ".tags",
+        ];
 
         let info = ProgramInfo {
             fallible: false,

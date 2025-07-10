@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use std::fmt::Display;
 
-use vector_core::event::{
+use vector_lib::event::{
     metric::{Bucket, MetricData, MetricSeries, Sample},
     Event, EventMetadata, Metric, MetricValue, StatisticKind,
 };
@@ -144,8 +144,8 @@ pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<H
 #[macro_export]
 macro_rules! series {
 	($name:expr) => {
-		vector_core::event::metric::MetricSeries {
-			name: vector_core::event::metric::MetricName {
+		vector_lib::event::metric::MetricSeries {
+			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
 				namespace: None,
 			},
@@ -153,12 +153,12 @@ macro_rules! series {
 		}
 	};
 	($name:expr, $($tk:expr => $tv:expr),*) => {
-		vector_core::event::metric::MetricSeries {
-			name: vector_core::event::metric::MetricName {
+		vector_lib::event::metric::MetricSeries {
+			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
 				namespace: None,
 			},
-			tags: Some(vector_core::metric_tags!( $( $tk => $tv, )* )),
+			tags: Some(vector_lib::metric_tags!( $( $tk => $tv, )* )),
 		}
 	};
 }

@@ -221,3 +221,18 @@ k8s
 
 # ignore specific user:password string containing special chars for unit testing
 user:P@ssw0rd
+
+# Ignore base64 encoded values in Prometheus Pushgateway URL paths
+/.+@base64/.+
+
+# Ignore base64 encoded values in VRL examples (requires padding to avoid false positives)
+"[A-Za-z0-9+\/]*=="
+
+# ignore uuid_from_friendly_id argument
+uuid_from_friendly_id!\(".*"\)
+
+# Ignore punycode
+\bxn--[-0-9a-z]+
+
+# changelog.d fragment authors line
+^authors: .*$

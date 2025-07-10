@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use vector_core::event::{metric::MetricData, Metric, MetricValue};
+use vector_lib::event::{metric::MetricData, Metric, MetricValue};
 
 #[allow(clippy::large_enum_variant)]
 enum SplitState {
@@ -189,7 +189,7 @@ impl MetricSplit for AggregatedSummarySplitter {
 mod tests {
     use std::collections::BTreeSet;
 
-    use vector_core::event::{
+    use vector_lib::event::{
         metric::{Bucket, MetricTags, Quantile, Sample},
         Metric, MetricKind, MetricValue, StatisticKind,
     };

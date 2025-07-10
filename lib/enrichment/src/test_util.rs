@@ -1,15 +1,15 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {
-    data: BTreeMap<String, Value>,
+    data: ObjectMap,
     indexes: Arc<Mutex<Vec<Vec<String>>>>,
 }
 
@@ -20,12 +20,12 @@ impl DummyEnrichmentTable {
 
     pub(crate) fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
         Self {
-            data: BTreeMap::from([("field".to_string(), Value::from("result"))]),
+            data: ObjectMap::from([("field".into(), Value::from("result"))]),
             indexes,
         }
     }
 
-    pub(crate) fn new_with_data(data: BTreeMap<String, Value>) -> Self {
+    pub(crate) fn new_with_data(data: ObjectMap) -> Self {
         Self {
             data,
             indexes: Default::default(),
@@ -39,8 +39,9 @@ impl Table for DummyEnrichmentTable {
         _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         Ok(self.data.clone())
     }
 
@@ -49,8 +50,9 @@ impl Table for DummyEnrichmentTable {
         _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         Ok(vec![self.data.clone()])
     }
 

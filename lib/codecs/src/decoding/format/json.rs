@@ -17,10 +17,7 @@ use super::{default_lossy, Deserializer};
 #[derive(Debug, Clone, Default)]
 pub struct JsonDeserializerConfig {
     /// JSON-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub json: JsonDeserializerOptions,
 }
 
@@ -77,7 +74,7 @@ pub struct JsonDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,

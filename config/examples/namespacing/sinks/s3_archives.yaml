@@ -1,0 +1,13 @@
+# Send structured data to a cost-effective long-term storage
+inputs: ["apache_parser"]           # don't sample for S3
+type: "aws_s3"
+region: "us-east-1"
+bucket: "my-log-archives"
+key_prefix: "date=%Y-%m-%d"         # daily partitions, hive friendly format
+compression: "gzip"                 # compress final objects
+framing:
+  method: "newline_delimited"       # new line delimited...
+encoding:
+  codec: "json"                     # ...JSON
+batch:
+  max_bytes: 10000000               # 10mb uncompressed

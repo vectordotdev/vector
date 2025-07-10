@@ -6,17 +6,18 @@ use std::time::Duration;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
-use codecs::{BytesDeserializerConfig, StreamDecodingError};
 use flate2::read::MultiGzDecoder;
-use lookup::lookup_v2::parse_value_path;
-use lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
 use rmp_serde::{decode, Deserializer, Serializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::schema::Definition;
+use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::ipallowlist::IpAllowlistConfig;
+use vector_lib::lookup::lookup_v2::parse_value_path;
+use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
+use vector_lib::schema::Definition;
 use vrl::value::kind::Collection;
 use vrl::value::{Kind, Value};
 
@@ -40,6 +41,132 @@ use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentT
 #[configurable_component(source("fluent", "Collect logs from a Fluentd or Fluent Bit agent."))]
 #[derive(Clone, Debug)]
 pub struct FluentConfig {
+    #[serde(flatten)]
+    mode: FluentMode,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    log_namespace: Option<bool>,
+}
+
+/// Listening mode for the `fluent` source.
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)] // just used for configuration
+pub enum FluentMode {
+    /// Listen on TCP port
+    Tcp(FluentTcpConfig),
+
+    /// Listen on unix stream socket
+    #[cfg(unix)]
+    Unix(FluentUnixConfig),
+}
+
+/// Serde doesn't provide a way to specify a default tagged variant when deserializing
+/// So we use a somewhat arcane setup with an untagged and tagged versions to allow
+/// users to not have to specify mode = tcp
+///
+/// See [serde-rs/serde#2231](https://github.com/serde-rs/serde/issues/2231)
+mod deser {
+    use super::*;
+
+    #[allow(clippy::large_enum_variant)]
+    #[derive(Deserialize)]
+    #[serde(tag = "mode")]
+    enum FluentModeTagged {
+        #[serde(rename = "tcp")]
+        Tcp(FluentTcpConfig),
+
+        #[cfg(unix)]
+        #[serde(rename = "unix")]
+        Unix(FluentUnixConfig),
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FluentModeDe {
+        Tagged(FluentModeTagged),
+
+        // Note: this must be last as serde attempts variants in order
+        Untagged(FluentTcpConfig),
+    }
+
+    impl<'de> Deserialize<'de> for FluentMode {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Ok(match FluentModeDe::deserialize(deserializer)? {
+                FluentModeDe::Tagged(FluentModeTagged::Tcp(config)) => FluentMode::Tcp(config),
+                #[cfg(unix)]
+                FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
+                FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
+            })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_tcp_default_mode() {
+            let json_data = serde_json::json!({
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
+
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+        }
+
+        #[test]
+        fn test_tcp_explicit_mode() {
+            let json_data = serde_json::json!({
+                "mode": "tcp",
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
+
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
+        }
+
+        #[test]
+        fn test_invalid_unix_mode() {
+            let json_data = serde_json::json!({
+                "mode": "unix",
+                "address": "0.0.0.0:2020",
+                "connection_limit": 2
+            });
+
+            assert!(serde_json::from_value::<FluentConfig>(json_data).is_err());
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn test_valid_unix_mode() {
+            let json_data = serde_json::json!({
+                "mode": "unix",
+                "path": "/foo"
+            });
+
+            let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
+            assert!(
+                matches!(parsed.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo")
+            );
+        }
+    }
+}
+
+/// Configuration for the `fluent` TCP source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct FluentTcpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
@@ -49,6 +176,9 @@ pub struct FluentConfig {
 
     #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.
     ///
@@ -63,33 +193,14 @@ pub struct FluentConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
-
-    /// The namespace to use for logs. This overrides the global setting.
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default)]
-    log_namespace: Option<bool>,
 }
 
-impl GenerateConfig for FluentConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
-            keepalive: None,
-            tls: None,
-            receive_buffer_bytes: None,
-            acknowledgements: Default::default(),
-            connection_limit: Some(2),
-            log_namespace: None,
-        })
-        .unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "fluent")]
-impl SourceConfig for FluentConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let log_namespace = cx.log_namespace(self.log_namespace);
+impl FluentTcpConfig {
+    fn build(
+        &self,
+        cx: SourceContext,
+        log_namespace: LogNamespace,
+    ) -> crate::Result<super::Source> {
         let source = FluentSource::new(log_namespace);
         let shutdown_secs = Duration::from_secs(30);
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
@@ -98,7 +209,7 @@ impl SourceConfig for FluentConfig {
             .as_ref()
             .and_then(|tls| tls.client_metadata_key.clone())
             .and_then(|k| k.path);
-        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
         source.run(
             self.address,
             self.keepalive,
@@ -110,24 +221,105 @@ impl SourceConfig for FluentConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            self.permit_origin.clone().map(Into::into),
             FluentConfig::NAME,
             log_namespace,
         )
+    }
+}
+
+/// Configuration for the `fluent` unix socket source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+#[cfg(unix)]
+pub struct FluentUnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: std::path::PathBuf,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o777))]
+    #[configurable(metadata(docs::examples = 0o600))]
+    #[configurable(metadata(docs::examples = 508))]
+    pub socket_file_mode: Option<u32>,
+}
+
+#[cfg(unix)]
+impl FluentUnixConfig {
+    fn build(
+        &self,
+        cx: SourceContext,
+        log_namespace: LogNamespace,
+    ) -> crate::Result<super::Source> {
+        let source = FluentSource::new(log_namespace);
+
+        crate::sources::util::build_unix_stream_source(
+            self.path.clone(),
+            self.socket_file_mode,
+            source.decoder(),
+            move |events, host| source.handle_events_impl(events, host.into()),
+            cx.shutdown,
+            cx.out,
+        )
+    }
+}
+
+impl GenerateConfig for FluentConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: FluentMode::Tcp(FluentTcpConfig {
+                address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+                keepalive: None,
+                permit_origin: None,
+                tls: None,
+                receive_buffer_bytes: None,
+                acknowledgements: Default::default(),
+                connection_limit: Some(2),
+            }),
+            log_namespace: None,
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "fluent")]
+impl SourceConfig for FluentConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+        match &self.mode {
+            FluentMode::Tcp(t) => t.build(cx, log_namespace),
+            #[cfg(unix)]
+            FluentMode::Unix(u) => u.build(cx, log_namespace),
+        }
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
         let schema_definition = self.schema_definition(log_namespace);
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.as_tcp_resource()]
+        match &self.mode {
+            FluentMode::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
+            #[cfg(unix)]
+            FluentMode::Unix(_) => vec![],
+        }
     }
 
     fn can_acknowledge(&self) -> bool {
-        true
+        matches!(self.mode, FluentMode::Tcp(_))
     }
 }
 
@@ -142,12 +334,16 @@ impl FluentConfig {
 
         let tag_key = parse_value_path("tag").ok().map(LegacyKey::Overwrite);
 
-        let tls_client_metadata_path = self
-            .tls
-            .as_ref()
-            .and_then(|tls| tls.client_metadata_key.as_ref())
-            .and_then(|k| k.path.clone())
-            .map(LegacyKey::Overwrite);
+        let tls_client_metadata_path = match &self.mode {
+            FluentMode::Tcp(tcp) => tcp
+                .tls
+                .as_ref()
+                .and_then(|tls| tls.client_metadata_key.as_ref())
+                .and_then(|k| k.path.clone())
+                .map(LegacyKey::Overwrite),
+            #[cfg(unix)]
+            FluentMode::Unix(_) => None,
+        };
 
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
@@ -213,19 +409,8 @@ impl FluentSource {
             legacy_host_key_path: log_schema().host_key().cloned(),
         }
     }
-}
 
-impl TcpSource for FluentSource {
-    type Error = DecodeError;
-    type Item = FluentFrame;
-    type Decoder = FluentDecoder;
-    type Acker = FluentAcker;
-
-    fn decoder(&self) -> Self::Decoder {
-        FluentDecoder::new(self.log_namespace)
-    }
-
-    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
+    fn handle_events_impl(&self, events: &mut [Event], host: Value) {
         for event in events {
             let log = event.as_mut_log();
 
@@ -239,9 +424,24 @@ impl TcpSource for FluentSource {
                 log,
                 legacy_host_key,
                 path!("host"),
-                host.ip().to_string(),
+                host.clone(),
             );
         }
+    }
+}
+
+impl TcpSource for FluentSource {
+    type Error = DecodeError;
+    type Item = FluentFrame;
+    type Decoder = FluentDecoder;
+    type Acker = FluentAcker;
+
+    fn decoder(&self) -> Self::Decoder {
+        FluentDecoder::new(self.log_namespace)
+    }
+
+    fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
+        self.handle_events_impl(events, host.ip().to_string().into())
     }
 
     fn build_acker(&self, frame: &[Self::Item]) -> Self::Acker {
@@ -295,7 +495,7 @@ impl From<decode::Error> for DecodeError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FluentDecoder {
     log_namespace: LogNamespace,
 }
@@ -464,13 +664,12 @@ impl Decoder for FluentDecoder {
 
             src.advance(byte_size);
 
-            let maybe_item = self.handle_message(res, byte_size).map_err(|error| {
-                let base64_encoded_message = BASE64_STANDARD.encode(&src);
+            let maybe_item = self.handle_message(res, byte_size).inspect_err(|error| {
+                let base64_encoded_message = BASE64_STANDARD.encode(&src[..]);
                 emit!(FluentMessageDecodeError {
-                    error: &error,
+                    error,
                     base64_encoded_message
                 });
-                error
             })?;
             if let Some(item) = maybe_item {
                 return Ok(Some(item));
@@ -629,18 +828,17 @@ impl From<FluentEvent<'_>> for LogEvent {
 mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
-    use lookup::OwnedTargetPath;
     use rmp_serde::Serializer;
     use serde::Serialize;
-    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{event::Value, schema::Definition};
-    use vrl::value::kind::Collection;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
+    use vrl::value::{kind::Collection, ObjectMap, Value};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
@@ -661,15 +859,15 @@ mod tests {
     // Decode base64: https://toolslick.com/conversion/data/messagepack-to-json
 
     fn mock_event(name: &str, timestamp: &str) -> Event {
-        Event::Log(LogEvent::from(BTreeMap::from([
-            (String::from("message"), Value::from(name)),
+        Event::Log(LogEvent::from(ObjectMap::from([
+            ("message".into(), Value::from(name)),
             (
-                log_schema().source_type_key().unwrap().to_string(),
+                log_schema().source_type_key().unwrap().to_string().into(),
                 Value::from(FluentConfig::NAME),
             ),
-            (String::from("tag"), Value::from("tag.name")),
+            ("tag".into(), Value::from("tag.name")),
             (
-                String::from("timestamp"),
+                "timestamp".into(),
                 Value::Timestamp(DateTime::parse_from_rfc3339(timestamp).unwrap().into()),
             ),
         ])))
@@ -892,12 +1090,15 @@ mod tests {
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let source = FluentConfig {
-            address: address.into(),
-            tls: None,
-            keepalive: None,
-            receive_buffer_bytes: None,
-            acknowledgements: true.into(),
-            connection_limit: None,
+            mode: FluentMode::Tcp(FluentTcpConfig {
+                address: address.into(),
+                tls: None,
+                keepalive: None,
+                permit_origin: None,
+                receive_buffer_bytes: None,
+                acknowledgements: true.into(),
+                connection_limit: None,
+            }),
             log_namespace: None,
         }
         .build(SourceContext::new_test(sender, None))
@@ -956,12 +1157,15 @@ mod tests {
     #[test]
     fn output_schema_definition_vector_namespace() {
         let config = FluentConfig {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
-            tls: None,
-            keepalive: None,
-            receive_buffer_bytes: None,
-            acknowledgements: false.into(),
-            connection_limit: None,
+            mode: FluentMode::Tcp(FluentTcpConfig {
+                address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+                tls: None,
+                keepalive: None,
+                permit_origin: None,
+                receive_buffer_bytes: None,
+                acknowledgements: false.into(),
+                connection_limit: None,
+            }),
             log_namespace: Some(true),
         };
 
@@ -1011,12 +1215,15 @@ mod tests {
     #[test]
     fn output_schema_definition_legacy_namespace() {
         let config = FluentConfig {
-            address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
-            tls: None,
-            keepalive: None,
-            receive_buffer_bytes: None,
-            acknowledgements: false.into(),
-            connection_limit: None,
+            mode: FluentMode::Tcp(FluentTcpConfig {
+                address: SocketListenAddr::SocketAddr("0.0.0.0:24224".parse().unwrap()),
+                tls: None,
+                keepalive: None,
+                permit_origin: None,
+                receive_buffer_bytes: None,
+                acknowledgements: false.into(),
+                connection_limit: None,
+            }),
             log_namespace: None,
         };
 
@@ -1050,8 +1257,9 @@ mod integration_tests {
 
     use futures::Stream;
     use tokio::time::sleep;
-    use vector_core::event::{Event, EventStatus};
+    use vector_lib::event::{Event, EventStatus};
 
+    use crate::sources::fluent::{FluentMode, FluentTcpConfig};
     use crate::{
         config::{SourceConfig, SourceContext},
         docker::Container,
@@ -1126,7 +1334,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1207,7 +1415,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(&format!("http://{}/", test_address))
+                        .post(format!("http://{}/", test_address))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1232,12 +1440,15 @@ mod integration_tests {
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
-                address: address.into(),
-                tls: None,
-                keepalive: None,
-                receive_buffer_bytes: None,
-                acknowledgements: false.into(),
-                connection_limit: None,
+                mode: FluentMode::Tcp(FluentTcpConfig {
+                    address: address.into(),
+                    tls: None,
+                    keepalive: None,
+                    permit_origin: None,
+                    receive_buffer_bytes: None,
+                    acknowledgements: false.into(),
+                    connection_limit: None,
+                }),
                 log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))

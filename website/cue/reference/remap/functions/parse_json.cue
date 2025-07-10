@@ -23,14 +23,25 @@ remap: functions: parse_json: {
 			name: "max_depth"
 			description: """
 				Number of layers to parse for nested JSON-formatted documents.
-				The value must be in range 1..128.
+				The value must be in the range of 1 to 128.
 				"""
 			required: false
 			type: ["integer"]
 		},
+		{
+			name: "lossy"
+			description: """
+				Whether to parse the JSON in a lossy manner. Replaces invalid UTF-8 characters
+				with the Unicode character `�` (U+FFFD) if set to true, otherwise returns an error
+				if there are any invalid UTF-8 characters present.
+				"""
+			required: false
+			default:  true
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a valid JSON-formatted payload",
+		"`value` is not a valid JSON-formatted payload.",
 	]
 	return: types: ["boolean", "integer", "float", "string", "object", "array", "null"]
 

@@ -53,7 +53,7 @@ impl ReadToken {
     }
 }
 
-/// Error that occurred during calls to [`Reader`].
+/// Error that occurred during calls to [`BufferReader`].
 #[derive(Debug, Snafu)]
 pub enum ReaderError<T>
 where
@@ -70,7 +70,7 @@ where
     /// The reader failed to deserialize the record.
     ///
     /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
     /// handled internally by moving to the next data file, as corruption may have affected other
     /// records in a way that is not easily detectable and could lead to records which
     /// deserialize/decode but contain invalid data.
@@ -80,7 +80,7 @@ where
     /// The record's checksum did not match.
     ///
     /// In most cases, this indicates that the data file being read was corrupted or truncated in
-    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// some fashion.  Callers of [`BufferReader::next`] will not actually receive this error, as it is
     /// handled internally by moving to the next data file, as corruption may have affected other
     /// records in a way that is not easily detectable and could lead to records which
     /// deserialize/decode but contain invalid data.
@@ -394,7 +394,7 @@ where
 
 /// Reads records from the buffer.
 #[derive(Debug)]
-pub struct Reader<T, FS>
+pub struct BufferReader<T, FS>
 where
     FS: Filesystem,
 {
@@ -412,13 +412,13 @@ where
     _t: PhantomData<T>,
 }
 
-impl<T, FS> Reader<T, FS>
+impl<T, FS> BufferReader<T, FS>
 where
     T: Bufferable,
     FS: Filesystem,
     FS::File: Unpin,
 {
-    /// Creates a new [`Reader`] attached to the given [`Ledger`].
+    /// Creates a new [`BufferReader`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
@@ -1035,7 +1035,7 @@ where
 
                     return Err(e);
                 }
-            };
+            }
 
             // Fundamentally, when `try_read_record` returns `None`, there's three possible
             // scenarios:

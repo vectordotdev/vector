@@ -5,11 +5,9 @@ base: components: transforms: remap: configuration: {
 		description: """
 			Drops any event that is manually aborted during processing.
 
-			Normally, if a VRL program is manually aborted (using [`abort`][vrl_docs_abort]) when
-			processing an event, the original, unmodified event is sent downstream. In some cases,
-			you may not wish to send the event any further, such as if certain transformation or
-			enrichment is strictly required. Setting `drop_on_abort` to `true` allows you to ensure
-			these events do not get processed any further.
+			If a VRL program is manually aborted (using [`abort`][vrl_docs_abort]) when
+			processing an event, this option controls whether the original, unmodified event is sent
+			downstream without any modifications or if it is dropped.
 
 			Additionally, dropped events can potentially be diverted to a specially-named output for
 			further logging and analysis by setting `reroute_dropped`.
@@ -47,6 +45,19 @@ base: components: transforms: remap: configuration: {
 			"""
 		required: false
 		type: string: examples: ["./my/program.vrl"]
+	}
+	files: {
+		description: """
+			File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
+
+			If a relative path is provided, its root is the current working directory.
+
+			Required if `source` or `file` are missing.
+
+			[vrl]: https://vector.dev/docs/reference/vrl
+			"""
+		required: false
+		type: array: items: type: string: examples: ["['./my/program.vrl', './my/program2.vrl']"]
 	}
 	metric_tag_values: {
 		description: """

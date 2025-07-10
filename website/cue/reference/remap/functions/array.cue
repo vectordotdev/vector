@@ -3,20 +3,20 @@ package metadata
 remap: functions: array: {
 	category: "Type"
 	description: """
-		Returns the `value` if it's an array and errors otherwise. This enables the type checker to guarantee that the
-		returned value is an array and can be used in any function that expects one.
+		Returns `value` if it is an array, otherwise returns an error. This enables the type checker to guarantee that the
+		returned value is an array and can be used in any function that expects an array.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that you need to ensure is an array."
+			description: "The value to check if it is an array."
 			required:    true
 			type: ["any"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't an array.",
+		"`value` is not an array.",
 	]
 	return: {
 		types: ["array"]

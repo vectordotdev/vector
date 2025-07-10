@@ -3,7 +3,7 @@ use crate::{event::LogEvent, test_util::trace_init};
 use bytes::Bytes;
 use std::ffi::OsStr;
 use std::io::Cursor;
-use vector_core::event::EventMetadata;
+use vector_lib::event::EventMetadata;
 use vrl::value;
 
 #[cfg(unix)]
@@ -388,7 +388,7 @@ async fn test_graceful_shutdown() {
         String::from("bash"),
         String::from("-c"),
         String::from(
-            r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
+            r"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done",
         ),
     ];
     let hostname = Some("Some.Machine".to_string());

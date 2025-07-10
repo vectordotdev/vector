@@ -16,24 +16,24 @@ remap: functions: map_keys: {
 		   - Any mutation done on a nested object *before* recursing into
 		     it, are preserved.
 		3. For every nested array type:
-		   - First return the key of the array type itself
+		   - First return the key of the array type itself.
 		   - Then find all objects within the array, and apply item (2)
 		     to each individual object.
 
-		Practically speaking, the above rules mean that `map_keys` with
-		`recursive` enabled will find *all* keys in the target,
+		The above rules mean that `map_keys` with
+		`recursive` enabled finds *all* keys in the target,
 		regardless of whether nested objects are nested inside arrays.
 
-		The function uses the "function closure syntax" to allow reading
+		The function uses the function closure syntax to allow reading
 		the key for each item in the object.
 
 		The same scoping rules apply to closure blocks as they do for
-		regular blocks, meaning, any variable defined in parent scopes
-		are accessible, and mutations to those variables are preserved,
+		regular blocks. This means that any variable defined in parent scopes
+		is accessible, and mutations to those variables are preserved,
 		but any new variables instantiated in the closure block are
 		unavailable outside of the block.
 
-		Check out the examples below to learn about the closure syntax.
+		See the examples below to learn about the closure syntax.
 		"""#
 
 	arguments: [

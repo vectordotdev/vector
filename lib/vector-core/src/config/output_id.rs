@@ -2,7 +2,8 @@ use std::fmt;
 
 use vector_common::config::ComponentKey;
 
-use crate::{config::configurable_component, schema};
+use super::configurable_component;
+use crate::schema;
 
 /// Component output identifier.
 #[configurable_component]
@@ -71,6 +72,15 @@ impl From<(&ComponentKey, String)> for OutputId {
         Self {
             component: key.clone(),
             port: Some(name),
+        }
+    }
+}
+
+impl From<(String, Option<String>)> for OutputId {
+    fn from((component, port): (String, Option<String>)) -> Self {
+        Self {
+            component: component.into(),
+            port,
         }
     }
 }

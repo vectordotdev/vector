@@ -249,9 +249,7 @@ impl SchemaObject {
     /// and does not check any subschemas. Because of this, both `{}` and  `{"not": {}}` accept any type according
     /// to this method.
     pub fn has_type(&self, ty: InstanceType) -> bool {
-        self.instance_type
-            .as_ref()
-            .map_or(true, |x| x.contains(&ty))
+        self.instance_type.as_ref().is_none_or(|x| x.contains(&ty))
     }
 
     get_or_insert_default_fn!(metadata, Metadata);

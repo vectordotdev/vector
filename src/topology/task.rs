@@ -9,8 +9,8 @@ use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;
-use vector_buffers::topology::channel::BufferReceiverStream;
-use vector_core::event::EventArray;
+use vector_lib::buffers::topology::channel::BufferReceiverStream;
+use vector_lib::event::EventArray;
 
 use crate::{config::ComponentKey, utilization::Utilization};
 
@@ -79,6 +79,7 @@ impl Task {
         self.key.id()
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     pub fn typetag(&self) -> &str {
         &self.typetag
     }

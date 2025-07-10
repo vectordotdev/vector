@@ -10,10 +10,10 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
-use vector_config::component::{
-    ExampleError, SinkDescription, SourceDescription, TransformDescription,
+use vector_lib::configurable::component::{
+    SinkDescription, SourceDescription, TransformDescription,
 };
-use vector_core::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
+use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
 use crate::config::{format, Format, SinkHealthcheckOptions};
 
@@ -119,7 +119,7 @@ pub(crate) fn generate_example(
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
-        .split(|c| c == '|' || c == '/')
+        .split(['|', '/'])
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim().to_string())
@@ -133,7 +133,7 @@ pub(crate) fn generate_example(
     let mut errs = Vec::new();
 
     let mut source_names = Vec::new();
-    if let Some(source_types) = components.get(0) {
+    if let Some(source_types) = components.first() {
         let mut sources = IndexMap::new();
 
         for (i, source_expr) in source_types.iter().enumerate() {
@@ -158,12 +158,10 @@ pub(crate) fn generate_example(
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate source '{}': {}",
-                            source_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate source '{}': {}",
+                        source_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -221,12 +219,10 @@ pub(crate) fn generate_example(
             let mut example = match TransformDescription::example(&transform_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate transform '{}': {}",
-                            transform_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate transform '{}': {}",
+                        transform_type, err
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -273,9 +269,7 @@ pub(crate) fn generate_example(
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
-                    }
+                    errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     Value::Table(Map::new())
                 }
             };
@@ -489,6 +483,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -526,6 +523,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -557,6 +557,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -580,6 +583,9 @@ mod tests {
 
                 [sinks.sink0.encoding]
                 codec = "json"
+
+                [sinks.sink0.encoding.json]
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -661,18 +667,18 @@ mod tests {
 
         assert_eq!(
             generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
               source0:
                 count: 9223372036854775807
-                format: json
-                interval: 1.0
-                type: demo_logs
                 decoding:
                   codec: bytes
+                format: json
                 framing:
                   method: bytes
+                interval: 1.0
+                type: demo_logs
             transforms:
               transform0:
                 inputs:
@@ -687,10 +693,12 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
-                target: stdout
-                type: console
                 encoding:
                   codec: json
+                  json:
+                    pretty: false
+                target: stdout
+                type: console
                 healthcheck:
                   enabled: true
                   uri: null
@@ -698,7 +706,7 @@ mod tests {
                   type: memory
                   max_events: 500
                   when_full: block
-            "#}
+            "}
         );
     }
 
@@ -724,15 +732,15 @@ mod tests {
               "sources": {
                 "source0": {
                   "count": 9223372036854775807,
-                  "format": "json",
-                  "interval": 1.0,
-                  "type": "demo_logs",
                   "decoding": {
                     "codec": "bytes"
                   },
+                  "format": "json",
                   "framing": {
                     "method": "bytes"
-                  }
+                  },
+                  "interval": 1.0,
+                  "type": "demo_logs"
                 }
               },
               "transforms": {
@@ -753,11 +761,14 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
+                  "encoding": {
+                    "codec": "json",
+                    "json": {
+                      "pretty": false
+                    }
+                  },
                   "target": "stdout",
                   "type": "console",
-                  "encoding": {
-                    "codec": "json"
-                  },
                   "healthcheck": {
                     "enabled": true,
                     "uri": null

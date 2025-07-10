@@ -1,7 +1,7 @@
-//! The GCP Stackdriver Logs [`vector_core::sink::VectorSink`].
+//! The GCP Stackdriver Logs [`vector_lib::sink::VectorSink`].
 //!
-//! This module contains the [`vector_core::sink::VectorSink`] instance that is responsible for
-//! taking a stream of [`vector_core::event::Event`]s and forwarding them to the GCP
+//! This module contains the [`vector_lib::sink::VectorSink`] instance that is responsible for
+//! taking a stream of [`vector_lib::event::Event`]s and forwarding them to the GCP
 //! Stackdriver service.
 
 mod config;

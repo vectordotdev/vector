@@ -1,8 +1,10 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 
 use bytes::{Buf, Bytes};
@@ -10,22 +12,31 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{event_path, owned_value_path};
+use hyper::{service::make_service_fn, Server};
+use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
+use serde_json::{
+    de::{Read as JsonRead, StrRead},
+    Deserializer, Value as JsonValue,
+};
 use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{self, event_path, owned_value_path};
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     schema::meaning,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
+use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
+use warp::http::header::{HeaderValue, CONTENT_TYPE};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
@@ -38,9 +49,9 @@ use self::{
 use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
     event::{Event, LogEvent, Value},
+    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
-        SplunkHecRequestReceived,
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
@@ -55,6 +66,8 @@ pub const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
+
+const X_SPLUNK_REQUEST_CHANNEL: &str = "x-splunk-request-channel";
 
 /// Configuration for the `splunk_hec` source.
 #[configurable_component(source("splunk_hec", "Receive logs from Splunk."))]
@@ -102,6 +115,10 @@ pub struct SplunkConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl_generate_config_from_default!(SplunkConfig);
@@ -116,6 +133,7 @@ impl Default for SplunkConfig {
             acknowledgements: Default::default(),
             store_hec_token: false,
             log_namespace: None,
+            keepalive: Default::default(),
         }
     }
 }
@@ -128,7 +146,7 @@ fn default_socket_address() -> SocketAddr {
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
         let source = SplunkSource::new(self, tls.http_protocol_name(), cx);
@@ -140,15 +158,6 @@ impl SourceConfig for SplunkConfig {
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
-            .and(
-                warp::path::full()
-                    .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHecRequestReceived {
-                            path: path.as_str()
-                        });
-                    })
-                    .untuple_one(),
-            )
             .and(
                 event_service
                     .or(raw_service)
@@ -164,14 +173,30 @@ impl SourceConfig for SplunkConfig {
 
         let listener = tls.bind(&self.address).await?;
 
+        let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            warp::serve(services.with(warp::trace(move |_info| span.clone())))
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(services.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))
@@ -182,7 +207,7 @@ impl SourceConfig for SplunkConfig {
 
         let schema_definition = match log_namespace {
             LogNamespace::Legacy => {
-                let definition = vector_core::schema::Definition::empty_legacy_namespace()
+                let definition = vector_lib::schema::Definition::empty_legacy_namespace()
                     .with_event_field(
                         &owned_value_path!("line"),
                         Kind::object(Collection::empty())
@@ -201,10 +226,11 @@ impl SourceConfig for SplunkConfig {
                     definition
                 }
             }
-            LogNamespace::Vector => vector_core::schema::Definition::new_with_default_metadata(
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
                 Kind::bytes().or_object(Collection::empty()),
                 [log_namespace],
-            ),
+            )
+            .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE),
         }
         .with_standard_vector_source_metadata()
         .with_source_metadata(
@@ -247,7 +273,10 @@ impl SourceConfig for SplunkConfig {
             None,
         );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -302,7 +331,7 @@ impl SplunkSource {
     fn event_service(&self, out: SourceSender) -> BoxedFilter<(Response,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         let splunk_channel = splunk_channel_header
             .and(splunk_channel_query_param)
@@ -332,18 +361,13 @@ impl SplunkSource {
                       token: Option<String>,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
-                      xff: Option<String>,
+                      remote_addr: Option<String>,
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
                     let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     let events_received = events_received.clone();
-                    emit!(HttpBytesReceived {
-                        byte_size: body.len(),
-                        http_path: path.as_str(),
-                        protocol,
-                    });
 
                     async move {
                         if idx_ack.is_some() && channel.is_none() {
@@ -351,14 +375,19 @@ impl SplunkSource {
                         }
 
                         let mut data = Vec::new();
-                        let body = if gzip {
+                        let (byte_size, body) = if gzip {
                             MultiGzDecoder::new(body.reader())
                                 .read_to_end(&mut data)
                                 .map_err(|_| Rejection::from(ApiError::BadRequest))?;
-                            String::from_utf8_lossy(data.as_slice())
+                            (data.len(), String::from_utf8_lossy(data.as_slice()))
                         } else {
-                            String::from_utf8_lossy(body.as_ref())
+                            (body.len(), String::from_utf8_lossy(body.as_ref()))
                         };
+                        emit!(HttpBytesReceived {
+                            byte_size,
+                            http_path: path.as_str(),
+                            protocol,
+                        });
 
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
@@ -374,15 +403,19 @@ impl SplunkSource {
 
                         let mut error = None;
                         let mut events = Vec::new();
-                        let iter = EventIterator::new(
-                            Deserializer::from_str(&body).into_iter::<JsonValue>(),
+
+                        let iter: EventIterator<'_, StrRead<'_>> = EventIteratorGenerator {
+                            deserializer: Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             remote,
-                            xff,
+                            remote_addr,
                             batch,
-                            token.filter(|_| store_hec_token).map(Into::into),
+                            token: token.filter(|_| store_hec_token).map(Into::into),
                             log_namespace,
-                        );
+                            events_received,
+                        }
+                        .into();
+
                         for result in iter {
                             match result {
                                 Ok(event) => events.push(event),
@@ -394,11 +427,6 @@ impl SplunkSource {
                         }
 
                         if !events.is_empty() {
-                            events_received.emit(CountByteSize(
-                                events.len(),
-                                events.estimated_json_encoded_size_of(),
-                            ));
-
                             if let Err(ClosedError) = out.send_batch(events).await {
                                 return Err(Rejection::from(ApiError::ServerShutdown));
                             }
@@ -503,26 +531,50 @@ impl SplunkSource {
             .boxed()
     }
 
+    fn lenient_json_content_type_check<T>() -> impl Filter<Extract = (T,), Error = Rejection> + Clone
+    where
+        T: Send + DeserializeOwned + 'static,
+    {
+        warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
+            .and(warp::body::bytes())
+            .and_then(
+                |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
+                    let ok = ctype
+                        .as_ref()
+                        .and_then(|v| v.to_str().ok())
+                        .map(|h| h.to_ascii_lowercase().contains("application/json"))
+                        .unwrap_or(true);
+
+                    if !ok {
+                        return Err(warp::reject::custom(ApiError::UnsupportedContentType));
+                    }
+
+                    let value = serde_json::from_slice::<T>(&body)
+                        .map_err(|_| warp::reject::custom(ApiError::BadRequest))?;
+
+                    Ok(value)
+                },
+            )
+    }
+
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
         let idx_ack = self.idx_ack.clone();
+
         warp::post()
-            .and(path!("ack"))
+            .and(warp::path!("ack"))
             .and(self.authorization())
             .and(SplunkSource::required_channel())
-            .and(warp::body::json())
-            .and_then(move |_, channel_id: String, body: HecAckStatusRequest| {
+            .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>())
+            .and_then(move |_, channel: String, req: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {
                     if let Some(idx_ack) = idx_ack {
-                        let ack_statuses = idx_ack
-                            .get_acks_status_from_channel(channel_id, &body.acks)
+                        let acks = idx_ack
+                            .get_acks_status_from_channel(channel, &req.acks)
                             .await?;
-                        Ok(
-                            warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
-                                .into_response(),
-                        )
+                        Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
                     } else {
-                        Err(Rejection::from(ApiError::AckIsDisabled))
+                        Err(warp::reject::custom(ApiError::AckIsDisabled))
                     }
                 }
             })
@@ -590,7 +642,7 @@ impl SplunkSource {
     fn required_channel() -> BoxedFilter<(String,)> {
         let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
             .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::optional::<String>(X_SPLUNK_REQUEST_CHANNEL);
 
         splunk_channel_header
             .and(splunk_channel_query_param)
@@ -621,22 +673,28 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
+    /// handle to EventsReceived registry
+    events_received: Registered<EventsReceived>,
 }
 
-impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
-    fn new(
-        deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
-        channel: Option<String>,
-        remote: Option<SocketAddr>,
-        remote_addr: Option<String>,
-        batch: Option<BatchNotifier>,
-        token: Option<Arc<str>>,
-        log_namespace: LogNamespace,
-    ) -> Self {
-        EventIterator {
-            deserializer,
+/// Intermediate struct to generate an `EventIterator`
+struct EventIteratorGenerator<'de, R: JsonRead<'de>> {
+    deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
+    channel: Option<String>,
+    batch: Option<BatchNotifier>,
+    token: Option<Arc<str>>,
+    log_namespace: LogNamespace,
+    events_received: Registered<EventsReceived>,
+    remote: Option<SocketAddr>,
+    remote_addr: Option<String>,
+}
+
+impl<'de, R: JsonRead<'de>> From<EventIteratorGenerator<'de, R>> for EventIterator<'de, R> {
+    fn from(f: EventIteratorGenerator<'de, R>) -> Self {
+        Self {
+            deserializer: f.deserializer,
             events: 0,
-            channel: channel.map(Value::from),
+            channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
                 // Extract the host field with the given priority:
@@ -646,25 +704,28 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 DefaultExtractor::new_with(
                     "host",
                     log_schema().host_key().cloned().into(),
-                    remote_addr
-                        .or_else(|| remote.map(|addr| addr.to_string()))
+                    f.remote_addr
+                        .or_else(|| f.remote.map(|addr| addr.to_string()))
                         .map(Value::from),
-                    log_namespace,
+                    f.log_namespace,
                 ),
-                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), log_namespace),
-                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), log_namespace),
+                DefaultExtractor::new("index", OptionalValuePath::new(INDEX), f.log_namespace),
+                DefaultExtractor::new("source", OptionalValuePath::new(SOURCE), f.log_namespace),
                 DefaultExtractor::new(
                     "sourcetype",
                     OptionalValuePath::new(SOURCETYPE),
-                    log_namespace,
+                    f.log_namespace,
                 ),
             ],
-            batch,
-            token,
-            log_namespace,
+            batch: f.batch,
+            token: f.token,
+            log_namespace: f.log_namespace,
+            events_received: f.events_received,
         }
     }
+}
 
+impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
     fn build_event(&mut self, mut json: JsonValue) -> Result<Event, Rejection> {
         // Construct Event from parsed json event
         let mut log = match self.log_namespace {
@@ -786,6 +847,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 let event: Value = event.into();
                 let mut log = LogEvent::from(event);
 
+                // EstimatedJsonSizeOf must be calculated before enrichment
+                self.events_received
+                    .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
                 // The timestamp is extracted from the message for the Legacy namespace.
                 self.log_namespace.insert_vector_metadata(
                     &mut log,
@@ -840,6 +905,11 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             },
             None => return Err(ApiError::MissingEventField { event: self.events }.into()),
         };
+
+        // EstimatedJsonSizeOf must be calculated before enrichment
+        self.events_received
+            .emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
+
         Ok(log)
     }
 }
@@ -1005,6 +1075,8 @@ fn raw_event(
             log
         }
     };
+    // We need to calculate the estimated json size of the event BEFORE enrichment.
+    events_received.emit(CountByteSize(1, log.estimated_json_encoded_size_of()));
 
     // Add channel
     log_namespace.insert_source_metadata(
@@ -1040,10 +1112,7 @@ fn raw_event(
         log = log.with_batch_notifier(&batch);
     }
 
-    let event = Event::from(log);
-    events_received.emit(CountByteSize(1, event.estimated_json_encoded_size_of()));
-
-    Ok(event)
+    Ok(Event::from(log))
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -1051,6 +1120,7 @@ pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
+    UnsupportedContentType,
     MissingChannel,
     NoData,
     InvalidDataFormat { event: usize },
@@ -1145,6 +1215,14 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     response_json(StatusCode::OK, body)
 }
 
+fn response_plain(code: StatusCode, msg: &'static str) -> Response {
+    warp::reply::with_status(
+        warp::reply::with_header(msg, http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        code,
+    )
+    .into_response()
+}
+
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
         emit!(SplunkHecRequestError { error });
@@ -1157,6 +1235,10 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 splunk_response::INVALID_AUTHORIZATION,
             ),
             ApiError::UnsupportedEncoding => empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE),
+            ApiError::UnsupportedContentType => response_plain(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "The request's content-type is not supported",
+            ),
             ApiError::MissingChannel => {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL)
             }
@@ -1209,18 +1291,22 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
-    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
+    use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_common::sensitive_string::SensitiveString;
-    use vector_core::{event::EventStatus, schema::Definition};
+    use vector_lib::codecs::{
+        decoding::DeserializerConfig, BytesDecoderConfig, JsonSerializerConfig,
+        TextSerializerConfig,
+    };
+    use vector_lib::sensitive_string::SensitiveString;
+    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;
-    use crate::sinks::splunk_hec::common::{config_host_key, config_timestamp_key};
     use crate::{
-        codecs::EncodingConfig,
+        codecs::{DecodingConfig, EncodingConfig},
+        components::validation::prelude::*,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         sinks::{
@@ -1275,6 +1361,7 @@ mod tests {
                 acknowledgements: acknowledgements.unwrap_or_default(),
                 store_hec_token,
                 log_namespace: None,
+                keepalive: Default::default(),
             }
             .build(cx)
             .await
@@ -1294,7 +1381,7 @@ mod tests {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
             endpoint: format!("http://{}", address),
-            host_key: config_host_key(),
+            host_key: None,
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -1306,7 +1393,7 @@ mod tests {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            timestamp_key: config_timestamp_key(),
+            timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: Default::default(),
         }
@@ -1397,7 +1484,7 @@ mod tests {
         b.body(message.to_owned())
     }
 
-    async fn send_with<'a>(
+    async fn send_with(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1408,7 +1495,7 @@ mod tests {
         b.send().await.unwrap().status().as_u16()
     }
 
-    async fn send_with_response<'a>(
+    async fn send_with_response(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1815,7 +1902,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1829,7 +1916,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(&format!("http://{}/services/collector/health", address))
+            .get(format!("http://{}/services/collector/health", address))
             .send()
             .await
             .unwrap();
@@ -2438,6 +2525,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ack_service_accepts_parameterized_content_type() {
+        let ack_config = HecAcknowledgementsConfig {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+
+        let event_res = send_with_response(
+            address,
+            "services/collector/event",
+            r#"{"event":"param-test"}"#,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        let _ = collect_n(source, 1).await;
+
+        let body = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+
+        let res = reqwest::Client::new()
+            .post(format!("http://{}/services/collector/ack", address))
+            .header("Authorization", format!("Splunk {}", TOKEN))
+            .header("x-splunk-request-channel", "guid")
+            .header("Content-Type", "application/json; some-random-text; hello")
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let _parsed: HecAckStatusResponse = res.json().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn event_service_acknowledgements_enabled_channel_required() {
         let message = r#"{"event":"first", "color": "blue"}"#;
         let ack_config = HecAcknowledgementsConfig {
@@ -2489,6 +2621,7 @@ mod tests {
             Kind::object(Collection::empty()).or_bytes(),
             [LogNamespace::Vector],
         )
+        .with_meaning(OwnedTargetPath::event_root(), meaning::MESSAGE)
         .with_metadata_field(
             &owned_value_path!("vector", "source_type"),
             Kind::bytes(),
@@ -2566,4 +2699,41 @@ mod tests {
 
         assert_eq!(definitions, Some(expected_definition));
     }
+
+    impl ValidatableComponent for SplunkConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            let config = Self {
+                address: default_socket_address(),
+                ..Default::default()
+            };
+
+            let listen_addr_http = format!("http://{}/services/collector/event", config.address);
+            let uri = Uri::try_from(&listen_addr_http).expect("should not fail to parse URI");
+
+            let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+            let framing = BytesDecoderConfig::new().into();
+            let decoding = DeserializerConfig::Json(Default::default());
+
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(uri, None).with_headers(HashMap::from([(
+                    X_SPLUNK_REQUEST_CHANNEL.to_string(),
+                    "channel".to_string(),
+                )])),
+                DecodingConfig::new(framing, decoding, false.into()),
+            );
+
+            ValidationConfiguration::from_source(
+                Self::NAME,
+                log_namespace,
+                vec![ComponentTestCaseConfig::from_source(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
+    }
+
+    register_validatable_component!(SplunkConfig);
 }

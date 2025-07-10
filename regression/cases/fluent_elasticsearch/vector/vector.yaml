@@ -1,0 +1,39 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  fluent:
+    type:    "fluent"
+    address: "0.0.0.0:8282"
+
+##
+## Transforms
+##
+
+## No transforms specified in the original TOML configuration.
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  elasticsearch:
+    type:        "elasticsearch"
+    inputs: [ "fluent" ]
+    endpoint:    "http://0.0.0.0:8080"
+    mode:        "bulk"
+    pipeline:    "pipeline-name"
+    compression: "none"
+    bulk:
+      index: "vector-%F"

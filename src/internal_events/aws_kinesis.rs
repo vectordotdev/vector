@@ -1,10 +1,7 @@
 /// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
-use crate::emit;
 use metrics::counter;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 
 #[derive(Debug)]
 pub struct AwsKinesisStreamNoPartitionKeyError<'a> {
@@ -20,14 +17,15 @@ impl InternalEvent for AwsKinesisStreamNoPartitionKeyError<'_> {
             partition_key_field = %self.partition_key_field,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

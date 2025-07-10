@@ -1,20 +1,21 @@
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{net::SocketAddr, time::Duration};
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::StreamExt;
+use listenfd::ListenFd;
+use smallvec::SmallVec;
+use tokio_util::udp::UdpFramed;
+use vector_lib::codecs::{
     decoding::{Deserializer, Framer},
     BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
 };
-use futures::StreamExt;
-use listenfd::ListenFd;
-use lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
-use smallvec::SmallVec;
-use tokio_util::udp::UdpFramed;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use vrl::event_path;
 
 #[cfg(unix)]
@@ -70,6 +71,7 @@ pub struct SyslogConfig {
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)]
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
@@ -78,6 +80,9 @@ pub enum Mode {
 
         #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
+
+        #[configurable(derived)]
+        permit_origin: Option<IpAllowlistConfig>,
 
         #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
@@ -104,7 +109,9 @@ pub enum Mode {
         receive_buffer_bytes: Option<usize>,
     },
 
-    /// Listen on UDS. (Unix domain socket)
+    /// Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
+    ///
+    /// For Unix datagram sockets, use the `socket` source instead.
     #[cfg(unix)]
     Unix {
         /// The Unix socket path.
@@ -139,6 +146,7 @@ impl Default for SyslogConfig {
             mode: Mode::Tcp {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
+                permit_origin: None,
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
@@ -171,6 +179,7 @@ impl SourceConfig for SyslogConfig {
             Mode::Tcp {
                 address,
                 keepalive,
+                permit_origin,
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
@@ -186,7 +195,7 @@ impl SourceConfig for SyslogConfig {
                     .as_ref()
                     .and_then(|tls| tls.client_metadata_key.clone())
                     .and_then(|k| k.path);
-                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+                let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
                 source.run(
                     address,
                     keepalive,
@@ -198,6 +207,7 @@ impl SourceConfig for SyslogConfig {
                     cx,
                     false.into(),
                     connection_limit,
+                    permit_origin.map(Into::into),
                     SyslogConfig::NAME,
                     log_namespace,
                 )
@@ -246,7 +256,10 @@ impl SourceConfig for SyslogConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -271,7 +284,7 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = codecs::decoding::Error;
+    type Error = vector_lib::codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = Decoder;
     type Acker = TcpNullAcker;
@@ -435,22 +448,19 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
-    use std::{
-        collections::{BTreeMap, HashMap},
-        fmt,
-        str::FromStr,
-    };
+    use std::{collections::HashMap, fmt, str::FromStr};
+    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
-    use codecs::decoding::format::Deserializer;
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
-    use vector_common::assert_event_data_eq;
-    use vector_core::{config::ComponentKey, schema::Definition};
-    use vrl::value::{kind::Collection, Kind, Value};
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::codecs::decoding::format::Deserializer;
+    use vector_lib::lookup::PathPrefix;
+    use vector_lib::{config::ComponentKey, schema::Definition};
+    use vrl::value::{kind::Collection, Kind, ObjectMap, Value};
 
     use super::*;
     use crate::{
@@ -800,10 +810,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34)
                     .single()
                     .expect("invalid timestamp"),
@@ -846,17 +853,14 @@ mod test {
         let msg = "qwerty";
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x]"#, msg
+            r"[incorrect x]", msg
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 19, 48, 34)
                     .single()
                     .expect("invalid timestamp"),
@@ -889,7 +893,7 @@ mod test {
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r#"[incorrect x=]"#, msg
+            r"[incorrect x=]", msg
         );
 
         let event = event_from_bytes(
@@ -914,7 +918,7 @@ mod test {
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,
-            r#"[empty]"#
+            r"[empty]"
         );
 
         let event = event_from_bytes("host", None, msg.into(), LogNamespace::Legacy).unwrap();
@@ -1002,10 +1006,7 @@ mod test {
                 .into();
 
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 expected_date,
             );
             expected.insert(
@@ -1054,10 +1055,7 @@ mod test {
                 .expect("invalid timestamp")
                 .into();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 expected_date,
             );
             expected.insert(
@@ -1091,10 +1089,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                (
-                    lookup::PathPrefix::Event,
-                    log_schema().timestamp_key().unwrap(),
-                ),
+                (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
                 Utc.with_ymd_and_hms(2019, 2, 13, 21, 53, 30)
                     .single()
                     .and_then(|t| t.with_nanosecond(605_850 * 1000))
@@ -1130,6 +1125,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
                 address: in_addr.into(),
+                permit_origin: None,
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,
@@ -1190,16 +1186,16 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS;
+        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
         use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
         use tokio::io::AsyncWriteExt;
         use tokio::net::UnixStream;
         use tokio_util::codec::{FramedWrite, LinesCodec};
 
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
-            let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
+            let in_path = tempfile::tempdir().unwrap().keep().join("stream_test");
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Unix {
@@ -1273,6 +1269,7 @@ mod test {
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
                 address: in_addr.into(),
+                permit_origin: None,
                 keepalive: None,
                 tls: None,
                 receive_buffer_bytes: None,
@@ -1380,7 +1377,7 @@ mod test {
                 host: "hogwarts".to_owned(),
                 source_type: "syslog".to_owned(),
                 appname: "harry".to_owned(),
-                procid: thread_rng().gen_range(0..32768),
+                procid: rng().random_range(0..32768),
                 structured_data,
                 message: msg,
             }
@@ -1442,7 +1439,7 @@ mod test {
         }
     }
 
-    fn structured_data_from_fields(fields: BTreeMap<String, Value>) -> StructuredData {
+    fn structured_data_from_fields(fields: ObjectMap) -> StructuredData {
         let mut structured_data = StructuredData::default();
 
         for (key, value) in fields.into_iter() {
@@ -1450,10 +1447,10 @@ mod test {
                 .into_object()
                 .unwrap()
                 .into_iter()
-                .map(|(k, v)| (k, value_to_string(v)))
+                .map(|(k, v)| (k.into(), value_to_string(v)))
                 .collect();
 
-            structured_data.insert(key, subfields);
+            structured_data.insert(key.into(), subfields);
         }
 
         structured_data
@@ -1541,7 +1538,7 @@ mod test {
         max_children: usize,
         field_len: usize,
     ) -> StructuredData {
-        let amount = thread_rng().gen_range(0..max_children);
+        let amount = rng().random_range(0..max_children);
 
         random_maps(max_map_size, field_len)
             .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately

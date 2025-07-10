@@ -1,5 +1,5 @@
-use aws_sdk_cloudwatchlogs::error::DescribeLogGroupsError;
-use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::error::SdkError;
+use aws_sdk_cloudwatchlogs::operation::describe_log_groups::DescribeLogGroupsError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use snafu::Snafu;
 

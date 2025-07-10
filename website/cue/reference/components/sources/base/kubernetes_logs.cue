@@ -15,8 +15,12 @@ base: components: sources: kubernetes_logs: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
 		type: string: examples: ["/var/local/lib/vector/"]
@@ -96,7 +100,7 @@ base: components: sources: kubernetes_logs: configuration: {
 
 			If your files share a common header that is not always a fixed size,
 
-			If the file has less than this amount of lines, it won’t be read at all.
+			If the file has less than this amount of lines, it won't be read at all.
 			"""
 		required: false
 		type: uint: {
@@ -129,6 +133,16 @@ base: components: sources: kubernetes_logs: configuration: {
 			unit: "seconds"
 		}
 	}
+	include_paths_glob_patterns: {
+		description: "A list of glob patterns to include while reading the files."
+		required:    false
+		type: array: {
+			default: [
+				"**/*",
+			]
+			items: type: string: examples: ["**/include/**"]
+		}
+	}
 	ingestion_timestamp_field: {
 		description: """
 			Overrides the name of the log field used to add the ingestion timestamp to each event.
@@ -139,6 +153,20 @@ base: components: sources: kubernetes_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
+	}
+	internal_metrics: {
+		description: "Configuration of internal metrics for file-based components."
+		required:    false
+		type: object: options: include_file_tag: {
+			description: """
+				Whether or not to include the "file" tag on the component's corresponding internal metrics.
+
+				This is useful for distinguishing between different files while monitoring. However, the tag's
+				cardinality is unbounded.
+				"""
+			required: false
+			type: bool: default: false
+		}
 	}
 	kube_config_file: {
 		description: """
@@ -162,6 +190,19 @@ base: components: sources: kubernetes_logs: configuration: {
 			default: 32768
 			unit:    "bytes"
 		}
+	}
+	max_merged_line_bytes: {
+		description: """
+			The maximum number of bytes a line can contain - after merging - before being discarded.
+
+			This protects against malformed lines or tailing incorrect files.
+
+			Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
+			config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
+			if auto_partial_merge is true, so if this is set to be 1 MiB, for example, but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+			"""
+		required: false
+		type: uint: unit: "bytes"
 	}
 	max_read_bytes: {
 		description: """
@@ -385,6 +426,17 @@ base: components: sources: kubernetes_logs: configuration: {
 				beginning: "Read from the beginning of the file."
 				end:       "Start reading from the current end of the file."
 			}
+		}
+	}
+	rotate_wait_secs: {
+		description: """
+			How long to keep an open handle to a rotated log file.
+			The default value represents "no limit"
+			"""
+		required: false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "seconds"
 		}
 	}
 	self_node_name: {

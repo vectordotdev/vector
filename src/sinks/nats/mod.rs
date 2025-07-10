@@ -19,7 +19,7 @@ mod tests;
 enum NatsError {
     #[snafu(display("invalid encoding: {}", source))]
     Encoding {
-        source: codecs::encoding::BuildError,
+        source: vector_lib::codecs::encoding::BuildError,
     },
     #[snafu(display("NATS Config Error: {}", source))]
     Config { source: NatsConfigError },
@@ -27,4 +27,6 @@ enum NatsError {
     Connect { source: async_nats::ConnectError },
     #[snafu(display("NATS Server Error: {}", source))]
     ServerError { source: async_nats::Error },
+    #[snafu(display("NATS Publish Error: {}", source))]
+    PublishError { source: async_nats::Error },
 }

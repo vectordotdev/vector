@@ -3,10 +3,10 @@ package metadata
 remap: functions: match_any: {
 	category: "String"
 	description: """
-		Determines whether the `value` matches any the given `patterns`. All
+		Determines whether `value` matches any of the given `patterns`. All
 		patterns are checked in a single pass over the target string, giving this
-		function a potentially significant performance advantage over multiple calls
-		to `match`.
+		function a potential performance advantage over the multiple calls
+		in the `match` function.
 		"""
 
 	arguments: [

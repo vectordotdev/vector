@@ -11,20 +11,74 @@ base: components: sources: demo_logs: configuration: {
 		type: uint: default: 9223372036854775807
 	}
 	decoding: {
-		description: "Configures how events are decoded from raw bytes."
-		required:    false
+		description: """
+			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+			type (log, metric, trace).
+			"""
+		required: false
 		type: object: options: {
+			avro: {
+				description:   "Apache Avro-specific encoder options."
+				relevant_when: "codec = \"avro\""
+				required:      true
+				type: object: options: {
+					schema: {
+						description: """
+																The Avro schema definition.
+																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																* `Date`
+																* `Decimal`
+																* `Duration`
+																* `Fixed`
+																* `TimeMillis`
+																"""
+						required: true
+						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
+					}
+					strip_schema_id_prefix: {
+						description: """
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+																"""
+						required: true
+						type: bool: {}
+					}
+				}
+			}
 			codec: {
 				description: "The codec to use for decoding events."
 				required:    false
 				type: string: {
 					default: "bytes"
 					enum: {
+						avro: """
+															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+
+															[apache_avro]: https://avro.apache.org/
+															"""
 						bytes: "Uses the raw bytes as-is."
 						gelf: """
 															Decodes the raw bytes as a [GELF][gelf] message.
 
+															This codec is experimental for the following reason:
+
+															The GELF specification is more strict than the actual Graylog receiver.
+															Vector's decoder currently adheres more strictly to the GELF spec, with
+															the exception that some characters such as `@`  are allowed in field names.
+
+															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
+															by Graylog, and is much more relaxed than the GELF spec.
+
+															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
+															the codec may continue to relax the enforcement of specification.
+
 															[gelf]: https://docs.graylog.org/docs/gelf
+															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
+															"""
+						influxdb: """
+															Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+
+															[influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
 															"""
 						json: """
 															Decodes the raw bytes as [JSON][json].
@@ -34,6 +88,8 @@ base: components: sources: demo_logs: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
+															This decoder can output all types of events (logs, metrics, traces).
+
 															This codec is **[experimental][experimental]**.
 
 															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -41,6 +97,8 @@ base: components: sources: demo_logs: configuration: {
 															"""
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
+
+															This decoder can output all types of events (logs, metrics, traces).
 
 															This codec is **[experimental][experimental]**.
 
@@ -61,12 +119,33 @@ base: components: sources: demo_logs: configuration: {
 															[rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
 															[rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
 															"""
+						vrl: """
+															Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+
+															[vrl]: https://vector.dev/docs/reference/vrl
+															"""
 					}
 				}
 			}
 			gelf: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: lossy: {
+					description: """
+						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+
+						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+
+						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+						"""
+					required: false
+					type: bool: default: true
+				}
+			}
+			influxdb: {
+				description:   "Influxdb-specific decoding options."
+				relevant_when: "codec = \"influxdb\""
 				required:      false
 				type: object: options: lossy: {
 					description: """
@@ -118,14 +197,23 @@ base: components: sources: demo_logs: configuration: {
 				required:      false
 				type: object: options: {
 					desc_file: {
-						description: "Path to desc file"
-						required:    false
+						description: """
+																The path to the protobuf descriptor set file.
+
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																"""
+						required: false
 						type: string: default: ""
 					}
 					message_type: {
-						description: "message type. e.g package.message"
+						description: "The name of the message type to use for serializing."
 						required:    false
-						type: string: default: ""
+						type: string: {
+							default: ""
+							examples: ["package.Message"]
+						}
 					}
 				}
 			}
@@ -143,6 +231,37 @@ base: components: sources: demo_logs: configuration: {
 						"""
 					required: false
 					type: bool: default: true
+				}
+			}
+			vrl: {
+				description:   "VRL-specific decoding options."
+				relevant_when: "codec = \"vrl\""
+				required:      true
+				type: object: options: {
+					source: {
+						description: """
+																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
+																Note that the final contents of the `.` target will be used as the decoding result.
+																Compilation error or use of 'abort' in a program will result in a decoding error.
+
+																[vrl]: https://vector.dev/docs/reference/vrl
+																"""
+						required: true
+						type: string: {}
+					}
+					timezone: {
+						description: """
+																The name of the timezone to apply to timestamp conversions that do not contain an explicit
+																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
+																to indicate system local time.
+
+																If not set, `local` will be used.
+
+																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+																"""
+						required: false
+						type: string: examples: ["local", "America/New_York", "EST5EDT"]
+					}
 				}
 			}
 		}
@@ -197,7 +316,7 @@ base: components: sources: demo_logs: configuration: {
 					delimiter: {
 						description: "The character that delimits byte sequences."
 						required:    true
-						type: uint: {}
+						type: ascii_char: {}
 					}
 					max_length: {
 						description: """
@@ -218,6 +337,86 @@ base: components: sources: demo_logs: configuration: {
 					}
 				}
 			}
+			chunked_gelf: {
+				description:   "Options for the chunked GELF decoder."
+				relevant_when: "method = \"chunked_gelf\""
+				required:      false
+				type: object: options: {
+					decompression: {
+						description: "Decompression configuration for GELF messages."
+						required:    false
+						type: string: {
+							default: "Auto"
+							enum: {
+								Auto: "Automatically detect the decompression method based on the magic bytes of the message."
+								Gzip: "Use Gzip decompression."
+								None: "Do not decompress the message."
+								Zlib: "Use Zlib decompression."
+							}
+						}
+					}
+					max_length: {
+						description: """
+																The maximum length of a single GELF message, in bytes. Messages longer than this length will
+																be dropped. If this option is not set, the decoder does not limit the length of messages and
+																the per-message memory is unbounded.
+
+																Note that a message can be composed of multiple chunks and this limit is applied to the whole
+																message, not to individual chunks.
+
+																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
+																The message's payload is the concatenation of all the chunks' payloads.
+																"""
+						required: false
+						type: uint: {}
+					}
+					pending_messages_limit: {
+						description: """
+																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
+																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
+																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
+																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+																"""
+						required: false
+						type: uint: {}
+					}
+					timeout_secs: {
+						description: """
+																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
+																decoder drops all the received chunks of the timed out message.
+																"""
+						required: false
+						type: float: default: 5.0
+					}
+				}
+			}
+			length_delimited: {
+				description:   "Options for the length delimited decoder."
+				relevant_when: "method = \"length_delimited\""
+				required:      true
+				type: object: options: {
+					length_field_is_big_endian: {
+						description: "Length field byte order (little or big endian)"
+						required:    false
+						type: bool: default: true
+					}
+					length_field_length: {
+						description: "Number of bytes representing the field length"
+						required:    false
+						type: uint: default: 4
+					}
+					length_field_offset: {
+						description: "Number of bytes in the header before the length field"
+						required:    false
+						type: uint: default: 0
+					}
+					max_frame_length: {
+						description: "Maximum frame length"
+						required:    false
+						type: uint: default: 8388608
+					}
+				}
+			}
 			method: {
 				description: "The framing method."
 				required:    false
@@ -226,8 +425,13 @@ base: components: sources: demo_logs: configuration: {
 					enum: {
 						bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (for example, split between messages or stream segments)."
 						character_delimited: "Byte frames which are delimited by a chosen character."
-						length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
-						newline_delimited:   "Byte frames which are delimited by a newline character."
+						chunked_gelf: """
+															Byte frames which are chunked GELF messages.
+
+															[chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+															"""
+						length_delimited:  "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
+						newline_delimited: "Byte frames which are delimited by a newline character."
 						octet_counting: """
 															Byte frames according to the [octet counting][octet_counting] format.
 

@@ -1,9 +1,8 @@
 use metrics::counter;
-use metrics::gauge;
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 use crate::{built_info, config};
-use vector_common::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct VectorStarted;
@@ -18,16 +17,7 @@ impl InternalEvent for VectorStarted {
             arch = built_info::TARGET_ARCH,
             revision = built_info::VECTOR_BUILD_DESC.unwrap_or(""),
         );
-        gauge!(
-            "build_info",
-            1.0,
-            "debug" => built_info::DEBUG,
-            "version" => built_info::PKG_VERSION,
-            "rust_version" => built_info::RUST_VERSION,
-            "arch" => built_info::TARGET_ARCH,
-            "revision" => built_info::VECTOR_BUILD_DESC.unwrap_or("")
-        );
-        counter!("started_total", 1);
+        counter!("started_total").increment(1);
     }
 }
 
@@ -43,7 +33,7 @@ impl InternalEvent for VectorReloaded<'_> {
             message = "Vector has reloaded.",
             path = ?self.config_paths
         );
-        counter!("reloaded_total", 1);
+        counter!("reloaded_total").increment(1);
     }
 }
 
@@ -56,7 +46,7 @@ impl InternalEvent for VectorStopped {
             target: "vector",
             message = "Vector has stopped."
         );
-        counter!("stopped_total", 1);
+        counter!("stopped_total").increment(1);
     }
 }
 
@@ -69,7 +59,7 @@ impl InternalEvent for VectorQuit {
             target: "vector",
             message = "Vector has quit."
         );
-        counter!("quit_total", 1);
+        counter!("quit_total").increment(1);
     }
 }
 
@@ -83,16 +73,14 @@ impl InternalEvent for VectorReloadError {
             error_code = "reload",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "reload",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("reload_errors_total", 1);
+        )
+        .increment(1);
     }
 }
 
@@ -106,16 +94,14 @@ impl InternalEvent for VectorConfigLoadError {
             error_code = "config_load",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "config_load",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("config_load_errors_total", 1);
+        )
+        .increment(1);
     }
 }
 
@@ -129,15 +115,13 @@ impl InternalEvent for VectorRecoveryError {
             error_code = "recovery",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "recovery",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("recover_errors_total", 1);
+        )
+        .increment(1);
     }
 }

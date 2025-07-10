@@ -32,6 +32,12 @@ components: transforms: throttle: {
 		traces:  false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+	}
+
 	telemetry: metrics: {
 		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}

@@ -1,19 +1,20 @@
-use std::{collections::BTreeMap, time::SystemTime};
+use std::time::SystemTime;
 
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use enrichment::Case;
 use vector::enrichment_tables::{
     file::File,
     geoip::{Geoip, GeoipConfig},
+    mmdb::{Mmdb, MmdbConfig},
     Condition, Table,
 };
-use vrl::value::Value;
+use vector_lib::enrichment::Case;
+use vrl::value::{ObjectMap, Value};
 
 criterion_group!(
     name = benches;
     config = Criterion::default().noise_threshold(0.02).sample_size(10);
-    targets = benchmark_enrichment_tables_file, benchmark_enrichment_tables_geoip
+    targets = benchmark_enrichment_tables_file, benchmark_enrichment_tables_geoip, benchmark_enrichment_tables_mmdb
 );
 criterion_main!(benches);
 
@@ -97,8 +98,13 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
         };
 
         let result = (0..10)
-            .map(|idx| (format!("field-{}", idx), column(idx, size - result_offset)))
-            .collect::<BTreeMap<_, _>>();
+            .map(|idx| {
+                (
+                    format!("field-{}", idx).into(),
+                    column(idx, size - result_offset),
+                )
+            })
+            .collect::<ObjectMap>();
 
         (file, index, condition, result)
     };
@@ -249,14 +255,14 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
     group.bench_function("enrichment_tables/geoip_isp", |b| {
         let table = build("tests/data/GeoIP2-ISP-Test.mmdb");
         let ip = "208.192.1.2";
-        let mut expected = BTreeMap::<String, Value>::new();
-        expected.insert("autonomous_system_number".to_string(), 701i64.into());
+        let mut expected = ObjectMap::new();
+        expected.insert("autonomous_system_number".into(), 701i64.into());
         expected.insert(
-            "autonomous_system_organization".to_string(),
+            "autonomous_system_organization".into(),
             "MCI Communications Services, Inc. d/b/a Verizon Business".into(),
         );
-        expected.insert("isp".to_string(), "Verizon Business".into());
-        expected.insert("organization".to_string(), "Verizon Business".into());
+        expected.insert("isp".into(), "Verizon Business".into());
+        expected.insert("organization".into(), "Verizon Business".into());
 
         b.iter_batched(
             || (&table, ip, &expected),
@@ -283,18 +289,18 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
     group.bench_function("enrichment_tables/geoip_city", |b| {
         let table = build("tests/data/GeoIP2-City-Test.mmdb");
         let ip = "67.43.156.9";
-        let mut expected = BTreeMap::<String, Value>::new();
-        expected.insert("city_name".to_string(), Value::Null);
-        expected.insert("country_code".to_string(), "BT".into());
-        expected.insert("country_name".to_string(), "Bhutan".into());
-        expected.insert("continent_code".to_string(), "AS".into());
-        expected.insert("region_code".to_string(), Value::Null);
-        expected.insert("region_name".to_string(), Value::Null);
-        expected.insert("timezone".to_string(), "Asia/Thimphu".into());
-        expected.insert("latitude".to_string(), Value::from(27.5));
-        expected.insert("longitude".to_string(), Value::from(90.5));
-        expected.insert("postal_code".to_string(), Value::Null);
-        expected.insert("metro_code".to_string(), Value::Null);
+        let mut expected = ObjectMap::new();
+        expected.insert("city_name".into(), Value::Null);
+        expected.insert("country_code".into(), "BT".into());
+        expected.insert("country_name".into(), "Bhutan".into());
+        expected.insert("continent_code".into(), "AS".into());
+        expected.insert("region_code".into(), Value::Null);
+        expected.insert("region_name".into(), Value::Null);
+        expected.insert("timezone".into(), "Asia/Thimphu".into());
+        expected.insert("latitude".into(), Value::from(27.5));
+        expected.insert("longitude".into(), Value::from(90.5));
+        expected.insert("postal_code".into(), Value::Null);
+        expected.insert("metro_code".into(), Value::Null);
 
         b.iter_batched(
             || (&table, ip, &expected),
@@ -309,6 +315,88 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
                                 value: ip.into(),
                             }],
                             None,
+                            None,
+                        )
+                        .as_ref()
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
+    let mut group = c.benchmark_group("enrichment_tables_mmdb");
+    let build = |path: &str| {
+        Mmdb::new(MmdbConfig {
+            path: path.to_string(),
+        })
+        .unwrap()
+    };
+
+    group.bench_function("enrichment_tables/mmdb_isp", |b| {
+        let table = build("tests/data/GeoIP2-ISP-Test.mmdb");
+        let ip = "208.192.1.2";
+        let mut expected = ObjectMap::new();
+        expected.insert("autonomous_system_number".into(), 701i64.into());
+        expected.insert(
+            "autonomous_system_organization".into(),
+            "MCI Communications Services, Inc. d/b/a Verizon Business".into(),
+        );
+        expected.insert("isp".into(), "Verizon Business".into());
+        expected.insert("organization".into(), "Verizon Business".into());
+
+        b.iter_batched(
+            || (&table, ip, &expected),
+            |(table, ip, expected)| {
+                assert_eq!(
+                    Ok(expected),
+                    table
+                        .find_table_row(
+                            Case::Insensitive,
+                            &[Condition::Equals {
+                                field: "ip",
+                                value: ip.into(),
+                            }],
+                            None,
+                            None,
+                        )
+                        .as_ref()
+                )
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.bench_function("enrichment_tables/mmdb_city", |b| {
+        let table = build("tests/data/GeoIP2-City-Test.mmdb");
+        let ip = "67.43.156.9";
+        let mut expected = ObjectMap::new();
+        expected.insert(
+            "location".into(),
+            ObjectMap::from([
+                ("latitude".into(), Value::from(27.5)),
+                ("longitude".into(), Value::from(90.5)),
+            ])
+            .into(),
+        );
+
+        b.iter_batched(
+            || (&table, ip, &expected),
+            |(table, ip, expected)| {
+                assert_eq!(
+                    Ok(expected),
+                    table
+                        .find_table_row(
+                            Case::Insensitive,
+                            &[Condition::Equals {
+                                field: "ip",
+                                value: ip.into(),
+                            }],
+                            Some(&[
+                                "location.latitude".to_string(),
+                                "location.longitude".to_string(),
+                            ]),
                             None,
                         )
                         .as_ref()

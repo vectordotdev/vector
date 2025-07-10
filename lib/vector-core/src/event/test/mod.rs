@@ -21,10 +21,13 @@ fn event_iteration() {
     assert_eq!(
         all,
         vec![
-            ("Ke$ha".into(), "It's going down, I'm yelling timber".into()),
             (
                 "Pitbull".into(),
                 "The bigger they are, the harder they fall".into()
+            ),
+            (
+                "\"Ke$ha\"".into(),
+                "It's going down, I'm yelling timber".into()
             ),
         ]
         .into_iter()
@@ -43,9 +46,9 @@ fn event_iteration_order() {
     assert_eq!(
         collected,
         vec![
-            (String::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-            (String::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-            (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
+            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
+            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
         ]
     );
 }

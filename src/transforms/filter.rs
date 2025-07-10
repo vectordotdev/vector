@@ -1,6 +1,6 @@
-use vector_common::internal_event::{Count, InternalEventHandle as _, Registered};
-use vector_config::configurable_component;
-use vector_core::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -34,7 +34,7 @@ impl From<AnyCondition> for FilterConfig {
 
 impl GenerateConfig for FilterConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(r#"condition = ".message = \"value\"""#).unwrap()
+        toml::from_str(r#"condition = ".message == \"value\"""#).unwrap()
     }
 }
 
@@ -53,12 +53,12 @@ impl TransformConfig for FilterConfig {
 
     fn outputs(
         &self,
-        _enrichment_tables: enrichment::TableRegistry,
+        _enrichment_tables: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, schema::Definition)],
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
-            DataType::all(),
+            DataType::all_bits(),
             clone_input_definitions(input_definitions),
         )]
     }
@@ -100,8 +100,8 @@ mod test {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_common::config::ComponentKey;
-    use vector_core::event::{Metric, MetricKind, MetricValue};
+    use vector_lib::config::ComponentKey;
+    use vector_lib::event::{Metric, MetricKind, MetricValue};
 
     use super::*;
     use crate::config::schema::Definition;

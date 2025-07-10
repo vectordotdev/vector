@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use lookup::{path, OwnedTargetPath};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::{self, path, OwnedTargetPath};
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
@@ -114,13 +114,10 @@ fn normalize_event(
 
     if let Some(timestamp_key) = timestamp_key {
         let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
-
-        let time = match time {
-            Value::Bytes(val) => val,
-            _ => return Err(NormalizationError::TimeValueUnexpectedType),
-        };
-        let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-            .context(TimeParsingSnafu)?;
+        let time = time
+            .as_str()
+            .ok_or(NormalizationError::TimeValueUnexpectedType)?;
+        let time = DateTime::parse_from_rfc3339(time.as_ref()).context(TimeParsingSnafu)?;
         log_namespace.insert_source_metadata(
             Config::NAME,
             log,

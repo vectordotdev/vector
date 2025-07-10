@@ -5,7 +5,6 @@ remap: functions: to_float: {
 	description: """
 		Coerces the `value` into a float.
 		"""
-
 	arguments: [
 		{
 			name: "value"
@@ -17,7 +16,7 @@ remap: functions: to_float: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a supported float representation",
+		"`value` is not a supported float representation.",
 	]
 	return: {
 		types: ["float"]

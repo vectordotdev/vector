@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
@@ -7,7 +8,8 @@ use exitcode::ExitCode;
 
 use crate::{
     config::{self, Config, ConfigDiff},
-    topology::{self, builder::Pieces},
+    extra_context::ExtraContext,
+    topology::{self, builder::TopologyPieces},
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -18,6 +20,10 @@ pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
     #[arg(long)]
     pub no_environment: bool,
+
+    /// Disables health checks during validation.
+    #[arg(long)]
+    pub skip_healthchecks: bool,
 
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
@@ -53,9 +59,8 @@ pub struct Opts {
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
-    /// If none are specified the default config path `/etc/vector/vector.toml`
-    /// will be targeted. And if the aforementioned file does not exist,
-    //  then `/etc/vector/vector.yaml` will be used.
+    /// If none are specified, the default config path `/etc/vector/vector.yaml`
+    /// is targeted.
     #[arg(env = "VECTOR_CONFIG", value_delimiter(','))]
     pub paths: Vec<PathBuf>,
 
@@ -136,24 +141,18 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, true)
+    let builder = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
+    config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
-    let (config, build_warnings) = builder
+    let (config, warnings) = builder
         .build_with_warnings()
         .map_err(&mut report_error)
         .ok()?;
 
     // Warnings
-    let warnings = load_warnings
-        .into_iter()
-        .chain(build_warnings)
-        .collect::<Vec<_>>();
     if !warnings.is_empty() {
         if opts.deny_warnings {
             report_error(warnings);
@@ -177,16 +176,17 @@ async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter)
     } else {
         return false;
     };
-
-    validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
+    opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
 
 async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-) -> Option<Pieces> {
-    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
+) -> Option<TopologyPieces> {
+    match topology::TopologyPieces::build(config, diff, HashMap::new(), ExtraContext::default())
+        .await
+    {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -203,7 +203,7 @@ async fn validate_healthchecks(
     opts: &Opts,
     config: &Config,
     diff: &ConfigDiff,
-    pieces: &mut Pieces,
+    pieces: &mut TopologyPieces,
     fmt: &mut Formatter,
 ) -> bool {
     if !config.healthchecks.enabled {

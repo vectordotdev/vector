@@ -1,0 +1,5 @@
+# See https://github.com/check-spelling/check-spelling/wiki/Configuration-Examples:-only
+\.md$
+\.cue$
+\.html$
+\.txt$

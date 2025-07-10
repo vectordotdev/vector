@@ -7,16 +7,16 @@ base: components: sinks: statsd: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
 			description: """
 				Whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -48,7 +48,7 @@ base: components: sinks: statsd: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -136,7 +136,7 @@ base: components: sinks: statsd: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -158,7 +158,7 @@ base: components: sinks: statsd: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -191,16 +191,25 @@ base: components: sinks: statsd: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

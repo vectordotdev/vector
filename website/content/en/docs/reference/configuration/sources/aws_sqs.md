@@ -1,7 +1,7 @@
 ---
 title: AWS SQS
 description: Collect logs from [AWS SQS](https://aws.amazon.com/sqs)
-kind: source
+component_kind: source
 layout: component
 tags: ["aws", "sqs", "queue", "component", "source", "logs"]
 ---

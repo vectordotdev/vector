@@ -3,9 +3,9 @@ use std::{marker::PhantomData, num::NonZeroUsize, time::Duration};
 use derivative::Derivative;
 use serde_with::serde_as;
 use snafu::Snafu;
-use vector_common::json_size::JsonSize;
-use vector_config::configurable_component;
-use vector_core::stream::BatcherSettings;
+use vector_lib::configurable::configurable_component;
+use vector_lib::json_size::JsonSize;
+use vector_lib::stream::BatcherSettings;
 
 use super::EncodedEvent;
 use crate::{event::EventFinalizers, internal_events::LargeEventDroppedError};
@@ -101,7 +101,7 @@ where
     /// The maximum size of a batch that is processed by a sink.
     ///
     /// This is based on the uncompressed size of the batched events, before they are
-    /// serialized/compressed.
+    /// serialized or compressed.
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
@@ -285,8 +285,8 @@ pub struct BatchSize<B> {
 impl<B> BatchSize<B> {
     pub const fn const_default() -> Self {
         BatchSize {
-            bytes: usize::max_value(),
-            events: usize::max_value(),
+            bytes: usize::MAX,
+            events: usize::MAX,
             _type_marker: PhantomData,
         }
     }

@@ -1,22 +1,24 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use pulsar::{Error as PulsarError, Pulsar, TokioExecutor};
+use pulsar::{Pulsar, TokioExecutor};
 use serde::Serialize;
 use snafu::Snafu;
 use std::collections::HashMap;
-
-use crate::sinks::prelude::*;
+use vrl::value::KeyString;
 
 use super::{
     config::PulsarSinkConfig, encoder::PulsarEncoder, request_builder::PulsarRequestBuilder,
     service::PulsarService, util,
 };
+use crate::sinks::prelude::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub(crate) enum BuildError {
     #[snafu(display("creating pulsar producer failed: {}", source))]
-    CreatePulsarSink { source: PulsarError },
+    CreatePulsarSink {
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
 
 pub(crate) struct PulsarSink {
@@ -37,7 +39,7 @@ pub(super) struct PulsarEvent {
     pub(super) event: Event,
     pub(super) topic: String,
     pub(super) key: Option<Bytes>,
-    pub(super) properties: Option<HashMap<String, Bytes>>,
+    pub(super) properties: Option<HashMap<KeyString, Bytes>>,
     pub(super) timestamp_millis: Option<i64>,
 }
 
@@ -56,7 +58,7 @@ impl ByteSizeOf for PulsarEvent {
             + self.properties.as_ref().map_or(0, |props| {
                 props
                     .iter()
-                    .map(|(key, val)| key.capacity() + val.size_of())
+                    .map(|(key, val)| key.allocated_bytes() + val.size_of())
                     .sum()
             })
     }

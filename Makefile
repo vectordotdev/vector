@@ -223,6 +223,14 @@ build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/releas
 build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-arm-unknown-linux-gnueabi
+build-arm-unknown-linux-gnueabi: target/arm-unknown-linux-gnueabi/release/vector ## Build a release binary for the arm-unknown-linux-gnueabi triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-arm-unknown-linux-musleabi
+build-arm-unknown-linux-musleabi: target/arm-unknown-linux-musleabi/release/vector ## Build a release binary for the arm-unknown-linux-musleabi triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -343,7 +351,7 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior-config
 test-behavior-config: ## Runs configuration related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features transforms --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features secret-backend-example --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/config/*
 
 .PHONY: test-behavior-%
@@ -361,7 +369,7 @@ test-integration: test-integration-databend test-integration-docker-logs test-in
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
 test-integration-%-cleanup:
@@ -527,7 +535,10 @@ package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Bui
 package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+
+.PHONY: package-arm-unknown-linux-gnueabi-all
+package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu  # Build all arm-unknown-linux-gnueabihf GNU packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
@@ -553,6 +564,14 @@ package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-${VERSION}-armv7-
 package-armv7-unknown-linux-musleabihf: target/artifacts/vector-${VERSION}-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}."
 
+.PHONY: package-arm-unknown-linux-gnueabi
+package-arm-unknown-linux-gnueabi: target/artifacts/vector-${VERSION}-arm-unknown-linux-gnueabi.tar.gz ## Build an archive suitable for the `arm-unknown-linux-gnueabi` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-arm-unknown-linux-musleabi
+package-arm-unknown-linux-musleabi: target/artifacts/vector-${VERSION}-arm-unknown-linux-musleabi.tar.gz ## Build an archive suitable for the `arm-unknown-linux-musleabi` triple.
+	@echo "Output to ${<}."
+
 # debs
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
@@ -571,6 +590,10 @@ package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb 
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
+.PHONY: package-deb-arm-gnu
+package-deb-arm-gnu: package-arm-unknown-linux-gnueabi ## Build the arm-unknown-linux-gnueabi deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=arm-unknown-linux-gnueabi -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
@@ -584,10 +607,6 @@ package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Buil
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=aarch64-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
-
-.PHONY: package-rpm-armv7-gnu
-package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 .PHONY: package-rpm-armv7hl-gnu
 package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
@@ -625,10 +644,6 @@ release-push: ## Push new Vector version
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
 	@cargo vdev release s3
-
-.PHONY: sync-install
-sync-install: ## Sync the install.sh script for access via sh.vector.dev
-	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
 .PHONY: sha256sum
 sha256sum: ## Generate SHA256 checksums of CI artifacts

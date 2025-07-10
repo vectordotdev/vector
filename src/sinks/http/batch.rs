@@ -1,9 +1,8 @@
 //! Batch settings for the `http` sink.
 
-use codecs::encoding::Framer;
-use vector_core::{
-    event::Event, stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
+use vector_lib::codecs::encoding::Framer;
+use vector_lib::stream::batcher::limiter::ItemBatchSize;
+use vector_lib::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::codecs::Encoder;
 
@@ -16,7 +15,8 @@ pub(super) struct HttpBatchSizer {
 impl ItemBatchSize<Event> for HttpBatchSizer {
     fn size(&self, item: &Event) -> usize {
         match self.encoder.serializer() {
-            codecs::encoding::Serializer::Json(_) | codecs::encoding::Serializer::NativeJson(_) => {
+            vector_lib::codecs::encoding::Serializer::Json(_)
+            | vector_lib::codecs::encoding::Serializer::NativeJson(_) => {
                 item.estimated_json_encoded_size_of().get()
             }
             _ => item.size_of(),

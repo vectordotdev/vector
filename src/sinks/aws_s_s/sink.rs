@@ -2,15 +2,6 @@ use super::{client::Client, request_builder::SSRequestBuilder, service::SSServic
 use crate::sinks::aws_s_s::retry::SSRetryLogic;
 use crate::sinks::prelude::*;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct SqsSinkDefaultBatchSettings;
-
-impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(1);
-    const MAX_BYTES: Option<usize> = Some(262_144);
-    const TIMEOUT_SECS: f64 = 1.0;
-}
-
 #[derive(Clone)]
 pub(super) struct SSSink<C, E>
 where
@@ -40,9 +31,7 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default().timeout_secs(30));
+        let request = self.request.into_settings();
         let retry_logic: SSRetryLogic<E> = super::retry::SSRetryLogic::new();
         let service = tower::ServiceBuilder::new()
             .settings(request, retry_logic)

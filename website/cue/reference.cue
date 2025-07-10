@@ -31,9 +31,10 @@ _values: {
 //
 // * `at_least_once` - The event will be delivered at least once and
 // could be delivered more than once.
+// * `exactly_once` - The event will be delivered exactly once.
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
-#DeliveryStatus: "at_least_once" | "best_effort"
+#DeliveryStatus: "at_least_once" | "exactly_once" | "best_effort"
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
@@ -403,7 +404,7 @@ _values: {
 	}
 
 	syntaxes: [#Syntax, ...#Syntax] & [
-			{
+		{
 			name:        "vrl"
 			description: """
 				A [Vector Remap Language](\(urls.vrl_reference)) (VRL) [Boolean
@@ -462,7 +463,7 @@ _values: {
 	}
 
 	condition_examples: [#ConditionExample, ...#ConditionExample] & [
-				{
+		{
 			title:   "Standard VRL"
 			name:    "vrl"
 			example: ".status == 500"
@@ -493,13 +494,14 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	"*"?: {}
-	"bool"?:       #TypeBool & {_args: required:      Args.required}
-	"float"?:      #TypeFloat & {_args: required:     Args.required}
-	"object"?:     #TypeObject & {_args: required:    Args.required}
-	"string"?:     #TypeString & {_args: required:    Args.required}
+	"bool"?: #TypeBool & {_args: required: Args.required}
+	"float"?: #TypeFloat & {_args: required: Args.required}
+	"object"?: #TypeObject & {_args: required: Args.required}
+	"string"?: #TypeString & {_args: required: Args.required}
 	"ascii_char"?: #TypeAsciiChar & {_args: required: Args.required}
-	"timestamp"?:  #TypeTimestamp & {_args: required: Args.required}
-	"uint"?:       #TypeUint & {_args: required:      Args.required}
+	"timestamp"?: #TypeTimestamp & {_args: required: Args.required}
+	"int"?: #TypeInt & {_args: required: Args.required}
+	"uint"?: #TypeUint & {_args: required: Args.required}
 }
 
 #TypeArray: {
@@ -582,7 +584,7 @@ _values: {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[
-				for k, v in enum {
+			for k, v in enum {
 				k
 			},
 		]
@@ -616,6 +618,25 @@ _values: {
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
 	examples: [_values.current_timestamp]
+}
+
+#TypeInt: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: int | *null
+	}
+
+	// `examples` clarify values through examples. This should be used
+	// when examples cannot be derived from the `default` or `enum`
+	// options.
+	examples?: [int, ...int]
+
+	// `unit` clarifies the value's unit. While this should be included
+	// as the suffix in the name, this helps to explicitly clarify that.
+	unit?: #Unit | null
 }
 
 #TypeUint: {
@@ -676,7 +697,7 @@ _coercing_fields: """
 	:------|:------------|:-------
 	`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
 	`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
-	`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+	`%FT%T` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
 	`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
 	`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
 	`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`

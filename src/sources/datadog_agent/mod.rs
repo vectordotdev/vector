@@ -17,27 +17,38 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
+use std::convert::Infallible;
+use std::time::Duration;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
-use lookup::owned_value_path;
+use hyper::service::make_service_fn;
+use hyper::Server;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::Span;
-use vector_common::internal_event::{EventsReceived, Registered};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{BatchNotifier, BatchStatus};
+use vector_lib::internal_event::{EventsReceived, Registered};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::schema::meaning;
+use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::path::OwnedTargetPath;
+use vrl::value::kind::Collection;
 use vrl::value::Kind;
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
+use crate::common::http::ErrorMessage;
+use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
@@ -48,7 +59,7 @@ use crate::{
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self, util::ErrorMessage},
+    sources::{self},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -82,25 +93,31 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
 
-    /// If this is set to `true`, metrics are not accepted by the component.
+    /// If this is set to `true`, metrics (beta) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
 
-    /// If this is set to `true`, traces are not accepted by the component.
+    /// If this is set to `true`, traces (alpha) are not accepted by the component.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
 
-    /// If this is set to `true` logs, metrics, and traces are sent to different outputs.
+    /// If this is set to `true`, logs, metrics (beta), and traces (alpha) are sent to different outputs.
     ///
     ///
-    /// For a source component named `agent`, the received logs, metrics, and traces can then be
+    /// For a source component named `agent`, the received logs, metrics (beta), and traces (alpha) can then be
     /// configured as input to other components by specifying `agent.logs`, `agent.metrics`, and
     /// `agent.traces`, respectively.
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
+
+    /// If this is set to `true`, when log events contain the field `ddtags`, the string value that
+    /// contains a list of key:value pairs set by the Agent is parsed and expanded into an array.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_false")]
+    parse_ddtags: bool,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -121,6 +138,10 @@ pub struct DatadogAgentConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    keepalive: KeepaliveConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -136,7 +157,9 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
+            parse_ddtags: false,
             log_namespace: Some(false),
+            keepalive: KeepaliveConfig::default(),
         })
         .unwrap()
     }
@@ -152,48 +175,62 @@ impl SourceConfig for DatadogAgentConfig {
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
             .or_else(|| cx.schema_definitions.get(&None))
-            .expect("registered log schema required")
-            .clone();
+            .cloned();
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let source = DatadogAgentSource::new(
             self.store_api_key,
             decoder,
             tls.http_protocol_name(),
             logs_schema_definition,
             log_namespace,
+            self.parse_ddtags,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
+        let keepalive_settings = self.keepalive.clone();
 
         info!(message = "Building HTTP server.", address = %self.address);
 
         Ok(Box::pin(async move {
-            let span = Span::current();
-            let routes = filters
-                .with(warp::trace(move |_info| span.clone()))
-                .recover(|r: Rejection| async move {
-                    if let Some(e_msg) = r.find::<ErrorMessage>() {
-                        let json = warp::reply::json(e_msg);
-                        Ok(warp::reply::with_status(json, e_msg.status_code()))
-                    } else {
-                        // other internal error - will return 500 internal server error
-                        Err(r)
-                    }
-                });
+            let routes = filters.recover(|r: Rejection| async move {
+                if let Some(e_msg) = r.find::<ErrorMessage>() {
+                    let json = warp::reply::json(e_msg);
+                    Ok(warp::reply::with_status(json, e_msg.status_code()))
+                } else {
+                    // other internal error - will return 500 internal server error
+                    Err(r)
+                }
+            });
 
-            warp::serve(routes)
-                .serve_incoming_with_graceful_shutdown(
-                    listener.accept_stream(),
-                    shutdown.map(|_| ()),
-                )
-                .await;
+            let span = Span::current();
+            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+                let svc = ServiceBuilder::new()
+                    .layer(build_http_trace_layer(span.clone()))
+                    .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
+                        MaxConnectionAgeLayer::new(
+                            Duration::from_secs(secs),
+                            keepalive_settings.max_connection_age_jitter_factor,
+                            conn.peer_addr(),
+                        )
+                    }))
+                    .service(warp::service(routes.clone()));
+                futures_util::future::ok::<_, Infallible>(svc)
+            });
+
+            Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
+                .serve(make_svc)
+                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?;
 
             Ok(())
         }))
@@ -203,59 +240,76 @@ impl SourceConfig for DatadogAgentConfig {
         let definition = self
             .decoding
             .schema_definition(global_log_namespace.merge(self.log_namespace))
+            // NOTE: "status" is intentionally semantically mapped to "severity",
+            //       since that is what DD designates as the semantic meaning of status
+            // https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convention/?s=severity#reserved-attributes
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("status"))),
                 &owned_value_path!("status"),
                 Kind::bytes(),
-                Some("severity"),
+                Some(meaning::SEVERITY),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
                 &owned_value_path!("timestamp"),
                 Kind::timestamp(),
-                Some("timestamp"),
+                Some(meaning::TIMESTAMP),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
                 &owned_value_path!("hostname"),
                 Kind::bytes(),
-                Some("host"),
+                Some(meaning::HOST),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
                 &owned_value_path!("service"),
                 Kind::bytes(),
-                Some("service"),
+                Some(meaning::SERVICE),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddsource"))),
                 &owned_value_path!("ddsource"),
                 Kind::bytes(),
-                Some("source"),
+                Some(meaning::SOURCE),
             )
             .with_source_metadata(
                 Self::NAME,
                 Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
                 &owned_value_path!("ddtags"),
-                Kind::bytes(),
-                Some("tags"),
+                if self.parse_ddtags {
+                    Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined()
+                } else {
+                    Kind::bytes()
+                },
+                Some(meaning::TAGS),
             )
             .with_standard_vector_source_metadata();
 
+        let mut output = Vec::with_capacity(1);
+
         if self.multiple_outputs {
-            vec![
-                SourceOutput::new_logs(DataType::Log, definition).with_port(LOGS),
-                SourceOutput::new_metrics().with_port(METRICS),
-                SourceOutput::new_traces().with_port(TRACES),
-            ]
+            if !self.disable_logs {
+                output.push(SourceOutput::new_maybe_logs(DataType::Log, definition).with_port(LOGS))
+            }
+            if !self.disable_metrics {
+                output.push(SourceOutput::new_metrics().with_port(METRICS))
+            }
+            if !self.disable_traces {
+                output.push(SourceOutput::new_traces().with_port(TRACES))
+            }
         } else {
-            vec![SourceOutput::new_logs(DataType::all(), definition)]
+            output.push(SourceOutput::new_maybe_logs(
+                DataType::all_bits(),
+                definition,
+            ))
         }
+        output
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -269,8 +323,6 @@ impl SourceConfig for DatadogAgentConfig {
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
-    BadRequest,
-    InvalidDataFormat,
     ServerShutdown,
 }
 
@@ -290,8 +342,9 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
-    logs_schema_definition: Arc<schema::Definition>,
+    logs_schema_definition: Option<Arc<schema::Definition>>,
     events_received: Registered<EventsReceived>,
+    parse_ddtags: bool,
 }
 
 #[derive(Clone)]
@@ -326,8 +379,9 @@ impl DatadogAgentSource {
         store_api_key: bool,
         decoder: Decoder,
         protocol: &'static str,
-        logs_schema_definition: schema::Definition,
+        logs_schema_definition: Option<schema::Definition>,
         log_namespace: LogNamespace,
+        parse_ddtags: bool,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -345,9 +399,10 @@ impl DatadogAgentSource {
                 .clone(),
             decoder,
             protocol,
-            logs_schema_definition: Arc::new(logs_schema_definition),
+            logs_schema_definition: logs_schema_definition.map(Arc::new),
             log_namespace,
             events_received: register!(EventsReceived),
+            parse_ddtags,
         }
     }
 
@@ -407,6 +462,12 @@ impl DatadogAgentSource {
                         let mut decoded = Vec::new();
                         MultiGzDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
+                            .map_err(|error| handle_decode_error(encoding, error))?;
+                        decoded.into()
+                    }
+                    "zstd" => {
+                        let mut decoded = Vec::new();
+                        zstd::stream::copy_decode(body.reader(), &mut decoded)
                             .map_err(|error| handle_decode_error(encoding, error))?;
                         decoded.into()
                     }

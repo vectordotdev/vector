@@ -1,14 +1,22 @@
-use codecs::JsonSerializerConfig;
+use bytes::Bytes;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
-use vector_core::tls::TlsEnableableConfig;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::tls::TlsEnableableConfig;
 
 use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
-    sinks::prelude::*,
+    sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
 
 use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
+
+#[derive(Clone, Copy, Debug)]
+pub struct NatsTowerRequestConfigDefaults;
+
+impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
+    const CONCURRENCY: Concurrency = Concurrency::None;
+}
 
 /// Configuration for the `nats` sink.
 #[configurable_component(sink(
@@ -25,7 +33,7 @@ pub struct NatsSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
@@ -58,6 +66,9 @@ pub struct NatsSinkConfig {
     /// [nats_url]: https://docs.nats.io/using-nats/developer/connecting#nats-url
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
+    #[configurable(metadata(
+        docs::examples = "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"
+    ))]
     pub(super) url: String,
 
     #[configurable(derived)]
@@ -68,7 +79,15 @@ pub struct NatsSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub(super) request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
+
+    /// Send messages using [Jetstream][jetstream].
+    ///
+    /// If set, the `subject` must belong to an existing JetStream stream.
+    ///
+    /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
+    #[serde(default)]
+    pub(super) jetstream: bool,
 }
 
 fn default_name() -> String {
@@ -86,6 +105,7 @@ impl GenerateConfig for NatsSinkConfig {
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
             request: Default::default(),
+            jetstream: Default::default(),
         })
         .unwrap()
     }
@@ -118,13 +138,99 @@ impl std::convert::TryFrom<&NatsSinkConfig> for async_nats::ConnectOptions {
 }
 
 impl NatsSinkConfig {
-    pub(super) async fn connect(&self) -> Result<async_nats::Client, NatsError> {
-        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+    pub(super) async fn connect(
+        &self,
+        options: async_nats::ConnectOptions,
+    ) -> Result<async_nats::Client, NatsError> {
+        let urls = self.parse_server_addresses()?;
+        options.connect(urls).await.context(ConnectSnafu)
+    }
 
-        options.connect(&self.url).await.context(ConnectSnafu)
+    fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, NatsError> {
+        self.url
+            .split(',')
+            .map(|url| {
+                url.parse::<async_nats::ServerAddr>()
+                    .map_err(|_| NatsError::Connect {
+                        source: async_nats::ConnectErrorKind::ServerParse.into(),
+                    })
+            })
+            .collect()
+    }
+
+    #[cfg(not(test))]
+    fn create_connect_options(&self) -> Result<async_nats::ConnectOptions, NatsError> {
+        let mut options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+        options = options.retry_on_initial_connect();
+        Ok(options)
+    }
+
+    #[cfg(test)]
+    fn create_connect_options(&self) -> Result<async_nats::ConnectOptions, NatsError> {
+        let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
+        Ok(options)
+    }
+
+    pub(super) async fn publisher(&self) -> Result<NatsPublisher, NatsError> {
+        let options = self.create_connect_options()?;
+        let connection = self.connect(options).await?;
+
+        if self.jetstream {
+            Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
+                connection,
+            )))
+        } else {
+            Ok(NatsPublisher::Core(connection))
+        }
     }
 }
 
 async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
-    config.connect().map_ok(|_| ()).map_err(|e| e.into()).await
+    let options: async_nats::ConnectOptions = (&config).try_into().context(ConfigSnafu)?;
+    config
+        .connect(options)
+        .map_ok(|_| ())
+        .map_err(|e| e.into())
+        .await
+}
+
+pub enum NatsPublisher {
+    Core(async_nats::Client),
+    JetStream(async_nats::jetstream::Context),
+}
+
+impl NatsPublisher {
+    pub(super) async fn publish<S: async_nats::subject::ToSubject>(
+        &self,
+        subject: S,
+        payload: Bytes,
+    ) -> Result<(), NatsError> {
+        match self {
+            NatsPublisher::Core(client) => {
+                client
+                    .publish(subject, payload)
+                    .await
+                    .map_err(|e| NatsError::PublishError {
+                        source: Box::new(e),
+                    })?;
+                client
+                    .flush()
+                    .map_ok(|_| ())
+                    .map_err(|e| NatsError::PublishError {
+                        source: Box::new(e),
+                    })
+                    .await
+            }
+            NatsPublisher::JetStream(jetstream) => {
+                let ack = jetstream.publish(subject, payload).await.map_err(|e| {
+                    NatsError::PublishError {
+                        source: Box::new(e),
+                    }
+                })?;
+                ack.await.map(|_| ()).map_err(|e| NatsError::PublishError {
+                    source: Box::new(e),
+                })
+            }
+        }
+    }
 }

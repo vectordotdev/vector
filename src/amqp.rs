@@ -1,6 +1,6 @@
 //! Functionality supporting both the `[crate::sources::amqp]` source and `[crate::sinks::amqp]` sink.
 use lapin::tcp::{OwnedIdentity, OwnedTLSConfig};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 /// AMQP connection options.
 #[configurable_component]
@@ -31,6 +31,30 @@ impl Default for AmqpConfig {
             connection_string: "amqp://127.0.0.1/%2f".to_string(),
             tls: None,
         }
+    }
+}
+
+/// Polls the connection until a connection can be made.
+/// Gives up after 5 attempts.
+#[cfg(feature = "amqp-integration-tests")]
+#[cfg(test)]
+pub(crate) async fn await_connection(connection: &AmqpConfig) {
+    let mut pause = tokio::time::Duration::from_millis(1);
+    let mut attempts = 0;
+
+    loop {
+        let connection = connection.clone();
+        if connection.connect().await.is_ok() {
+            return;
+        }
+        attempts += 1;
+
+        if attempts == 5 {
+            return;
+        }
+
+        tokio::time::sleep(pause).await;
+        pause *= 2;
     }
 }
 

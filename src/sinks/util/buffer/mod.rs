@@ -5,6 +5,7 @@ use flate2::write::{GzEncoder, ZlibEncoder};
 
 use super::{
     batch::{err_event_too_large, Batch, BatchSize, PushResult},
+    snappy::SnappyEncoder,
     zstd::ZstdEncoder,
 };
 
@@ -32,6 +33,7 @@ pub enum InnerBuffer {
     Gzip(GzEncoder<bytes::buf::Writer<BytesMut>>),
     Zlib(ZlibEncoder<bytes::buf::Writer<BytesMut>>),
     Zstd(ZstdEncoder<bytes::buf::Writer<BytesMut>>),
+    Snappy(SnappyEncoder<bytes::buf::Writer<BytesMut>>),
 }
 
 impl Buffer {
@@ -62,6 +64,7 @@ impl Buffer {
                     ZstdEncoder::new(writer, level.into())
                         .expect("Zstd encoder should not fail on init."),
                 ),
+                Compression::Snappy => InnerBuffer::Snappy(SnappyEncoder::new(writer)),
             }
         })
     }
@@ -81,6 +84,7 @@ impl Buffer {
             InnerBuffer::Zstd(inner) => {
                 inner.write_all(input).unwrap();
             }
+            InnerBuffer::Snappy(inner) => inner.write_all(input).unwrap(),
         }
     }
 
@@ -92,6 +96,7 @@ impl Buffer {
                 InnerBuffer::Gzip(inner) => inner.get_ref().get_ref().is_empty(),
                 InnerBuffer::Zlib(inner) => inner.get_ref().get_ref().is_empty(),
                 InnerBuffer::Zstd(inner) => inner.get_ref().get_ref().is_empty(),
+                InnerBuffer::Snappy(inner) => inner.is_empty(),
             })
             .unwrap_or(true)
     }
@@ -142,6 +147,10 @@ impl Batch for Buffer {
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec")
                 .into_inner(),
+            Some(InnerBuffer::Snappy(inner)) => inner
+                .finish()
+                .expect("This can't fail because the inner writer is a Vec")
+                .into_inner(),
             None => BytesMut::new(),
         }
     }
@@ -161,7 +170,7 @@ mod test {
     use bytes::{Buf, BytesMut};
     use futures::{future, stream, SinkExt, StreamExt};
     use tokio::time::Duration;
-    use vector_common::json_size::JsonSize;
+    use vector_lib::json_size::JsonSize;
 
     use super::{Buffer, Compression};
     use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
@@ -189,10 +198,12 @@ mod test {
             batch_settings.timeout,
         );
 
-        let input = std::iter::repeat(BytesMut::from(
-            "It's going down, I'm yelling timber, You better move, you better dance",
-        ))
-        .take(100_000);
+        let input = std::iter::repeat_n(
+            BytesMut::from(
+                "It's going down, I'm yelling timber, You better move, you better dance",
+            ),
+            100_000,
+        );
 
         buffered
             .sink_map_err(drop)
@@ -219,10 +230,10 @@ mod test {
             decompressed
         });
 
-        assert!(decompressed.eq(std::iter::repeat(
-            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec()
+        assert!(decompressed.eq(std::iter::repeat_n(
+            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
+            100_000
         )
-        .take(100_000)
         .flatten()));
     }
 }

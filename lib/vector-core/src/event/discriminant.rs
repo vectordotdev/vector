@@ -1,9 +1,7 @@
-use std::{
-    collections::BTreeMap,
-    hash::{Hash, Hasher},
-};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 
-use super::{LogEvent, Value};
+use super::{LogEvent, ObjectMap, Value};
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
@@ -79,7 +77,7 @@ fn f64_eq(this: f64, other: f64) -> bool {
     }
     if this != other {
         return false;
-    };
+    }
     if (this.is_sign_positive() && other.is_sign_negative())
         || (this.is_sign_negative() && other.is_sign_positive())
     {
@@ -98,7 +96,7 @@ fn array_eq(this: &[Value], other: &[Value]) -> bool {
         .all(|(first, second)| value_eq(first, second))
 }
 
-fn map_eq(this: &BTreeMap<String, Value>, other: &BTreeMap<String, Value>) -> bool {
+fn map_eq(this: &ObjectMap, other: &ObjectMap) -> bool {
     if this.len() != other.len() {
         return false;
     }
@@ -150,7 +148,7 @@ fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
     }
 }
 
-fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
+fn hash_map<H: Hasher>(hasher: &mut H, map: &ObjectMap) {
     for (key, val) in map {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);
@@ -159,6 +157,22 @@ fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
 
 fn hash_null<H: Hasher>(hasher: &mut H) {
     hasher.write_u8(0);
+}
+
+impl fmt::Display for Discriminant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        for (i, value) in self.values.iter().enumerate() {
+            if i != 0 {
+                write!(fmt, "-")?;
+            }
+            if let Some(value) = value {
+                value.fmt(fmt)?;
+            } else {
+                fmt.write_str("none")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -295,6 +309,7 @@ mod tests {
 
     #[test]
     fn with_hash_map() {
+        #[allow(clippy::mutable_key_type)]
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
         let event_stream_1 = {
@@ -366,5 +381,22 @@ mod tests {
         assert_eq!(process_event(event_stream_1), 2);
         assert_eq!(process_event(event_stream_2), 2);
         assert_eq!(process_event(event_stream_3), 2);
+    }
+
+    #[test]
+    fn test_display() {
+        let mut event = LogEvent::default();
+        event.insert("hostname", "localhost");
+        event.insert("container_id", 1);
+
+        let discriminant = Discriminant::from_log_event(
+            &event,
+            &["hostname".to_string(), "container_id".to_string()],
+        );
+        assert_eq!(format!("{discriminant}"), "\"localhost\"-1");
+
+        let discriminant =
+            Discriminant::from_log_event(&event, &["hostname".to_string(), "service".to_string()]);
+        assert_eq!(format!("{discriminant}"), "\"localhost\"-none");
     }
 }

@@ -1,4 +1,4 @@
-use crate::event::LogEvent;
+use super::LogEvent;
 
 /// Encapsulates the inductive events merging algorithm.
 ///
@@ -38,8 +38,7 @@ impl LogEventMergeState {
 
 #[cfg(test)]
 mod test {
-    use super::LogEventMergeState;
-    use crate::event::LogEvent;
+    use super::*;
 
     fn log_event_with_message(message: &str) -> LogEvent {
         LogEvent::from(message)

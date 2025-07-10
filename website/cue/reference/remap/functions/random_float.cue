@@ -9,19 +9,19 @@ remap: functions: random_float: {
 	arguments: [
 		{
 			name:        "min"
-			description: "Minimum value (inclusive)"
+			description: "Minimum value (inclusive)."
 			required:    true
 			type: ["float"]
 		},
 		{
 			name:        "max"
-			description: "Maximum value (exclusive)"
+			description: "Maximum value (exclusive)."
 			required:    true
 			type: ["float"]
 		},
 	]
 	internal_failure_reasons: [
-		"max is not greater than min",
+		"`max` is not greater than `min`.",
 	]
 	return: types: ["float"]
 

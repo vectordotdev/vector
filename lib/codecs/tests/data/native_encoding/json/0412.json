@@ -1,1 +1,1 @@
-{"metric":{"name":"l","namespace":"u","interval_ms":1056442877,"kind":"absolute","gauge":{"value":-418752.0}}}
+{"metric":{"name":"b","namespace":"y","tags":{"q":"i"},"timestamp":"1969-12-31T17:46:34.000030466Z","kind":"incremental","gauge":{"value":322880.0}}}

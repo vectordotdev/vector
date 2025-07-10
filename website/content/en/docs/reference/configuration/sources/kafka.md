@@ -1,7 +1,7 @@
 ---
 title: Kafka
 description: Collect observability data from [Apache Kafka](https://kafka.apache.org) topics
-kind: source
+component_kind: source
 layout: component
 tags: ["kafka", "apache", "component", "source"]
 ---

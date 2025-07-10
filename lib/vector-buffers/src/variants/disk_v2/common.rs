@@ -64,7 +64,7 @@ pub(crate) const fn align16(amount: usize) -> usize {
         "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`"
     );
 
-    ((amount + SERIALIZER_ALIGNMENT - 1) / SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
+    amount.div_ceil(SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
 }
 
 /// Gets the maximum possible data file size given the type-level numerical limits and buffer invariants.
@@ -428,7 +428,7 @@ mod tests {
     };
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`")]
     fn test_align16_too_large() {
         // We forcefully panic if the input to `align16` is too large to align without overflow, primarily because
         // that's a huge amount even on 32-bit systems and in non-test code, we only use `align16` in a const context,

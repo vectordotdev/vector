@@ -5,10 +5,9 @@ use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snap::raw::Decoder as SnappyDecoder;
 use warp::http::StatusCode;
 
-use super::error::ErrorMessage;
-use crate::internal_events::HttpDecompressError;
+use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
-pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
         for encoding in encodings.rsplit(',').map(str::trim) {
             body = match encoding {

@@ -161,7 +161,7 @@ impl RegisterInternalEvent for RegisteredEndpointBytesReceived {
     type Handle = EndpointBytesReceivedHandle;
 
     fn register(self) -> Self::Handle {
-        let bytes_total = register_counter!(
+        let bytes_total = counter!(
             "component_received_bytes_total",
             "protocol" => self.protocol,
             "endpoint" => self.endpoint.clone(),

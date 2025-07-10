@@ -1,7 +1,7 @@
 use std::fmt;
 
 use tokio::sync::mpsc;
-use vector_buffers::topology::channel::SendError;
+use vector_lib::buffers::topology::channel::SendError;
 
 use crate::event::{Event, EventArray};
 

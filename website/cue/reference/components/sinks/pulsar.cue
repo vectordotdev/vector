@@ -59,12 +59,15 @@ components: sinks: pulsar: {
 	configuration: base.components.sinks.pulsar.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
-	}
-
-	telemetry: metrics: {
-		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 }

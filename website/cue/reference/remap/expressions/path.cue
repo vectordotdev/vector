@@ -44,18 +44,6 @@ remap: expressions: path: {
 							```
 							"""
 					}
-					coalescing: {
-						title:       "Path segment coalescing"
-						description: """
-							Path segments can be coalesced, allowing for the first non-null value to be used. This is
-							particularly useful when working with
-							[externally tagged](\(urls.externally_tagged_representation)) data:
-
-							```coffee
-							.grand_parent.(parent1 | parent2).child
-							```
-							"""
-					}
 					dynamic: {
 						title: "Dynamic paths"
 						description: """
@@ -73,9 +61,9 @@ remap: expressions: path: {
 							"""
 					}
 					nonexistent: {
-						title: "Non-existent paths"
+						title: "Nonexistent paths"
 						description: """
-							Non-existent paths resolve to `null`.
+							Nonexistent paths resolve to `null`.
 							"""
 					}
 					quoting: {
@@ -134,14 +122,6 @@ remap: expressions: path: {
 				.parent.child
 				"""#
 			return: input.log.parent.child
-		},
-		{
-			title: "Nested path coalescing"
-			input: log: grand_parent: parent2: child: "Hello, World!"
-			source: #"""
-				.grand_parent.(parent1 | parent2).child
-				"""#
-			return: input.log.grand_parent.parent2.child
 		},
 		{
 			title: "Array element path (first)"

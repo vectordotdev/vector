@@ -23,7 +23,7 @@ remap: functions: values: {
 	}
 	examples: [
 		{
-			title: "Get values from the object."
+			title: "Get values from the object"
 			input: log: {
 				"key1": "val1"
 				"key2": "val2"

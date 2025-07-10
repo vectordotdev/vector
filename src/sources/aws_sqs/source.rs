@@ -1,16 +1,16 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
-    model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName, QueueAttributeName},
+    types::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName},
     Client as SqsClient,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_common::finalizer::UnorderedFinalizer;
-use vector_common::internal_event::{EventsReceived, Registered};
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
+use vector_lib::finalizer::UnorderedFinalizer;
+use vector_lib::internal_event::{EventsReceived, Registered};
 
 use crate::{
     codecs::Decoder,
@@ -108,9 +108,9 @@ impl SqsSource {
             .max_number_of_messages(MAX_BATCH_SIZE)
             .wait_time_seconds(self.poll_secs as i32)
             .visibility_timeout(self.visibility_timeout_secs as i32)
+            .message_system_attribute_names(MessageSystemAttributeName::from("SentTimestamp"))
             // I think this should be a known attribute
             // https://github.com/awslabs/aws-sdk-rust/issues/411
-            .attribute_names(QueueAttributeName::from("SentTimestamp"))
             .send()
             .await;
 
@@ -208,7 +208,8 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
                 DeleteMessageBatchRequestEntry::builder()
                     .id(id.to_string())
                     .receipt_handle(receipt)
-                    .build(),
+                    .build()
+                    .expect("all required builder parameters specified"),
             );
         }
         if let Err(err) = batch.send().await {
@@ -224,7 +225,7 @@ mod tests {
     use crate::config::{log_schema, SourceConfig};
     use crate::sources::aws_sqs::AwsSqsConfig;
     use chrono::SecondsFormat;
-    use lookup::path;
+    use vector_lib::lookup::path;
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {

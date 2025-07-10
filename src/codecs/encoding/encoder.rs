@@ -1,9 +1,9 @@
 use bytes::BytesMut;
-use codecs::{
+use tokio_util::codec::Encoder as _;
+use vector_lib::codecs::{
     encoding::{Error, Framer, Serializer},
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
 };
-use tokio_util::codec::Encoder as _;
 
 use crate::{
     event::Event,
@@ -23,7 +23,7 @@ where
 impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
-            framer: NewlineDelimitedEncoder::new().into(),
+            framer: NewlineDelimitedEncoder::default().into(),
             serializer: TextSerializerConfig::default().build().into(),
         }
     }
@@ -116,6 +116,7 @@ impl Encoder<Framer> {
             (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
             (
                 Serializer::Avro(_)
+                | Serializer::Cef(_)
                 | Serializer::Csv(_)
                 | Serializer::Gelf(_)
                 | Serializer::Json(_)
@@ -184,10 +185,10 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
-    use codecs::encoding::BoxedFramingError;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
-    use vector_core::event::LogEvent;
+    use vector_lib::codecs::encoding::BoxedFramingError;
+    use vector_lib::event::LogEvent;
 
     use super::*;
 

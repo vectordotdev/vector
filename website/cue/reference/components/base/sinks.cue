@@ -8,7 +8,7 @@ base: components: sinks: configuration: {
 			More information about the individual buffer types, and buffer behavior, can be found in the
 			[Buffering Model][buffering_model] section.
 
-			[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/
+			[buffering_model]: /docs/architecture/buffering-model/
 			"""
 		required: false
 		type: object: options: {
@@ -76,6 +76,34 @@ base: components: sinks: configuration: {
 			}
 		}
 	}
+	graph: {
+		description: """
+			Extra graph configuration
+
+			Configure output for component when generated with graph command
+			"""
+		required: false
+		type: object: options: node_attributes: {
+			description: """
+				Node attributes to add to this component's node in resulting graph
+
+				They are added to the node as provided
+				"""
+			required: false
+			type: object: {
+				examples: [{
+					color: "red"
+					name:  "Example Node"
+					width: "5.0"
+				}]
+				options: "*": {
+					description: "A single graph node attribute in graphviz DOT language."
+					required:    true
+					type: string: {}
+				}
+			}
+		}
+	}
 	healthcheck: {
 		description: "Healthcheck configuration."
 		required:    false
@@ -84,6 +112,14 @@ base: components: sinks: configuration: {
 				description: "Whether or not to check the health of the sink when Vector starts up."
 				required:    false
 				type: bool: default: true
+			}
+			timeout: {
+				description: "Timeout duration for healthcheck in seconds."
+				required:    false
+				type: float: {
+					default: 10.0
+					unit:    "seconds"
+				}
 			}
 			uri: {
 				description: """
@@ -119,7 +155,7 @@ base: components: sinks: configuration: {
 			Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 
 			Similar to common proxy configuration convention, you can set different proxies
-			to use based on the type of traffic being proxied, as well as set specific hosts that
+			to use based on the type of traffic being proxied. You can also set specific hosts that
 			should not be proxied.
 			"""
 		required: false

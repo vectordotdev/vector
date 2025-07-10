@@ -139,12 +139,10 @@ pub async fn setup<const N: usize>(
 }
 
 pub fn init_instrumentation() {
-    if metrics::try_recorder().is_none() {
-        let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
-        tracing::subscriber::set_global_default(subscriber).unwrap();
-
+    let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
+    if tracing::subscriber::set_global_default(subscriber).is_ok() {
         let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
-        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+        metrics::set_global_recorder(recorder).unwrap();
     }
 }
 
@@ -164,7 +162,7 @@ pub async fn wtr_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
     }
     drop(sender);
 
@@ -177,7 +175,7 @@ pub async fn war_measurement<const N: usize>(
     messages: Vec<Message<N>>,
 ) {
     for msg in messages.into_iter() {
-        sender.send(msg).await.unwrap();
+        sender.send(msg, None).await.unwrap();
         _ = receiver.next().await.unwrap();
     }
 }

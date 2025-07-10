@@ -5,7 +5,7 @@ use crate::aws::RegionOrEndpoint;
 use crate::config::{
     AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
 };
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use super::{
     client::SqsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,
@@ -49,12 +49,13 @@ impl GenerateConfig for SqsSinkConfig {
 impl SqsSinkConfig {
     pub(super) async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &self.base_config.auth,
             self.region.region(),
             self.region.endpoint(),
             proxy,
-            &self.base_config.tls,
-            true,
+            self.base_config.tls.as_ref(),
+            None,
         )
         .await
     }

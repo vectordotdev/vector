@@ -77,6 +77,5 @@ components: sinks: gcp_chronicle_unstructured: {
 		traces:  false
 	}
 
-	how_it_works: {
-	}
+	how_it_works: {}
 }

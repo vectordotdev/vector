@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Debug, marker::PhantomData};
 
-use lookup::lookup_v2::ConfigValuePath;
 use rand::random;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
 use crate::{
@@ -42,6 +42,8 @@ where
     R: Record + Send + Sync + Unpin + Clone + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let batch_settings = self.batch_settings;
+
         input
             .filter_map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
@@ -63,21 +65,12 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .batched_partitioned(
-                KinesisPartitioner {
-                    _phantom: PhantomData,
-                },
-                self.batch_settings,
-            )
-            .map(|(key, events)| {
+            .batched(batch_settings.as_byte_size_config())
+            .map(|events| {
                 let metadata = RequestMetadata::from_batch(
                     events.iter().map(|req| req.get_metadata().clone()),
                 );
-                BatchKinesisRequest {
-                    key,
-                    events,
-                    metadata,
-                }
+                BatchKinesisRequest { events, metadata }
             })
             .into_driver(self.service)
             .run()
@@ -146,7 +139,6 @@ pub struct BatchKinesisRequest<R>
 where
     R: Record + Clone,
 {
-    pub key: KinesisKey,
     pub events: Vec<KinesisRequest<R>>,
     metadata: RequestMetadata,
 }
@@ -157,9 +149,6 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            key: KinesisKey {
-                partition_key: self.key.partition_key.clone(),
-            },
             events: self.events.to_vec(),
             metadata: self.metadata.clone(),
         }
@@ -185,24 +174,5 @@ where
 
     fn metadata_mut(&mut self) -> &mut RequestMetadata {
         &mut self.metadata
-    }
-}
-
-struct KinesisPartitioner<R>
-where
-    R: Record,
-{
-    _phantom: PhantomData<R>,
-}
-
-impl<R> Partitioner for KinesisPartitioner<R>
-where
-    R: Record,
-{
-    type Item = KinesisRequest<R>;
-    type Key = KinesisKey;
-
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.key.clone()
     }
 }

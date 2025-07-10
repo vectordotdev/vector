@@ -1,7 +1,5 @@
-use std::{collections::BTreeMap, convert::TryInto, fmt::Debug, sync::Arc};
+use std::{convert::TryInto, fmt::Debug, sync::Arc};
 
-use crate::config::LogNamespace;
-use crate::{config::OutputId, ByteSizeOf};
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
@@ -16,12 +14,15 @@ use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
-    config::ComponentKey, finalization, internal_event::TaggedEventsSent, json_size::JsonSize,
-    request_metadata::GetEventCountTags, EventDataEq,
+    byte_size_of::ByteSizeOf, config::ComponentKey, finalization, internal_event::TaggedEventsSent,
+    json_size::JsonSize, request_metadata::GetEventCountTags, EventDataEq,
 };
-pub use vrl::value::Value;
+pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
+
+use crate::config::LogNamespace;
+use crate::config::OutputId;
 
 pub mod array;
 pub mod discriminant;
@@ -319,6 +320,13 @@ impl Event {
         self
     }
 
+    /// Sets the `source_type` in the event metadata to the provided value.
+    #[must_use]
+    pub fn with_source_type(mut self, source_type: &'static str) -> Self {
+        self.metadata_mut().set_source_type(source_type);
+        self
+    }
+
     /// Sets the `upstream_id` in the event metadata to the provided value.
     #[must_use]
     pub fn with_upstream_id(mut self, upstream_id: Arc<OutputId>) -> Self {
@@ -340,8 +348,8 @@ impl Event {
                 serde_json::Value::Object(fields) => Ok(LogEvent::from(
                     fields
                         .into_iter()
-                        .map(|(k, v)| (k, v.into()))
-                        .collect::<BTreeMap<_, _>>(),
+                        .map(|(k, v)| (k.into(), v.into()))
+                        .collect::<ObjectMap>(),
                 )
                 .into()),
                 _ => Err(crate::Error::from(

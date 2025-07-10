@@ -1,0 +1,2 @@
+# Set global options
+data_dir: "/var/lib/vector"

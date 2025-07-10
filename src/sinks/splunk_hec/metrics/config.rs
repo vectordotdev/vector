@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use futures_util::FutureExt;
-use lookup::lookup_v2::OptionalValuePath;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::sink::VectorSink;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
@@ -145,7 +145,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
 #[typetag::serde(name = "splunk_hec_metrics")]
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = create_client(&self.tls, cx.proxy())?;
+        let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
             self.default_token.inner().to_owned(),
@@ -166,11 +166,7 @@ impl SinkConfig for HecMetricsSinkConfig {
 }
 
 impl HecMetricsSinkConfig {
-    pub fn build_processor(
-        &self,
-        client: HttpClient,
-        cx: SinkContext,
-    ) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -181,7 +177,7 @@ impl HecMetricsSinkConfig {
             compression: self.compression,
         };
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             EndpointTarget::default(),
@@ -207,7 +203,6 @@ impl HecMetricsSinkConfig {
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let sink = HecMetricsSink {
-            context: cx,
             service,
             batch_settings,
             request_builder,

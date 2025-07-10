@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use futures_util::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::schema::Definition;
-use vector_core::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::schema::Definition;
+use vector_lib::{
     config::{DataType, SourceOutput},
     source::Source,
 };
@@ -67,7 +67,7 @@ impl SourceConfig for TripwireSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             DataType::Log,
             Definition::default_legacy_namespace(),
         )]

@@ -3,12 +3,11 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
-use vector_config::{
-    configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
-};
+use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
 use vector_config_common::attributes::CustomAttribute;
 use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_config_macros::configurable_component;
+use vector_lib::{
     config::{
         AcknowledgementsConfig, GlobalOptions, LogNamespace, SourceAcknowledgementsConfig,
         SourceOutput,
@@ -16,8 +15,8 @@ use vector_core::{
     source::Source,
 };
 
-use super::{schema, ComponentKey, ProxyConfig, Resource};
-use crate::{shutdown::ShutdownSignal, SourceSender};
+use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
+use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -35,7 +34,7 @@ impl Configurable for BoxedSource {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SourceDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SourceDescription::generate_schemas(gen)
     }
 }
 
@@ -51,11 +50,12 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
+
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
 
     #[serde(default, skip)]
     pub sink_acknowledgements: bool,
@@ -69,6 +69,7 @@ impl SourceOuter {
     pub(crate) fn new<I: Into<BoxedSource>>(inner: I) -> Self {
         Self {
             proxy: Default::default(),
+            graph: Default::default(),
             sink_acknowledgements: false,
             inner: inner.into(),
         }
@@ -123,6 +124,7 @@ dyn_clone::clone_trait_object!(SourceConfig);
 pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -134,10 +136,14 @@ pub struct SourceContext {
     /// Given a source can expose multiple [`SourceOutput`] channels, the ID is tied to the identifier of
     /// that `SourceOutput`.
     pub schema_definitions: HashMap<Option<String>, schema::Definition>,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
 }
 
 impl SourceContext {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_shutdown(
         key: &ComponentKey,
         out: SourceSender,
@@ -148,18 +154,20 @@ impl SourceContext {
             Self {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
+                enrichment_tables: Default::default(),
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
+                extra_context: Default::default(),
             },
             shutdown,
         )
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_test(
         out: SourceSender,
         schema_definitions: Option<HashMap<Option<String>, schema::Definition>>,
@@ -167,12 +175,14 @@ impl SourceContext {
         Self {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
+            enrichment_tables: Default::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
+            extra_context: Default::default(),
         }
     }
 
@@ -181,7 +191,7 @@ impl SourceContext {
         if config.enabled() {
             warn!(
                 message = "Enabling `acknowledgements` on sources themselves is deprecated in favor of enabling them in the sink configuration, and will be removed in a future version.",
-                component_name = self.key.id(),
+                component_id = self.key.id(),
             );
         }
 

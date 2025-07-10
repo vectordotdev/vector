@@ -2,9 +2,9 @@ use futures::FutureExt;
 use http::{header::AUTHORIZATION, Request, Uri};
 use hyper::Body;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
     config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -58,17 +58,14 @@ pub(super) struct AppsignalConfig {
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -88,7 +85,7 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 
 impl AppsignalConfig {
     pub(super) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
@@ -102,7 +99,7 @@ impl AppsignalConfig {
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
 
         let request_opts = self.request;
-        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = request_opts.into_settings();
         let retry_logic = HttpStatusRetryLogic::new(|req: &AppsignalResponse| req.http_status);
 
         let service = ServiceBuilder::new()

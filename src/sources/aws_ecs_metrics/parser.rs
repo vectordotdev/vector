@@ -507,14 +507,27 @@ fn network_metrics(
     .collect()
 }
 
+#[derive(Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+enum StatsPayload {
+    Container(ContainerStats),
+    Empty {},
+    Null,
+}
+
 pub(super) fn parse(
     bytes: &[u8],
     namespace: Option<String>,
 ) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
-    let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
+    let parsed = serde_json::from_slice::<BTreeMap<String, StatsPayload>>(bytes)?;
 
-    for (id, container) in parsed {
+    for (id, payload) in parsed {
+        let container = match payload {
+            StatsPayload::Container(container) => container,
+            _ => continue,
+        };
+
         let mut tags = MetricTags::default();
         tags.replace("container_id".into(), id);
         if let Some(name) = container.name {
@@ -560,8 +573,8 @@ pub(super) fn parse(
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::metric_tags;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -608,7 +621,9 @@ mod test {
                     "io_time_recursive": [],
                     "sectors_recursive": []
                 }
-            }
+            },
+            "123456789": {},
+            "123456789": null
         }"#;
 
         assert_event_data_eq!(
@@ -672,7 +687,9 @@ mod test {
                         "throttled_time": 0
                     }
                 }
-            }
+            },
+            "2344": {},
+            "test": null
         }"#;
 
         assert_event_data_eq!(

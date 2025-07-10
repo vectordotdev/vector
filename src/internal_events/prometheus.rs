@@ -1,16 +1,11 @@
 #[cfg(feature = "sources-prometheus-scrape")]
 use std::borrow::Cow;
 
-use hyper::StatusCode;
 use metrics::counter;
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
 #[cfg(feature = "sources-prometheus-scrape")]
-use prometheus_parser::ParserError;
-use vector_core::internal_event::InternalEvent;
-
-use crate::emit;
-use vector_common::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
-};
+use vector_lib::prometheus::parser::ParserError;
 
 #[cfg(feature = "sources-prometheus-scrape")]
 #[derive(Debug)]
@@ -21,7 +16,7 @@ pub struct PrometheusParseError<'a> {
 }
 
 #[cfg(feature = "sources-prometheus-scrape")]
-impl<'a> InternalEvent for PrometheusParseError<'a> {
+impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",
@@ -29,7 +24,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
@@ -37,13 +32,12 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "url" => self.url.to_string(),
-        );
-        // deprecated
-        counter!("parse_errors_total", 1);
+        )
+        .increment(1);
     }
 }
 
@@ -59,32 +53,14 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusServerRequestComplete {
-    pub status_code: StatusCode,
-}
-
-impl InternalEvent for PrometheusServerRequestComplete {
-    fn emit(self) {
-        let message = "Request to prometheus server complete.";
-        if self.status_code.is_success() {
-            debug!(message, status_code = %self.status_code);
-        } else {
-            warn!(message, status_code = %self.status_code);
-        }
-        counter!("requests_received_total", 1);
+        )
+        .increment(1);
     }
 }
 
@@ -98,13 +74,13 @@ impl InternalEvent for PrometheusNormalizationError {
             message = normalization_reason,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: 1,
             reason: normalization_reason

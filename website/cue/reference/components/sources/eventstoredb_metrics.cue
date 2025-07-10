@@ -115,8 +115,4 @@ components: sources: eventstoredb_metrics: {
 			tags:              _eventstoredb_metrics_tags
 		}
 	}
-	telemetry: metrics: {
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
-	}
 }

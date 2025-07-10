@@ -8,8 +8,8 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_config::configurable_component;
-use vector_core::event::EventStatus;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::EventStatus;
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -48,7 +48,7 @@ pub struct HecClientAcknowledgementsConfig {
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         flatten,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub inner: AcknowledgementsConfig,
 }
@@ -123,7 +123,8 @@ impl HecAckClient {
                     let acked_ack_ids = ack_query_response
                         .acks
                         .iter()
-                        .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
+                        .filter(|&(_ack_id, ack_status)| *ack_status)
+                        .map(|(ack_id, _ack_status)| *ack_id)
                         .collect::<Vec<u64>>();
                     self.finalize_delivered_ack_ids(acked_ack_ids.as_slice());
                     self.expire_ack_ids_with_status(EventStatus::Rejected);
@@ -287,7 +288,7 @@ mod tests {
 
     use futures_util::{stream::FuturesUnordered, StreamExt};
     use tokio::sync::oneshot::{self, Receiver};
-    use vector_core::{config::proxy::ProxyConfig, event::EventStatus};
+    use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
     use super::HecAckClient;
     use crate::{

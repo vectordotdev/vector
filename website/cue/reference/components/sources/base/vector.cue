@@ -13,7 +13,7 @@ base: components: sources: vector: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -39,7 +39,7 @@ base: components: sources: vector: configuration: {
 				description: """
 					Sets the list of supported ALPN protocols.
 
-					Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
 					that they are defined.
 					"""
 				required: false
@@ -61,7 +61,7 @@ base: components: sources: vector: configuration: {
 					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
 					an inline string in PEM format.
 
-					If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
@@ -94,16 +94,25 @@ base: components: sources: vector: configuration: {
 				required: false
 				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 			}
+			server_name: {
+				description: """
+					Server name to use when using Server Name Indication (SNI).
+
+					Only relevant for outgoing connections.
+					"""
+				required: false
+				type: string: examples: ["www.example.com"]
+			}
 			verify_certificate: {
 				description: """
-					Enables certificate verification.
+					Enables certificate verification. For components that create a server, this requires that the
+					client connections have a valid client certificate. For components that initiate requests,
+					this validates that the upstream has a valid certificate.
 
 					If enabled, certificates must not be expired and must be issued by a trusted
 					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
 					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on until the verification process reaches a root certificate.
-
-					Relevant for both incoming and outgoing connections.
+					so on, until the verification process reaches a root certificate.
 
 					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
 					"""

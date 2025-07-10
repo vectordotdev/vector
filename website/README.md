@@ -1,14 +1,12 @@
 # The Vector website and documentation
 
-[![Netlify Status](https://api.netlify.com/api/v1/badges/abeaffe6-d38a-4f03-8b6c-c6909e94918e/deploy-status)](https://app.netlify.com/sites/vector-project/deploys)
-
-This directory houses all of the assets used to build Vector's website and documentation, available at [vector.dev][vector].
+This directory houses all the assets used to build Vector's website and documentation, available at [vector.dev][vector].
 
 ## Prerequisites
 
 In order to run the site [locally](#run-the-site-locally), you need to have these installed:
 
-* The [Hugo] static site generator. Make sure to install the extended version (with [Sass] and [ESBuild] support), specifically the version specified in [`netlify.toml`](../netlify.toml).
+* The [Hugo] static site generator. Refer to https://gohugo.io/installation/ for instructions.
 * The CLI tool for the [CUE] configuration and validation language.
 * [Node.js] and the [Yarn] package manager (for static assets and some scripting).
 * [htmltest] for link checking.
@@ -17,12 +15,7 @@ In order to run the site [locally](#run-the-site-locally), you need to have thes
 
 vector.dev is a complex site with a lot of moving parts. This section breaks the site down into some key components.
 
-### Netlify
-
-vector.dev is built by and hosted on the [Netlify] platform. [Deploy previews] are built for *all* pull requests to the Vector project (though this may change in the near future).
- You can update site configuration and see the results of site builds on the Netlify [project page][netlify_project]. The configuration for Netlify is in the root of this repo, in the [`netlify.toml`][netlify_toml] file.
-
-#### Branches
+### Branches
 
 The current Vector release branch (`vX.X`, for example `v0.15`) branch is used to build the "production" site at https://vector.dev. All changes should be targeted to `master`. If you want to release a website change outside of the normal release cadence, you can cherry-pick the commit to the release branch.
 
@@ -31,6 +24,10 @@ The `master` branch, on the other hand, often contains unreleased, "nightly" cha
 ### Static site generator
 
 vector.dev is built using the [Hugo] static site generator. The site configuration is in [`config.toml`](./config.toml). The standard Hugo [directory structure] is obeyed.
+
+### Cargo data
+
+Some pages in the Vector documentation rely on dependency information such as version numbers found in the [`../Cargo.lock`](../Cargo.lock) file. Whenever you build the Vector site, the `../Cargo.lock` file is copied into `data/cargo-lock.toml` so it can be used in conjunction with Hugo's templating system to build HTML.
 
 ### Structured data
 
@@ -67,14 +64,13 @@ In addition to Tailwind classes, some CSS is built from [Sass] (all Sass files a
 
 ### Search
 
-Search for vector.dev is provided by [Algolia]. Our search solution is largely custom:
+Search for vector.dev is provided by [Typesense]. Our search solution is largely custom:
 
-* The [`algolia-index.ts`](./scripts/algolia-index.ts) script indexes all of the relevant pages on the site and stores the entire index in a single JSON file (output to `public/search.json`).
-* The [`atomic-algolia`][atomic-algolia] tool syncs the generated JSON index with the Algolia backend, performing all the necessary create, update, and delete operations.
+* The [`typesense-index.ts`](./scripts/typesense-index.ts) script generates an index of all of the relevant pages on the site and stores the result in a single JSON file (output to `public/search.json`).
+* The [`typesense-sync.ts`](./scripts/typesense-sync.ts) script syncs the generated JSON index with the Typesense backend, performing all the necessary create, update, and delete operations, using a custom package, `typesense-sync`. Reach out in #websites for more details.
 
-The Algolia configuration for the site is controlled via the [`algolia.json`](./algolia.json) file. The Algolia CLI syncs this config with the Algolia API.
+The Typesense configuration for the site is captured via the [`typesense.config.json`](./typesense.config.json) file.
 
-> Everything needed to configure Algolia search for vector.dev is in this repo; you should never make manual configuration changes through the Algolia dashboard.
 
 #### De-indexing pages
 
@@ -99,9 +95,8 @@ vector.dev uses two different icon sets for different purposes:
 
 Redirects for vector.dev are defined in three difference places (depending on the use):
 
-1. Domain-level redirects, e.g. the chat.vector.dev redirect to our Discord server, are defined in [`netlify.toml`](../netlify.toml) in the repo root.
-2. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
-3. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
+1. Splat-style redirects (which can't be defined as Hugo aliases) are defined in [`./static/_redirects`](./static/_redirects).
+2. Redirects for specific pages are defined in the [`aliases`][aliases] field in the relevant page's front matter.
 
 ### Link checking
 
@@ -155,10 +150,6 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
     The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
 
-## Lighthouse scores
-
-[Lighthouse] scores for the website are produced automatically by [Netlify's Lighthouse plugin][plugin]. Those reports are available at `${ROOT}/reports/lighthouse`, where `ROOT` is the root URL for a version of the site. Thus, reports for the production version of the site would be available at https://vector.dev/reports/lighthouse. Reports are also generated for deploy previews and branch deploys.
-
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
@@ -203,13 +194,11 @@ description: """
         """
 ```
 
-[algolia]: https://algolia.com
+[typesense]: https://typesense.org
 [aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
-[atomic-algolia]: https://github.com/chrisdmacrae/atomic-algolia
 [components]: https://vector.dev/components
 [cue]: https://cuelang.org
-[deploy previews]: https://docs.netlify.com/site-deploys/deploy-previews
 [directory structure]: https://gohugo.io/getting-started/directory-structure
 [esbuild]: https://github.com/evanw/esbuild
 [guides]: https://vector.dev/guides
@@ -219,10 +208,7 @@ description: """
 [hugo pipes]: https://gohugo.io/hugo-pipes
 [ionicons]: https://ionic.io/ionicons
 [lighthouse]: https://web.dev/performance-scoring
-[netlify]: https://netlify.com
-[netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org
-[plugin]: https://www.npmjs.com/package/@netlify/plugin-lighthouse
 [postcss]: https://github.com/postcss/postcss
 [purgecss]: https://purgecss.com
 [react.js]: https://reactjs.org

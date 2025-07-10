@@ -4,9 +4,9 @@ use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use lookup::lookup_v2::OptionalValuePath;
 use snafu::{ResultExt, Snafu};
-use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
+use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{
     request::HecRequest,
@@ -43,7 +43,7 @@ pub enum HealthcheckError {
 }
 
 pub fn create_client(
-    tls: &Option<TlsConfig>,
+    tls: Option<&TlsConfig>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
@@ -141,9 +141,11 @@ pub fn config_host_key() -> OptionalValuePath {
     }
 }
 
-pub fn config_timestamp_key() -> OptionalValuePath {
-    OptionalValuePath {
-        path: crate::config::log_schema().timestamp_key().cloned(),
+pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
+    OptionalTargetPath {
+        path: crate::config::log_schema()
+            .timestamp_key_target_path()
+            .cloned(),
     }
 }
 
@@ -168,7 +170,7 @@ pub fn render_template_string<'a>(
 mod tests {
     use bytes::Bytes;
     use http::{HeaderValue, Uri};
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
         matchers::{header, method, path},
         Mock, MockServer, ResponseTemplate,
@@ -194,7 +196,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert!(healthcheck.await.is_ok())
@@ -211,7 +213,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -231,7 +233,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -251,7 +253,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -397,7 +399,7 @@ mod integration_tests {
 
     use http::StatusCode;
     use tokio::time::Duration;
-    use vector_core::config::proxy::ProxyConfig;
+    use vector_lib::config::proxy::ProxyConfig;
     use warp::Filter;
 
     use super::{
@@ -411,7 +413,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let address = splunk_hec_address();
         let token = get_token().await;
 
@@ -425,7 +427,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_server_not_listening() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(
             "http://localhost:1111/".to_string(),
             get_token().await,
@@ -437,7 +439,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_server_unavailable() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(
             "http://localhost:5503/".to_string(),
             get_token().await,

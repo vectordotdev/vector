@@ -12,23 +12,24 @@ use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::json_size::JsonSize;
+use vector_lib::json_size::JsonSize;
 
+use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
-        HttpClientHttpResponseError, RequestCompleted, StreamClosedError,
+        HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
     SourceSender,
 };
-use vector_common::shutdown::ShutdownSignal;
-use vector_core::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
@@ -75,6 +76,13 @@ pub(crate) trait HttpClientContext {
     /// (Optional) Called if the HTTP response is not 200 ('OK').
     fn on_http_response_error(&self, _uri: &Uri, _header: &Parts) {}
 
+    /// (Optional) Process the base URL before each request.
+    /// Allows for dynamic query parameters that update at runtime.
+    /// Returns a new URL if parameters need to be updated, or None to use the original URL.
+    fn process_url(&self, _url: &Uri) -> Option<Uri> {
+        None
+    }
+
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so
     // that accurate byte count metrics can be emitted.
@@ -82,15 +90,22 @@ pub(crate) trait HttpClientContext {
 }
 
 /// Builds a url for the HTTP requests.
-pub(crate) fn build_url(uri: &Uri, query: &HashMap<String, Vec<String>>) -> Uri {
+pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
     if let Some(query) = uri.query() {
         serializer.extend_pairs(url::form_urlencoded::parse(query.as_bytes()));
     };
-    for (k, l) in query {
-        for v in l {
-            serializer.append_pair(k, v);
-        }
+    for (k, query_value) in query {
+        match query_value {
+            QueryParameterValue::SingleParam(param) => {
+                serializer.append_pair(k, param.value());
+            }
+            QueryParameterValue::MultiParams(params) => {
+                for v in params {
+                    serializer.append_pair(k, v.value());
+                }
+            }
+        };
     }
     let mut builder = Uri::builder();
     if let Some(scheme) = uri.scheme() {
@@ -140,12 +155,15 @@ pub(crate) async fn call<
         .take_until(inputs.shutdown)
         .map(move |_| stream::iter(inputs.urls.clone()))
         .flatten()
-        .map(move |url| {
+        .map(move |base_url| {
             let client = client.clone();
-            let endpoint = url.to_string();
+            let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
-            let mut context = context_builder.build(&url);
+            let mut context = context_builder.build(&base_url);
+
+            // Check if we need to process the URL dynamically (for updating VRL expressions)
+            let url = context.process_url(&base_url).unwrap_or(base_url);
 
             let mut builder = match http_method {
                 HttpMethod::Head => Request::head(&url),
@@ -154,6 +172,7 @@ pub(crate) async fn call<
                 HttpMethod::Put => Request::put(&url),
                 HttpMethod::Patch => Request::patch(&url),
                 HttpMethod::Delete => Request::delete(&url),
+                HttpMethod::Options => Request::options(&url),
             };
 
             // add user specified headers
@@ -175,7 +194,6 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            let start = Instant::now();
             tokio::time::timeout(inputs.timeout, client.send(request))
                 .then(move |result| async move {
                     match result {
@@ -202,10 +220,6 @@ pub(crate) async fn call<
                 .filter_map(move |response| {
                     ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(RequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
                             context.on_response(&url, &header, &body).map(|mut events| {
                                 let byte_size = if events.is_empty() {
                                     // We need to explicitly set the byte size

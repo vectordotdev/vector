@@ -5,7 +5,7 @@ use http::Response;
 use hyper::body;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
-use vector_core::config::log_schema;
+use vector_lib::config::log_schema;
 
 use super::{
     config::{default_host, AzureMonitorLogsConfig},

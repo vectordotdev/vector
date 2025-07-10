@@ -94,7 +94,7 @@ impl<'a> From<&'a TraceEvent> for EventRef<'a> {
     }
 }
 
-impl<'a> EventDataEq<Event> for EventRef<'a> {
+impl EventDataEq<Event> for EventRef<'_> {
     fn event_data_eq(&self, that: &Event) -> bool {
         match (self, that) {
             (Self::Log(a), Event::Log(b)) => a.event_data_eq(b),

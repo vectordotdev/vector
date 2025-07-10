@@ -1,4 +1,4 @@
-use vector_core::event::{Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue};
 
 use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
@@ -20,7 +20,7 @@ impl MetricNormalize for StatsdNormalizer {
 
 #[cfg(test)]
 mod tests {
-    use vector_core::event::MetricKind;
+    use vector_lib::event::MetricKind;
 
     use super::StatsdNormalizer;
 

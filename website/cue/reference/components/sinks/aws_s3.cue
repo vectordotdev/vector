@@ -78,9 +78,16 @@ components: sinks: aws_s3: components._aws & {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
 	}
 
 	how_it_works: {

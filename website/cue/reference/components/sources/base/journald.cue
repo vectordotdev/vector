@@ -13,7 +13,7 @@ base: components: sources: journald: configuration: {
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 			[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
@@ -43,11 +43,25 @@ base: components: sources: journald: configuration: {
 		description: """
 			The directory used to persist file checkpoint positions.
 
-			By default, the global `data_dir` option is used. Make sure the running user has write
-			permissions to this directory.
+			By default, the [global `data_dir` option][global_data_dir] is used.
+			Make sure the running user has write permissions to this directory.
+
+			If this directory is specified, then Vector will attempt to create it.
+
+			[global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 			"""
 		required: false
 		type: string: examples: ["/var/lib/vector"]
+	}
+	emit_cursor: {
+		description: """
+			Whether to emit the [__CURSOR field][cursor]. See also [sd_journal_get_cursor][get_cursor].
+
+			[cursor]: https://www.freedesktop.org/software/systemd/man/latest/systemd.journal-fields.html#Address%20Fields
+			[get_cursor]: https://www.freedesktop.org/software/systemd/man/latest/sd_journal_get_cursor.html
+			"""
+		required: false
+		type: bool: default: false
 	}
 	exclude_matches: {
 		description: """

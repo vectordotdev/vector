@@ -1,5 +1,5 @@
 use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 use super::config::DatadogLogsConfig;
 use crate::{

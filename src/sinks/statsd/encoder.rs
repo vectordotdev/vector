@@ -5,7 +5,7 @@ use std::{
 
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
-use vector_core::event::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
+use vector_lib::event::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 
 use crate::{
     internal_events::StatsdInvalidMetricError,
@@ -153,7 +153,7 @@ fn encode_and_write_single_event<V: Display>(
 
 #[cfg(test)]
 mod tests {
-    use vector_core::{
+    use vector_lib::{
         event::{metric::TagValue, MetricTags},
         metric_tags,
     };
@@ -161,7 +161,7 @@ mod tests {
     use super::encode_tags;
 
     #[cfg(feature = "sources-statsd")]
-    use vector_core::event::{Metric, MetricKind, MetricValue, StatisticKind};
+    use vector_lib::event::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[cfg(feature = "sources-statsd")]
     fn encode_metric(metric: &Metric) -> bytes::BytesMut {
@@ -177,11 +177,16 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
-        use crate::sources::statsd::parser::parse as statsd_parse;
+        use crate::sources::statsd::{parser::Parser, ConversionUnit};
+        let statsd_parser = Parser::new(true, ConversionUnit::Seconds);
 
         let s = std::str::from_utf8(metric).unwrap().trim();
         s.split('\n')
-            .map(|packet| statsd_parse(packet).expect("should not fail to parse statsd packet"))
+            .map(|packet| {
+                statsd_parser
+                    .parse(packet)
+                    .expect("should not fail to parse statsd packet")
+            })
             .collect()
     }
 
@@ -241,7 +246,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -271,7 +276,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -286,7 +291,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -296,7 +301,7 @@ mod tests {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.5 => 1, 1.5 => 1],
+                samples: vector_lib::samples![1.5 => 1, 1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -306,7 +311,7 @@ mod tests {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.5 => 2],
+                samples: vector_lib::samples![1.5 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -314,7 +319,7 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(expected, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -324,7 +329,7 @@ mod tests {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![2.5 => 1, 1.5 => 1, 1.5 => 1],
+                samples: vector_lib::samples![2.5 => 1, 1.5 => 1, 1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -334,7 +339,7 @@ mod tests {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.5 => 2],
+                samples: vector_lib::samples![1.5 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -343,7 +348,7 @@ mod tests {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![2.5 => 1],
+                samples: vector_lib::samples![2.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -351,8 +356,8 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(expected1, output.remove(0));
-        vector_common::assert_event_data_eq!(expected2, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected1, output.remove(0));
+        vector_lib::assert_event_data_eq!(expected2, output.remove(0));
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -369,6 +374,6 @@ mod tests {
 
         let frame = encode_metric(&input);
         let mut output = parse_encoded_metrics(&frame);
-        vector_common::assert_event_data_eq!(input, output.remove(0));
+        vector_lib::assert_event_data_eq!(input, output.remove(0));
     }
 }

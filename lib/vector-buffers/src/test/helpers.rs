@@ -1,6 +1,5 @@
-use std::{future::Future, path::Path, str::FromStr};
+use std::{future::Future, path::Path, str::FromStr, sync::LazyLock};
 
-use once_cell::sync::Lazy;
 use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
@@ -72,7 +71,7 @@ pub fn install_tracing_helpers() -> AssertionRegistry {
     //
     // TODO: At some point, we might be able to write a simple derive macro that does this for us, and
     // configures the other necessary bits, but for now.... by hand will get the job done.
-    static ASSERTION_REGISTRY: Lazy<AssertionRegistry> = Lazy::new(|| {
+    static ASSERTION_REGISTRY: LazyLock<AssertionRegistry> = LazyLock::new(|| {
         let assertion_registry = AssertionRegistry::default();
         let assertions_layer = AssertionsLayer::new(&assertion_registry);
 

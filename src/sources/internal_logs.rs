@@ -1,11 +1,11 @@
 use chrono::Utc;
-use codecs::BytesDeserializerConfig;
 use futures::{stream, StreamExt};
-use lookup::lookup_v2::OptionalValuePath;
-use lookup::{owned_value_path, path, OwnedValuePath};
-use vector_config::configurable_component;
-use vector_core::config::log_schema;
-use vector_core::{
+use vector_lib::codecs::BytesDeserializerConfig;
+use vector_lib::config::log_schema;
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     schema::Definition,
 };
@@ -35,8 +35,7 @@ pub struct InternalLogsConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the current process ID to each event.
     ///
@@ -52,10 +51,6 @@ pub struct InternalLogsConfig {
     log_namespace: Option<bool>,
 }
 
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
-}
-
 fn default_pid_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("pid"))
 }
@@ -65,7 +60,7 @@ impl_generate_config_from_default!(InternalLogsConfig);
 impl Default for InternalLogsConfig {
     fn default() -> InternalLogsConfig {
         InternalLogsConfig {
-            host_key: default_host_key(),
+            host_key: None,
             pid_key: default_pid_key(),
             log_namespace: None,
         }
@@ -75,7 +70,12 @@ impl Default for InternalLogsConfig {
 impl InternalLogsConfig {
     /// Generates the `schema::Definition` for this component.
     fn schema_definition(&self, log_namespace: LogNamespace) -> Definition {
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
         let pid_key = self.pid_key.clone().path.map(LegacyKey::Overwrite);
 
         // There is a global and per-source `log_namespace` config.
@@ -104,7 +104,11 @@ impl InternalLogsConfig {
 #[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let host_key = self.host_key.clone().path;
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path;
         let pid_key = self.pid_key.clone().path;
 
         let subscription = TraceSubscription::subscribe();
@@ -125,7 +129,10 @@ impl SourceConfig for InternalLogsConfig {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -204,9 +211,9 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
-    use lookup::OwnedTargetPath;
     use tokio::time::{sleep, Duration};
-    use vector_core::event::Value;
+    use vector_lib::event::Value;
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
 
     use super::*;

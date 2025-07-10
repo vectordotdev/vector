@@ -245,12 +245,14 @@ remap: #Remap & {
 				1 │ structured = parse_key_value(.message)
 				  │ ------------ ^^^^^^^^^^^^^^^^^^^^^^^^^
 				  │ │            │
-				  │ │            this expression is fallible
-				  │ │            update the expression to be infallible
+				  │ │            this expression is fallible because at least one argument's type cannot be verified to be valid
+				  │ │            update the expression to be infallible by adding a `!`: `parse_key_value!(.message)`
+				  │ │            `.message` argument type is `any` and this function expected a parameter `value` of type `string`
 				  │ or change this to an infallible assignment:
 				  │ structured, err = parse_key_value(.message)
 				  │
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
+				  = see functions characteristics documentation at https://vrl.dev/expressions/#function-call-characteristics
 				  = learn more about error code 103 at https://errors.vrl.dev/103
 				  = see language documentation at https://vrl.dev
 				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples

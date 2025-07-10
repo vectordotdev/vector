@@ -3,7 +3,7 @@ package metadata
 remap: functions: starts_with: {
 	category: "String"
 	description: """
-		Determines whether the `value` begins with the `substring`.
+		Determines whether `value` begins with `substring`.
 		"""
 
 	arguments: [

@@ -3,7 +3,7 @@ use crate::sinks::prelude::*;
 use bytes::BytesMut;
 use std::io;
 use tokio_util::codec::Encoder as _;
-use vector_core::config::telemetry;
+use vector_lib::config::telemetry;
 
 #[derive(Clone, Debug)]
 pub(super) struct AmqpEncoder {

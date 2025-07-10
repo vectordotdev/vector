@@ -4,16 +4,19 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use vector_buffers::topology::channel::{limited, LimitedReceiver};
-use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, schema::Definition};
-use vector_core::{
+use vector_lib::buffers::topology::channel::{limited, LimitedReceiver};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, schema::Definition};
+use vector_lib::{
     config::{DataType, SourceOutput},
-    event::{EventArray, EventContainer},
+    event::EventContainer,
     source::Source,
 };
 
-use crate::config::{SourceConfig, SourceContext};
+use crate::{
+    config::{SourceConfig, SourceContext},
+    source_sender::SourceSenderItem,
+};
 
 /// Configuration for the `test_basic` source.
 #[configurable_component(source("test_basic", "Test (basic)."))]
@@ -21,7 +24,7 @@ use crate::config::{SourceConfig, SourceContext};
 #[serde(default)]
 pub struct BasicSourceConfig {
     #[serde(skip)]
-    receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
+    receiver: Arc<Mutex<Option<LimitedReceiver<SourceSenderItem>>>>,
 
     #[serde(skip)]
     event_counter: Option<Arc<AtomicUsize>>,
@@ -42,7 +45,7 @@ impl Default for BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -52,34 +55,34 @@ impl Default for BasicSourceConfig {
 impl_generate_config_from_default!(BasicSourceConfig);
 
 impl BasicSourceConfig {
-    pub fn new(receiver: LimitedReceiver<EventArray>) -> Self {
+    pub fn new(receiver: LimitedReceiver<SourceSenderItem>) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
     }
 
-    pub fn new_with_data(receiver: LimitedReceiver<EventArray>, data: &str) -> Self {
+    pub fn new_with_data(receiver: LimitedReceiver<SourceSenderItem>, data: &str) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: Some(data.into()),
         }
     }
 
     pub fn new_with_event_counter(
-        receiver: LimitedReceiver<EventArray>,
+        receiver: LimitedReceiver<SourceSenderItem>,
         event_counter: Arc<AtomicUsize>,
     ) -> Self {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -133,7 +136,7 @@ impl SourceConfig for BasicSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.data_type.unwrap(),
             Definition::default_legacy_namespace(),
         )]

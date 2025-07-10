@@ -1,7 +1,7 @@
 ---
 title: Sematext metrics
 description: Publish metric events to [Sematext](https://sematext.com)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["sematext", "component", "sink", "metrics"]
 ---

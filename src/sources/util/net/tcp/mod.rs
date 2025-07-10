@@ -1,13 +1,12 @@
-mod request_limiter;
+pub mod request_limiter;
 
-use std::{collections::BTreeMap, io, mem::drop, net::SocketAddr, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
-use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use futures_util::future::OptionFuture;
+use ipnet::IpNet;
 use listenfd::ListenFd;
-use lookup::{path, OwnedValuePath};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -17,12 +16,14 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
-use vector_common::finalization::AddBatchNotifier;
-use vector_core::{
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::finalization::AddBatchNotifier;
+use vector_lib::lookup::{path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,
 };
-use vrl::value::Value;
+use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
@@ -42,12 +43,13 @@ use crate::{
     SourceSender,
 };
 
-const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
+pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
-async fn try_bind_tcp_listener(
+pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
+    allowlist: Option<Vec<IpNet>>,
 ) -> crate::Result<MaybeTlsListener> {
     match addr {
         SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
@@ -60,6 +62,7 @@ async fn try_bind_tcp_listener(
             }
         },
     }
+    .map(|listener| listener.with_allowlist(allowlist))
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -118,6 +121,7 @@ where
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
+        allowlist: Option<Vec<IpNet>>,
         source_name: &'static str,
         log_namespace: LogNamespace,
     ) -> crate::Result<crate::sources::Source> {
@@ -125,7 +129,7 @@ where
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
-            let listener = try_bind_tcp_listener(addr, listenfd, &tls)
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls, allowlist)
                 .await
                 .map_err(|error| {
                     emit!(SocketBindError {
@@ -364,8 +368,8 @@ async fn handle_stream<T>(
 
 
                         if let Some(certificate_metadata) = &certificate_metadata {
-                            let mut metadata: BTreeMap<String, Value> = BTreeMap::new();
-                            metadata.insert("subject".to_string(), certificate_metadata.subject().into());
+                            let mut metadata = ObjectMap::new();
+                            metadata.insert("subject".into(), certificate_metadata.subject().into());
                             for event in &mut events {
                                 let log = event.as_mut_log();
 

@@ -3,7 +3,7 @@ use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
-use vector_core::internal_event::DEFAULT_OUTPUT;
+use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
     builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
@@ -44,12 +44,14 @@ pub fn check_names<'a, I: Iterator<Item = &'a ComponentKey>>(names: I) -> Result
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 
-    if config.sources.is_empty() {
-        errors.push("No sources defined in the config.".to_owned());
-    }
+    if !config.allow_empty {
+        if config.sources.is_empty() {
+            errors.push("No sources defined in the config.".to_owned());
+        }
 
-    if config.sinks.is_empty() {
-        errors.push("No sinks defined in the config.".to_owned());
+        if config.sinks.is_empty() {
+            errors.push("No sinks defined in the config.".to_owned());
+        }
     }
 
     // Helper for below
@@ -246,35 +248,32 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
     };
 
     // Now build a mapping of buffer IDs/usage configuration to the mountpoint they reside on.
-    let mountpoint_buffer_mapping =
-        configured_disk_buffers
-            .into_iter()
-            .fold(HashMap::new(), |mut mappings, usage| {
-                let canonicalized_data_dir = usage
-                    .data_dir()
-                    .canonicalize()
-                    .unwrap_or_else(|_| usage.data_dir().to_path_buf());
-                let mountpoint = mountpoints
-                    .keys()
-                    .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
+    let mountpoint_buffer_mapping = configured_disk_buffers.into_iter().fold(
+        HashMap::new(),
+        |mut mappings: HashMap<PathBuf, Vec<DiskUsage>>, usage| {
+            let canonicalized_data_dir = usage
+                .data_dir()
+                .canonicalize()
+                .unwrap_or_else(|_| usage.data_dir().to_path_buf());
+            let mountpoint = mountpoints
+                .keys()
+                .find(|mountpoint| canonicalized_data_dir.starts_with(mountpoint));
 
-                match mountpoint {
-                    None => warn!(
-                        buffer_id = usage.id().id(),
-                        data_dir = usage.data_dir().to_string_lossy().as_ref(),
-                        canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
-                        message = "Found no matching mountpoint for buffer data directory.",
-                    ),
-                    Some(mountpoint) => {
-                        mappings
-                            .entry(mountpoint.clone())
-                            .or_insert_with(Vec::new)
-                            .push(usage);
-                    }
+            match mountpoint {
+                None => warn!(
+                    buffer_id = usage.id().id(),
+                    data_dir = usage.data_dir().to_string_lossy().as_ref(),
+                    canonicalized_data_dir = canonicalized_data_dir.to_string_lossy().as_ref(),
+                    message = "Found no matching mountpoint for buffer data directory.",
+                ),
+                Some(mountpoint) => {
+                    mappings.entry(mountpoint.clone()).or_default().push(usage);
                 }
+            }
 
-                mappings
-            });
+            mappings
+        },
+    );
 
     // Finally, we have a mapping of disk buffers, based on their underlying mountpoint. Go through
     // and check to make sure the sum total of `max_size` for all buffers associated with each
@@ -326,20 +325,29 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let source_ids = config.sources.iter().flat_map(|(key, source)| {
-        source
-            .inner
-            .outputs(config.schema.log_namespace())
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    ("source", OutputId::from((key, port.clone())))
-                } else {
-                    ("source", OutputId::from(key))
-                }
-            })
-            .collect::<Vec<_>>()
-    });
+    let table_sources = config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+        .collect::<Vec<_>>();
+    let source_ids = config
+        .sources
+        .iter()
+        .chain(table_sources.iter().map(|(k, s)| (k, s)))
+        .flat_map(|(key, source)| {
+            source
+                .inner
+                .outputs(config.schema.log_namespace())
+                .iter()
+                .map(|output| {
+                    if let Some(port) = &output.port {
+                        ("source", OutputId::from((key, port.clone())))
+                    } else {
+                        ("source", OutputId::from(key))
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         get_transform_output_ids(
             transform.inner.as_ref(),
@@ -350,6 +358,11 @@ pub fn warnings(config: &Config) -> Vec<String> {
         .collect::<Vec<_>>()
     });
 
+    let table_sinks = config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink(key))
+        .collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms
@@ -357,6 +370,9 @@ pub fn warnings(config: &Config) -> Vec<String> {
             .any(|(_, transform)| transform.inputs.contains(&id))
             && !config
                 .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&id))
+            && !table_sinks
                 .iter()
                 .any(|(_, sink)| sink.inputs.contains(&id))
         {

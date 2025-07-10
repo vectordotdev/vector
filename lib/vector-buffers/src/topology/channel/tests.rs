@@ -21,7 +21,7 @@ async fn assert_send_ok_with_capacities<T>(
 ) where
     T: Bufferable,
 {
-    assert!(sender.send(value.into()).await.is_ok());
+    assert!(sender.send(value.into(), None).await.is_ok());
     assert_current_send_capacity(sender, base_expected, overflow_expected);
 }
 
@@ -59,7 +59,7 @@ where
     // had no more messages to send, waiting for-ev-er for the next one.
     let start = Instant::now();
     _ = send_baton.wait().await;
-    assert!(sender.send(send_value.into()).await.is_ok());
+    assert!(sender.send(send_value.into(), None).await.is_ok());
     let send_delay = start.elapsed();
     assert!(send_delay > recv_delay);
     drop(sender);

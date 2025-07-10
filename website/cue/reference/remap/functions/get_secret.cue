@@ -16,13 +16,12 @@ remap: functions: get_secret: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: [
-	]
+	internal_failure_reasons: []
 	return: types: ["string"]
 
 	examples: [
 		{
-			title: "Get the Datadog API key from the event metadata."
+			title: "Get the Datadog API key from the event metadata"
 			source: #"""
 				get_secret("datadog_api_key")
 				"""#

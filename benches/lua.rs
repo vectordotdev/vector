@@ -40,8 +40,11 @@ fn bench_add_fields(c: &mut Criterion) {
                 key, value
             );
             Transform::event_task(
-                transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
-                    .unwrap(),
+                transforms::lua::v2::Lua::new(
+                    &toml::from_str::<LuaConfig>(&config).unwrap(),
+                    "transform".into(),
+                )
+                .unwrap(),
             )
         }),
     ];
@@ -117,7 +120,8 @@ fn bench_field_filter(c: &mut Criterion) {
                 """
             "#};
             Transform::event_task(
-                transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
+                transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap(), "transform".into())
+                    .unwrap(),
             )
         }),
     ];

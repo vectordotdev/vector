@@ -14,12 +14,17 @@ remap: functions: parse_klog: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` doesn't match the `klog` format",
+		"`value` does not match the `klog` format.",
 	]
 	return: types: ["object"]
+	notices: [
+		"""
+			This function resolves the year for messages. If the current month is January and the provided month is December, it sets the year to the previous year. Otherwise, it sets the year to the current year.
+			""",
+	]
 	examples: [
 		{
-			title: "Parse via klog"
+			title: "Parse using klog"
 			source: #"""
 				parse_klog!("I0505 17:59:40.692994   28133 klog.go:70] hello from klog")
 				"""#
@@ -29,7 +34,7 @@ remap: functions: parse_klog: {
 				level:     "info"
 				line:      70
 				message:   "hello from klog"
-				timestamp: "2023-05-05T17:59:40.692994Z"
+				timestamp: "2025-05-05T17:59:40.692994Z"
 			}
 		},
 	]

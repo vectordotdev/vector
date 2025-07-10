@@ -15,7 +15,7 @@ pub(super) struct HoneycombSink<S> {
 
 impl<S> HoneycombSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -36,10 +36,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             // Batch the input stream with size calculation based on the estimated encoded json size
-            .batched(
-                self.batch_settings
-                    .into_item_size_config(HttpJsonBatchSizer),
-            )
+            .batched(self.batch_settings.as_item_size_config(HttpJsonBatchSizer))
             // Build requests with default concurrency limit.
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -66,7 +63,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for HoneycombSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,

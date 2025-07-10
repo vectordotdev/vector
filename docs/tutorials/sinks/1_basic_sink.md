@@ -22,7 +22,10 @@ Provide some module level comments to explain what the sink does.
 Let's setup all the imports we will need for the tutorial:
 
 ```rust
-use crate::prelude::*;
+use crate::sinks::prelude::*;
+use vector_lib::internal_event::{
+    ByteSize, BytesSent, EventsSent, InternalEventHandle, Output, Protocol,
+};
 ```
 
 # Configuration
@@ -41,7 +44,7 @@ pub struct BasicConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -253,15 +256,13 @@ emit the event. Change the body of `run_inner` to look like the following:
 
 ```diff
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
++       let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
+
         while let Some(mut event) = input.next().await {
 +           let bytes = format!("{:#?}", event);
 +           println!("{}", bytes);
 -           println!("{:#?}", event);
-
-+           emit!(BytesSent {
-+               byte_size: bytes.len(),
-+               protocol: "none".into()
-+           });
++           bytes_sent.emit(ByteSize(bytes.len()));
 
             let finalizers = event.take_finalizers();
             finalizers.update_status(EventStatus::Delivered);
@@ -276,15 +277,27 @@ emit the event. Change the body of `run_inner` to look like the following:
 [`EventSent`][events_sent] is emitted by each component in Vector to
 instrument how many bytes have been sent to the next downstream component.
 
-Add the following after emitting `BytesSent`:
+Change the body of `run_inner` to look like the following:
 
 ```diff
-+     let event_byte_size = event.estimated_json_encoded_size_of();
-+     emit!(EventsSent {
-+         count: 1,
-+         byte_size: event_byte_size,
-+         output: None,
-+     });
+    async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let bytes_sent = register!(BytesSent::from(Protocol("console".into(),)));
++       let events_sent = register!(EventsSent::from(Output(None)));
+
+        while let Some(mut event) = input.next().await {
+            let bytes = format!("{:#?}", event);
+            println!("{}", bytes);
+            bytes_sent.emit(ByteSize(bytes.len()));
+
++           let event_byte_size = event.estimated_json_encoded_size_of();
++           events_sent.emit(CountByteSize(1, event_byte_size));
+
+            let finalizers = event.take_finalizers();
+            finalizers.update_status(EventStatus::Delivered);
+        }
+
+        Ok(())
+    }
 ```
 
 More details about instrumenting Vector can be found
@@ -335,7 +348,7 @@ Our sink works!
 
 [event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
 [vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation
-[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+[acknowledgements]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 [configurable_component]: https://rust-doc.vector.dev/vector_config/attr.configurable_component.html
 [generate_config]: https://rust-doc.vector.dev/vector/config/trait.generateconfig
 [sink_config]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig

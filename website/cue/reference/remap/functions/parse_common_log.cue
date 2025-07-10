@@ -30,15 +30,15 @@ remap: functions: parse_common_log: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` doesn't match the Common Log Format",
-		"`timestamp_format` isn't a valid format string",
-		"The timestamp in `value` fails to parse using the provided `timestamp_format`",
+		"`value` does not match the Common Log Format.",
+		"`timestamp_format` is not a valid format string.",
+		"The timestamp in `value` fails to parse using the provided `timestamp_format`.",
 	]
 	return: types: ["object"]
 
 	examples: [
 		{
-			title: "Parse via Common Log Format (with default timestamp format)"
+			title: "Parse using Common Log Format (with default timestamp format)"
 			source: #"""
 				parse_common_log!("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326")
 				"""#
@@ -56,7 +56,7 @@ remap: functions: parse_common_log: {
 			}
 		},
 		{
-			title: "Parse via Common Log Format (with custom timestamp format)"
+			title: "Parse using Common Log Format (with custom timestamp format)"
 			source: #"""
 				parse_common_log!(
 					"127.0.0.1 bob frank [2000-10-10T20:55:36Z] \"GET /apache_pb.gif HTTP/1.0\" 200 2326",

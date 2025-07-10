@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, convert::TryInto};
 use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use vector_core::event::Value;
+use vector_lib::event::{KeyString, ObjectMap, Value};
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and
 /// without options, all using arrays to encode the top-level fields.
@@ -184,18 +184,18 @@ impl From<FluentValue> for Value {
                         .into_iter()
                         .filter_map(|(key, value)| {
                             key.as_str()
-                                .map(|k| (k.to_owned(), Value::from(FluentValue(value))))
+                                .map(|k| (k.into(), Value::from(FluentValue(value))))
                         })
                         .collect(),
                 )
             }
             rmpv::Value::Ext(code, bytes) => {
-                let mut fields = BTreeMap::new();
+                let mut fields = ObjectMap::new();
                 fields.insert(
-                    String::from("msgpack_extension_code"),
+                    KeyString::from("msgpack_extension_code"),
                     Value::Integer(code.into()),
                 );
-                fields.insert(String::from("bytes"), Value::Bytes(bytes.into()));
+                fields.insert(KeyString::from("bytes"), Value::Bytes(bytes.into()));
                 Value::Object(fields)
             }
         }
@@ -229,7 +229,7 @@ mod test {
 
     use approx::assert_relative_eq;
     use quickcheck::quickcheck;
-    use vector_core::event::Value;
+    use vrl::value::{ObjectMap, Value};
 
     use crate::sources::fluent::message::FluentValue;
 
@@ -249,7 +249,7 @@ mod test {
 
     quickcheck! {
         fn from_u64(input: u64) -> () {
-            if input > i64::max_value() as u64 {
+            if input > i64::MAX as u64 {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
                            Value::Bytes(input.to_string().into()))
             } else {
@@ -310,9 +310,9 @@ mod test {
             let actual_inner: Vec<(rmpv::Value, rmpv::Value)> = input.clone().into_iter().map(|(k,v)| (key_fn(k), val_fn(v))).collect();
             let actual = rmpv::Value::Map(actual_inner);
 
-            let mut expected_inner = BTreeMap::new();
+            let mut expected_inner = ObjectMap::new();
             for (k,v) in input.into_iter() {
-                expected_inner.insert(k, Value::Integer(v));
+                expected_inner.insert(k.into(), Value::Integer(v));
             }
             let expected = Value::Object(expected_inner);
 
@@ -346,9 +346,9 @@ mod test {
         fn from_ext(code: i8, bytes: Vec<u8>) -> () {
             let actual = rmpv::Value::Ext(code, bytes.clone());
 
-            let mut inner = BTreeMap::new();
-            inner.insert("msgpack_extension_code".to_string(), Value::Integer(code.into()));
-            inner.insert("bytes".to_string(), Value::Bytes(bytes.into()));
+            let mut inner = ObjectMap::new();
+            inner.insert("msgpack_extension_code".into(), Value::Integer(code.into()));
+            inner.insert("bytes".into(), Value::Bytes(bytes.into()));
             let expected = Value::Object(inner);
 
             assert_eq!(Value::from(FluentValue(actual)), expected);

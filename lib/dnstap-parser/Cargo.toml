@@ -1,0 +1,27 @@
+[package]
+name = "dnstap-parser"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+license = "MIT"
+
+[dependencies]
+base64 = { version = "0.22.1", default-features = false }
+bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
+chrono.workspace = true
+dnsmsg-parser = { path = "../dnsmsg-parser" }
+hickory-proto.workspace = true
+prost.workspace = true
+snafu.workspace = true
+tracing = { version = "0.1.34", default-features = false }
+vector-lib = { path = "../vector-lib" }
+vrl.workspace = true
+paste.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+chrono-tz.workspace = true

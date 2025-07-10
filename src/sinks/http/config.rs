@@ -1,13 +1,28 @@
 //! Configuration for the `http` sink.
 
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder,
-};
+#[cfg(feature = "aws-core")]
+use aws_config::meta::region::ProvideRegion;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
 use indexmap::IndexMap;
+use std::path::PathBuf;
+use vector_lib::codecs::{
+    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoder,
+};
+#[cfg(feature = "aws-core")]
+use vector_lib::config::proxy::ProxyConfig;
 
+use super::{
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    sink::HttpSink,
+};
+#[cfg(feature = "aws-core")]
+use crate::aws::AwsAuthentication;
+#[cfg(feature = "aws-core")]
+use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     http::{Auth, HttpClient, MaybeAuth},
@@ -20,11 +35,6 @@ use crate::{
     },
 };
 
-use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-    sink::HttpSink,
-};
-
 const CONTENT_TYPE_TEXT: &str = "text/plain";
 const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
 const CONTENT_TYPE_JSON: &str = "application/json";
@@ -33,33 +43,33 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 #[configurable_component(sink("http", "Deliver observability event data to an HTTP server."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HttpSinkConfig {
+pub struct HttpSinkConfig {
     /// The full URI to make HTTP requests to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub(super) uri: UriSerde,
+    pub uri: UriSerde,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
-    pub(super) method: HttpMethod,
+    pub method: HttpMethod,
 
     #[configurable(derived)]
-    pub(super) auth: Option<Auth>,
+    pub auth: Option<Auth>,
 
     /// A list of custom headers to add to each request.
     #[configurable(deprecated = "This option has been deprecated, use `request.headers` instead.")]
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub(super) headers: Option<IndexMap<String, String>>,
+    pub headers: Option<IndexMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) compression: Compression,
+    pub compression: Compression,
 
     #[serde(flatten)]
-    pub(super) encoding: EncodingConfigWithFraming,
+    pub encoding: EncodingConfigWithFraming,
 
     /// A string to prefix the payload with.
     ///
@@ -68,7 +78,7 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_suffix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "{\"data\":"))]
     #[serde(default)]
-    pub(super) payload_prefix: String,
+    pub payload_prefix: String,
 
     /// A string to suffix the payload with.
     ///
@@ -77,26 +87,26 @@ pub(super) struct HttpSinkConfig {
     /// If specified, the `payload_prefix` must also be specified and together they must produce a valid JSON object.
     #[configurable(metadata(docs::examples = "}"))]
     #[serde(default)]
-    pub(super) payload_suffix: String,
+    pub payload_suffix: String,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: RequestConfig,
+    pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub(super) tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
-    pub(super) acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 /// HTTP method.
@@ -108,7 +118,7 @@ pub(super) struct HttpSinkConfig {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
-pub(super) enum HttpMethod {
+pub enum HttpMethod {
     /// GET.
     Get,
 
@@ -152,7 +162,7 @@ impl From<HttpMethod> for Method {
 
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         Ok(HttpClient::new(tls, cx.proxy())?)
     }
 
@@ -284,9 +294,37 @@ impl SinkConfig for HttpSinkConfig {
             content_encoding,
         );
 
-        let service = HttpService::new(client, http_sink_request_builder);
+        let service = match &self.auth {
+            #[cfg(feature = "aws-core")]
+            Some(Auth::Aws { auth, service }) => {
+                let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
+                    .region()
+                    .await;
+                let region = (match &auth {
+                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
+                    AwsAuthentication::File { .. } => None,
+                    AwsAuthentication::Role { region, .. } => region.clone(),
+                    AwsAuthentication::Default { region, .. } => region.clone(),
+                })
+                .map_or(default_region, |r| Some(Region::new(r.to_string())))
+                .expect("Region must be specified");
 
-        let request_limits = self.request.tower.unwrap_with(&Default::default());
+                HttpService::new_with_sig_v4(
+                    client,
+                    http_sink_request_builder,
+                    SigV4Config {
+                        shared_credentials_provider: auth
+                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                            .await?,
+                        region: region.clone(),
+                        service: service.clone(),
+                    },
+                )
+            }
+            _ => HttpService::new(client, http_sink_request_builder),
+        };
+
+        let request_limits = self.request.tower.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
@@ -301,44 +339,78 @@ impl SinkConfig for HttpSinkConfig {
         Input::new(self.encoding.config().1.input_type())
     }
 
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
+    }
+
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
 }
 
-impl ValidatableComponent for HttpSinkConfig {
-    fn validation_configuration() -> ValidationConfiguration {
-        use codecs::{JsonSerializerConfig, MetricTagValues};
-        use std::str::FromStr;
+#[cfg(test)]
+mod tests {
+    use vector_lib::codecs::encoding::format::JsonSerializerOptions;
 
-        let config = Self {
-            uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                .expect("should never fail to parse"),
-            method: HttpMethod::Post,
-            encoding: EncodingConfigWithFraming::new(
-                None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
-                Transformer::default(),
-            ),
-            auth: None,
-            headers: None,
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: RequestConfig::default(),
-            tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
-            payload_prefix: String::new(),
-            payload_suffix: String::new(),
-        };
+    use super::*;
+    use crate::components::validation::prelude::*;
 
-        let external_resource = ExternalResource::new(
-            ResourceDirection::Push,
-            HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
-            config.encoding.clone(),
-        );
+    impl ValidatableComponent for HttpSinkConfig {
+        fn validation_configuration() -> ValidationConfiguration {
+            use std::str::FromStr;
+            use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+            use vector_lib::config::LogNamespace;
 
-        ValidationConfiguration::from_sink(Self::NAME, config, Some(external_resource))
+            let config = HttpSinkConfig {
+                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
+                    .expect("should never fail to parse"),
+                method: HttpMethod::Post,
+                encoding: EncodingConfigWithFraming::new(
+                    None,
+                    JsonSerializerConfig::new(
+                        MetricTagValues::Full,
+                        JsonSerializerOptions::default(),
+                    )
+                    .into(),
+                    Transformer::default(),
+                ),
+                auth: None,
+                headers: None,
+                compression: Compression::default(),
+                batch: BatchConfig::default(),
+                request: RequestConfig::default(),
+                tls: None,
+                acknowledgements: AcknowledgementsConfig::default(),
+                payload_prefix: String::new(),
+                payload_suffix: String::new(),
+            };
+
+            let external_resource = ExternalResource::new(
+                ResourceDirection::Push,
+                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                config.encoding.clone(),
+            );
+
+            ValidationConfiguration::from_sink(
+                Self::NAME,
+                LogNamespace::Legacy,
+                vec![ComponentTestCaseConfig::from_sink(
+                    config,
+                    None,
+                    Some(external_resource),
+                )],
+            )
+        }
     }
-}
 
-register_validatable_component!(HttpSinkConfig);
+    register_validatable_component!(HttpSinkConfig);
+}

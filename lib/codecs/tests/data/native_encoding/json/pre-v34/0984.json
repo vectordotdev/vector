@@ -1,0 +1,1 @@
+{"metric":{"name":"k","namespace":"m","tags":{"k":"h","m":"f","p":"i"},"kind":"absolute","distribution":{"samples":[{"value":-711104.0,"rate":3821617865}],"statistic":"summary"}}}

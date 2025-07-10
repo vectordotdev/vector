@@ -1,8 +1,8 @@
 use std::{io, sync::Arc};
 
 use serde::Serialize;
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
 
 use super::{
     EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,

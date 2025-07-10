@@ -97,9 +97,15 @@ components: sources: vector: {
 				tags: _extra_tags
 			}
 		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	telemetry: metrics: {
-		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+		grpc_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.grpc_server_handler_duration_seconds
+		grpc_server_messages_received_total:  components.sources.internal_metrics.output.metrics.grpc_server_messages_received_total
+		grpc_server_messages_sent_total:      components.sources.internal_metrics.output.metrics.grpc_server_messages_sent_total
+		protobuf_decode_errors_total:         components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

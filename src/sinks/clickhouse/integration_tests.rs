@@ -15,7 +15,8 @@ use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{timeout, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
+use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
 use super::*;
@@ -25,7 +26,7 @@ use crate::{
     sinks::util::{BatchConfig, Compression, TowerRequestConfig},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
-        random_string, trace_init,
+        random_table_name, trace_init,
     },
 };
 
@@ -37,7 +38,7 @@ fn clickhouse_address() -> String {
 async fn insert_events() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -49,7 +50,7 @@ async fn insert_events() {
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -86,7 +87,7 @@ async fn insert_events() {
 async fn skip_unknown_fields() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -95,11 +96,11 @@ async fn skip_unknown_fields() {
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
         table: table.clone().try_into().unwrap(),
-        skip_unknown_fields: true,
+        skip_unknown_fields: Some(true),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -132,7 +133,7 @@ async fn skip_unknown_fields() {
 async fn insert_events_unix_timestamps() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -145,7 +146,7 @@ async fn insert_events_unix_timestamps() {
         encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
         batch,
         request: TowerRequestConfig {
-            retry_attempts: Some(1),
+            retry_attempts: 1,
             ..Default::default()
         },
         ..Default::default()
@@ -171,10 +172,7 @@ async fn insert_events_unix_timestamps() {
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
@@ -194,7 +192,7 @@ async fn insert_events_unix_timestamps() {
 async fn insert_events_unix_timestamps_toml_config() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let config: ClickhouseConfig = toml::from_str(&format!(
@@ -232,10 +230,7 @@ timestamp_format = "unix""#,
 
     let exp_event = input_event.as_mut_log();
     exp_event.insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         format!(
             "{}",
             exp_event
@@ -255,7 +250,7 @@ timestamp_format = "unix""#,
 async fn no_retry_on_incorrect_data() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -314,7 +309,7 @@ async fn no_retry_on_incorrect_data_warp() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: gen_table().try_into().unwrap(),
+        table: random_table_name().try_into().unwrap(),
         batch,
         ..Default::default()
     };
@@ -329,7 +324,7 @@ async fn no_retry_on_incorrect_data_warp() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 }
 
 #[tokio::test]
@@ -339,7 +334,7 @@ async fn templated_table() {
     let n_tables = 2;
     let table_events: Vec<(String, Event, BatchStatusReceiver)> = (0..n_tables)
         .map(|_| {
-            let table = gen_table();
+            let table = random_table_name();
             let (mut event, receiver) = make_event();
             event.as_mut_log().insert("table", table.as_str());
             (table, event, receiver)
@@ -472,8 +467,4 @@ struct Stats {
     bytes_read: usize,
     elapsed: f64,
     rows_read: usize,
-}
-
-fn gen_table() -> String {
-    format!("test_{}", random_string(10).to_lowercase())
 }

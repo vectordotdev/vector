@@ -3,7 +3,8 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::configurable::configurable_component;
+use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
 use crate::{
@@ -28,8 +29,13 @@ pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
 #[configurable_component(sink("honeycomb", "Deliver log events to Honeycomb."))]
 #[derive(Clone, Debug)]
 pub struct HoneycombConfig {
-    // This endpoint is not user-configurable and only exists for testing purposes
-    #[serde(skip, default = "default_endpoint")]
+    /// Honeycomb's endpoint to send logs to
+    #[serde(default = "default_endpoint")]
+    #[configurable(metadata(
+        docs::examples = "https://api.honeycomb.io",
+        docs::examples = "https://api.eu1.honeycomb.io",
+    ))]
+    #[configurable(validation(format = "uri"))]
     pub(super) endpoint: String,
 
     /// The API key that is used to authenticate against Honeycomb.
@@ -52,23 +58,25 @@ pub struct HoneycombConfig {
     request: TowerRequestConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
+
+    /// The compression algorithm to use.
+    #[configurable(derived)]
+    #[serde(default = "Compression::zstd_default")]
+    compression: Compression,
 
     #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_endpoint() -> String {
-    "https://api.honeycomb.io/1/batch".to_string()
+    "https://api.honeycomb.io".to_string()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -100,6 +108,7 @@ impl SinkConfig for HoneycombConfig {
             encoder: HoneycombEncoder {
                 transformer: self.encoding.clone(),
             },
+            compression: self.compression,
         };
 
         let uri = self.build_uri()?;
@@ -107,13 +116,14 @@ impl SinkConfig for HoneycombConfig {
         let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
             uri: uri.clone(),
             api_key: self.api_key.clone(),
+            compression: self.compression,
         };
 
         let client = HttpClient::new(None, cx.proxy())?;
 
         let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
 
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
             .settings(request_limits, http_response_retry_logic())
@@ -139,7 +149,11 @@ impl SinkConfig for HoneycombConfig {
 
 impl HoneycombConfig {
     fn build_uri(&self) -> crate::Result<Uri> {
-        let uri = format!("{}/{}", self.endpoint, self.dataset);
+        let uri = format!(
+            "{}/1/batch/{}",
+            self.endpoint.trim_end_matches('/'),
+            self.dataset
+        );
         uri.parse::<Uri>().map_err(Into::into)
     }
 }

@@ -6,23 +6,20 @@ edition = "2021"
 publish = false
 
 [dependencies]
+chrono-tz.workspace = true
+dnstap-parser = { path = "../../dnstap-parser" }
 enrichment = { path = "../../enrichment" }
-vrl = { version = "0.7.0", features = ["test", "test_framework"] }
+vrl.workspace = true
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 
-ansi_term = "0.12"
-chrono = "0.4"
-chrono-tz = "0.8"
-clap = { version = "4.4.6", features = ["derive"] }
-glob = "0.3"
-prettydiff = "0.6"
-regex = "1"
-serde = "1"
-serde_json = "1"
-tracing-subscriber = { version = "0.3.17", default-features = false, features = ["fmt"] }
+clap.workspace = true
+glob.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.5.4" }
+tikv-jemallocator = { version = "0.6.0" }
 
 [features]
 default = []

@@ -1,8 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
@@ -10,7 +8,7 @@ pub struct TemplateRenderingError<'a> {
     pub error: crate::template::TemplateRenderingError,
 }
 
-impl<'a> InternalEvent for TemplateRenderingError<'a> {
+impl InternalEvent for TemplateRenderingError<'_> {
     fn emit(self) {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
@@ -25,14 +23,15 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
+
             );
 
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::TEMPLATE_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
 
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
@@ -44,7 +43,7 @@ impl<'a> InternalEvent for TemplateRenderingError<'a> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
+
             );
         }
     }
