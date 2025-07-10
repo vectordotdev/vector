@@ -12,10 +12,11 @@ use vector_lib::file_source::{
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
-pub async fn run_file_server<PP, E, C, S>(
+pub async fn run_file_server<PP, E, C, S, S2>(
     file_server: FileServer<PP, E>,
     chans: C,
     shutdown: S,
+    shutdown2: S2,
     checkpointer: Checkpointer,
 ) -> Result<FileServerShutdown, tokio::task::JoinError>
 where
@@ -25,13 +26,13 @@ where
     <C as Sink<Vec<Line>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
+    S2: Future + Unpin + Send + 'static,
+    <S2 as Future>::Output: Clone + Send + Sync,
 {
     let span = info_span!("file_server");
     let join_handle = spawn_blocking(move || {
-        // These will need to be separated when this source is updated
-        // to support end-to-end acknowledgements.
         let shutdown = shutdown.shared();
-        let shutdown2 = shutdown.clone();
+        let shutdown2 = shutdown2.shared();
         let _enter = span.enter();
         let result = file_server.run(chans, shutdown, shutdown2, checkpointer);
         result.expect("file server exited with an error")

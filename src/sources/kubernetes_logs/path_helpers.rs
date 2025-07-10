@@ -16,12 +16,17 @@ const LOG_PATH_DELIMITER: &str = "_";
 ///
 /// Based on <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L178>
 pub(super) fn build_pod_logs_directory(
+    maybe_logs_dir: Option<&str>,
     pod_namespace: &str,
     pod_name: &str,
     pod_uid: &str,
 ) -> PathBuf {
+    let logs_dir = match maybe_logs_dir {
+        Some(logs_dir) => logs_dir,
+        None => K8S_LOGS_DIR,
+    };
     [
-        K8S_LOGS_DIR,
+        logs_dir,
         &[pod_namespace, pod_name, pod_uid].join(LOG_PATH_DELIMITER),
     ]
     .join("/")
@@ -94,7 +99,7 @@ mod tests {
 
         for ((in_namespace, in_name, in_uid), expected) in cases.into_iter() {
             assert_eq!(
-                build_pod_logs_directory(in_namespace, in_name, in_uid),
+                build_pod_logs_directory(None, in_namespace, in_name, in_uid),
                 PathBuf::from(expected)
             );
         }
