@@ -47,7 +47,7 @@ components: sources: opentelemetry: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.opentelemetry.configuration
+	configuration: generated.components.sources.opentelemetry.configuration
 
 	outputs: [
 		{

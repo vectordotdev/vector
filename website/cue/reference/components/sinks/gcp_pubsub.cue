@@ -68,7 +68,7 @@ components: sinks: gcp_pubsub: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.gcp_pubsub.configuration
+	configuration: generated.components.sinks.gcp_pubsub.configuration
 
 	input: {
 		logs:    true
