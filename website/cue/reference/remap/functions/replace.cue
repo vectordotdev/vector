@@ -71,14 +71,9 @@ remap: functions: replace: {
 		{
 			title: "Replace with capture groups when not set in the configuration file (use `$$num` in config files)"
 			source: #"""
+			  # Note that in the context of Vector configuration files, an extra `$` escape character is required
+			  # (i.e. `$$num`) to avoid interepreting `num` as an environment variable.
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
-				"""#
-			return: "123"
-		},
-		{
-			title: "Replace with capture groups only when set in the configuration file (requires escaping the `$` character)"
-			source: #"""
-				replace("foo123bar", r'foo(?P<num>\d+)bar', "$$num")
 				"""#
 			return: "123"
 		},
