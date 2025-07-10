@@ -348,7 +348,7 @@ impl AzureBlobSinkConfig {
                     Ok(StatusCode::CONFLICT) => Ok(()),
                     _ => Err(format!("Unexpected status code {}", err.status())),
                 },
-                _ => Err(format!("Unexpected error {}", reason)),
+                _ => Err(format!("Unexpected error {:#?}", reason)),
             },
         };
 
