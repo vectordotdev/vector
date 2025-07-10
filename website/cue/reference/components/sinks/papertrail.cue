@@ -59,7 +59,7 @@ components: sinks: papertrail: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.papertrail.configuration
+	configuration: generated.components.sinks.papertrail.configuration
 
 	input: {
 		logs:    true

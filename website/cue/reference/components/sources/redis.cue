@@ -58,7 +58,7 @@ components: sources: redis: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.redis.configuration
+	configuration: generated.components.sources.redis.configuration
 
 	output: {
 		logs: record: {

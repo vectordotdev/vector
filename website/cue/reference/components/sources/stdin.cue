@@ -40,7 +40,7 @@ components: sources: stdin: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.stdin.configuration
+	configuration: generated.components.sources.stdin.configuration
 
 	output: {
 		logs: line: {

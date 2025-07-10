@@ -56,7 +56,7 @@ components: sources: datadog_agent: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.datadog_agent.configuration
+	configuration: generated.components.sources.datadog_agent.configuration
 
 	outputs: [
 		{

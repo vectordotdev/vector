@@ -67,7 +67,7 @@ components: sinks: azure_blob: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.azure_blob.configuration
+	configuration: generated.components.sinks.azure_blob.configuration
 
 	input: {
 		logs:    true

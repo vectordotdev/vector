@@ -24,7 +24,7 @@ components: transforms: filter: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.filter.configuration
+	configuration: generated.components.transforms.filter.configuration
 
 	input: {
 		logs: true

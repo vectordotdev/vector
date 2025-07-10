@@ -51,7 +51,7 @@ components: sources: logstash: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.logstash.configuration
+	configuration: generated.components.sources.logstash.configuration
 
 	output: logs: line: {
 		description: "A Logstash message"

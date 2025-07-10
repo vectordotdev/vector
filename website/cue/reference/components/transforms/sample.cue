@@ -24,7 +24,7 @@ components: transforms: sample: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.sample.configuration
+	configuration: generated.components.transforms.sample.configuration
 
 	input: {
 		logs:    true

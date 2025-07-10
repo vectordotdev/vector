@@ -24,7 +24,7 @@ components: transforms: dedupe: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.dedupe.configuration
+	configuration: generated.components.transforms.dedupe.configuration
 
 	input: {
 		logs:    true

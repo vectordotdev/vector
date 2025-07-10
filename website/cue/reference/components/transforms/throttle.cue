@@ -24,7 +24,7 @@ components: transforms: throttle: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.throttle.configuration
+	configuration: generated.components.transforms.throttle.configuration
 
 	input: {
 		logs:    true

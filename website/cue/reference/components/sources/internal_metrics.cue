@@ -36,7 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.internal_metrics.configuration
+	configuration: generated.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags

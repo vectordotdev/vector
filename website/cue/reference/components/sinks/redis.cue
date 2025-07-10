@@ -55,7 +55,7 @@ components: sinks: redis: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.redis.configuration
+	configuration: generated.components.sinks.redis.configuration
 
 	input: {
 		logs: true

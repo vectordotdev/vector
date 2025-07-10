@@ -49,7 +49,7 @@ components: sources: journald: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.journald.configuration
+	configuration: generated.components.sources.journald.configuration
 
 	output: logs: {
 		event: {

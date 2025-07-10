@@ -39,7 +39,7 @@ components: sources: kafka: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.kafka.configuration
+	configuration: generated.components.sources.kafka.configuration
 
 	output: {
 		logs: record: {

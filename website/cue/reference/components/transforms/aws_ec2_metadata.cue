@@ -49,7 +49,7 @@ components: transforms: aws_ec2_metadata: {
 		]
 	}
 
-	configuration: base.components.transforms.aws_ec2_metadata.configuration
+	configuration: generated.components.transforms.aws_ec2_metadata.configuration
 
 	env_vars: {
 		http_proxy:  env_vars._http_proxy

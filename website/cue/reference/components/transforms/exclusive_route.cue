@@ -26,7 +26,7 @@ components: transforms: exclusive_route: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.exclusive_route.configuration
+	configuration: generated.components.transforms.exclusive_route.configuration
 
 	input: {
 		logs: true

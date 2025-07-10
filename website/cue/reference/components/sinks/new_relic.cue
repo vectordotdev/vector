@@ -64,7 +64,7 @@ components: sinks: new_relic: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.new_relic.configuration
+	configuration: generated.components.sinks.new_relic.configuration
 
 	input: {
 		logs: true

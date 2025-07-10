@@ -50,7 +50,7 @@ components: sources: prometheus_remote_write: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.prometheus_remote_write.configuration
+	configuration: generated.components.sources.prometheus_remote_write.configuration
 
 	output: metrics: {
 		counter: output._passthrough_counter

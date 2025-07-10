@@ -40,7 +40,7 @@ components: sources: file_descriptor: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.file_descriptor.configuration
+	configuration: generated.components.sources.file_descriptor.configuration
 
 	output: {
 		logs: line: {

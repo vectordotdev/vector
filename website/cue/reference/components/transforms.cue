@@ -10,7 +10,7 @@ components: transforms: [Name=string]: {
 
 	kind: "transform"
 
-	configuration: base.components.transforms.configuration
+	configuration: generated.components.transforms.configuration
 
 	telemetry: metrics: {
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total

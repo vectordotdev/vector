@@ -36,7 +36,7 @@ components: sources: static_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.static_metrics.configuration
+	configuration: generated.components.sources.static_metrics.configuration
 
 	output: metrics: {
 		counter: output._passthrough_counter & {

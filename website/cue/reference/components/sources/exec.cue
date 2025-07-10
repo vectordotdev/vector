@@ -39,7 +39,7 @@ components: sources: exec: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.exec.configuration
+	configuration: generated.components.sources.exec.configuration
 
 	output: {
 		logs: line: {

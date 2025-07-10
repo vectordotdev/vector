@@ -101,7 +101,7 @@ components: sinks: websocket_server: {
 		}
 	}
 
-	configuration: base.components.sinks.websocket_server.configuration
+	configuration: generated.components.sinks.websocket_server.configuration
 
 	how_it_works: {
 		simple_configuration: {

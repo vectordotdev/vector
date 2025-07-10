@@ -58,7 +58,7 @@ components: sources: aws_kinesis_firehose: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_kinesis_firehose.configuration
+	configuration: generated.components.sources.aws_kinesis_firehose.configuration
 
 	output: {
 		logs: {

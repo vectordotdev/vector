@@ -41,7 +41,7 @@ components: sinks: console: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.console.configuration
+	configuration: generated.components.sinks.console.configuration
 
 	input: {
 		logs: true

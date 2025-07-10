@@ -77,7 +77,7 @@ components: sinks: http: {
 		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
-	configuration: base.components.sinks.http.configuration
+	configuration: generated.components.sinks.http.configuration
 
 	input: {
 		logs: true

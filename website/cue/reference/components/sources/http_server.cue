@@ -56,7 +56,7 @@ components: sources: http_server: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.http_server.configuration
+	configuration: generated.components.sources.http_server.configuration
 
 	output: {
 		logs: {

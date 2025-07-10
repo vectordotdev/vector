@@ -51,7 +51,7 @@ components: sources: dnstap: {
 		notices: []
 	}
 
-	configuration: base.components.sources.dnstap.configuration & {
+	configuration: generated.components.sources.dnstap.configuration & {
 		socket_receive_buffer_size: {
 			warnings: [
 				"""

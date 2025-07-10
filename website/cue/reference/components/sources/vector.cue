@@ -53,7 +53,7 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.vector.configuration
+	configuration: generated.components.sources.vector.configuration
 
 	output: {
 		logs: event: {

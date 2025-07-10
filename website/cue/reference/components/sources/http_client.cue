@@ -52,7 +52,7 @@ components: sources: http_client: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.http_client.configuration & {
+	configuration: generated.components.sources.http_client.configuration & {
 		endpoint: warnings: ["You must explicitly add the path to your endpoint."]
 	}
 

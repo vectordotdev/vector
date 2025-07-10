@@ -25,7 +25,7 @@ components: transforms: metric_to_log: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.metric_to_log.configuration
+	configuration: generated.components.transforms.metric_to_log.configuration
 
 	input: {
 		logs: false

@@ -9,7 +9,7 @@ components: sources: [Name=string]: {
 		if features.collect != _|_ {
 			if features.collect.proxy != _|_ {
 				if features.collect.proxy.enabled {
-					proxy: base.components.sources.configuration.proxy
+					proxy: generated.components.sources.configuration.proxy
 				}
 			}
 		}

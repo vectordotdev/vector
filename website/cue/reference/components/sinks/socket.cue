@@ -59,7 +59,7 @@ components: sinks: socket: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.socket.configuration
+	configuration: generated.components.sinks.socket.configuration
 
 	input: {
 		logs: true

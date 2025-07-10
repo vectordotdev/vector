@@ -56,7 +56,7 @@ components: sources: splunk_hec: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.splunk_hec.configuration
+	configuration: generated.components.sources.splunk_hec.configuration
 
 	output: logs: event: {
 		description: "A single event"
