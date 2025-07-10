@@ -272,7 +272,6 @@ indexmap
 inodes
 installdeb
 interpretervm
-interpreting
 invtrapezium
 ionicon
 iostat
