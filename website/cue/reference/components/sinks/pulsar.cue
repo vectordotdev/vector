@@ -56,7 +56,7 @@ components: sinks: pulsar: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.pulsar.configuration
+	configuration: generated.components.sinks.pulsar.configuration
 
 	input: {
 		logs: true
