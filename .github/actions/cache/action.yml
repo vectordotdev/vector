@@ -1,0 +1,61 @@
+name: "Cache and Bootstrap Environment Tools"
+description: "Composite action that caches and bootstraps Rust, Cargo, npm and other binaries provided in the prepare.sh script"
+
+inputs:
+  check-only:
+    description: 'If true, only check cache existence and exit on hit. On cache miss, create it'
+    required: false
+    default: 'false'
+
+env:
+  CI: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check prepare.sh
+      id: check-prepare-sh
+      shell: bash
+      run: |
+        if [ -f scripts/environment/prepare.sh ]; then
+          echo "has_prepare_sh=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_prepare_sh=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Fetch prepare.sh
+      if: steps.check-prepare-sh.outputs.has_prepare_sh == 'false'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        sparse-checkout: |
+          scripts/environment/prepare.sh
+
+    - name: Pull cached environment
+      if: ${{ inputs.check-only != 'true' }}
+      id: pull-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo
+          ~/.rustup
+          ~/.npm
+        key: env-${{ runner.os }}-${{ hashFiles('scripts/environment/prepare.sh') }}
+        restore-keys: |
+          env-${{ runner.os }}-
+
+    - name: Check if cache exists
+      if: ${{ inputs.check-only == 'true' }}
+      id: check-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/i-do-not-exist
+        key: env-${{ runner.os }}-${{ hashFiles('scripts/environment/prepare.sh') }}
+        restore-keys: |
+          env-${{ runner.os }}-
+
+    - name: Bootstrap environment
+      if: ${{ steps.pull-cache.outputs.cache-hit != 'true' || steps.check-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        ./scripts/environment/prepare.sh
