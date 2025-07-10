@@ -39,7 +39,7 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.nats.configuration
+	configuration: generated.components.sources.nats.configuration
 
 	output: {
 		logs: record: {

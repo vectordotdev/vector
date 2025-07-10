@@ -49,7 +49,7 @@ components: sources: nginx_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.nginx_metrics.configuration
+	configuration: generated.components.sources.nginx_metrics.configuration
 
 	how_it_works: {
 		mod_status: {

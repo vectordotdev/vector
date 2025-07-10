@@ -88,7 +88,7 @@ components: sources: docker_logs: {
 		platform_name: "docker"
 	}
 
-	configuration: base.components.sources.docker_logs.configuration
+	configuration: generated.components.sources.docker_logs.configuration
 
 	output: logs: {
 		log: {

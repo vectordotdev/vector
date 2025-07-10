@@ -42,7 +42,7 @@ components: sources: amqp: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.amqp.configuration
+	configuration: generated.components.sources.amqp.configuration
 
 	output: {
 		logs: record: {
