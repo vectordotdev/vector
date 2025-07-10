@@ -1548,6 +1548,7 @@ dependencies = [
  "async-trait",
  "bytes 1.10.1",
  "futures 0.3.31",
+ "openssl",
  "pin-project",
  "rustc_version 0.4.1",
  "serde",
