@@ -48,7 +48,7 @@ pub struct HttpSinkConfig {
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub uri: UriSerde,
+    pub uri: Template,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
@@ -286,9 +286,8 @@ impl SinkConfig for HttpSinkConfig {
         });
 
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
-            self.uri.with_default_parts(),
             self.method,
-            self.auth.choose_one(&self.uri.auth)?,
+            self.auth.clone(),
             headers,
             content_type,
             content_encoding,
@@ -330,7 +329,7 @@ impl SinkConfig for HttpSinkConfig {
             .settings(request_limits, http_response_retry_logic())
             .service(service);
 
-        let sink = HttpSink::new(service, batch_settings, request_builder);
+        let sink = HttpSink::new(service, self.uri.clone(), batch_settings, request_builder);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -370,9 +369,11 @@ mod tests {
             use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
             use vector_lib::config::LogNamespace;
 
+            let endpoint = "http://127.0.0.1:9000/endpoint";
+            let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
+
             let config = HttpSinkConfig {
-                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                    .expect("should never fail to parse"),
+                uri: Template::try_from(endpoint).expect("should never fail to parse"),
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
@@ -396,7 +397,7 @@ mod tests {
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                HttpResourceConfig::from_parts(uri.uri, Some(config.method.into())),
                 config.encoding.clone(),
             );
 
