@@ -23,7 +23,7 @@ const DEFAULT_PROFILE_NAME: &str = "default";
 /// IMDS Client Configuration for authenticating with AWS.
 #[serde_as]
 #[configurable_component]
-#[derive(Copy, Clone, Debug, Derivative)]
+#[derive(Copy, Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct ImdsAuthentication {
@@ -57,7 +57,7 @@ const fn default_timeout() -> Duration {
 
 /// Configuration of the authentication strategy for interacting with AWS services.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative)]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
@@ -70,6 +70,11 @@ pub enum AwsAuthentication {
         /// The AWS secret access key.
         #[configurable(metadata(docs::examples = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"))]
         secret_access_key: SensitiveString,
+
+        /// The AWS session token.
+        /// See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+        #[configurable(metadata(docs::examples = "AQoDYXdz...AQoDYXdz..."))]
+        session_token: Option<SensitiveString>,
 
         /// The ARN of an [IAM role][iam_role] to assume.
         ///
@@ -275,11 +280,12 @@ impl AwsAuthentication {
                 external_id,
                 region,
                 session_name,
+                session_token,
             } => {
                 let provider = SharedCredentialsProvider::new(Credentials::from_keys(
                     access_key_id.inner(),
                     secret_access_key.inner(),
-                    None,
+                    session_token.clone().map(|v| v.inner().into()),
                 ));
                 if let Some(assume_role) = assume_role {
                     let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
@@ -372,6 +378,7 @@ impl AwsAuthentication {
             external_id: None,
             region: None,
             session_name: None,
+            session_token: None,
         }
     }
 }

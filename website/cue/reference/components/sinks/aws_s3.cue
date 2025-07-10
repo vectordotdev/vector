@@ -73,14 +73,21 @@ components: sinks: aws_s3: components._aws & {
 		warnings: []
 	}
 
-	configuration: base.components.sinks.aws_s3.configuration & {
+	configuration: generated.components.sinks.aws_s3.configuration & {
 		_aws_include: false
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
 	}
 
 	how_it_works: {

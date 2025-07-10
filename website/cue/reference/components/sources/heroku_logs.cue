@@ -63,7 +63,7 @@ components: sources: heroku_logs: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.heroku_logs.configuration
+	configuration: generated.components.sources.heroku_logs.configuration
 
 	output: logs: line: {
 		description: "An individual event from a batch of events received through an HTTP POST request."

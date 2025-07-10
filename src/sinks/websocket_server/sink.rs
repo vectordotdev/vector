@@ -214,7 +214,7 @@ impl WebSocketListenerSink {
                 ));
                 return Ok(response);
             };
-            match auth.handle_auth(req.headers()) {
+            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
                 Ok(_) => {
                     extra_tags.append(&mut Self::extract_extra_tags(
                         &extra_tags_config,

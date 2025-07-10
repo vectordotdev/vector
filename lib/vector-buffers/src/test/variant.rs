@@ -67,7 +67,7 @@ impl Variant {
                     *when_full,
                 );
             }
-        };
+        }
 
         let (sender, receiver) = builder
             .build(String::from("benches"), Span::none())

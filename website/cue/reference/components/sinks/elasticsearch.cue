@@ -74,12 +74,19 @@ components: sinks: elasticsearch: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.elasticsearch.configuration
+	configuration: generated.components.sinks.elasticsearch.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 
 	how_it_works: {

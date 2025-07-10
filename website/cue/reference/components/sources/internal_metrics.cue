@@ -36,7 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.internal_metrics.configuration
+	configuration: generated.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags
@@ -438,18 +438,6 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags: _component_tags & {output: _output}
-		}
-		datadog_logs_received_in_total: {
-			description:       "Number of Datadog logs received."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		datadog_metrics_received_in_total: {
-			description:       "Number of Datadog metrics received."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
 		}
 		internal_metrics_cardinality: {
 			description:       "The total number of metrics emitted from the internal metrics registry."

@@ -26,7 +26,7 @@ components: transforms: exclusive_route: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.exclusive_route.configuration
+	configuration: generated.components.transforms.exclusive_route.configuration
 
 	input: {
 		logs: true
@@ -39,6 +39,18 @@ components: transforms: exclusive_route: {
 			summary:      true
 		}
 		traces: true
+	}
+
+	output: {
+		logs: "": {
+			description: "The input `log` event."
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
+		}
 	}
 
 	outputs: [

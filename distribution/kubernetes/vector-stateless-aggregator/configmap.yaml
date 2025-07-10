@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Stateless-Aggregator
-    app.kubernetes.io/version: "0.46.0-distroless-libc"
+    app.kubernetes.io/version: "0.48.0-distroless-libc"
 data:
   aggregator.yaml: |
     data_dir: /vector-data-dir

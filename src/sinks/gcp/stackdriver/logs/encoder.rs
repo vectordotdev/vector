@@ -173,7 +173,6 @@ pub(super) fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
-                            internal_log_rate_limit = true
                         );
                         0
                     }

@@ -73,7 +73,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		warnings: []
 	}
 
-	configuration: base.components.sinks.aws_kinesis_streams.configuration & {
+	configuration: generated.components.sinks.aws_kinesis_streams.configuration & {
 		_aws_include: false
 	}
 

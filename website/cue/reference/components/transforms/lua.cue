@@ -38,7 +38,7 @@ components: transforms: lua: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.lua.configuration
+	configuration: generated.components.transforms.lua.configuration
 
 	input: {
 		logs: true
@@ -51,6 +51,15 @@ components: transforms: lua: {
 			summary:      true
 		}
 		traces: false
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
 	}
 
 	examples: [

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     net::{SocketAddr, TcpListener},
     num::NonZeroU64,
     time::Duration,
@@ -65,7 +66,7 @@ async fn topology_reuse_old_port() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -90,7 +91,7 @@ async fn topology_rebuild_old() {
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
     assert!(!topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -107,7 +108,7 @@ async fn topology_old() {
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
     assert!(topology
-        .reload_config_and_respawn(old_config.build().unwrap(), Default::default(), None)
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 }
@@ -258,7 +259,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 
@@ -268,7 +269,7 @@ async fn topology_readd_input() {
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
     assert!(topology
-        .reload_config_and_respawn(new_config.build().unwrap(), Default::default(), None)
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
         .unwrap());
 
@@ -280,6 +281,36 @@ async fn topology_readd_input() {
         .collect::<Vec<_>>()
         .await
         .is_empty());
+}
+
+#[tokio::test]
+async fn topology_reload_component() {
+    test_util::trace_init();
+
+    let address_0 = next_addr();
+
+    let mut old_config = Config::builder();
+    old_config.add_source("in1", internal_metrics_source());
+    old_config.add_source("in2", internal_metrics_source());
+    old_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
+    let (mut topology, crash) = start_topology(old_config.clone().build().unwrap(), false).await;
+    let mut crash_stream = UnboundedReceiverStream::new(crash);
+
+    topology.extend_reload_set(HashSet::from_iter(vec![ComponentKey::from("out")]));
+
+    assert!(topology
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .await
+        .unwrap());
+
+    // TODO: Implement notification to avoid the sleep()
+    // Give the old topology configuration a chance to shutdown cleanly, etc.
+    sleep(Duration::from_secs(2)).await;
+
+    tokio::select! {
+        _ = wait_for_tcp(address_0) => {},
+        _ = crash_stream.next() => panic!(),
+    }
 }
 
 async fn reload_sink_test(
@@ -299,7 +330,7 @@ async fn reload_sink_test(
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
     assert!(topology
-        .reload_config_and_respawn(new_config, Default::default(), None)
+        .reload_config_and_respawn(new_config, Default::default())
         .await
         .unwrap());
 
