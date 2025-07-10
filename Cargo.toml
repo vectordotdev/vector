@@ -266,7 +266,7 @@ azure_storage = { version = "0.21", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
 
 # Needed to bridge with outdated version of azure_core used in azure_storage*
-azure_core_for_storage = { package = "azure_core", version = "0.21.0" }
+azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["reqwest", "hmac_openssl"] }
 
 
 # OpenDAL
