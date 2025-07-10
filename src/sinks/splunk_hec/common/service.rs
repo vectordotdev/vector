@@ -32,9 +32,10 @@ use crate::{
 
 pub struct HecService<S> {
     pub inner: S,
-    ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
+    ack_finalizer_tx: Option<mpsc::Sender<(u64, String, oneshot::Sender<EventStatus>)>>,
     ack_slots: PollSemaphore,
     current_ack_slot: Option<OwnedSemaphorePermit>,
+    indexer_acknowledgements: HecClientAcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -63,7 +64,7 @@ where
                 rx,
                 ack_client,
                 Arc::clone(&http_request_builder),
-                indexer_acknowledgements,
+                indexer_acknowledgements.clone(),
             ));
             Some(tx)
         } else {
@@ -76,6 +77,7 @@ where
             ack_finalizer_tx: tx,
             ack_slots,
             current_ack_slot: None,
+            indexer_acknowledgements,
         }
     }
 }
@@ -112,6 +114,7 @@ where
     fn call(&mut self, mut req: HecRequest) -> Self::Future {
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
+        let cookie_name = self.indexer_acknowledgements.cookie_name.clone();
 
         let metadata = std::mem::take(req.metadata_mut());
         let events_count = metadata.event_count();
@@ -128,7 +131,44 @@ where
                         Ok(body) => {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
-                                match ack_finalizer_tx.send((ack_id, tx)).await {
+
+                                // Extract a single cookie from response headers if available
+                                let cookie_string = if let Some(headers) = response.headers() {
+                                    if cookie_name.is_empty() {
+                                        String::new()
+                                    } else {
+                                        headers
+                                            .get_all(http::header::SET_COOKIE)
+                                            .iter()
+                                            .filter_map(|v| v.to_str().ok())
+                                            .find_map(|cookie_header| {
+                                                if cookie_header
+                                                    .starts_with(&format!("{}=", cookie_name))
+                                                {
+                                                    // Extract just the name + value part (before any semicolon)
+                                                    // We don't want any attributes like `Path` or `Expires`
+                                                    // that may be present in the header alongside the value
+                                                    let value = cookie_header
+                                                        .split(';')
+                                                        .next()
+                                                        .unwrap_or(cookie_header);
+                                                    Some(value.trim().to_string())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .unwrap_or_default()
+                                    }
+                                } else {
+                                    // For other response types, use an empty cookie string
+                                    // This effectively groups together all the acks into a single bucket,
+                                    // which is the same as the previous behavior without any cookies
+                                    String::new()
+                                };
+
+                                debug!(message = "Cookie string.", cookie_string = %cookie_string);
+
+                                match ack_finalizer_tx.send((ack_id, cookie_string, tx)).await {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(error) => {
@@ -170,11 +210,16 @@ where
 
 pub trait ResponseExt {
     fn body(&self) -> &Bytes;
+    fn headers(&self) -> Option<&http::HeaderMap>;
 }
 
 impl ResponseExt for http::Response<Bytes> {
     fn body(&self) -> &Bytes {
         self.body()
+    }
+
+    fn headers(&self) -> Option<&http::HeaderMap> {
+        Some(self.headers())
     }
 }
 
@@ -378,7 +423,9 @@ mod tests {
             .respond_with(move |_: &Request| {
                 let ack_id =
                     acknowledgements_enabled.then(|| ACK_ID.fetch_add(1, Ordering::Relaxed));
-                ResponseTemplate::new(200).set_body_json(HecAckResponseBody { ack_id })
+                ResponseTemplate::new(200)
+                    .set_body_json(HecAckResponseBody { ack_id })
+                    .insert_header("Set-Cookie", "splunkd_cookie=test-cookie-value")
             })
             .mount(&mock_server)
             .await;
@@ -599,5 +646,25 @@ mod tests {
             poll!(poll_fn(|cx| service.poll_ready(cx))),
             Poll::Ready(Ok(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_with_cookie_tracking_successful() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            cookie_name: "splunkd_cookie".to_string(),
+            ..Default::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let mut responses = FuturesUnordered::new();
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        while let Some(response) = responses.next().await {
+            assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
+        }
     }
 }
