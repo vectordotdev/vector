@@ -1,6 +1,6 @@
 use crate::codecs::Transformer;
 use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
+    encoding::{Framer, FramingConfig, Serializer, SerializerConfig, VarintLengthDelimitedEncoder},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
 use vector_lib::configurable::configurable_component;
@@ -114,9 +114,9 @@ impl EncodingConfigWithFraming {
                 CharacterDelimitedEncoder::new(0).into()
             }
             (None, Serializer::Protobuf(_)) => {
-                // Protobuf uses length-delimited messages, see:
+                // Protobuf uses varint length-delimited messages, see:
                 // https://developers.google.com/protocol-buffers/docs/techniques#streaming
-                LengthDelimitedEncoder::default().into()
+                VarintLengthDelimitedEncoder::default().into()
             }
             (
                 None,
