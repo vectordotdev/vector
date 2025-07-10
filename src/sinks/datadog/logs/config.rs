@@ -20,6 +20,11 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
+#[cfg(any(test, feature = "component-validation-tests"))]
+use crate::components::validation::prelude::*;
+#[cfg(any(test, feature = "component-validation-tests"))]
+use crate::register_validatable_component;
+
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -233,48 +238,50 @@ mod test {
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
-
-    impl ValidatableComponent for DatadogLogsConfig {
-        fn validation_configuration() -> ValidationConfiguration {
-            let endpoint = "http://127.0.0.1:9005".to_string();
-            let config = Self {
-                local_dd_common: LocalDatadogCommonConfig {
-                    endpoint: Some(endpoint.clone()),
-                    default_api_key: Some("unused".to_string().into()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-
-            let encoding = EncodingConfigWithFraming::new(
-                None,
-                JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default())
-                    .into(),
-                config.encoding.clone(),
-            );
-
-            let logs_endpoint = format!("{endpoint}/api/v2/logs");
-
-            let external_resource = ExternalResource::new(
-                ResourceDirection::Push,
-                HttpResourceConfig::from_parts(
-                    http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
-                    None,
-                ),
-                encoding,
-            );
-
-            ValidationConfiguration::from_sink(
-                Self::NAME,
-                LogNamespace::Legacy,
-                vec![ComponentTestCaseConfig::from_sink(
-                    config,
-                    None,
-                    Some(external_resource),
-                )],
-            )
-        }
-    }
-
-    register_validatable_component!(DatadogLogsConfig);
 }
+
+#[cfg(any(test, feature = "component-validation-tests"))]
+impl ValidatableComponent for DatadogLogsConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        let endpoint = "http://127.0.0.1:9005".to_string();
+        let config = Self {
+            local_dd_common: LocalDatadogCommonConfig {
+                endpoint: Some(endpoint.clone()),
+                default_api_key: Some("unused".to_string().into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let encoding = EncodingConfigWithFraming::new(
+            None,
+            JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default())
+                .into(),
+            config.encoding.clone(),
+        );
+
+        let logs_endpoint = format!("{endpoint}/api/v2/logs");
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(
+                http::Uri::try_from(&logs_endpoint).expect("should not fail to parse URI"),
+                None,
+            ),
+            encoding,
+        );
+
+        ValidationConfiguration::from_sink(
+            Self::NAME,
+            LogNamespace::Legacy,
+            vec![ComponentTestCaseConfig::from_sink(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+#[cfg(any(test, feature = "component-validation-tests"))]
+register_validatable_component!(DatadogLogsConfig);
