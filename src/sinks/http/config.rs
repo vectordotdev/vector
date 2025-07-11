@@ -305,6 +305,7 @@ impl SinkConfig for HttpSinkConfig {
                     AwsAuthentication::File { .. } => None,
                     AwsAuthentication::Role { region, .. } => region.clone(),
                     AwsAuthentication::Default { region, .. } => region.clone(),
+                    AwsAuthentication::Fallback(_) => None,
                 })
                 .map_or(default_region, |r| Some(Region::new(r.to_string())))
                 .expect("Region must be specified");
