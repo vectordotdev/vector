@@ -648,7 +648,7 @@ where
     /// `InconsistentState`, as being unable to immediately deserialize and decode a record we just serialized and
     /// encoded implies a fatal, and unrecoverable, error with the buffer implementation as a whole.
     #[instrument(skip(self), level = "trace")]
-    pub fn recover_archived_record(&mut self, token: WriteToken) -> Result<T, WriterError<T>> {
+    pub fn recover_archived_record(&mut self, token: &WriteToken) -> Result<T, WriterError<T>> {
         // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
         let serialized_len = token.serialized_len();
         debug_assert_eq!(
@@ -1240,7 +1240,7 @@ where
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
             // errors if we encounter them, but if we recover the record successfully, we're returning
             // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
-            return Ok(Err(writer.recover_archived_record(token)?));
+            return Ok(Err(writer.recover_archived_record(&token)?));
         };
 
         // Track our write since things appear to have succeeded. This only updates our internal

@@ -1048,6 +1048,35 @@ generated: components: sinks: aws_s3: configuration: {
 			}
 		}
 	}
+	retry_strategy: {
+		description: """
+			Specifies errors to retry
+
+			By default, the sink only retries attempts it deems possible to retry.
+			These settings extend the default behavior.
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "none"
+					enum: {
+						all:    "Retry on *all* errors"
+						custom: "Custom retry strategy"
+						none:   "Don't retry any errors"
+					}
+				}
+			}
+		}
+	}
 	server_side_encryption: {
 		description: """
 			AWS S3 Server-Side Encryption algorithms.
