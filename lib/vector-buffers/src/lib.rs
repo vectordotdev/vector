@@ -17,7 +17,7 @@ extern crate tracing;
 mod buffer_usage_data;
 
 pub mod config;
-pub use config::{BufferConfig, BufferType};
+pub use config::{BufferConfig, BufferType, MemoryBufferSize};
 use encoding::Encodable;
 use vector_config::configurable_component;
 
