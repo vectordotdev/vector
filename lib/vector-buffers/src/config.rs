@@ -510,6 +510,21 @@ max_events: 42
     }
 
     #[test]
+    fn parse_memory_with_byte_size_option() {
+        check_single_stage(
+            r"
+        max_size: 4096
+        ",
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxSize {
+                    max_size: NonZeroUsize::new(4096).unwrap(),
+                },
+                when_full: WhenFull::Block,
+            },
+        );
+    }
+
+    #[test]
     fn parse_multiple_stages() {
         check_multiple_stages(
             r"
