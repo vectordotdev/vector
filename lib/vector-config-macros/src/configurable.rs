@@ -700,15 +700,24 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
         None
     };
 
-    quote! {
-        {
-            #field_schema
-
-            if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
-                panic!(#field_already_contained);
+    if field.flatten() {
+        quote! {
+            {
+                #field_schema
+                flattened_subschemas.push(subschema);
             }
+        }
+    } else {
+        quote! {
+            {
+                #field_schema
 
-            #maybe_field_required
+                if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
+                    panic!(#field_already_contained);
+                }
+
+                #maybe_field_required
+            }
         }
     }
 }
@@ -733,6 +742,8 @@ fn generate_enum_struct_named_variant_schema(
         {
             let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
+            let mut flattened_subschemas = ::std::vec::Vec::new();
+            let had_unflatted_properties = !properties.is_empty();
 
             #(#mapped_fields)*
 
@@ -740,11 +751,28 @@ fn generate_enum_struct_named_variant_schema(
 
             #maybe_fill_discriminant_map
 
-            ::vector_config::schema::generate_struct_schema(
+            let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
                 required,
                 None
-            )
+            );
+
+            // If we have any flattened subschemas, deal with them now.
+            if !flattened_subschemas.is_empty() {
+                // A niche case here is if all fields were flattened, which would leave our main
+                // schema as simply validating that the value is an object, and _nothing_ else.
+                //
+                // That's kind of useless, and ends up as noise in the schema, so if we didn't have
+                // any of our own unflattened properties, then steal the first flattened subschema
+                // and swap our main schema for it before flattening things overall.
+                // if !had_unflatted_properties {
+                //     schema = flattened_subschemas.remove(0);
+                // }
+
+                ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
+            }
+
+            schema
         }
     }
 }
