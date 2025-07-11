@@ -556,6 +556,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
     let mut set_type = false;
     let mut set_namespace = false;
     let mut set_timestamp = false;
+    let mut set_interval_ms = false;
     let mut set_tags = false;
 
     for target_path in &info.target_queries {
@@ -582,6 +583,12 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             if !set_timestamp {
                 if let Some(timestamp) = metric.timestamp() {
                     map.insert("timestamp".into(), timestamp.into());
+                }
+            }
+
+            if !set_interval_ms {
+                if let Some(interval_ms) = metric.interval_ms() {
+                    map.insert("interval_ms".into(), interval_ms.into());
                 }
             }
 
@@ -626,6 +633,10 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 "timestamp" if !set_timestamp && metric.timestamp().is_some() => {
                     set_timestamp = true;
                     map.insert("timestamp".into(), metric.timestamp().unwrap().into());
+                }
+                "interval_ms" if !set_interval_ms && metric.interval_ms().is_some() => {
+                    set_interval_ms = true;
+                    map.insert("interval_ms".into(), metric.interval_ms().unwrap().into());
                 }
                 "tags" if !set_tags && metric.tags().is_some() => {
                     set_tags = true;
@@ -1098,7 +1109,8 @@ mod test {
             Utc.with_ymd_and_hms(2020, 12, 10, 12, 0, 0)
                 .single()
                 .expect("invalid timestamp"),
-        ));
+        ))
+        .with_interval_ms(Some(NonZero::<u32>::new(507).unwrap()));
 
         let info = ProgramInfo {
             fallible: false,
@@ -1106,6 +1118,7 @@ mod test {
             target_queries: vec![
                 OwnedTargetPath::event(owned_value_path!("name")),
                 OwnedTargetPath::event(owned_value_path!("namespace")),
+                OwnedTargetPath::event(owned_value_path!("interval_ms")),
                 OwnedTargetPath::event(owned_value_path!("timestamp")),
                 OwnedTargetPath::event(owned_value_path!("kind")),
                 OwnedTargetPath::event(owned_value_path!("type")),
@@ -1120,6 +1133,7 @@ mod test {
                 btreemap! {
                     "name" => "zub",
                     "namespace" => "zoob",
+                    "interval_ms" => 507,
                     "timestamp" => Utc.with_ymd_and_hms(2020, 12, 10, 12, 0, 0).single().expect("invalid timestamp"),
                     "tags" => btreemap! { "tig" => "tog" },
                     "kind" => "absolute",
