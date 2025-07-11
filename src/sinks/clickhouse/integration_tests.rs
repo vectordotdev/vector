@@ -19,15 +19,17 @@ use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, 
 use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
-use super::*;
 use crate::{
     codecs::{TimestampFormat, Transformer},
     config::{log_schema, SinkConfig, SinkContext},
-    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
+    sinks::{
+        clickhouse::config::ClickhouseConfig,
+        util::{BatchConfig, Compression, TowerRequestConfig},
+    },
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_table_name, trace_init,
-    },
+    }
 };
 
 fn clickhouse_address() -> String {

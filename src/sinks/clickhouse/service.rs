@@ -158,31 +158,31 @@ fn set_uri_query(
     if insert_random_shard {
         uri.push_str("insert_distributed_one_random_shard=1&")
     }
-    append_param_bool(&mut uri, "async_insert", query_settings.async_insert);
+    append_param_bool(&mut uri, "async_insert", query_settings.async_insert_settings.enabled);
     append_param_bool(
         &mut uri,
         "wait_for_async_insert",
-        query_settings.wait_for_async_insert,
+        query_settings.async_insert_settings.wait_for_processing,
     );
     append_param(
         &mut uri,
         "wait_for_async_insert_timeout",
-        query_settings.wait_for_async_insert_timeout,
+        query_settings.async_insert_settings.wait_for_processing_timeout,
     );
     append_param_bool(
         &mut uri,
         "async_insert_deduplicate",
-        query_settings.async_insert_deduplicate,
+        query_settings.async_insert_settings.deduplicate,
     );
     append_param(
         &mut uri,
         "async_insert_max_data_size",
-        query_settings.async_insert_max_data_size,
+        query_settings.async_insert_settings.max_data_size,
     );
     append_param(
         &mut uri,
         "async_insert_max_query_number",
-        query_settings.async_insert_max_query_number,
+        query_settings.async_insert_settings.max_query_number,
     );
     uri.push_str(query.as_str());
 
@@ -194,6 +194,7 @@ fn set_uri_query(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::clickhouse::config::*;
 
     #[test]
     fn encode_valid() {
@@ -272,10 +273,12 @@ mod tests {
             true,
             false,
             QuerySettingsConfig {
-                async_insert: Some(true),
-                wait_for_async_insert: Some(true),
-                wait_for_async_insert_timeout: Some(500),
-                ..QuerySettingsConfig::default()
+                async_insert_settings: AsyncInsertSettingsConfig {
+                    enabled: Some(true),
+                    wait_for_processing: Some(true),
+                    wait_for_processing_timeout: Some(500),
+                    ..AsyncInsertSettingsConfig::default()
+                },
             },
         )
         .unwrap();
