@@ -42,7 +42,7 @@ remap: functions: validate_json_schema: {
 		types: ["boolean"]
 		rules: [
 			#"Returns `true` if `value` conforms to the JSON Schema definition."#,
-			#"Returns `false` if `value` is anything else."#,
+			#"Returns `false` if `value` does not conform to the JSON Schema definition."#,
 		]
 	}
 
