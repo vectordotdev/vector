@@ -1,1 +1,1 @@
-{"log":{"":5969318026459231789,"_":null}}
+{"metric":{"name":"y","namespace":"y","tags":{"w":"v"},"interval_ms":2492925814,"kind":"incremental","counter":{"value":811776.0}}}

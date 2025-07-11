@@ -44,7 +44,10 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<FibonacciRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+    Retry<
+        FibonacciRetryPolicy<RL>,
+        Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+    >,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
     BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
@@ -90,8 +93,8 @@ pub trait TowerRequestConfigDefaults {
     const RATE_LIMIT_DURATION_SECS: u64 = 1;
     const RATE_LIMIT_NUM: u64 = i64::MAX as u64; // i64 avoids TOML deserialize issue
     const RETRY_ATTEMPTS: usize = isize::MAX as usize; // isize avoids TOML deserialize issue
-    const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(30) };
-    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(30).unwrap();
+    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(1).unwrap();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,7 +104,7 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 
 /// Middleware settings for outbound requests.
 ///
-/// Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 ///
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
@@ -352,7 +355,7 @@ impl TowerRequestSettings {
                     )
             })
             .enumerate()
-            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
         // Build sink service
@@ -444,10 +447,10 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(r#"concurrency = "broken""#)
             .expect_err("Invalid concurrency setting didn't fail");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = 0"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = 0")
             .expect_err("Invalid concurrency setting didn't fail on zero");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = -9"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = -9")
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
@@ -474,8 +477,8 @@ mod tests {
         const RATE_LIMIT_DURATION_SECS: u64 = 2;
         const RATE_LIMIT_NUM: u64 = 3;
         const RETRY_ATTEMPTS: usize = 4;
-        const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(5) };
-        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(6) };
+        const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(5).unwrap();
+        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(6).unwrap();
     }
 
     #[test]
@@ -496,14 +499,14 @@ mod tests {
     fn into_settings_with_populated_config() {
         // Populate with values not equal to the global defaults.
         let cfg = toml::from_str::<TowerRequestConfig>(
-            r#" concurrency = 16
+            r" concurrency = 16
             timeout_secs = 1
             rate_limit_duration_secs = 2
             rate_limit_num = 3
             retry_attempts = 4
             retry_max_duration_secs = 5
             retry_initial_backoff_secs = 6
-        "#,
+        ",
         )
         .expect("Config failed to parse");
 

@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
-use futures_util::FutureExt as _;
-
-use tokio::sync::{Mutex, MutexGuard};
-
 #[cfg(feature = "api")]
 use crate::api;
 use crate::extra_context::ExtraContext;
 use crate::internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded};
+use futures_util::FutureExt as _;
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{config, signal::ShutdownError, topology::RunningTopology};
 
@@ -17,6 +15,10 @@ pub struct SharedTopologyController(Arc<Mutex<TopologyController>>);
 impl SharedTopologyController {
     pub fn new(inner: TopologyController) -> Self {
         Self(Arc::new(Mutex::new(inner)))
+    }
+
+    pub fn blocking_lock(&self) -> MutexGuard<TopologyController> {
+        self.0.blocking_lock()
     }
 
     pub async fn lock(&self) -> MutexGuard<TopologyController> {

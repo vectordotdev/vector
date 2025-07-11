@@ -16,10 +16,13 @@ on:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
 
+permissions:
+  statuses: write
+
 jobs:
   check-component-features:
     # use free tier on schedule and 8 core to expedite results on demand invocation
-    runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-latest' || 'ubuntu-20.04-8core' }}
+    runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
     if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: (PR review) Set latest commit status as pending
@@ -33,15 +36,15 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: github.event_name == 'pull_request_review'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: github.event_name != 'pull_request_review'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-component-features

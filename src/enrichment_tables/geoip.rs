@@ -8,7 +8,7 @@ use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use maxminddb::{
     geoip2::{AnonymousIp, City, ConnectionType, Isp},
-    MaxMindDBError, Reader,
+    Reader,
 };
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
@@ -134,7 +134,7 @@ impl Geoip {
         };
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Geoip {
+            Ok(_) => Ok(Geoip {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 dbkind,
@@ -163,7 +163,7 @@ impl Geoip {
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = self.dbreader.lookup::<Isp>(ip).ok()?;
+                let data = self.dbreader.lookup::<Isp>(ip).ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -174,7 +174,7 @@ impl Geoip {
                 add_field!("organization", data.organization);
             }
             DatabaseKind::City => {
-                let data = self.dbreader.lookup::<City>(ip).ok()?;
+                let data = self.dbreader.lookup::<City>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -224,12 +224,12 @@ impl Geoip {
                 add_field!("postal_code", data.postal.and_then(|p| p.code));
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
+                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()??;
 
                 add_field!("connection_type", data.connection_type);
             }
             DatabaseKind::AnonymousIp => {
-                let data = self.dbreader.lookup::<AnonymousIp>(ip).ok()?;
+                let data = self.dbreader.lookup::<AnonymousIp>(ip).ok()??;
 
                 add_field!("is_anonymous", data.is_anonymous);
                 add_field!("is_anonymous_vpn", data.is_anonymous_vpn);
@@ -264,9 +264,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -283,6 +284,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -513,6 +515,7 @@ mod tests {
                 value: ip.into(),
             }],
             select,
+            None,
             None,
         )
         .unwrap()

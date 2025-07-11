@@ -9,7 +9,7 @@ releases: "0.30.0": {
 
 		In addition to the usual smaller enhancements and bug fixes, this release also includes
 		a refresh of the component statuses in the docs following the [stability
-		guarantees](/docs/about/under-the-hood/guarantees/#stability-guarantees).
+		guarantees](/docs/architecture/guarantees/#stability-guarantees).
 
 		Be sure to check out the [upgrade guide](/highlights/2023-05-22-0-30-0-upgrade-guide) for
 		breaking changes in this release.
@@ -152,7 +152,6 @@ releases: "0.30.0": {
 				The `tag_cardinality_limit` now includes the `metric_name` field on logs it produces
 				to more easily identify the metric that was limited.
 				"""
-			contributors: ["nomonamo"]
 			pr_numbers: [17295]
 		},
 		{

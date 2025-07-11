@@ -107,7 +107,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
 
     # Build docker image with Vector - the same way it's done for releases. Don't
     # do the push - we'll handle it later.
-    REPO="$CONTAINER_IMAGE_REPO" \
+    REPOS="$CONTAINER_IMAGE_REPO" \
       CHANNEL="test" \
       BASE="$BASE_TAG" \
       TAG="$VERSION_TAG" \

@@ -17,6 +17,7 @@ components: sources: http_server: {
 
 	features: {
 		acknowledgements: true
+		has_auth:         true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
@@ -55,56 +56,64 @@ components: sources: http_server: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.http_server.configuration
+	configuration: generated.components.sources.http_server.configuration
 
-	output: logs: {
-		text: {
-			description: "An individual line from a `text/plain` request"
-			fields: {
-				message: {
-					description:   "The raw line from the incoming payload."
-					relevant_when: "encoding == \"text\""
-					required:      true
-					type: string: {
-						examples: ["Hello world"]
+	output: {
+		logs: {
+			text: {
+				description: "An individual line from a `text/plain` request"
+				fields: {
+					message: {
+						description:   "The raw line from the incoming payload."
+						relevant_when: "encoding == \"text\""
+						required:      true
+						type: string: {
+							examples: ["Hello world"]
+						}
 					}
-				}
-				path: {
-					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
-					required:    true
-					type: string: {
-						examples: ["/", "/logs/event712"]
+					path: {
+						description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
+						required:    true
+						type: string: {
+							examples: ["/", "/logs/event712"]
+						}
 					}
-				}
-				source_type: {
-					description: "The name of the source type."
-					required:    true
-					type: string: {
-						examples: ["http_server"]
+					source_type: {
+						description: "The name of the source type."
+						required:    true
+						type: string: {
+							examples: ["http_server"]
+						}
 					}
+					timestamp: fields._current_timestamp
 				}
-				timestamp: fields._current_timestamp
+			}
+			structured: {
+				description: "An individual line from an `application/json` request"
+				fields: {
+					"*": {
+						common:        false
+						description:   "Any field contained in your JSON payload"
+						relevant_when: "encoding != \"text\""
+						required:      false
+						type: "*": {}
+					}
+					path: {
+						description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
+						required:    true
+						type: string: {
+							examples: ["/", "/logs/event712"]
+						}
+					}
+					timestamp: fields._current_timestamp
+				}
 			}
 		}
-		structured: {
-			description: "An individual line from an `application/json` request"
-			fields: {
-				"*": {
-					common:        false
-					description:   "Any field contained in your JSON payload"
-					relevant_when: "encoding != \"text\""
-					required:      false
-					type: "*": {}
-				}
-				path: {
-					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
-					required:    true
-					type: string: {
-						examples: ["/", "/logs/event712"]
-					}
-				}
-				timestamp: fields._current_timestamp
-			}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

@@ -8,7 +8,8 @@ use vector_lib::configurable::configurable_component;
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[configurable(description = "Configures how events are encoded into raw bytes.")]
+/// Configures how events are encoded into raw bytes.
+/// The selected encoding also determines which input types (logs, metrics, traces) are supported.
 pub struct EncodingConfig {
     #[serde(flatten)]
     encoding: SerializerConfig,
@@ -119,7 +120,8 @@ impl EncodingConfigWithFraming {
             }
             (
                 None,
-                Serializer::Csv(_)
+                Serializer::Cef(_)
+                | Serializer::Csv(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)

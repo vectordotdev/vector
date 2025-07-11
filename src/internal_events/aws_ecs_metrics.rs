@@ -13,7 +13,7 @@ pub struct AwsEcsMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsEventsReceived<'a> {
+impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
     fn emit(self) {
         trace!(
             message = "Events received.",
@@ -42,7 +42,7 @@ pub struct AwsEcsMetricsParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
+impl InternalEvent for AwsEcsMetricsParseError<'_> {
     fn emit(self) {
         error!(
             message = "Parsing error.",
@@ -50,12 +50,12 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
             error = ?self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
-            internal_log_rate_limit = true,
+
         );
         debug!(
             message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
             endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
+
         );
         counter!("parse_errors_total").increment(1);
         counter!(

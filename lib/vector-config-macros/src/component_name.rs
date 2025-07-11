@@ -3,7 +3,6 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Attribute, DeriveInput, Error, LitStr};
-use vector_config_common::configurable_package_name_hack;
 
 use crate::attrs::{self, path_matches};
 
@@ -90,13 +89,12 @@ pub fn derive_component_name_impl(input: TokenStream) -> TokenStream {
 
     // We have a single, valid component name, so let's actually spit out our derive.
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let vector_config = configurable_package_name_hack();
     let derived = quote! {
         impl #impl_generics #ident #ty_generics #where_clause {
             pub(super) const NAME: &'static str = #component_name;
         }
 
-        impl #impl_generics #vector_config::NamedComponent for #ident #ty_generics #where_clause {
+        impl #impl_generics ::vector_config::NamedComponent for #ident #ty_generics #where_clause {
             fn get_component_name(&self) -> &'static str {
                 #component_name
             }
@@ -110,7 +108,9 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
     if !path_matches(
         attr.path(),
         &[
+            attrs::API_COMPONENT,
             attrs::ENRICHMENT_TABLE_COMPONENT,
+            attrs::GLOBAL_OPTION_COMPONENT,
             attrs::PROVIDER_COMPONENT,
             attrs::SINK_COMPONENT,
             attrs::SOURCE_COMPONENT,

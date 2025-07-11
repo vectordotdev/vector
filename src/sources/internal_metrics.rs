@@ -145,7 +145,7 @@ struct InternalMetrics<'a> {
     shutdown: ShutdownSignal,
 }
 
-impl<'a> InternalMetrics<'a> {
+impl InternalMetrics<'_> {
     async fn run(mut self) -> Result<(), ()> {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));

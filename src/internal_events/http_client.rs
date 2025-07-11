@@ -29,7 +29,7 @@ fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> 
     headers
 }
 
-impl<'a, T: HttpBody> InternalEvent for AboutToSendHttpRequest<'a, T> {
+impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
     fn emit(self) {
         debug!(
             message = "Sending HTTP request.",
@@ -50,7 +50,7 @@ pub struct GotHttpResponse<'a, T> {
     pub roundtrip: Duration,
 }
 
-impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
+impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
     fn emit(self) {
         debug!(
             message = "HTTP response.",
@@ -79,14 +79,14 @@ pub struct GotHttpWarning<'a> {
     pub roundtrip: Duration,
 }
 
-impl<'a> InternalEvent for GotHttpWarning<'a> {
+impl InternalEvent for GotHttpWarning<'_> {
     fn emit(self) {
         warn!(
             message = "HTTP error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!("http_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
         histogram!("http_client_rtt_seconds").record(self.roundtrip);
@@ -98,7 +98,7 @@ impl<'a> InternalEvent for GotHttpWarning<'a> {
 /// Newtype placeholder to provide a formatter for the request and response body.
 struct FormatBody<'a, B>(&'a B);
 
-impl<'a, B: HttpBody> std::fmt::Display for FormatBody<'a, B> {
+impl<B: HttpBody> std::fmt::Display for FormatBody<'_, B> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let size = self.0.size_hint();
         match (size.lower(), size.upper()) {

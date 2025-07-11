@@ -11,7 +11,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
@@ -124,7 +124,7 @@ impl SinkConfig for PubsubConfig {
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
         let request_settings = self.request.into_settings();
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
@@ -144,7 +144,7 @@ impl SinkConfig for PubsubConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & DataType::Log)
+        Input::new(self.encoding.config().input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -278,7 +278,7 @@ mod integration_tests {
     use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        random_events_with_stream, random_string, trace_init,
+        random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
     };
 
     const PROJECT: &str = "testproject";
@@ -303,6 +303,34 @@ mod integration_tests {
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::default();
         config(topic).build(cx).await.expect("Building sink failed")
+    }
+
+    #[tokio::test]
+    async fn publish_metrics() {
+        trace_init();
+
+        let (topic, subscription) = create_topic_subscription().await;
+        let (sink, healthcheck) = config_build(&topic).await;
+
+        healthcheck.await.expect("Health check failed");
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_metrics_with_stream(100, Some(batch), None);
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let response = pull_messages(&subscription, 1000).await;
+        let messages = response
+            .receivedMessages
+            .as_ref()
+            .expect("Response is missing messages");
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = messages[i].message.decode_data_as_value();
+            let data = serde_json::to_value(data).unwrap();
+            let expected = serde_json::to_value(input[i].as_metric()).unwrap();
+            assert_eq!(data, expected);
+        }
     }
 
     #[tokio::test]
@@ -433,6 +461,14 @@ mod integration_tests {
                 .expect("Invalid base64 data");
             let data = String::from_utf8_lossy(&data);
             serde_json::from_str(&data).expect("Invalid message structure")
+        }
+
+        fn decode_data_as_value(&self) -> Value {
+            let data = BASE64_STANDARD
+                .decode(&self.data)
+                .expect("Invalid base64 data");
+            let data = String::from_utf8_lossy(&data);
+            serde_json::from_str(&data).expect("Invalid json")
         }
     }
 

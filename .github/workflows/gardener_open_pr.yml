@@ -10,7 +10,7 @@ on:
 jobs:
   add-contributor-to-project:
     name: Add contributor PR to Gardener project board
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ github.actor != 'dependabot[bot]' }}
     steps:
@@ -33,7 +33,7 @@ jobs:
           github-token: ${{ secrets.GH_PROJECT_PAT }}
   add-dependabot-to-project:
     name: Add dependabot PR to Gardener project board
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ github.actor == 'dependabot[bot]' }}
     steps:

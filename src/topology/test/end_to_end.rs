@@ -66,7 +66,7 @@ pub fn http_client(
 
     let sender = tokio::spawn(async move {
         let result = reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{}/", address))
             .body(body)
             .send()
             .await

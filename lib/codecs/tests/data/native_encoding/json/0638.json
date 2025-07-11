@@ -1,1 +1,1 @@
-{"metric":{"name":"f","kind":"absolute","aggregated_histogram":{"buckets":[],"count":8256986592620750676,"sum":-858368.0}}}
+{"metric":{"name":"t","namespace":"k","tags":{"s":"b","x":"y"},"timestamp":"1969-12-31T19:41:49.000002928Z","interval_ms":2984613283,"kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[],"n":[]},"count":0,"min":1.7976931348623157e308,"max":-1.7976931348623157e308,"sum":-667968.0,"avg":-404160.0}}}}}

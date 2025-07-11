@@ -7,4 +7,4 @@ publish = false
 license = "Unlicense"
 
 [dependencies]
-rand = "0.8.5"
+rand.workspace = true

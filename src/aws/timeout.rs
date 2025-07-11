@@ -71,11 +71,11 @@ mod tests {
     #[test]
     fn parsing_timeout_configuration() {
         let config = toml::from_str::<AwsTimeout>(
-            r#"
+            r"
             connect_timeout_seconds = 20
             operation_timeout_seconds = 20
             read_timeout_seconds = 60
-        "#,
+        ",
         )
         .unwrap();
 

@@ -66,6 +66,23 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_false")]
     pub remove_label_fields: bool,
 
+    /// Structured metadata that is attached to each batch of events.
+    ///
+    /// Both keys and values are templateable, which enables you to attach dynamic structured metadata to events.
+    ///
+    /// Valid metadata keys include `*`, and prefixes ending with `*`, to allow for the expansion of
+    /// objects into multiple metadata entries. This follows the same logic as [Label expansion][label_expansion].
+    ///
+    /// [label_expansion]: https://vector.dev/docs/reference/configuration/sinks/loki/#label-expansion
+    #[configurable(metadata(docs::examples = "loki_structured_metadata_examples()"))]
+    #[configurable(metadata(docs::additional_props_description = "Loki structured metadata."))]
+    #[serde(default)]
+    pub structured_metadata: HashMap<Template, Template>,
+
+    /// Whether or not to delete fields from the event when they are used in structured metadata.
+    #[serde(default = "crate::serde::default_false")]
+    pub remove_structured_metadata_fields: bool,
+
     /// Whether or not to remove the timestamp from the event payload.
     ///
     /// The timestamp is still sent as event metadata for Loki to use for indexing.
@@ -105,6 +122,21 @@ pub struct LokiConfig {
 }
 
 fn loki_labels_examples() -> HashMap<String, String> {
+    let mut examples = HashMap::new();
+    examples.insert("source".to_string(), "vector".to_string());
+    examples.insert(
+        "\"pod_labels_*\"".to_string(),
+        "{{ kubernetes.pod_labels }}".to_string(),
+    );
+    examples.insert("\"*\"".to_string(), "{{ metadata }}".to_string());
+    examples.insert(
+        "{{ event_field }}".to_string(),
+        "{{ some_other_event_field }}".to_string(),
+    );
+    examples
+}
+
+fn loki_structured_metadata_examples() -> HashMap<String, String> {
     let mut examples = HashMap::new();
     examples.insert("source".to_string(), "vector".to_string());
     examples.insert(
@@ -171,7 +203,7 @@ impl GenerateConfig for LokiConfig {
 
 impl LokiConfig {
     pub(super) fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         Ok(client)
     }

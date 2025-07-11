@@ -25,14 +25,15 @@ VRL programs act on a single observability [event](#event) and can be used to:
 Those programs are specified as part of your Vector [configuration]. Here's an
 example `remap` transform that contains a VRL program in the `source` field:
 
-```toml {title="vector.toml"}
-[transforms.modify]
-type = "remap"
-inputs = ["logs"]
-source = '''
-  del(.user_info)
-  .timestamp = now()
-'''
+```YAML {title="vector.yaml"}
+transforms:
+  modify:
+    type: remap
+    inputs:
+      - logs
+    source: |
+      del(.user_info)
+      .timestamp = now()
 ```
 
 This program changes the contents of each event that passes through this
@@ -45,22 +46,54 @@ Let's have a look at a more complex example. Imagine that you're working with
 HTTP log events that look like this:
 
 ```text
-"{\"status\":200,\"timestamp\":\"2021-03-01T19:19:24.646170Z\",\"message\":\"SUCCESS\",\"username\":\"ub40fan4life\"}"
+{
+  "message": "{\"status\":200,\"timestamp\":\"2021-03-01T19:19:24.646170Z\",\"message\":\"SUCCESS\",\"username\":\"ub40fan4life\"}"
+}
 ```
 
-You want to apply these changes to each event:
+Let's assume you want to apply a set of changes to each event that arrives to your Remap transform in order to produce
+an event with the following fields:
 
-- Parse the raw string into JSON
-- Reformat the `time` into a UNIX timestamp
-- Remove the `username` field
-- Convert the `message` to lowercase
+- `message` (string)
+- `status` (int)
+- `timestamp` (int)
+- `timestamp_str` (timestamp)
 
-This VRL program would accomplish all of that:
+The following VRL program demonstrates how to achieve the above:
 
 ```coffee
+# Parse the raw string into a JSON object, this way we can manipulate fields.
 . = parse_json!(string!(.message))
-.timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
+
+# At this point `.` is the following:
+#{
+#  "message": "SUCCESS",
+#  "status": 200,
+#  "timestamp": "2021-03-01T19:19:24.646170Z",
+#  "username": "ub40fan4life"
+#}
+
+# Attempt to parse the timestamp that was in the original message.
+# Note that `.timestamp` can be `null` if it wasn't present.
+parsed_timestamp, err = parse_timestamp(.timestamp, format: "%Y-%m-%dT%H:%M:%S.%fZ")
+
+# Check if the conversion was successful. Note here that all errors must be handled, more on that later.
+if err == null {
+   # Note that the `to_unix_timestamp` expects a `timestamp` argument.
+   # The following will compile because `parse_timestamp` returns a `timestamp`.
+  .timestamp = to_unix_timestamp(parsed_timestamp)
+} else {
+  # Conversion failed, in this case use the current time.
+  .timestamp = to_unix_timestamp(now())
+}
+
+# Convert back to timestamp for this tutorial.
+.timestamp_str = from_unix_timestamp!(.timestamp)
+
+# Remove the `username` field from the final target.
 del(.username)
+
+# Convert the `message` to lowercase.
 .message = downcase(string!(.message))
 ```
 
@@ -70,7 +103,8 @@ Finally, the resulting event:
 {
   "message": "success",
   "status": 200,
-  "timestamp": 1614626364
+  "timestamp": 1614644364,
+  "timestamp_str": "2021-03-02T00:19:24Z"
 }
 ```
 
@@ -81,11 +115,13 @@ event. But you can also use VRL to specify conditions, which convert events into
 a single Boolean expression. Here's an example [`filter`][filter] transform that
 filters out all messages for which the `severity` field equals `"info"`:
 
-```toml {title="vector.toml"}
-[transforms.filter_out_info]
-type = "filter"
-inputs = ["logs"]
-condition = '.severity != "info"'
+```yaml {title="vector.yaml"}
+transforms:
+  filter_out_info:
+    type: filter
+    inputs:
+      - logs
+    condition: '.severity != "info"'
 ```
 
 Conditions can also be more multifaceted. This condition would filter out all
@@ -93,7 +129,7 @@ events for which the `severity` field is `"info"`, the `status_code` field is
 greater than or equal to 400, and the `host` field isn't set:
 
 ```coffee
-condition = '.severity != "info" && .status_code < 400 && exists(.host)
+condition = '.severity != "info" && .status_code < 400 && exists(.host)'
 ```
 
 {{< info title="More VRL examples" >}} You can find more VRL examples further
@@ -112,7 +148,7 @@ these references as you write your VRL programs:
 VRL is designed to minimize the learning curve. These resources can help you get
 acquainted with Vector and VRL:
 
-{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
+{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/getting-started/transformation"
 >}}
 
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
@@ -163,14 +199,14 @@ VRL has some core concepts that you should be aware of as you dive in.
 [dedupe]: /docs/reference/configuration/transforms/dedupe
 [del]: /docs/reference/vrl/functions#del
 [errors]: /docs/reference/vrl/errors
-[events]: /docs/about/under-the-hood-architecture/data-model
+[events]: /docs/architecture/data-model
 [fail_safe]: https://en.wikipedia.org/wiki/Fail-safe
 [ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
 [filter]: /docs/reference/configuration/transforms/filter
 [log]: /docs/reference/vrl/functions#log
-[logs]: /docs/about/under-the-hood/architecture/data-model/log
+[logs]: /docs/architecture/data-model/log
 [memory_safety]: https://en.wikipedia.org/wiki/Memory_safety
-[metrics]: /docs/about/under-the-hood/architecture/data-model/metrics
+[metrics]: /docs/architecture/data-model/metrics
 [now]: /docs/reference/vrl/functions#now
 [remap]: /docs/reference/configuration/transforms/remap
 [route]: /docs/reference/configuration/transforms/route

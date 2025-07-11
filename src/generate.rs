@@ -119,7 +119,7 @@ pub(crate) fn generate_example(
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
-        .split(|c| c == '|' || c == '/')
+        .split(['|', '/'])
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim().to_string())
@@ -667,18 +667,18 @@ mod tests {
 
         assert_eq!(
             generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
               source0:
                 count: 9223372036854775807
-                format: json
-                interval: 1.0
-                type: demo_logs
                 decoding:
                   codec: bytes
+                format: json
                 framing:
                   method: bytes
+                interval: 1.0
+                type: demo_logs
             transforms:
               transform0:
                 inputs:
@@ -693,12 +693,12 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
-                target: stdout
-                type: console
                 encoding:
                   codec: json
                   json:
                     pretty: false
+                target: stdout
+                type: console
                 healthcheck:
                   enabled: true
                   uri: null
@@ -706,7 +706,7 @@ mod tests {
                   type: memory
                   max_events: 500
                   when_full: block
-            "#}
+            "}
         );
     }
 
@@ -732,15 +732,15 @@ mod tests {
               "sources": {
                 "source0": {
                   "count": 9223372036854775807,
-                  "format": "json",
-                  "interval": 1.0,
-                  "type": "demo_logs",
                   "decoding": {
                     "codec": "bytes"
                   },
+                  "format": "json",
                   "framing": {
                     "method": "bytes"
-                  }
+                  },
+                  "interval": 1.0,
+                  "type": "demo_logs"
                 }
               },
               "transforms": {
@@ -761,14 +761,14 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
-                  "target": "stdout",
-                  "type": "console",
                   "encoding": {
                     "codec": "json",
                     "json": {
                       "pretty": false
                     }
                   },
+                  "target": "stdout",
+                  "type": "console",
                   "healthcheck": {
                     "enabled": true,
                     "uri": null

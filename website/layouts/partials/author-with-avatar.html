@@ -1,0 +1,33 @@
+<div class="flex items-center">
+  {{ if or (not .Params.authors) (eq (len .Params.authors) 0) }}
+    <div class="ml-4 flex flex-col space-y-1">
+      <span class="text-md font-bold tracking-tight text-gray-700 dark:text-gray-200">
+        Unknown author
+      </span>
+    </div>
+  {{ else }}
+    <div class="flex-shrink-0">
+      <div class="flex -space-x-1 relative z-0 overflow-hidden">
+        {{ range .Params.authors }}
+          {{ $handle := . }}
+          {{ $img := printf "https://github.com/%s.png" $handle }}
+          <img class="relative z-30 inline-block h-12 w-12 rounded-full ring-1 ring-white dark:ring-dark"
+               src="{{ $img }}"
+               alt="Author avatar for {{ $handle }}">
+        {{ end }}
+      </div>
+    </div>
+
+    <div class="ml-4 flex flex-col space-y-1">
+      {{ range .Params.authors }}
+        {{ $handle := . }}
+        {{ $link := printf "https://github.com/%s" $handle }}
+        <a href="{{ $link }}"
+           class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200"
+           rel="noopener" target="_blank">
+          {{ $handle }}
+        </a>
+      {{ end }}
+    </div>
+  {{ end }}
+</div>

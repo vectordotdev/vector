@@ -5,10 +5,13 @@ generator:
       target_uri: "http://127.0.0.1:4317/opentelemetry.proto.collector.logs.v1.LogsService/Export"
       bytes_per_second: "100 Mb"
       parallel_connections: 5
-      block_sizes: ["1Mb", "0.5Mb", "0.25Mb", "0.125Mb", "128Kb"]
       maximum_prebuild_cache_size_bytes: "8 Mb"
       variant: "opentelemetry_logs"
 
 blackhole:
   - tcp:
       binding_addr: "127.0.0.1:15400"
+
+target_metrics:
+  - prometheus: # internal telemetry
+      uri: "http://127.0.0.1:9090/metrics"

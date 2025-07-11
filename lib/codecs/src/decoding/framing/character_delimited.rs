@@ -39,6 +39,7 @@ impl CharacterDelimitedDecoderConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
+    #[configurable(metadata(docs::type_override = "ascii_char"))]
     #[serde(with = "vector_core::serde::ascii_char")]
     pub delimiter: u8,
 

@@ -46,15 +46,18 @@ use crate::sinks::{
 };
 
 type Svc = Buffer<
-    ConcurrencyLimit<
+    Vec<InputLogEvent>,
+    <ConcurrencyLimit<
         RateLimit<
             Retry<
                 FibonacciRetryPolicy<CloudwatchRetryLogic<()>>,
-                Buffer<Timeout<CloudwatchLogsSvc>, Vec<InputLogEvent>>,
+                Buffer<
+                    Vec<InputLogEvent>,
+                    <Timeout<CloudwatchLogsSvc> as Service<Vec<InputLogEvent>>>::Future,
+                >,
             >,
         >,
-    >,
-    Vec<InputLogEvent>,
+    > as Service<Vec<InputLogEvent>>>::Future,
 >;
 
 #[derive(Debug)]
@@ -240,6 +243,9 @@ impl CloudwatchLogsSvc {
 
         let retention = config.retention.clone();
 
+        let kms_key = config.kms_key.clone();
+        let tags = config.tags.clone();
+
         CloudwatchLogsSvc {
             headers,
             client,
@@ -248,6 +254,8 @@ impl CloudwatchLogsSvc {
             create_missing_group,
             create_missing_stream,
             retention,
+            kms_key,
+            tags,
             token: None,
             token_rx: None,
         }
@@ -322,6 +330,8 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.create_missing_group,
                 self.create_missing_stream,
                 self.retention.clone(),
+                self.kms_key.clone(),
+                self.tags.clone(),
                 event_batches,
                 self.token.take(),
                 tx,
@@ -340,6 +350,8 @@ pub struct CloudwatchLogsSvc {
     create_missing_group: bool,
     create_missing_stream: bool,
     retention: Retention,
+    kms_key: Option<String>,
+    tags: Option<HashMap<String, String>>,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }

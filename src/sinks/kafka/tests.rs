@@ -19,11 +19,7 @@ mod integration_test {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::super::{
-        config::{KafkaRole, KafkaSinkConfig},
-        sink::KafkaSink,
-        *,
-    };
+    use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
         event::{ObjectMap, Value},
         kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
@@ -63,11 +59,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -87,11 +87,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -185,14 +189,15 @@ mod integration_test {
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        config.clone().to_rdkafka(KafkaRole::Consumer)?;
-        config.clone().to_rdkafka(KafkaRole::Producer)?;
-        self::sink::healthcheck(config.clone()).await?;
+        config.clone().to_rdkafka()?;
+        self::sink::healthcheck(config.clone(), Default::default()).await?;
         KafkaSink::new(config)
     }
 
@@ -335,6 +340,8 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
@@ -383,7 +390,7 @@ mod integration_test {
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
         client_config.set("bootstrap.servers", server.as_str());
-        client_config.set("group.id", &random_string(10));
+        client_config.set("group.id", random_string(10));
         client_config.set("enable.partition.eof", "true");
         kafka_auth.apply(&mut client_config).unwrap();
 

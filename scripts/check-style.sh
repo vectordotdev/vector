@@ -75,7 +75,7 @@ for FILE in $(git ls-files); do
   fi
 
   # check that the lines don't contain trailing spaces
-  if grep ' $' "$FILE" > /dev/null; then
+  if grep -n ' $' "$FILE"; then
     case "$MODE" in
       check)
         echo "File \"$FILE\" contains trailing spaces in some of the lines"

@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
@@ -19,7 +19,7 @@ use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
 use vrl::path::{parse_target_path, OwnedTargetPath};
 use vrl::prelude::KeyString;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct ReduceState {
     events: usize,
     fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
@@ -78,16 +78,8 @@ impl ReduceState {
 
         if let Some(fields_iter) = e.all_event_fields_skip_array_elements() {
             for (path, value) in fields_iter {
-                // TODO: This can be removed once issue 21077 is resolved.
-                //       Technically we need to quote any special characters (like `-` or `*` or ` `).
-                let parsable_path = if path.contains("\\.") {
-                    quote_invalid_paths(&path).into()
-                } else {
-                    path.clone()
-                };
-
                 // This should not return an error, unless there is a bug in the event fields iterator.
-                let parsed_path = match parse_target_path(&parsable_path) {
+                let parsed_path = match parse_target_path(&path) {
                     Ok(path) => path,
                     Err(error) => {
                         emit!(ReduceAddEventError { error, path });
@@ -140,7 +132,7 @@ impl ReduceState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
@@ -252,18 +244,18 @@ impl Reduce {
 
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
-            hash_map::Entry::Vacant(entry) => {
+            Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
                 state.add_event(event, &self.merge_strategies);
                 entry.insert(state);
             }
-            hash_map::Entry::Occupied(mut entry) => {
+            Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
             }
         };
     }
 
-    pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+    pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -320,73 +312,37 @@ impl TaskTransform<Event> for Reduce {
     where
         Self: 'static,
     {
-        let flush_period = self.flush_period;
+        let transform_fn = move |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
+            me.transform_one(emitter, event);
+        };
 
-        Box::pin(map_with_expiration(
-            self,
-            input_rx,
-            flush_period,
-            |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
-                // called for each event
-                me.transform_one(emitter, event);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called periodically to check for expired events
-                me.flush_into(emitter);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called when the input stream ends
-                me.flush_all_into(emitter);
-            },
-        ))
+        construct_output_stream(self, input_rx, transform_fn)
     }
 }
 
-// TODO delete after issue 21077 is resolved.
-fn quote_invalid_paths(path: &str) -> String {
-    let components: Vec<&str> = path.split('.').collect();
-
-    let index: Vec<bool> = components
-        .iter()
-        .map(|component| component.ends_with('\\'))
-        .collect();
-
-    let mut escaping = false;
-    let mut result = String::new();
-    index.iter().enumerate().for_each(|(i, _)| {
-        let current = components[i].trim_end_matches('\\');
-        if i == 0 {
-            if index[0] {
-                escaping = true;
-                result.push('"');
-            }
-            result.push_str(current);
-        } else if i == index.len() - 1 {
-            result.push_str(current);
-            if escaping {
-                escaping = false;
-                result.push('"');
-            };
-        } else if !index[i - 1] && index[i] {
-            escaping = true;
-            result.push('"');
-            result.push_str(current);
-        } else if index[i - 1] && index[i] {
-            escaping = true;
-            result.push_str(current);
-        } else if index[i - 1] && !index[i] {
-            result.push_str(current);
-            escaping = false;
-            result.push('"');
-        } else {
-            result.push_str(current);
-        }
-
-        if i < components.len() - 1 {
-            result.push('.');
-        }
-    });
-    result
+pub fn construct_output_stream(
+    reduce: Box<Reduce>,
+    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    mut transform_fn: impl FnMut(&mut Box<Reduce>, Event, &mut Emitter<Event>) + Send + Sync + 'static,
+) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+where
+    Reduce: 'static,
+{
+    let flush_period = reduce.flush_period;
+    Box::pin(map_with_expiration(
+        reduce,
+        input_rx,
+        flush_period,
+        move |me, event, emitter| {
+            transform_fn(me, event, emitter);
+        },
+        |me, emitter| {
+            me.flush_into(emitter);
+        },
+        |me, emitter| {
+            me.flush_all_into(emitter);
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -993,6 +949,7 @@ merge_strategies.bar = "concat"
             r#"
             group_by = [ "id" ]
             merge_strategies.events = "array"
+            merge_strategies."\"a-b\"" = "retain"
             merge_strategies.another = "discard"
 
             [ends_when]
@@ -1017,6 +974,7 @@ merge_strategies.bar = "concat"
                 btreemap! {"id" => 777, "another" => btreemap!{ "a" => 1}},
             ));
             e_1.insert("events", v_1.clone());
+            e_1.insert("\"a-b\"", 2);
             tx.send(e_1.into()).await.unwrap();
 
             let v_2 = Value::from(btreemap! {
@@ -1029,6 +987,7 @@ merge_strategies.bar = "concat"
                 btreemap! {"id" => 777, "test_end" => "done", "another" => btreemap!{ "b" => 2}},
             ));
             e_2.insert("events", v_2.clone());
+            e_2.insert("\"a-b\"", 2);
             tx.send(e_2.into()).await.unwrap();
 
             let output = out.recv().await.unwrap().into_log();
@@ -1036,6 +995,7 @@ merge_strategies.bar = "concat"
                 "id" => 1554,
                 "events" => vec![v_1, v_2],
                 "another" => btreemap!{ "a" => 1},
+                "a-b" => 2,
                 "test_end" => "done"
             });
             assert_eq!(*output.value(), expected_value);
@@ -1047,46 +1007,39 @@ merge_strategies.bar = "concat"
         .await
     }
 
-    #[test]
-    fn quote_paths_tests() {
-        let input = "one";
-        let expected = "one";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+    #[tokio::test]
+    async fn merged_quoted_path() {
+        let config = toml::from_str::<ReduceConfig>(indoc!(
+            r#"
+            [ends_when]
+              type = "vrl"
+              source = "exists(.test_end)"
+            "#,
+        ))
+        .unwrap();
 
-        let input = ".one";
-        let expected = ".one";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+        assert_transform_compliance(async move {
+            let (tx, rx) = mpsc::channel(1);
 
-        let input = "one.two.three.four";
-        let expected = "one.two.three.four";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
 
-        let input = r"one.two.three\.four";
-        let expected = "one.two.\"three.four\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+            let e_1 = LogEvent::from(Value::from(btreemap! {"a b" => 1}));
+            tx.send(e_1.into()).await.unwrap();
 
-        let input = r"one.two.three\.four\.five";
-        let expected = "one.two.\"three.four.five\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+            let e_2 = LogEvent::from(Value::from(btreemap! {"a b" => 2, "test_end" => "done"}));
+            tx.send(e_2.into()).await.unwrap();
 
-        let input = r"one.two.three\.four\.five.six";
-        let expected = "one.two.\"three.four.five\".six";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+            let output = out.recv().await.unwrap().into_log();
+            let expected_value = Value::from(btreemap! {
+                "a b" => 3,
+                "test_end" => "done"
+            });
+            assert_eq!(*output.value(), expected_value);
 
-        let input = r"one.two\.three.four\.five.six.seven\.eight";
-        let expected = "one.\"two.three\".\"four.five\".six.\"seven.eight\"";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
-
-        let input = r"one.two\.three\.four\.five.six\.seven.eight";
-        let expected = "one.\"two.three.four.five\".\"six.seven\".eight";
-        let result = quote_invalid_paths(input);
-        assert_eq!(result, expected);
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await
     }
 }

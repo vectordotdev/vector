@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"z","namespace":"_","tags":{"k":"b"},"kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":779584.0,"count":10048211611413518220},{"upper_limit":286016.0,"count":15367757674233105160},{"upper_limit":-701440.0,"count":7835320154768737454},{"upper_limit":-236800.0,"count":7071091506885373800}],"count":1394527940366514258,"sum":89728.0}}}

@@ -127,7 +127,7 @@ impl<'a> Record<'a> {
     }
 }
 
-impl<'a> ArchivedRecord<'a> {
+impl ArchivedRecord<'_> {
     /// Gets the metadata of this record.
     pub fn metadata(&self) -> u32 {
         self.metadata

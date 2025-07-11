@@ -26,7 +26,8 @@ use crate::{
     sinks::{
         gcs_common::{
             config::{
-                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
+                build_healthcheck, default_endpoint, GcsPredefinedAcl, GcsRetryLogic,
+                GcsStorageClass,
             },
             service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
@@ -147,6 +148,12 @@ pub struct GcsSinkConfig {
     #[serde(flatten)]
     encoding: EncodingConfigWithFraming,
 
+    /// Compression configuration.
+    ///
+    /// All compression algorithms use the default compression level unless otherwise specified.
+    ///
+    /// Some cloud storage API clients and browsers handle decompression transparently, so
+    /// depending on how they are accessed, files may not always appear to be compressed.
     #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
@@ -154,6 +161,12 @@ pub struct GcsSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
+
+    /// API endpoint for Google Cloud Storage
+    #[configurable(metadata(docs::examples = "http://localhost:9000"))]
+    #[configurable(validation(format = "uri"))]
+    #[serde(default = "default_endpoint")]
+    endpoint: String,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -196,6 +209,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
+        endpoint: Default::default(),
         request: Default::default(),
         auth: Default::default(),
         tls: Default::default(),
@@ -221,8 +235,8 @@ impl GenerateConfig for GcsSinkConfig {
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
-        let base_url = format!("{}{}/", BASE_URL, self.bucket);
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let base_url = format!("{}/{}/", self.endpoint, self.bucket);
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
@@ -276,6 +290,7 @@ impl GcsSinkConfig {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
                 .context(KeyPrefixTemplateSnafu)?,
+            None,
         ))
     }
 }

@@ -564,7 +564,7 @@ pub trait Response: fmt::Debug {
 
 impl Response for () {}
 
-impl<'a> Response for &'a str {}
+impl Response for &str {}
 
 #[cfg(test)]
 mod tests {

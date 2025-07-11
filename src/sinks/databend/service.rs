@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 use std::io::Cursor;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use chrono::Utc;
-use databend_client::error::Error as DatabendError;
 use databend_client::APIClient as DatabendAPIClient;
+use databend_client::Error as DatabendError;
 use futures::future::BoxFuture;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
@@ -26,16 +27,19 @@ impl RetryLogic for DatabendRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            DatabendError::InvalidResponse(qe) => match qe.code {
-                429 => true,
-                // general server error
-                500 => true,
-                // storage doesn't support presign operation
-                3902 => false,
-                // fail to parse stage attachment
-                1046 => false,
-                _ => false,
-            },
+            DatabendError::Response { status, .. } => {
+                match status.as_u16() {
+                    429 => true,
+                    // general server error
+                    500 => true,
+                    // storage doesn't support presign operation
+                    3902 => false,
+                    // fail to parse stage attachment
+                    1046 => false,
+                    _ => false,
+                }
+            }
+            DatabendError::WithContext(boxed_error, ..) => self.is_retriable_error(boxed_error),
             DatabendError::IO(_) => true,
             _ => false,
         }
@@ -44,7 +48,7 @@ impl RetryLogic for DatabendRetryLogic {
 
 #[derive(Clone)]
 pub struct DatabendService {
-    client: DatabendAPIClient,
+    client: Arc<DatabendAPIClient>,
     table: String,
     file_format_options: BTreeMap<&'static str, &'static str>,
     copy_options: BTreeMap<&'static str, &'static str>,
@@ -94,7 +98,7 @@ impl DriverResponse for DatabendResponse {
 
 impl DatabendService {
     pub(super) fn new(
-        client: DatabendAPIClient,
+        client: Arc<DatabendAPIClient>,
         table: String,
         file_format_options: BTreeMap<&'static str, &'static str>,
         copy_options: BTreeMap<&'static str, &'static str>,
@@ -115,9 +119,8 @@ impl DatabendService {
         let database = self
             .client
             .current_database()
-            .await
             .unwrap_or("default".to_string());
-        let suffix = thread_rng()
+        let suffix = rng()
             .sample_iter(&Alphanumeric)
             .take(8)
             .map(char::from)
@@ -158,8 +161,8 @@ impl Service<DatabendRequest> for DatabendService {
 
         let future = async move {
             let metadata = request.get_metadata().clone();
-            let protocol = service.client.scheme.as_str();
-            let host_port = format!("{}:{}", service.client.host, service.client.port);
+            let protocol = service.client.scheme();
+            let host_port = format!("{}:{}", service.client.host(), service.client.port());
             let endpoint = host_port.as_str();
             let byte_size = request.data.len();
             service.insert_with_stage(request.data).await?;

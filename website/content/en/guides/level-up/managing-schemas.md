@@ -4,7 +4,7 @@ short: Schemas
 description: Learn how to manage log schemas with Vector.
 author_github: https://github.com/hoverbear
 domain: schemas
-weight: 2
+weight: 1
 tags: ["schemas", "schema management", "logs", "level up", "guides", "guide"]
 ---
 
@@ -13,8 +13,9 @@ Before you begin, this guide assumes the following:
 
 * You understand the [basic Vector concepts][docs.about.concepts]
 * You understand [how to set up a basic pipeline][docs.setup.quickstart].
+* This guide assumes `log_namespace` (off by default) was not explicitly enabled.
 
-[docs.about.concepts]: /docs/about/concepts/
+[docs.about.concepts]: /docs/introduction/concepts/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 {{< /requirement >}}
 
@@ -331,4 +332,3 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 [docs.sources]: /docs/reference/configuration/sources/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.enrichment_functions]: /docs/reference/vrl/functions/#enrichment-functions
-

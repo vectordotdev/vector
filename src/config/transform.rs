@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
@@ -12,13 +13,15 @@ use vector_lib::configurable::{
 };
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    id::Inputs,
     schema,
     transform::Transform,
 };
 
+use super::dot_graph::GraphConfig;
 use super::schema::Options as SchemaOptions;
+use super::ComponentKey;
 use super::OutputId;
-use super::{id::Inputs, ComponentKey};
 use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
@@ -56,6 +59,10 @@ where
     T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
+    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     #[configurable(metadata(docs::hidden))]
@@ -74,7 +81,11 @@ where
     {
         let inputs = Inputs::from_iter(inputs);
         let inner = inner.into();
-        TransformOuter { inputs, inner }
+        TransformOuter {
+            inputs,
+            inner,
+            graph: Default::default(),
+        }
     }
 
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U>
@@ -93,6 +104,7 @@ where
         TransformOuter {
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
+            graph: self.graph,
         }
     }
 }
@@ -152,7 +164,7 @@ impl TransformContext {
         }
     }
 
-    #[cfg(any(test, feature = "test"))]
+    #[cfg(test)]
     pub fn new_test(
         schema_definitions: HashMap<Option<String>, HashMap<OutputId, schema::Definition>>,
     ) -> Self {
@@ -241,6 +253,11 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
+    }
+
+    /// Gets the files to watch to trigger reload
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        Vec::new()
     }
 }
 

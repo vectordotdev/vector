@@ -28,7 +28,6 @@ impl InternalEvent for LuaScriptError {
             error_code = mlua_error_code(&self.error),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -58,7 +57,7 @@ impl InternalEvent for LuaBuildError {
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -72,7 +71,7 @@ impl InternalEvent for LuaBuildError {
     }
 }
 
-const fn mlua_error_code(err: &mlua::Error) -> &'static str {
+fn mlua_error_code(err: &mlua::Error) -> &'static str {
     use mlua::Error::*;
 
     match err {
@@ -80,14 +79,15 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         RuntimeError(_) => "runtime_error",
         MemoryError(_) => "memory_error",
         SafetyError(_) => "memory_safety_error",
-        MemoryLimitNotAvailable => "memory_limit_not_available",
+        MemoryControlNotAvailable => "memory_control_not_available",
         RecursiveMutCallback => "mutable_callback_called_recursively",
         CallbackDestructed => "callback_destructed",
         StackError => "out_of_stack",
         BindError => "too_many_arguments_to_function_bind",
+        BadArgument { .. } => "bad_argument",
         ToLuaConversionError { .. } => "error_converting_value_to_lua",
         FromLuaConversionError { .. } => "error_converting_value_from_lua",
-        CoroutineInactive => "coroutine_inactive",
+        CoroutineUnresumable => "coroutine_unresumable",
         UserDataTypeMismatch => "userdata_type_mismatch",
         UserDataDestructed => "userdata_destructed",
         UserDataBorrowError => "userdata_borrow_error",
@@ -98,6 +98,7 @@ const fn mlua_error_code(err: &mlua::Error) -> &'static str {
         CallbackError { .. } => "callback_error",
         PreviouslyResumedPanic => "previously_resumed_panic",
         ExternalError(_) => "external_error",
+        WithContext { cause, .. } => mlua_error_code(cause),
         _ => "unknown",
     }
 }

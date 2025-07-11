@@ -6,18 +6,18 @@ components: sinks: [Name=string]: {
 	features: _
 
 	configuration: {
-		inputs: base.components.sinks.configuration.inputs
-		buffer: base.components.sinks.configuration.buffer
+		inputs: generated.components.sinks.configuration.inputs
+		buffer: generated.components.sinks.configuration.buffer
 		healthcheck: {
-			description: base.components.sinks.configuration.healthcheck.description
-			required:    base.components.sinks.configuration.healthcheck.required
+			description: generated.components.sinks.configuration.healthcheck.description
+			required:    generated.components.sinks.configuration.healthcheck.required
 			type: object: options: {
-				enabled: base.components.sinks.configuration.healthcheck.type.object.options.enabled
+				enabled: generated.components.sinks.configuration.healthcheck.type.object.options.enabled
 
 				if features.healthcheck != _|_ {
 					if features.healthcheck.uses_uri != _|_ {
 						if features.healthcheck.uses_uri {
-							uri: base.components.sinks.configuration.healthcheck.type.object.options.uri
+							uri: generated.components.sinks.configuration.healthcheck.type.object.options.uri
 						}
 					}
 				}
@@ -26,7 +26,7 @@ components: sinks: [Name=string]: {
 
 		if features.send != _|_ && features.send.proxy != _|_ {
 			if features.send.proxy.enabled {
-				proxy: base.components.sinks.configuration.proxy
+				proxy: generated.components.sinks.configuration.proxy
 			}
 		}
 
@@ -635,12 +635,12 @@ components: sinks: [Name=string]: {
 
 				retry_policy: {
 					title: "Retry policy"
-					body: """
-						Vector will retry failed requests (status == 429, >= 500, and != 501).
+					body: *"""
+						Vector will retry failed requests (status in [408, 429], >= 500, and != 501).
 						Other responses will not be retried. You can control the number of
 						retry attempts and backoff rate with the `request.retry_attempts` and
 						`request.retry_backoff_secs` options.
-						"""
+						""" | string
 				}
 			}
 		}
@@ -651,7 +651,7 @@ components: sinks: [Name=string]: {
 					title: "Transport Layer Security (TLS)"
 					body:  """
 						Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
-						enable and adjust TLS behavior via the [`tls.*`](#tls) options and/or via an
+						enable and adjust TLS behavior via the `tls.*`` options and/or via an
 						[OpenSSL configuration file](\(urls.openssl_conf)). The file location defaults to
 						`/usr/local/ssl/openssl.cnf` or can be specified with the `OPENSSL_CONF` environment variable.
 						"""

@@ -53,7 +53,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=master
+  - github.com/vectordotdev/vector/tree/master/distribution/kubernetes/vector-agent
 
 images:
   # Override the Vector image to pin the version used.
@@ -271,7 +271,7 @@ Vector is tested extensively against Kubernetes. In addition to Kubernetes being
 [kubernetes]: https://kubernetes.io
 [kubernetes_logs]: /docs/reference/configuration/sources/kubernetes_logs
 [kubernetes_logs_config]: /docs/reference/configuration/sources/kubernetes_logs/#configuration
-[kubernetes_logs_output]: /docs/reference/configuration/sources/kubernetes_logs#output-data
+[kubernetes_logs_output]: /docs/reference/configuration/sources/kubernetes_logs#output-types
 [kustomize]: https://kustomize.io
 [node]: https://kubernetes.io/docs/concepts/architecture/nodes
 [reduce]: /docs/reference/configuration/transforms/reduce

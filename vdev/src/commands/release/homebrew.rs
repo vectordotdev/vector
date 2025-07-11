@@ -1,17 +1,20 @@
 use crate::git;
 use anyhow::Result;
 use hex;
-use regex;
 use reqwest;
 use sha2::Digest;
-use std::env;
 use std::path::Path;
+use std::{env, fs};
 use tempfile::TempDir;
 
 /// Releases latest version to the vectordotdev homebrew tap
 #[derive(clap::Args, Debug)]
 #[command()]
-pub struct Cli {}
+pub struct Cli {
+    /// GitHub username for the repository.
+    #[arg(long, default_value = "vectordotdev")]
+    username: String,
+}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
@@ -19,73 +22,94 @@ impl Cli {
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
 
-        let github_token = env::var("GITHUB_TOKEN")?;
+        debug!("Cloning the homebrew repository for username: {}", self.username);
+        clone_and_setup_git(&self.username)?;
 
-        // Clone the homebrew-brew repository
-        let homebrew_repo =
-            format!("https://{github_token}:x-oauth-basic@github.com/vectordotdev/homebrew-brew");
-        git::clone(&homebrew_repo)?;
-        env::set_current_dir("homebrew-brew")?;
-
-        // Set git configurations
-        git::set_config_value("user.name", "vic")?;
-        git::set_config_value("user.email", "vector@datadoghq.com")?;
-
-        // Get package details for updating Formula/vector.rb
         let vector_version = env::var("VECTOR_VERSION")?;
-        let package_url = format!("https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-x86_64-apple-darwin.tar.gz");
-        let package_sha256 = hex::encode(sha2::Sha256::digest(
-            reqwest::blocking::get(&package_url)?.bytes()?,
-        ));
+        debug!("Updating the vector.rb formula for VECTOR_VERSION={vector_version}.");
+        update_formula("Formula/vector.rb", &vector_version)?;
 
-        // Update content of Formula/vector.rb
-        update_content(
-            "Formula/vector.rb",
-            &package_url,
-            &package_sha256,
-            &vector_version,
-        )?;
+        debug!("Committing and pushing changes (if any).");
+        commit_and_push_changes(&vector_version)?;
 
-        // Check if there is any change in git index
-        let has_changes = !git::check_git_repository_clean()?;
-        if has_changes {
-            let commit_message = format!("Release Vector {vector_version}");
-            git::commit(&commit_message)?;
-        }
-
-        git::push()?;
-
-        // Remove temporary directory
         td.close()?;
         Ok(())
     }
 }
 
-/// Open the vector.rb file and update the new content
-fn update_content<P>(
-    file_path: P,
-    package_url: &str,
-    package_sha256: &str,
-    vector_version: &str,
-) -> Result<()>
-where
-    P: AsRef<Path>,
-{
-    let content = std::fs::read_to_string(&file_path)?;
-    let patterns = [
-        (format!(r#"url "{package_url}""#), r#"url ".*""#),
-        (format!(r#"sha256 "{package_sha256}""#), r#"sha256 ".*""#),
-        (format!(r#"version "{vector_version}""#), r#"version ".*""#),
-    ];
-    let new_content = substitute(content, &patterns);
-    std::fs::write(file_path, new_content)?;
+
+/// Clones the repository and sets up Git configuration
+fn clone_and_setup_git(username: &str) -> Result<()> {
+    let github_token = env::var("HOMEBREW_TOKEN")?;
+    let homebrew_repo = format!(
+        "https://{username}:{github_token}@github.com/{username}/homebrew-brew.git"
+    );
+
+
+    git::clone(&homebrew_repo)?;
+    env::set_current_dir("homebrew-brew")?;
+    git::set_config_value("user.name", "vic")?;
+    git::set_config_value("user.email", "vector@datadoghq.com")?;
     Ok(())
 }
 
-fn substitute(mut content: String, patterns: &[(String, &str)]) -> String {
-    for (value, pattern) in patterns {
-        let re = regex::Regex::new(pattern).unwrap();
-        content = re.replace_all(&content, value.as_str()).to_string();
+/// Updates the vector.rb formula with new URLs, SHA256s, and version
+fn update_formula<P>(file_path: P, vector_version: &str) -> Result<()>
+where
+    P: AsRef<Path>,
+{
+    // URLs and SHA256s for both architectures
+    let x86_package_url = format!(
+        "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-x86_64-apple-darwin.tar.gz"
+    );
+    let x86_package_sha256 = hex::encode(sha2::Sha256::digest(
+        reqwest::blocking::get(&x86_package_url)?.bytes()?,
+    ));
+
+    let arm_package_url = format!(
+        "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-arm64-apple-darwin.tar.gz"
+    );
+    let arm_package_sha256 = hex::encode(sha2::Sha256::digest(
+        reqwest::blocking::get(&arm_package_url)?.bytes()?,
+    ));
+
+    let content = fs::read_to_string(&file_path)?;
+
+    // Replace the lines with updated URLs and SHA256s
+    let updated_content = content
+        .lines()
+        .map(|line| {
+            if line.trim_start().starts_with("version \"") {
+                format!("  version \"{vector_version}\"")
+            } else if line.contains("# x86_64 url") {
+                format!("      url \"{x86_package_url}\" # x86_64 url")
+            } else if line.contains("# x86_64 sha256") {
+                format!("      sha256 \"{x86_package_sha256}\" # x86_64 sha256")
+            } else if line.contains("# arm64 url") {
+                format!("      url \"{arm_package_url}\" # arm64 url")
+            } else if line.contains("# arm64 sha256") {
+                format!("      sha256 \"{arm_package_sha256}\" # arm64 sha256")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    fs::write(file_path, updated_content)?;
+    Ok(())
+}
+
+/// Commits and pushes changes if any exist
+fn commit_and_push_changes(vector_version: &str) -> Result<()> {
+    let has_changes = !git::check_git_repository_clean()?;
+    if has_changes {
+        debug!("Modified lines {:?}", git::get_modified_files());
+        let commit_message = format!("Release Vector {vector_version}");
+        git::commit(&commit_message)?;
+        git::push()?;
+    } else {
+        debug!("No changes to push.");
     }
-    content
+    Ok(())
 }

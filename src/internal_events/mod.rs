@@ -49,7 +49,7 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
-#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+#[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
 mod filter;
@@ -127,6 +127,10 @@ mod udp;
 mod unix;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
+#[cfg(feature = "sinks-websocket-server")]
+mod websocket_server;
+#[cfg(feature = "transforms-window")]
+mod window;
 
 #[cfg(any(
     feature = "sources-file",
@@ -189,7 +193,7 @@ pub(crate) use self::exec::*;
     feature = "sinks-file",
 ))]
 pub(crate) use self::file::*;
-#[cfg(any(feature = "sources-file-descriptor", feature = "sources-stdin"))]
+#[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 pub(crate) use self::file_descriptor::*;
 #[cfg(feature = "transforms-filter")]
 pub(crate) use self::filter::*;
@@ -261,6 +265,10 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
+#[cfg(feature = "sinks-websocket-server")]
+pub(crate) use self::websocket_server::*;
+#[cfg(feature = "transforms-window")]
+pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub use self::{

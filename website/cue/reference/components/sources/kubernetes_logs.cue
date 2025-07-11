@@ -6,7 +6,7 @@ components: sources: kubernetes_logs: {
 	title: "Kubernetes Logs"
 
 	description: """
-		Collects Pod logs from Kubernetes Nodes, automatically enriching data
+		Collects Pod logs Vector's host Kubernetes Node, automatically enriching data
 		with metadata via the Kubernetes API.
 		"""
 
@@ -57,7 +57,7 @@ components: sources: kubernetes_logs: {
 		platform_name: "kubernetes"
 	}
 
-	configuration: base.components.sources.kubernetes_logs.configuration
+	configuration: generated.components.sources.kubernetes_logs.configuration
 
 	output: logs: line: {
 		description: "An individual line from a `Pod` log file."
@@ -268,7 +268,7 @@ components: sources: kubernetes_logs: {
 			body:  """
 					Vector will enrich data with Kubernetes context. A comprehensive
 					list of fields can be found in the
-					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-data).
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-types).
 					"""
 		}
 

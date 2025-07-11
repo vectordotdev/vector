@@ -98,7 +98,9 @@ mod tests {
         serializer
             .encode(histogram_event.clone(), &mut bytes)
             .unwrap();
-        let json = serializer.to_json_value(histogram_event).unwrap();
-        assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
+        assert_eq!(
+            bytes.freeze(),
+            serde_json::to_string(&histogram_event).unwrap()
+        );
     }
 }

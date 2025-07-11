@@ -4,7 +4,8 @@
 #![allow(dead_code)]
 #![allow(unreachable_pub)]
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use vector_lib::{
@@ -16,6 +17,8 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 /// The datadog tags event path.
 pub const DDTAGS: &str = "ddtags";
+/// The datadog message event path.
+pub const MESSAGE: &str = "message";
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.
@@ -28,6 +31,13 @@ pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
     (meaning::SOURCE, "ddsource"),
     (meaning::TAGS, DDTAGS),
 ];
+
+/// Returns true if the parameter `attr` is one of the reserved Datadog log attributes
+pub fn is_reserved_attribute(attr: &str) -> bool {
+    DD_RESERVED_SEMANTIC_ATTRS
+        .iter()
+        .any(|(_, attr_str)| &attr == attr_str)
+}
 
 /// DatadogSeriesMetric
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -94,7 +104,7 @@ fn compute_api_endpoint(endpoint: &str) -> String {
     // This mechanism is derived from the forwarder health check in the Datadog Agent:
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L45-L47
     // https://github.com/DataDog/datadog-agent/blob/cdcf0fc809b9ac1cd6e08057b4971c7dbb8dbe30/comp/forwarder/defaultforwarder/forwarder_health.go#L188-L190
-    static DOMAIN_REGEX: Lazy<Regex> = Lazy::new(|| {
+    static DOMAIN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?:[a-z]{2}\d\.)?(datadoghq\.[a-z]+|ddog-gov\.com)/*$")
             .expect("Could not build Datadog domain regex")
     });

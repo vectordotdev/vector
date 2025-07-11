@@ -16,8 +16,8 @@ use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
     consumer::{
-        stream_consumer::StreamPartitionQueue, CommitMode, Consumer, ConsumerContext, Rebalance,
-        StreamConsumer,
+        stream_consumer::StreamPartitionQueue, BaseConsumer, CommitMode, Consumer, ConsumerContext,
+        Rebalance, StreamConsumer,
     },
     error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
@@ -1202,21 +1202,21 @@ fn create_consumer(
         .set("auto.offset.reset", &config.auto_offset_reset)
         .set(
             "session.timeout.ms",
-            &config.session_timeout_ms.as_millis().to_string(),
+            config.session_timeout_ms.as_millis().to_string(),
         )
         .set(
             "socket.timeout.ms",
-            &config.socket_timeout_ms.as_millis().to_string(),
+            config.socket_timeout_ms.as_millis().to_string(),
         )
         .set(
             "fetch.wait.max.ms",
-            &config.fetch_wait_max_ms.as_millis().to_string(),
+            config.fetch_wait_max_ms.as_millis().to_string(),
         )
         .set("enable.partition.eof", "false")
         .set("enable.auto.commit", "true")
         .set(
             "auto.commit.interval.ms",
-            &config.commit_interval_ms.as_millis().to_string(),
+            config.commit_interval_ms.as_millis().to_string(),
         )
         .set("enable.auto.offset.store", "false")
         .set("statistics.interval.ms", "1000")
@@ -1369,15 +1369,11 @@ impl ClientContext for KafkaSourceContext {
 }
 
 impl ConsumerContext for KafkaSourceContext {
-    fn pre_rebalance(&self, rebalance: &Rebalance) {
+    fn pre_rebalance(&self, _base_consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
         match rebalance {
             Rebalance::Assign(tpl) => self.consume_partitions(tpl),
 
             Rebalance::Revoke(tpl) => {
-                // TODO  workaround for https://github.com/fede1024/rust-rdkafka/issues/681
-                if tpl.capacity() == 0 {
-                    return;
-                }
                 self.revoke_partitions(tpl);
                 self.commit_consumer_state();
             }

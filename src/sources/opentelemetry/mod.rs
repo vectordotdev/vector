@@ -13,7 +13,7 @@ use std::net::SocketAddr;
 use futures::{future::join, FutureExt, TryFutureExt};
 use tonic::codec::CompressionEncoding;
 use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-use vector_lib::opentelemetry::convert::{
+use vector_lib::opentelemetry::logs::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
@@ -23,6 +23,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use vector_lib::{
@@ -46,7 +47,10 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
+use super::http_server::{build_param_matcher, remove_duplicates};
+
 pub const LOGS: &str = "logs";
+pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for the `opentelemetry` source.
@@ -113,6 +117,20 @@ struct HttpConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+
+    /// A list of HTTP headers to include in the log event.
+    ///
+    /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
+    ///
+    /// Specifying "*" results in all headers included in the log event.
+    ///
+    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "User-Agent"))]
+    #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
+    #[configurable(metadata(docs::examples = "X-*"))]
+    #[configurable(metadata(docs::examples = "*"))]
+    headers: Vec<String>,
 }
 
 fn example_http_config() -> HttpConfig {
@@ -120,6 +138,7 @@ fn example_http_config() -> HttpConfig {
         address: "0.0.0.0:4318".parse().unwrap(),
         tls: None,
         keepalive: KeepaliveConfig::default(),
+        headers: vec![],
     }
 }
 
@@ -143,7 +162,7 @@ impl SourceConfig for OpentelemetryConfig {
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let grpc_tls_settings = MaybeTlsSettings::from_config(&self.grpc.tls, true)?;
+        let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -163,8 +182,20 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
+        let metrics_service = MetricsServiceServer::new(Service {
+            pipeline: cx.out.clone(),
+            acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
+        })
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
+
         let mut builder = RoutesBuilder::default();
-        builder.add_service(log_service).add_service(trace_service);
+        builder
+            .add_service(log_service)
+            .add_service(metrics_service)
+            .add_service(trace_service);
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
@@ -175,15 +206,18 @@ impl SourceConfig for OpentelemetryConfig {
             error!(message = "Source future failed.", %error);
         });
 
-        let http_tls_settings = MaybeTlsSettings::from_config(&self.http.tls, true)?;
+        let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
+        let headers =
+            build_param_matcher(&remove_duplicates(self.http.headers.clone(), "headers"))?;
         let filters = build_warp_filter(
             acknowledgements,
             log_namespace,
             cx.out,
             bytes_received,
             events_received,
+            headers,
         );
         let http_source = run_http_server(
             self.http.address,
@@ -288,6 +322,7 @@ impl SourceConfig for OpentelemetryConfig {
 
         vec![
             SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS),
+            SourceOutput::new_metrics().with_port(METRICS),
             SourceOutput::new_traces().with_port(TRACES),
         ]
     }

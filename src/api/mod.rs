@@ -2,14 +2,15 @@
 mod handler;
 mod schema;
 mod server;
-pub mod tap;
-#[cfg(all(test, feature = "vector-api-tests"))]
+#[cfg(all(
+    test,
+    feature = "vector-api-tests",
+    feature = "sinks-blackhole",
+    feature = "sources-demo_logs",
+    feature = "transforms-log_to_metric",
+    feature = "transforms-remap",
+))]
 mod tests;
 
 pub use schema::build_schema;
 pub use server::Server;
-use tokio::sync::oneshot;
-
-// Shutdown channel types used by the server and tap.
-type ShutdownTx = oneshot::Sender<()>;
-type ShutdownRx = oneshot::Receiver<()>;

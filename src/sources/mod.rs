@@ -29,7 +29,7 @@ pub mod exec;
 pub mod file;
 #[cfg(any(
     feature = "sources-stdin",
-    all(unix, feature = "sources-file-descriptor")
+    all(unix, feature = "sources-file_descriptor")
 ))]
 pub mod file_descriptors;
 #[cfg(feature = "sources-fluent")]
@@ -58,6 +58,8 @@ pub mod kubernetes_logs;
 pub mod logstash;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
+#[cfg(feature = "sources-mqtt")]
+pub mod mqtt;
 #[cfg(feature = "sources-nats")]
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]

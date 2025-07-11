@@ -38,7 +38,7 @@ components: transforms: lua: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.lua.configuration
+	configuration: generated.components.transforms.lua.configuration
 
 	input: {
 		logs: true
@@ -53,6 +53,15 @@ components: transforms: lua: {
 		traces: false
 	}
 
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+	}
+
 	examples: [
 		{
 			title: "Add, rename, and remove log fields"
@@ -63,6 +72,7 @@ components: transforms: lua: {
 						-- Add root level field
 						event.log.field = "new value"
 						-- Add nested field
+						event.log.nested = {}
 						event.log.nested.field = "nested value"
 						-- Rename field
 						event.log.renamed_field = event.log.field_to_rename

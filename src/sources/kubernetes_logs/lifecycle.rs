@@ -111,7 +111,7 @@ pub struct Slot<'bound, 'lc> {
     shutdown_trigger: oneshot::Sender<()>,
 }
 
-impl<'bound, 'lc> Slot<'bound, 'lc> {
+impl<'bound> Slot<'bound, '_> {
     /// Bind the lifecycle slot to a concrete future.
     /// The passed future MUST start it's shutdown process when requested to
     /// shutdown via the signal passed from the corresponding

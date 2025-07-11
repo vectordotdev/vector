@@ -2,6 +2,7 @@ use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
+use smallvec::SmallVec;
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -17,7 +18,6 @@ use vector_lib::EstimatedJsonEncodedSizeOf;
 use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::Decoder,
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
@@ -34,14 +34,19 @@ use crate::{
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
 /// syslog source).
-pub fn build_unix_stream_source(
+pub fn build_unix_stream_source<D, F, E>(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
-    decoder: Decoder,
+    decoder: D,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> crate::Result<Source> {
+) -> crate::Result<Source>
+where
+    D: tokio_util::codec::Decoder<Item = (F, usize), Error = E> + Clone + Send + 'static,
+    E: StreamDecodingError + std::fmt::Display + Send,
+    F: Into<SmallVec<[Event; 1]>> + Send,
+{
     Ok(Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
@@ -79,7 +84,7 @@ pub fn build_unix_stream_source(
                 .and_then(|addr| {
                     addr.as_pathname().map(|e| e.to_owned()).map({
                         |path| {
-                            span.record("peer_path", &field::debug(&path));
+                            span.record("peer_path", field::debug(&path));
                             path.to_string_lossy().into_owned().into()
                         }
                     })
@@ -108,7 +113,9 @@ pub fn build_unix_stream_source(
 
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok((mut events, _byte_size)) => {
+                            Ok((frame, _byte_size)) => {
+                                let mut events = frame.into();
+
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.estimated_json_encoded_size_of(),

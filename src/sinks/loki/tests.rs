@@ -110,7 +110,8 @@ async fn healthcheck_includes_auth() {
     let (rx, _trigger, server) = build_test_server(addr);
     tokio::spawn(server);
 
-    let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
@@ -139,7 +140,8 @@ async fn healthcheck_grafana_cloud() {
     )
     .unwrap();
 
-    let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
     let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
 
@@ -174,4 +176,29 @@ async fn timestamp_out_of_range() {
     let e1 = Event::Log(e1);
 
     assert!(sink.encoder.encode_event(e1).is_none());
+}
+
+#[tokio::test]
+async fn structured_metadata_as_json() {
+    let (config, cx) = load_sink::<LokiConfig>(
+        r#"
+        endpoint = "http://localhost:3100"
+        labels = {test = "structured_metadata"}
+        structured_metadata.bar = "{{ foo }}"
+        encoding.codec = "json"
+        encoding.except_fields = ["foo"]
+        "#,
+    )
+    .unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
+
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
+    e1.as_mut_log().insert("foo", "bar");
+
+    let event = sink.encoder.encode_event(e1).unwrap();
+    let body = serde_json::json!(event.event);
+    let expected_metadata = serde_json::json!({"bar": "bar"});
+
+    assert_eq!(body[2], expected_metadata);
 }

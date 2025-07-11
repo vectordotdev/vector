@@ -1,18 +1,19 @@
-use std::{
-    collections::HashMap, convert::TryFrom, future::ready, pin::Pin, sync::Arc, time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
 
+use bollard::query_parameters::{
+    EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
+};
 use bollard::{
-    container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
+    container::LogOutput,
     errors::Error as DockerError,
+    query_parameters::InspectContainerOptions,
     service::{ContainerInspectResponse, EventMessage},
-    system::EventsOptions,
     Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
@@ -55,9 +56,9 @@ const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
-static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
-static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
-static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
+static STDERR: LazyLock<Bytes> = LazyLock::new(|| "stderr".into());
+static STDOUT: LazyLock<Bytes> = LazyLock::new(|| "stdout".into());
+static CONSOLE: LazyLock<Bytes> = LazyLock::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]
@@ -427,11 +428,12 @@ impl DockerLogsSourceCore {
             filters.insert("image".to_owned(), include_images.clone());
         }
 
-        self.docker.events(Some(EventsOptions {
-            since: Some(self.now_timestamp),
-            until: None,
-            filters,
-        }))
+        self.docker.events(Some(
+            EventsOptionsBuilder::new()
+                .since(&self.now_timestamp.timestamp().to_string())
+                .filters(&filters)
+                .build(),
+        ))
     }
 }
 
@@ -529,11 +531,12 @@ impl DockerLogsSource {
         self.esb
             .core
             .docker
-            .list_containers(Some(ListContainersOptions {
-                all: false, // only running containers
-                filters,
-                ..Default::default()
-            }))
+            .list_containers(Some(
+                ListContainersOptionsBuilder::new()
+                    .all(false)
+                    .filters(&filters)
+                    .build(),
+            ))
             .await?
             .into_iter()
             .for_each(|container| {
@@ -738,14 +741,15 @@ impl EventStreamBuilder {
 
     async fn run_event_stream(mut self, mut info: ContainerLogInfo) {
         // Establish connection
-        let options = Some(LogsOptions::<String> {
-            follow: true,
-            stdout: true,
-            stderr: true,
-            since: info.log_since(),
-            timestamps: true,
-            ..Default::default()
-        });
+        let options = Some(
+            LogsOptionsBuilder::new()
+                .follow(true)
+                .stdout(true)
+                .stderr(true)
+                .since(info.log_since() as i32) // 2038 bug (I think)
+                .timestamps(true)
+                .build(),
+        );
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
         emit!(DockerLogsContainerWatch {
@@ -906,12 +910,12 @@ impl ContainerState {
         }
     }
 
-    fn running(&mut self) {
+    const fn running(&mut self) {
         self.running = true;
         self.generation += 1;
     }
 
-    fn stopped(&mut self) {
+    const fn stopped(&mut self) {
         self.running = false;
     }
 
@@ -1277,7 +1281,7 @@ impl ContainerMetadata {
             name: name.as_str().trim_start_matches('/').to_owned().into(),
             name_str: name,
             image: config.image.unwrap().into(),
-            created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
+            created_at: created.with_timezone(&Utc),
         })
     }
 }

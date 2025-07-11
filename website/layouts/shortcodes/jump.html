@@ -1,14 +1,22 @@
 {{ $link := .Get 0 }}
 {{ if not $link }}
-{{ errorf "No page title specified" }}
+  {{ errorf "No page title specified" }}
 {{ end }}
 
 {{ $hash := .Get 1 }}
 
-{{ $page := site.GetPage $link }}
-{{ if not $page }}
-{{ errorf "Error in link shortcode at content/%s. No page found at %s." $.Page.File $link }}
+{{/* Try both with and without leading slash for compatibility */}}
+{{ $page := "" }}
+{{ if hasPrefix $link "/" }}
+  {{ $page = site.GetPage (strings.TrimPrefix "/" $link) }}
+{{ else }}
+  {{ $page = site.GetPage $link }}
 {{ end }}
+
+{{ if not $page }}
+  {{ errorf "Error in jump shortcode at %s: No page found at %s. Please ensure the page exists and the path is correct." $.Page.File.Path $link }}
+{{ end }}
+
 <div class="jump">
   <a href="{{ $link }}{{ with $hash }}#{{ . }}{{ end }}">
     <div class="border dark:border-gray-700 rounded-md px-3.5 py-2 hover:border-secondary dark:hover:border-primary">

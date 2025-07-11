@@ -159,9 +159,12 @@ impl Service<KafkaRequest> for KafkaService {
                             })
                             .map_err(|(err, _)| err);
                     }
-                    // Producer queue is full.
+                    // Producer queue is full or a policy has been violated and the request should
+                    // be retried
                     Err((
-                        KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull),
+                        KafkaError::MessageProduction(
+                            RDKafkaErrorCode::QueueFull | RDKafkaErrorCode::PolicyViolation,
+                        ),
                         original_record,
                     )) => {
                         if blocked_state.is_none() {

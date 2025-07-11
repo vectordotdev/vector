@@ -172,7 +172,7 @@ impl GenerateConfig for VectorConfig {
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_settings = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 

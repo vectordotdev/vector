@@ -119,14 +119,11 @@ pub(super) fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) =
-        id_key_field.and_then(|key| log.remove((PathPrefix::Event, key)))
-    {
-        Some(String::from_utf8_lossy(&key).into_owned())
-    } else {
-        None
-    };
-    let document_metadata = match (id.clone(), mode.version_type(), mode.version(&log)) {
+
+    let id = id_key_field
+        .and_then(|key| log.remove((PathPrefix::Event, key)))
+        .and_then(|id| id.as_str().map(Into::into));
+    let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
         (None, _, _) => DocumentMetadata::WithoutId,
         (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
             DocumentMetadata::Id(id)

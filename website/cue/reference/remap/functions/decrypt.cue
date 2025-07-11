@@ -13,6 +13,8 @@ remap: functions: decrypt: {
 		* AES-256-OFB (key = 32 bytes, iv = 16 bytes)
 		* AES-192-OFB  (key = 24 bytes, iv = 16 bytes)
 		* AES-128-OFB (key = 16 bytes, iv = 16 bytes)
+		* AES-128-SIV (key = 32 bytes, iv = 16 bytes)
+		* AES-256-SIV (key = 64 bytes, iv = 16 bytes)
 		* Deprecated - AES-256-CTR (key = 32 bytes, iv = 16 bytes)
 		* Deprecated - AES-192-CTR (key = 24 bytes, iv = 16 bytes)
 		* Deprecated - AES-128-CTR (key = 16 bytes, iv = 16 bytes)

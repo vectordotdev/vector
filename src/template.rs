@@ -1,15 +1,16 @@
 //! Functionality for managing template fields used by Vector's sinks.
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     FixedOffset, Utc,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
-use vector_lib::configurable::{configurable_component, ConfigurableString};
+use vector_lib::configurable::{
+    configurable_component, ConfigurableNumber, ConfigurableString, NumberClass,
+};
 use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
     event::{EventRef, Metric, Value},
 };
 
-static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 /// Errors raised whilst parsing a Template field.
 #[allow(missing_docs)]
@@ -27,6 +28,8 @@ pub enum TemplateParseError {
     StrftimeError,
     #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
     InvalidPathSyntax { path: String },
+    #[snafu(display("Invalid numeric template"))]
+    InvalidNumericTemplate { template: String },
 }
 
 /// Errors raised whilst rendering a Template.
@@ -35,6 +38,10 @@ pub enum TemplateParseError {
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
     MissingKeys { missing_keys: Vec<String> },
+    #[snafu(display("Not numeric: {:?}", input))]
+    NotNumeric { input: String },
+    #[snafu(display("Unsupported part for numeric value"))]
+    UnsupportedNumeric,
 }
 
 /// A templated field.
@@ -133,7 +140,7 @@ impl From<Template> for String {
 
 impl fmt::Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.src)
+        self.src.fmt(f)
     }
 }
 
@@ -221,6 +228,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
@@ -234,6 +242,208 @@ impl Template {
     /// A dynamic template string contains sections that depend on the input event or time.
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
+    }
+}
+
+/// The source of a `uint` template. May be a constant numeric value or a template string.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[configurable_component]
+#[serde(untagged)]
+enum UnsignedIntTemplateSource {
+    /// A static unsigned number.
+    Number(u64),
+    /// A string, which may be a template.
+    String(String),
+}
+
+impl Default for UnsignedIntTemplateSource {
+    fn default() -> Self {
+        Self::Number(Default::default())
+    }
+}
+
+impl fmt::Display for UnsignedIntTemplateSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Number(i) => i.fmt(f),
+            Self::String(s) => s.fmt(f),
+        }
+    }
+}
+
+/// Unsigned integer template.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(
+    try_from = "UnsignedIntTemplateSource",
+    into = "UnsignedIntTemplateSource"
+)]
+pub struct UnsignedIntTemplate {
+    src: UnsignedIntTemplateSource,
+
+    #[serde(skip)]
+    parts: Vec<Part>,
+}
+
+impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: UnsignedIntTemplateSource) -> Result<Self, Self::Error> {
+        match src {
+            UnsignedIntTemplateSource::Number(num) => Ok(UnsignedIntTemplate {
+                src: UnsignedIntTemplateSource::Number(num),
+                parts: Vec::new(),
+            }),
+            UnsignedIntTemplateSource::String(s) => UnsignedIntTemplate::try_from(s),
+        }
+    }
+}
+
+impl From<UnsignedIntTemplate> for UnsignedIntTemplateSource {
+    fn from(template: UnsignedIntTemplate) -> UnsignedIntTemplateSource {
+        template.src
+    }
+}
+
+impl TryFrom<&str> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: &str) -> Result<Self, Self::Error> {
+        UnsignedIntTemplate::try_from(Cow::Borrowed(src))
+    }
+}
+
+impl TryFrom<String> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        UnsignedIntTemplate::try_from(Cow::Owned(src))
+    }
+}
+
+impl From<u64> for UnsignedIntTemplate {
+    fn from(num: u64) -> UnsignedIntTemplate {
+        UnsignedIntTemplate {
+            src: UnsignedIntTemplateSource::Number(num),
+            parts: Vec::new(),
+        }
+    }
+}
+
+impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
+        parse_template(&src).and_then(|parts| {
+            let is_static =
+                parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
+
+            if is_static {
+                match src.parse::<u64>() {
+                    Ok(num) => Ok(UnsignedIntTemplate {
+                        src: UnsignedIntTemplateSource::Number(num),
+                        parts,
+                    }),
+                    Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
+                        template: src.into_owned(),
+                    }),
+                }
+            } else {
+                Ok(UnsignedIntTemplate {
+                    parts,
+                    src: UnsignedIntTemplateSource::String(src.into_owned()),
+                })
+            }
+        })
+    }
+}
+
+impl From<UnsignedIntTemplate> for String {
+    fn from(template: UnsignedIntTemplate) -> String {
+        template.src.to_string()
+    }
+}
+
+impl fmt::Display for UnsignedIntTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.src.fmt(f)
+    }
+}
+
+impl ConfigurableString for UnsignedIntTemplate {}
+impl ConfigurableNumber for UnsignedIntTemplate {
+    type Numeric = u64;
+
+    fn class() -> NumberClass {
+        NumberClass::Unsigned
+    }
+}
+
+impl UnsignedIntTemplate {
+    /// Renders the given template with data from the event.
+    pub fn render<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<u64, TemplateRenderingError> {
+        match self.src {
+            UnsignedIntTemplateSource::Number(num) => Ok(num),
+            UnsignedIntTemplateSource::String(_) => self.render_event(event.into()),
+        }
+    }
+
+    fn render_event(&self, event: EventRef<'_>) -> Result<u64, TemplateRenderingError> {
+        let mut missing_keys = Vec::new();
+        let mut out = String::with_capacity(20);
+        for part in &self.parts {
+            match part {
+                Part::Literal(lit) => out.push_str(lit),
+                Part::Reference(key) => {
+                    out.push_str(
+                        &match event {
+                            EventRef::Log(log) => log
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
+                            EventRef::Metric(metric) => {
+                                render_metric_field(key, metric).map(Cow::Borrowed)
+                            }
+                            EventRef::Trace(trace) => trace
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
+                        }
+                        .unwrap_or_else(|| {
+                            missing_keys.push(key.to_owned());
+                            Cow::Borrowed("")
+                        }),
+                    );
+                }
+                _ => return Err(TemplateRenderingError::UnsupportedNumeric),
+            }
+        }
+        if missing_keys.is_empty() {
+            out.parse::<u64>()
+                .map_err(|_| TemplateRenderingError::NotNumeric { input: out })
+        } else {
+            Err(TemplateRenderingError::MissingKeys { missing_keys })
+        }
+    }
+
+    /// Returns the names of the fields that are rendered in this template.
+    pub fn get_fields(&self) -> Option<Vec<String>> {
+        let parts: Vec<_> = self
+            .parts
+            .iter()
+            .filter_map(|part| {
+                if let Part::Reference(r) = part {
+                    Some(r.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        (!parts.is_empty()).then_some(parts)
     }
 }
 
@@ -349,7 +559,7 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
 fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
-        "namespace" => metric.namespace().map(Into::into),
+        "namespace" => metric.namespace(),
         _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
         _ => None,
     }
@@ -411,11 +621,18 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
+        let f5 = UnsignedIntTemplate::try_from("{{ foo }}-{{ bar }}")
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f6 = UnsignedIntTemplate::from(123u64).get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
+        assert_eq!(f5, vec!["foo", "bar"]);
+        assert_eq!(f6, None);
     }
 
     #[test]
@@ -436,6 +653,23 @@ mod tests {
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = UnsignedIntTemplate::from(123);
+
+        assert_eq!(Ok(123), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number_dynamic() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("foo", 123);
+
+        let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
+        assert_eq!(Ok(123), template.render(&event))
     }
 
     #[test]

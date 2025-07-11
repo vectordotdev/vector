@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
+FROM docker.io/ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
@@ -12,7 +12,7 @@ RUN echo $TZ > /etc/timezone
 
 # Setup the env
 COPY scripts/environment/*.sh /git/vectordotdev/vector/scripts/environment/
-RUN cd git/vectordotdev/vector && ./scripts/environment/bootstrap-ubuntu-20.04.sh
+RUN cd git/vectordotdev/vector && ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain
 WORKDIR /git/vectordotdev/vector

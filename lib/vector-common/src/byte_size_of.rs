@@ -31,7 +31,7 @@ pub trait ByteSizeOf {
     fn allocated_bytes(&self) -> usize;
 }
 
-impl<'a, T> ByteSizeOf for &'a T
+impl<T> ByteSizeOf for &T
 where
     T: ByteSizeOf,
 {
@@ -64,7 +64,7 @@ impl ByteSizeOf for KeyString {
     }
 }
 
-impl<'a> ByteSizeOf for &'a str {
+impl ByteSizeOf for &str {
     fn allocated_bytes(&self) -> usize {
         0
     }

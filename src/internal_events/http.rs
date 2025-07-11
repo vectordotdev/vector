@@ -29,7 +29,7 @@ pub struct HttpServerResponseSent<'a, B> {
     pub latency: Duration,
 }
 
-impl<'a, B> InternalEvent for HttpServerResponseSent<'a, B> {
+impl<B> InternalEvent for HttpServerResponseSent<'_, B> {
     fn emit(self) {
         let labels = &[(
             HTTP_STATUS_LABEL,
@@ -98,6 +98,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
     }
 }
 
+#[cfg(feature = "sources-utils-http")]
 #[derive(Debug)]
 pub struct HttpBadRequest<'a> {
     code: u16,
@@ -116,7 +117,8 @@ impl<'a> HttpBadRequest<'a> {
     }
 }
 
-impl<'a> InternalEvent for HttpBadRequest<'a> {
+#[cfg(feature = "sources-utils-http")]
+impl InternalEvent for HttpBadRequest<'_> {
     fn emit(self) {
         warn!(
             message = "Received bad request.",
@@ -125,7 +127,7 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
-            internal_log_rate_limit = true,
+
         );
         counter!(
             "component_errors_total",
@@ -143,7 +145,7 @@ pub struct HttpDecompressError<'a> {
     pub encoding: &'a str,
 }
 
-impl<'a> InternalEvent for HttpDecompressError<'a> {
+impl InternalEvent for HttpDecompressError<'_> {
     fn emit(self) {
         error!(
             message = "Failed decompressing payload.",
@@ -168,7 +170,7 @@ pub struct HttpInternalError<'a> {
     pub message: &'a str,
 }
 
-impl<'a> InternalEvent for HttpInternalError<'a> {
+impl InternalEvent for HttpInternalError<'_> {
     fn emit(self) {
         error!(
             message = %self.message,

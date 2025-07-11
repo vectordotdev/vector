@@ -132,7 +132,7 @@ pub struct ValidationConfiguration {
 
 impl ValidationConfiguration {
     /// Creates a new `ValidationConfiguration` for a source.
-    pub fn from_source(
+    pub const fn from_source(
         component_name: &'static str,
         log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,
@@ -146,7 +146,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a transform.
-    pub fn from_transform(
+    pub const fn from_transform(
         component_name: &'static str,
         log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,
@@ -160,7 +160,7 @@ impl ValidationConfiguration {
     }
 
     /// Creates a new `ValidationConfiguration` for a sink.
-    pub fn from_sink(
+    pub const fn from_sink(
         component_name: &'static str,
         log_namespace: LogNamespace,
         component_configurations: Vec<ComponentTestCaseConfig>,

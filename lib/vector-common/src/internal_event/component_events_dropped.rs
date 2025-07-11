@@ -10,7 +10,7 @@ pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub reason: &'a str,
 }
 
-impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
+impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTENTIONAL> {
     fn emit(self) {
         let count = self.count;
         self.register().emit(Count(count));
@@ -48,7 +48,7 @@ pub struct DroppedHandle<'a, const INTENDED: bool> {
     reason: &'a str,
 }
 
-impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDED> {
+impl<const INTENDED: bool> InternalEventHandle for DroppedHandle<'_, INTENDED> {
     type Data = Count;
     fn emit(&self, data: Self::Data) {
         let message = "Events dropped";
@@ -58,7 +58,6 @@ impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDE
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
-                internal_log_rate_limit = true,
             );
         } else {
             error!(
@@ -66,7 +65,6 @@ impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDE
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
-                internal_log_rate_limit = true,
             );
         }
         self.discarded_events.increment(data.0 as u64);

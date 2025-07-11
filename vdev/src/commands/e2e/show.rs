@@ -13,6 +13,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::show::exec(&self.test, E2E_TESTS_DIR)
+        crate::commands::compose_tests::show::exec(self.test.as_ref(), E2E_TESTS_DIR)
     }
 }

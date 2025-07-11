@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"t","tags":{"c":"j","q":"q"},"interval_ms":1560054956,"kind":"incremental","gauge":{"value":434176.0}}}

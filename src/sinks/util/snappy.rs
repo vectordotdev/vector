@@ -19,7 +19,7 @@ pub struct SnappyEncoder<W: io::Write> {
 }
 
 impl<W: io::Write> SnappyEncoder<W> {
-    pub fn new(writer: W) -> Self {
+    pub const fn new(writer: W) -> Self {
         Self {
             writer,
             buffer: Vec::new(),

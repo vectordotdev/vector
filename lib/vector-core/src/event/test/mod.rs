@@ -21,10 +21,13 @@ fn event_iteration() {
     assert_eq!(
         all,
         vec![
-            ("Ke$ha".into(), "It's going down, I'm yelling timber".into()),
             (
                 "Pitbull".into(),
                 "The bigger they are, the harder they fall".into()
+            ),
+            (
+                "\"Ke$ha\"".into(),
+                "It's going down, I'm yelling timber".into()
             ),
         ]
         .into_iter()

@@ -645,10 +645,6 @@ release-push: ## Push new Vector version
 release-s3: ## Release artifacts to S3
 	@cargo vdev release s3
 
-.PHONY: sync-install
-sync-install: ## Sync the install.sh script for access via sh.vector.dev
-	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
-
 .PHONY: sha256sum
 sha256sum: ## Generate SHA256 checksums of CI artifacts
 	scripts/checksum.sh

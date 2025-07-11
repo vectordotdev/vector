@@ -36,7 +36,7 @@ impl Cli {
     pub fn exec(self) -> Result<()> {
         crate::commands::compose_tests::test::exec::<IntegrationTest>(
             &self.integration,
-            &self.environment,
+            self.environment.as_ref(),
             self.build_all,
             self.retries.unwrap_or_default(),
             &self.args,

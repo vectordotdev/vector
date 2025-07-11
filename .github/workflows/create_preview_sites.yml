@@ -22,85 +22,163 @@ on:
         description: "Request endpoint"
         required: true
 
+permissions:
+  issues: write
+  pull-requests: write
+  statuses: write
+  actions: read
+
 jobs:
   create_preview_site:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      # Get the artifacts with the PR number and branch name
+      - name: Download artifact
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: ${{ github.event.workflow_run.id }},
+            });
+            const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
+            const download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            fs.writeFileSync('${{ github.workspace }}/pr.zip', Buffer.from(download.data));
 
-    # Get the artifacts with the PR number and branch name
-    - name: Download artifact
-      uses: actions/github-script@v7.0.1
-      with:
-        script: |
-          const fs = require('fs');
-          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-             owner: context.repo.owner,
-             repo: context.repo.repo,
-             run_id: ${{ github.event.workflow_run.id }},
-          });
-          const matchArtifact = artifacts.data.artifacts.filter(artifact => artifact.name == "pr")[0];
-          const download = await github.rest.actions.downloadArtifact({
-             owner: context.repo.owner,
-             repo: context.repo.repo,
-             artifact_id: matchArtifact.id,
-             archive_format: 'zip',
-          });
-          fs.writeFileSync('${{ github.workspace }}/pr.zip', Buffer.from(download.data));
+      # Extract the info from the artifact and set variables
+      - name: Extract PR info from artifact
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            const path = require('path');
 
-    # Extract the info from the artifact and set variables
-    - name: Extract PR info from artifact
-      run: |
-        unzip pr.zip -d pr
-        BRANCH_NAME=$(cat ./pr/branch)
-        SANITIZED_BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/[\/\.]/-/g')
-        echo "SANITIZED_BRANCH_NAME=$SANITIZED_BRANCH_NAME" >> $GITHUB_ENV
-        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+            execSync('unzip pr.zip -d pr');
+            const branchName = fs.readFileSync(path.join('pr', 'branch'), 'utf8').trim();
+            const prNumber = fs.readFileSync(path.join('pr', 'number'), 'utf8').trim();
+            const integrity = fs.readFileSync(path.join('pr', 'integrity'), 'utf8').trim();
 
-    # Kick off the job in amplify
-    - name: Deploy Site
-      env:
-        APP_ID: ${{ inputs.APP_ID }}
-        APP_NAME: ${{ inputs.APP_NAME }}
-        REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
-        REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
-        ENDPOINT: ${{ secrets.ENDPOINT }}
-      run: |
-        sleep 20
-        HMAC_KEY=$(echo -n $REQUEST_MESSAGE | openssl dgst -sha256 -hmac "$REQUEST_TOKEN" | cut -d" " -f2)
-        SIGNATURE="sha256=$HMAC_KEY"
-        RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-             -H "Content-Type: application/json" \
-             -H "X-Hub-Signature: $SIGNATURE" \
-             -d "{\"app_id\": \"$APP_ID\", \"branch_name\": \"$BRANCH_NAME\"}" \
-          "$ENDPOINT")
+            // Validate branch name again (only allow alphanumeric, dash, and underscore)
+            const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
+            if (!branchNameRegex.test(branchName)) {
+              core.setFailed(`Invalid branch name detected: ${branchName}`);
+              return;
+            }
 
-        # check the response code and fail if not 200
-        if [ "$RESPONSE_CODE" != "200" ]; then
-          echo "Request failed with response code $RESPONSE_CODE"
-          exit 1
-        fi
+            const sanitizedBranchName = branchName.replace(/[\/\.]/g, '-');
+            core.exportVariable('SANITIZED_BRANCH_NAME', sanitizedBranchName);
+            core.exportVariable('BRANCH_NAME', branchName);
+            core.exportVariable('PR_NUMBER', prNumber);
+            core.exportVariable('INTEGRITY', integrity);
 
-    # Add preview link to comment if all 3 sites successfully start
-    - name: Comment Preview Link
-      if: success()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        APP_ID: ${{ inputs.APP_ID }}
-        APP_NAME: ${{ inputs.APP_NAME }}
-      uses: actions/github-script@v7.0.1
-      with:
-        script: |
-          const fs = require('fs');
-          const prNumber = fs.readFileSync('./pr/number', 'utf8');
-          const issueNumber = parseInt(prNumber);
-          const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env
+      # Validate the integrity of the artifact
+      - name: Validate Artifact Integrity
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const crypto = require('crypto');
 
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: issueNumber,
-            body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
-          });
+            const prNumber = process.env.PR_NUMBER;
+            const branchName = process.env.BRANCH_NAME;
+            const integrity = process.env.INTEGRITY;
 
+            const numberHash = crypto.createHash('sha256').update(prNumber).digest('hex');
+            const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
+            const expectedIntegrity = `${numberHash}:${branchHash}`;
 
+            if (expectedIntegrity !== integrity) {
+              core.setFailed('Artifact integrity validation failed');
+            }
+
+      # Kick off the job in amplify
+      - name: Deploy Site
+        uses: actions/github-script@v7.0.1
+        env:
+          APP_ID: ${{ inputs.APP_ID }}
+          APP_NAME: ${{ inputs.APP_NAME }}
+          REQUEST_TOKEN: ${{ secrets.REQUEST_TOKEN }}
+          REQUEST_MESSAGE: ${{ secrets.REQUEST_MESSAGE }}
+          ENDPOINT: ${{ secrets.ENDPOINT }}
+        with:
+          script: |
+            const crypto = require('crypto');
+            const https = require('https');
+
+            // Access secrets through environment variables
+            const appId = process.env.APP_ID;
+            const appName = process.env.APP_NAME;
+            const requestToken = process.env.REQUEST_TOKEN;
+            const requestMessage = process.env.REQUEST_MESSAGE;
+            const endpoint = process.env.ENDPOINT;
+            const sanitizedBranchName = process.env.SANITIZED_BRANCH_NAME;
+
+            const hmacKey = crypto.createHmac('sha256', requestToken).update(requestMessage).digest('hex');
+            const signature = `sha256=${hmacKey}`;
+
+            const makeRequest = () => {
+              return new Promise((resolve, reject) => {
+                const options = {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Hub-Signature': signature,
+                  }
+                };
+
+                const req = https.request(endpoint, options, (res) => {
+                  let data = '';
+                  res.on('data', (chunk) => { data += chunk; });
+                  res.on('end', () => {
+                    resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode });
+                  });
+                });
+
+                req.on('error', (error) => {
+                  reject(error);
+                });
+
+                req.write(JSON.stringify({
+                  app_id: appId,
+                  branch_name: sanitizedBranchName,
+                }));
+
+                req.end();
+              });
+            };
+
+            const response = await makeRequest();
+
+            if (!response.ok) {
+              core.setFailed(`Request failed with response code ${response.status}`);
+            }
+
+      # Add preview link to comment if all 3 sites successfully start
+      - name: Comment Preview Link
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_ID: ${{ inputs.APP_ID }}
+          APP_NAME: ${{ inputs.APP_NAME }}
+        uses: actions/github-script@v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = fs.readFileSync('./pr/number', 'utf8');
+            const issueNumber = parseInt(prNumber);
+            const { APP_ID, APP_NAME, SANITIZED_BRANCH_NAME } = process.env;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `Your preview site for the **${APP_NAME}** will be ready in a few minutes, please allow time for it to build. \n \n Heres your preview link: \n [${APP_NAME} preview](https://${SANITIZED_BRANCH_NAME}.${APP_ID}.amplifyapp.com)`
+            });
