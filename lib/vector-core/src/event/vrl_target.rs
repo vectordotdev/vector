@@ -551,108 +551,84 @@ fn target_get_mut_metric<'a>(
 fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
     let mut map = ObjectMap::default();
 
-    let mut set_name = false;
-    let mut set_kind = false;
-    let mut set_type = false;
-    let mut set_namespace = false;
-    let mut set_timestamp = false;
-    let mut set_interval_ms = false;
-    let mut set_tags = false;
+    struct MetricProperty {
+        property: &'static str,
+        getter: fn(&Metric) -> Option<Value>,
+        set: bool,
+    }
+
+    impl MetricProperty {
+        fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
+            Self {
+                property,
+                getter,
+                set: false,
+            }
+        }
+
+        fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
+            if self.set {
+                return;
+            }
+            if let Some(value) = (self.getter)(metric) {
+                map.insert(self.property.into(), value);
+                self.set = true;
+            }
+        }
+    }
+
+    let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
+    let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
+    let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
+    let mut namespace = MetricProperty::new("namespace", |metric| {
+        metric.namespace().map(String::from).map(Into::into)
+    });
+    let mut interval_ms =
+        MetricProperty::new("interval_ms", |metric| metric.interval_ms().map(Into::into));
+    let mut timestamp =
+        MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
+    let mut tags = MetricProperty::new("tags", |metric| {
+        metric.tags().cloned().map(|tags| {
+            tags.into_iter_single()
+                .map(|(tag, value)| (tag.into(), value.into()))
+                .collect::<ObjectMap>()
+                .into()
+        })
+    });
 
     for target_path in &info.target_queries {
         // Accessing a root path requires us to pre-populate all fields.
         if target_path == &OwnedTargetPath::event_root() {
-            if !set_name {
-                map.insert("name".into(), metric.name().to_owned().into());
-            }
-
-            if !set_kind {
-                map.insert("kind".into(), metric.kind().into());
-            }
-
-            if !set_type {
-                map.insert("type".into(), metric.value().clone().into());
-            }
-
-            if !set_namespace {
-                if let Some(namespace) = metric.namespace() {
-                    map.insert("namespace".into(), namespace.to_owned().into());
-                }
-            }
-
-            if !set_timestamp {
-                if let Some(timestamp) = metric.timestamp() {
-                    map.insert("timestamp".into(), timestamp.into());
-                }
-            }
-
-            if !set_interval_ms {
-                if let Some(interval_ms) = metric.interval_ms() {
-                    map.insert("interval_ms".into(), interval_ms.into());
-                }
-            }
-
-            if !set_tags {
-                if let Some(tags) = metric.tags().cloned() {
-                    map.insert(
-                        "tags".into(),
-                        tags.into_iter_single()
-                            .map(|(tag, value)| (tag.into(), value.into()))
-                            .collect::<ObjectMap>()
-                            .into(),
-                    );
-                }
-            }
-
+            let mut properties = [
+                &mut name,
+                &mut kind,
+                &mut type_,
+                &mut namespace,
+                &mut interval_ms,
+                &mut timestamp,
+                &mut tags,
+            ];
+            properties
+                .iter_mut()
+                .for_each(|property| property.insert(metric, &mut map));
             break;
         }
 
         // For non-root paths, we continuously populate the value with the
         // relevant data.
         if let Some(OwnedSegment::Field(field)) = target_path.path.segments.first() {
-            match field.as_ref() {
-                "name" if !set_name => {
-                    set_name = true;
-                    map.insert("name".into(), metric.name().to_owned().into());
-                }
-                "kind" if !set_kind => {
-                    set_kind = true;
-                    map.insert("kind".into(), metric.kind().into());
-                }
-                "type" if !set_type => {
-                    set_type = true;
-                    map.insert("type".into(), metric.value().clone().into());
-                }
-                "namespace" if !set_namespace && metric.namespace().is_some() => {
-                    set_namespace = true;
-                    map.insert(
-                        "namespace".into(),
-                        metric.namespace().unwrap().to_owned().into(),
-                    );
-                }
-                "timestamp" if !set_timestamp && metric.timestamp().is_some() => {
-                    set_timestamp = true;
-                    map.insert("timestamp".into(), metric.timestamp().unwrap().into());
-                }
-                "interval_ms" if !set_interval_ms && metric.interval_ms().is_some() => {
-                    set_interval_ms = true;
-                    map.insert("interval_ms".into(), metric.interval_ms().unwrap().into());
-                }
-                "tags" if !set_tags && metric.tags().is_some() => {
-                    set_tags = true;
-                    map.insert(
-                        "tags".into(),
-                        metric
-                            .tags()
-                            .cloned()
-                            .unwrap()
-                            .into_iter_single()
-                            .map(|(tag, value)| (tag.into(), value.into()))
-                            .collect::<ObjectMap>()
-                            .into(),
-                    );
-                }
-                _ => {}
+            let property = match field.as_ref() {
+                "name" => Some(&mut name),
+                "kind" => Some(&mut kind),
+                "type" => Some(&mut type_),
+                "namespace" => Some(&mut namespace),
+                "timestamp" => Some(&mut timestamp),
+                "interval_ms" => Some(&mut interval_ms),
+                "tags" => Some(&mut tags),
+                _ => None,
+            };
+            if let Some(property) = property {
+                property.insert(metric, &mut map);
             }
         }
     }
