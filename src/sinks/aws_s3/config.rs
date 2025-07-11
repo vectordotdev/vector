@@ -4,9 +4,7 @@ use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::sink::VectorSink;
-use vector_lib::TimeZone;
+use vector_lib::{configurable::configurable_component, sink::VectorSink, TimeZone};
 
 use super::sink::S3RequestOptions;
 use crate::{
@@ -151,7 +149,10 @@ pub struct S3SinkConfig {
     /// By default, the sink only retries attempts it deems possible to retry.
     /// These settings override the default behavior.
     #[configurable(derived)]
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "vector_lib::serde::is_default"
+    )]
     pub retry_strategy: RetryStrategy,
 }
 

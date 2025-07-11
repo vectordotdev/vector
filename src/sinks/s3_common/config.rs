@@ -340,19 +340,22 @@ fn should_retry_error(
 ///
 /// [error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 #[configurable_component]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
 pub enum RetryStrategy {
     /// Don't retry any errors
     #[default]
     None,
 
     /// Retry on *all* errors
-    #[serde(rename = "all")]
     All,
 
-    /// Retry only on these HTTP status codes
-    #[serde(rename = "status_codes")]
-    StatusCodes(Vec<u16>),
+    /// Custom retry strategy
+    Custom {
+        /// Retry only on these HTTP status codes
+        status_codes: Vec<u16>
+    },
 }
 
 impl RetryLogic for RetryStrategy {
@@ -363,8 +366,8 @@ impl RetryLogic for RetryStrategy {
         match self {
             RetryStrategy::None => false,
             RetryStrategy::All => true,
-            RetryStrategy::StatusCodes(codes) => {
-                is_retriable_error(error) || should_retry_error(Some(codes.clone()), error)
+            RetryStrategy::Custom { status_codes } => {
+                is_retriable_error(error) || should_retry_error(Some(status_codes.clone()), error)
             }
         }
     }

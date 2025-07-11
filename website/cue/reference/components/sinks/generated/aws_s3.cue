@@ -1056,16 +1056,23 @@ generated: components: sinks: aws_s3: configuration: {
 			These settings override the default behavior.
 			"""
 		required: false
-		type: {
-			object: options: status_codes: {
-				required: true
+		type: object: options: {
+			status_codes: {
+				description:   "Retry only on these HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
 				type: array: items: type: uint: {}
 			}
-			string: {
-				default: "None"
-				enum: {
-					None: "Don't retry any errors"
-					all:  "Retry on *all* errors"
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "none"
+					enum: {
+						all:    "Retry on *all* errors"
+						custom: "Custom retry strategy"
+						none:   "Don't retry any errors"
+					}
 				}
 			}
 		}
