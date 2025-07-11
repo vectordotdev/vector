@@ -204,7 +204,7 @@ impl DiskUsage {
 pub enum MemoryBufferSize {
     /// Express the maximum size of the buffer as number of elements.
     MaxEvents {
-        /// The maximum number of events the buffer can hold.
+        /// The maximum number of events allowed in the buffer.
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: NonZeroUsize,
     },
@@ -212,6 +212,8 @@ pub enum MemoryBufferSize {
     /// Express the maximum size of the buffer in terms of bytes allocated.
     MaxSize {
         /// The maximum allowed amount of allocated memory the buffer can hold.
+        ///
+        /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
         #[configurable(metadata(docs::type_unit = "bytes"))]
         max_size: NonZeroUsize,
     },
