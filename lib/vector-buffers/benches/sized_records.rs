@@ -87,10 +87,10 @@ fn create_disk_v2_variant(_max_events: usize, max_size: u64) -> BufferType {
 fn create_in_memory_variant(bound_by: BoundBy, max_events: usize, max_size: u64) -> BufferType {
     let size = match bound_by {
         BoundBy::Bytes => MemoryBufferSize::MaxSize {
-            max_bytes: NonZeroUsize::new(max_size as usize).unwrap(),
+            max_size: NonZeroUsize::new(max_size as usize).unwrap(),
         },
         BoundBy::NumberEvents => MemoryBufferSize::MaxEvents {
-            max_size: NonZeroUsize::new(max_events).unwrap(),
+            max_events: NonZeroUsize::new(max_events).unwrap(),
         },
     };
     BufferType::Memory {

@@ -48,7 +48,7 @@ pub struct BasicSourceConfig {
 impl Default for BasicSourceConfig {
     fn default() -> Self {
         let (_, receiver) = limited(MemoryBufferSize::MaxEvents {
-            max_size: NonZeroUsize::new(1000).unwrap(),
+            max_events: NonZeroUsize::new(1000).unwrap(),
         });
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),

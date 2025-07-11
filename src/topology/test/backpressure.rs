@@ -99,7 +99,7 @@ async fn buffer_drop_fan_out() {
     );
     sink_outer.buffer = BufferConfig::Single(BufferType::Memory {
         size: MemoryBufferSize::MaxEvents {
-            max_size: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
+            max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
         },
         when_full: WhenFull::DropNewest,
     });

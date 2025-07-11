@@ -394,7 +394,7 @@ impl Output {
         output_id: OutputId,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents {
-            max_size: NonZeroUsize::new(n).unwrap(),
+            max_events: NonZeroUsize::new(n).unwrap(),
         });
         (
             Self {

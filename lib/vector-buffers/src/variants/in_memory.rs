@@ -23,7 +23,7 @@ impl MemoryBuffer {
 
     pub fn with_max_events(n: NonZeroUsize) -> Self {
         Self {
-            capacity: MemoryBufferSize::MaxEvents { max_size: n },
+            capacity: MemoryBufferSize::MaxEvents { max_events: n },
         }
     }
 }
@@ -38,8 +38,8 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         let (max_bytes, max_size) = match self.capacity {
-            MemoryBufferSize::MaxSize { max_bytes } => (Some(max_bytes.get() as u64), None),
-            MemoryBufferSize::MaxEvents { max_size } => (None, Some(max_size.get())),
+            MemoryBufferSize::MaxSize { max_size } => (Some(max_size.get() as u64), None),
+            MemoryBufferSize::MaxEvents { max_events } => (None, Some(max_events.get())),
         };
 
         usage_handle.set_buffer_limits(max_bytes, max_size);

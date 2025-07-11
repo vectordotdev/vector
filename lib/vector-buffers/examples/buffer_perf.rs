@@ -262,7 +262,7 @@ where
             );
             BufferType::Memory {
                 size: MemoryBufferSize::MaxEvents {
-                    max_size: max_size_events,
+                    max_events: max_size_events,
                 },
                 when_full,
             }
