@@ -57,7 +57,7 @@ components: sources: kubernetes_logs: {
 		platform_name: "kubernetes"
 	}
 
-	configuration: base.components.sources.kubernetes_logs.configuration
+	configuration: generated.components.sources.kubernetes_logs.configuration
 
 	output: logs: line: {
 		description: "An individual line from a `Pod` log file."
