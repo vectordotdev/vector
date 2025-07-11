@@ -55,7 +55,7 @@ components: sources: statsd: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.statsd.configuration
+	configuration: generated.components.sources.statsd.configuration
 
 	output: metrics: {
 		counter:      output._passthrough_counter

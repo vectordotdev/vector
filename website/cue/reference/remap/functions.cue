@@ -66,14 +66,18 @@ remap: {
 		This function returns the rows that match the provided condition(s). _All_ fields need to
 		match for rows to be returned; if any fields do not match, then no rows are returned.
 
-		There are currently two forms of search criteria:
+		There are currently three forms of search criteria:
 
 		1. **Exact match search**. The given field must match the value exactly. Case sensitivity
 		   can be specified using the `case_sensitive` argument. An exact match search can use an
 		   index directly into the dataset, which should make this search fairly "cheap" from a
 		   performance perspective.
 
-		2. **Date range search**. The given field must be greater than or equal to the `from` date
+		2. **Wildcard match search**. The given fields specified by the exact match search may also
+		    be matched exactly to the value provided to the `wildcard` parameter.
+		    A wildcard match search can also use an index directly into the dataset.
+
+		3. **Date range search**. The given field must be greater than or equal to the `from` date
 		   and/or less than or equal to the `to` date. A date range search involves
 		   sequentially scanning through the rows that have been located using any exact match
 		   criteria. This can be an expensive operation if there are many rows returned by any exact

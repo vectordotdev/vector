@@ -257,7 +257,7 @@ impl InnerCreds {
 }
 
 async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
-    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
+    let claims = JwtClaims::new(creds.iss(), &[scope.clone()], creds.token_uri(), None, None);
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 
