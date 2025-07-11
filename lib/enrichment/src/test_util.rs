@@ -39,6 +39,7 @@ impl Table for DummyEnrichmentTable {
         _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         Ok(self.data.clone())
@@ -49,6 +50,7 @@ impl Table for DummyEnrichmentTable {
         _case: Case,
         _condition: &[Condition],
         _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         Ok(vec![self.data.clone()])

@@ -51,7 +51,7 @@ components: sources: mongodb_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.mongodb_metrics.configuration
+	configuration: generated.components.sources.mongodb_metrics.configuration
 
 	how_it_works: {
 		mod_status: {
