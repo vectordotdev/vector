@@ -56,7 +56,7 @@ remap: functions: find_enrichment_table_records: {
 				  case_sensitive: false)
 				"""#
 			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
-					{"id":          2, "firstname":   "Fred", "surname": "Smith"},
+				{"id": 2, "firstname": "Fred", "surname": "Smith"},
 			]
 		},
 		{
@@ -72,7 +72,7 @@ remap: functions: find_enrichment_table_records: {
 				  })
 				"""#
 			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
-					{"id":          2, "firstname":   "Fred", "surname": "Smith"},
+				{"id": 2, "firstname": "Fred", "surname": "Smith"},
 			]
 		},
 	]
