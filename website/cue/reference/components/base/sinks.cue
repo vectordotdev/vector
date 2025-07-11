@@ -19,8 +19,12 @@ base: components: sinks: configuration: {
 				type: uint: default: 500
 			}
 			max_size: {
-				description: "The maximum size across all events allowed in the buffer."
-				required:    false
+				description: """
+					The maximum allowed amount of allocated memory the buffer can hold.
+
+					If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
+					"""
+				required: true
 				type: uint: unit: "bytes"
 			}
 			type: {
