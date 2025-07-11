@@ -549,8 +549,6 @@ fn target_get_mut_metric<'a>(
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
 fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
-    let mut map = ObjectMap::default();
-
     struct MetricProperty {
         property: &'static str,
         getter: fn(&Metric) -> Option<Value>,
@@ -595,6 +593,8 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 .into()
         })
     });
+
+    let mut map = ObjectMap::default();
 
     for target_path in &info.target_queries {
         // Accessing a root path requires us to pre-populate all fields.
