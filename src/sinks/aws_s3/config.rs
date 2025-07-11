@@ -147,12 +147,9 @@ pub struct S3SinkConfig {
     /// Specifies errors to retry
     ///
     /// By default, the sink only retries attempts it deems possible to retry.
-    /// These settings override the default behavior.
+    /// These settings extend the default behavior.
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_lib::serde::is_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub retry_strategy: RetryStrategy,
 }
 

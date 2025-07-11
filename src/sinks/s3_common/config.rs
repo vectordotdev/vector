@@ -353,8 +353,8 @@ pub enum RetryStrategy {
 
     /// Custom retry strategy
     Custom {
-        /// Retry only on these HTTP status codes
-        status_codes: Vec<u16>
+        /// Retry on these specific HTTP status codes
+        status_codes: Vec<u16>,
     },
 }
 

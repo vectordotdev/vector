@@ -1053,12 +1053,12 @@ generated: components: sinks: aws_s3: configuration: {
 			Specifies errors to retry
 
 			By default, the sink only retries attempts it deems possible to retry.
-			These settings override the default behavior.
+			These settings extend the default behavior.
 			"""
 		required: false
 		type: object: options: {
 			status_codes: {
-				description:   "Retry only on these HTTP status codes"
+				description:   "Retry on these specific HTTP status codes"
 				relevant_when: "type = \"custom\""
 				required:      true
 				type: array: items: type: uint: {}
