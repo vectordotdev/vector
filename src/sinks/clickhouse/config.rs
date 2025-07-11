@@ -130,7 +130,6 @@ pub struct QuerySettingsConfig {
     pub async_insert_settings: AsyncInsertSettingsConfig,
 }
 
-
 /// Async insert related settings for the `clickhouse` sink.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default)]

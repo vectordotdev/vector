@@ -158,7 +158,11 @@ fn set_uri_query(
     if insert_random_shard {
         uri.push_str("insert_distributed_one_random_shard=1&")
     }
-    append_param_bool(&mut uri, "async_insert", query_settings.async_insert_settings.enabled);
+    append_param_bool(
+        &mut uri,
+        "async_insert",
+        query_settings.async_insert_settings.enabled,
+    );
     append_param_bool(
         &mut uri,
         "wait_for_async_insert",
@@ -167,7 +171,9 @@ fn set_uri_query(
     append_param(
         &mut uri,
         "wait_for_async_insert_timeout",
-        query_settings.async_insert_settings.wait_for_processing_timeout,
+        query_settings
+            .async_insert_settings
+            .wait_for_processing_timeout,
     );
     append_param_bool(
         &mut uri,

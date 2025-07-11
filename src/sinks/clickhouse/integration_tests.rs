@@ -29,7 +29,7 @@ use crate::{
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_table_name, trace_init,
-    }
+    },
 };
 
 fn clickhouse_address() -> String {
