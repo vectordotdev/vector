@@ -69,8 +69,10 @@ remap: functions: replace: {
 			return: "Pineapples and Bananas"
 		},
 		{
-			title: "Replace with capture groups (Note: Use `$$num` in config files)"
+			title: "Replace with capture groups when not set in the configuration file (use `$$num` in config files)"
 			source: #"""
+				# Note that in the context of Vector configuration files, an extra `$` escape character is required
+				# (i.e. `$$num`) to avoid interepreting `num` as an environment variable.
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
 				"""#
 			return: "123"
