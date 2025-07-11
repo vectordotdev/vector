@@ -120,8 +120,8 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
         let (limit, value) = match self.inner.limit {
-            MemoryBufferSize::MaxSize(max_size) => (max_size, item.allocated_bytes()),
-            MemoryBufferSize::MaxEvents(max_events) => (max_events, item.event_count()),
+            MemoryBufferSize::MaxSize { max_bytes } => (max_bytes, item.allocated_bytes()),
+            MemoryBufferSize::MaxEvents { max_size } => (max_size, item.event_count()),
         };
         cmp::min(limit.get(), value) as u32
     }
