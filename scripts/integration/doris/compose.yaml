@@ -1,0 +1,13 @@
+version: "3"
+services:
+  doris:
+    image: docker.io/yagagagaga/doris-standalone:${CONFIG_VERSION}
+    container_name: doris
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8030"
+      - "9030"
+      - "8040"
+    environment:
+      - SKIP_CHECK_ULIMIT=true
