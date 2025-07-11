@@ -39,7 +39,7 @@ pub(super) enum RedisConnection {
 }
 
 impl RedisConnection {
-    pub(super) fn new_direct(conn: ConnectionManager) -> Self {
+    pub(super) const fn new_direct(conn: ConnectionManager) -> Self {
         Self::Direct(conn)
     }
 

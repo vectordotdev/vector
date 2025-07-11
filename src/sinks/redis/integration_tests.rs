@@ -51,6 +51,7 @@ async fn redis_sink_sentinel_reaches_primary() {
             ..Default::default()
         },
         sentinel_service: Some("vector".to_owned()),
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -88,6 +89,7 @@ async fn redis_sink_sentinel_rpush() {
             ..Default::default()
         },
         sentinel_service: Some("vector".to_owned()),
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -159,6 +161,7 @@ async fn redis_sink_list_lpush() {
             ..Default::default()
         },
         sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -230,6 +233,7 @@ async fn redis_sink_list_rpush() {
             ..Default::default()
         },
         sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -314,6 +318,7 @@ async fn redis_sink_channel() {
             ..Default::default()
         },
         sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -390,6 +395,7 @@ async fn redis_sink_channel_data_volume_tags() {
             ..Default::default()
         },
         sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -440,6 +446,7 @@ async fn redis_sink_metrics() {
             ..Default::default()
         },
         sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -538,6 +545,7 @@ async fn redis_sink_traces() {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             sentinel_service: None,
+            sentinel_connect: None,
             acknowledgements: Default::default(),
         };
 
