@@ -137,7 +137,7 @@ pub struct VectorConfig {
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 impl VectorConfig {
@@ -172,7 +172,7 @@ impl GenerateConfig for VectorConfig {
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_settings = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
@@ -200,7 +200,10 @@ impl SourceConfig for VectorConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {

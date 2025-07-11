@@ -2,4 +2,4 @@
 type: "file"
 include: # supports globbing
   - "/var/log/apache2/*.log"
-ignore_older: 86400 # 1 day
+ignore_older_secs: 86400 # 1 day

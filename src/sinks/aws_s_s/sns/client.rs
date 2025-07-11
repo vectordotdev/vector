@@ -16,7 +16,6 @@ impl SnsMessagePublisher {
     }
 }
 
-#[async_trait::async_trait]
 impl Client<PublishError> for SnsMessagePublisher {
     async fn send_message(
         &self,

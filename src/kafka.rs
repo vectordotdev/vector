@@ -115,7 +115,7 @@ impl KafkaAuthConfig {
             if let Some(verify_certificate) = &tls.options.verify_certificate {
                 client.set(
                     "enable.ssl.certificate.verification",
-                    &verify_certificate.to_string(),
+                    verify_certificate.to_string(),
                 );
             }
 

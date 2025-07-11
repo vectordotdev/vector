@@ -2,10 +2,11 @@ use std::sync::{atomic::Ordering, Arc, RwLock};
 use std::{cell::OnceCell, time::Duration};
 
 use chrono::Utc;
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
 use quanta::Clock;
 
+use super::metric_matcher::MetricKeyMatcher;
 use super::recency::{GenerationalStorage, Recency};
 use super::storage::VectorStorage;
 use crate::event::{Metric, MetricValue};
@@ -15,7 +16,7 @@ thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new(
 #[allow(dead_code)]
 pub(super) struct Registry {
     registry: MetricsRegistry<Key, GenerationalStorage<VectorStorage>>,
-    recency: RwLock<Option<Recency<Key>>>,
+    recency: RwLock<Option<Recency<Key, MetricKeyMatcher>>>,
 }
 
 impl Registry {
@@ -30,8 +31,21 @@ impl Registry {
         self.registry.clear();
     }
 
-    pub(super) fn set_expiry(&self, timeout: Option<Duration>) {
-        let recency = timeout.map(|_| Recency::new(Clock::new(), MetricKindMask::ALL, timeout));
+    pub(super) fn set_expiry(
+        &self,
+        global_timeout: Option<Duration>,
+        expire_metrics_per_metric_set: Vec<(MetricKeyMatcher, Duration)>,
+    ) {
+        let recency = if global_timeout.is_none() && expire_metrics_per_metric_set.is_empty() {
+            None
+        } else {
+            Some(Recency::new(
+                Clock::new(),
+                MetricKindMask::ALL,
+                global_timeout,
+                expire_metrics_per_metric_set,
+            ))
+        };
         *(self.recency.write()).expect("Failed to acquire write lock on recency map") = recency;
     }
 
@@ -46,9 +60,9 @@ impl Registry {
         let recency = recency.as_ref();
 
         for (key, counter) in self.registry.get_counter_handles() {
-            if recency.map_or(true, |recency| {
-                recency.should_store_counter(&key, &counter, &self.registry)
-            }) {
+            if recency
+                .is_none_or(|recency| recency.should_store_counter(&key, &counter, &self.registry))
+            {
                 // NOTE this will truncate if the value is greater than 2**52.
                 #[allow(clippy::cast_precision_loss)]
                 let value = counter.get_inner().load(Ordering::Relaxed) as f64;
@@ -57,16 +71,16 @@ impl Registry {
             }
         }
         for (key, gauge) in self.registry.get_gauge_handles() {
-            if recency.map_or(true, |recency| {
-                recency.should_store_gauge(&key, &gauge, &self.registry)
-            }) {
+            if recency
+                .is_none_or(|recency| recency.should_store_gauge(&key, &gauge, &self.registry))
+            {
                 let value = gauge.get_inner().load(Ordering::Relaxed);
                 let value = MetricValue::Gauge { value };
                 metrics.push(Metric::from_metric_kv(&key, value, timestamp));
             }
         }
         for (key, histogram) in self.registry.get_histogram_handles() {
-            if recency.map_or(true, |recency| {
+            if recency.is_none_or(|recency| {
                 recency.should_store_histogram(&key, &histogram, &self.registry)
             }) {
                 let value = histogram.get_inner().make_metric();
@@ -93,6 +107,17 @@ impl Registry {
 
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
+///
+/// TODO: The latest version of the `metrics` crate has a test recorder interface that could be used
+/// to replace this whole global/local switching mechanism, as it effectively does the exact same
+/// thing internally. However, it is only available through a `with_test_recorder` function that
+/// takes a closure and cleans up the test recorder once the closure finishes. This is a much
+/// cleaner interface, but interacts poorly with async code as used by the component tests. The best
+/// path forward to make async tests work, then, is to replace the standard `#[tokio::test]` proc
+/// macro wrapper with an alternate wrapper that does the normal tokio setup from within the
+/// `with_test_recorder` closure, and use it across all the tests that require a test
+/// recorder. Given the large number of such tests, we are retaining this global test recorder hack
+/// here, but some day we should refactor the tests to eliminate it.
 #[derive(Clone)]
 pub(super) enum VectorRecorder {
     Global(Arc<Registry>),
@@ -124,15 +149,15 @@ impl VectorRecorder {
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: &Key) -> Counter {
+    fn register_counter(&self, key: &Key, _: &Metadata<'_>) -> Counter {
         self.with_registry(|r| r.get_counter(key))
     }
 
-    fn register_gauge(&self, key: &Key) -> Gauge {
+    fn register_gauge(&self, key: &Key, _: &Metadata<'_>) -> Gauge {
         self.with_registry(|r| r.get_gauge(key))
     }
 
-    fn register_histogram(&self, key: &Key) -> Histogram {
+    fn register_histogram(&self, key: &Key, _: &Metadata<'_>) -> Histogram {
         self.with_registry(|r| r.get_histogram(key))
     }
 

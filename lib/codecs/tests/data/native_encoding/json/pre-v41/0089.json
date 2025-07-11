@@ -1,0 +1,1 @@
+{"metric":{"name":"b","namespace":"c","tags":{"a":"b","d":"b"},"interval_ms":209331180,"kind":"absolute","gauge":{"value":-113472.0}}}

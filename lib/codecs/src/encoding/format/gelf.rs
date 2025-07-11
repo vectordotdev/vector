@@ -19,12 +19,18 @@ use vector_core::{
 ///   of vector will still work.
 ///   The exception is that if 'Additional fields' are found to be missing an underscore prefix and
 ///   are otherwise valid field names, we prepend the underscore.
-
+///
 /// Errors that can occur during GELF serialization.
 #[derive(Debug, Snafu)]
 pub enum GelfSerializerError {
     #[snafu(display(r#"LogEvent does not contain required field: "{}""#, field))]
     MissingField { field: KeyString },
+    #[snafu(display(
+        r#"LogEvent contains field with invalid name not matching pattern '{}': "{}""#,
+        pattern,
+        field,
+    ))]
+    InvalidField { field: KeyString, pattern: String },
     #[snafu(display(
         r#"LogEvent contains a value with an invalid type. field = "{}" type = "{}" expected type = "{}""#,
         field,
@@ -36,8 +42,6 @@ pub enum GelfSerializerError {
         actual_type: String,
         expected_type: String,
     },
-    #[snafu(display(r#"LogEvent contains an invalid field name. field = "{}""#, field))]
-    InvalidFieldName { field: String },
 }
 
 /// Config used to build a `GelfSerializer`.
@@ -192,8 +196,9 @@ fn coerce_field_names_and_values(
                 _ => {
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD_REGEX.is_match(field) {
-                        return MissingFieldSnafu {
+                        return InvalidFieldSnafu {
                             field: field.clone(),
+                            pattern: VALID_FIELD_REGEX.to_string(),
                         }
                         .fail()
                         .map_err(|e| e.to_string().into());

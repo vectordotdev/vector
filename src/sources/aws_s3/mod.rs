@@ -130,6 +130,13 @@ pub struct AwsS3Config {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
+
+    /// Specifies which addressing style to use.
+    ///
+    /// This controls whether the bucket name is in the hostname, or part of the URL.
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
+    pub force_path_style: bool,
 }
 
 const fn default_framing() -> FramingConfig {
@@ -137,6 +144,10 @@ const fn default_framing() -> FramingConfig {
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
         newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
     })
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl_generate_config_from_default!(AwsS3Config);
@@ -210,7 +221,7 @@ impl SourceConfig for AwsS3Config {
             schema_definition = schema_definition.unknown_fields(Kind::bytes());
         }
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -232,11 +243,15 @@ impl AwsS3Config {
         let endpoint = self.region.endpoint();
 
         let s3_client = create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(self.force_path_style),
+            },
             &self.auth,
             region.clone(),
             endpoint.clone(),
             proxy,
-            &self.tls_options,
+            self.tls_options.as_ref(),
+            None,
         )
         .await?;
 
@@ -247,11 +262,13 @@ impl AwsS3Config {
         match self.sqs {
             Some(ref sqs) => {
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
+                    &SqsClientBuilder {},
                     &self.auth,
                     region.clone(),
                     endpoint,
                     proxy,
-                    &sqs.tls_options,
+                    sqs.tls_options.as_ref(),
+                    sqs.timeout.as_ref(),
                 )
                 .await?;
 
@@ -275,16 +292,8 @@ impl AwsS3Config {
 
 #[derive(Debug, Snafu)]
 enum CreateSqsIngestorError {
-    #[snafu(display("Unable to initialize: {}", source))]
-    Initialize { source: sqs::IngestorNewError },
-    #[snafu(display("Unable to create AWS client: {}", source))]
-    Client { source: crate::Error },
-    #[snafu(display("Unable to create AWS credentials provider: {}", source))]
-    Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("Endpoint is invalid"))]
-    InvalidEndpoint,
 }
 
 /// None if body is empty
@@ -438,6 +447,8 @@ mod test {
 #[cfg(test)]
 mod integration_tests {
     use std::{
+        any::Any,
+        collections::HashMap,
         fs::File,
         io::{self, BufRead},
         path::Path,
@@ -491,6 +502,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -519,6 +531,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Json(JsonDeserializerConfig::default()),
+            None,
         )
         .await;
     }
@@ -539,6 +552,7 @@ mod integration_tests {
             Delivered,
             true,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -560,6 +574,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -581,6 +596,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -610,6 +626,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -640,6 +657,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -670,6 +688,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -698,6 +717,7 @@ mod integration_tests {
             Delivered,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -721,6 +741,7 @@ mod integration_tests {
             Errored,
             false,
             DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }
@@ -741,6 +762,31 @@ mod integration_tests {
             Rejected,
             false,
             DeserializerConfig::Bytes,
+            None,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn handles_failed_status_without_deletion() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let mut custom_options: HashMap<String, Box<dyn Any>> = HashMap::new();
+        custom_options.insert("delete_failed_message".to_string(), Box::new(false));
+
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Rejected,
+            false,
+            DeserializerConfig::Bytes,
+            Some(custom_options),
         )
         .await;
     }
@@ -763,6 +809,7 @@ mod integration_tests {
             sqs: Some(sqs::Config {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
+                max_number_of_messages: 10,
                 visibility_timeout_secs: 0,
                 client_concurrency: None,
                 ..Default::default()
@@ -786,6 +833,7 @@ mod integration_tests {
         status: EventStatus,
         log_namespace: bool,
         decoding: DeserializerConfig,
+        custom_options: Option<HashMap<String, Box<dyn Any>>>,
     ) {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
@@ -798,7 +846,16 @@ mod integration_tests {
 
             tokio::time::sleep(Duration::from_secs(1)).await;
 
-            let config = config(&queue, multiline, log_namespace, decoding);
+            let mut config = config(&queue, multiline, log_namespace, decoding);
+
+            if let Some(false) = custom_options
+                .as_ref()
+                .and_then(|opts| opts.get("delete_failed_message"))
+                .and_then(|val| val.downcast_ref::<bool>())
+                .copied()
+            {
+                config.sqs.as_mut().unwrap().delete_failed_message = false;
+            }
 
             s3.put_object()
                 .bucket(bucket.clone())
@@ -856,8 +913,8 @@ mod integration_tests {
             )
             .unwrap();
 
-            s3_event.records[0].s3.bucket.name = bucket.clone();
-            s3_event.records[0].s3.object.key = key.clone();
+            s3_event.records[0].s3.bucket.name.clone_from(&bucket);
+            s3_event.records[0].s3.object.key.clone_from(&key);
 
             // send SQS message (this is usually sent by S3 itself when an object is uploaded)
             // This does not automatically work with localstack and the AWS SDK, so this is done manually
@@ -905,6 +962,9 @@ mod integration_tests {
             match status {
                 Errored => {
                     // need to wait up to the visibility timeout before it will be counted again
+                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+                }
+                Rejected if !config.sqs.unwrap().delete_failed_message => {
                     assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
                 }
                 _ => {
@@ -971,12 +1031,17 @@ mod integration_tests {
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
+        let force_path_style_value: bool = true;
         create_client::<S3ClientBuilder>(
+            &S3ClientBuilder {
+                force_path_style: Some(force_path_style_value),
+            },
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()
@@ -990,11 +1055,13 @@ mod integration_tests {
         };
         let proxy_config = ProxyConfig::default();
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &auth,
             region_endpoint.region(),
             region_endpoint.endpoint(),
             &proxy_config,
-            &None,
+            None,
+            None,
         )
         .await
         .unwrap()

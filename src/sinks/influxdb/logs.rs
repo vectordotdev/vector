@@ -163,7 +163,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let measurement = self.get_measurement()?;
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
@@ -320,7 +320,6 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for InfluxDbLogsSink {
     type Input = BytesMut;
     type Output = BytesMut;

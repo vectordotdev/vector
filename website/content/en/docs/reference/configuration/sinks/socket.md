@@ -1,7 +1,7 @@
 ---
 title: Socket
 description: Deliver logs to a remote socket endpoint
-kind: sink
+component_kind: sink
 layout: component
 tags: ["socket", "remote", "component", "sink", "logs"]
 aliases: ["/docs/reference/sinks/tcp"]

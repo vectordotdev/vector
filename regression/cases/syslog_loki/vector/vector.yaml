@@ -27,7 +27,7 @@ sinks:
   loki:
     type:                "loki"
     inputs: [ "syslog" ]
-    endpoint:            "http://localhost:8080"
+    endpoint:            "http://0.0.0.0:8080"
     encoding:
       codec: "json"
     out_of_order_action: "accept"

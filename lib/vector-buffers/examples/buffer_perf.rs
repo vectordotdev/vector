@@ -231,11 +231,11 @@ impl Configuration {
 }
 
 fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut records = Vec::new();
     for i in 1..=200_000 {
-        let payload_size = rng.gen_range(min..max);
-        let payload = (0..payload_size).map(|_| rng.gen::<u8>()).collect();
+        let payload_size = rng.random_range(min..max);
+        let payload = (0..payload_size).map(|_| rng.random::<u8>()).collect();
         let message = VariableMessage::new(i, payload);
         records.push(message);
     }
@@ -283,7 +283,7 @@ where
 
     variant
         .add_to_builder(&mut builder, Some(data_dir), id)
-        .expect("should not fail to to add variant to builder");
+        .expect("should not fail to add variant to builder");
 
     builder
         .build(String::from("buffer_perf"), Span::none())

@@ -30,11 +30,6 @@ enum HealthcheckError {
     },
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
-    #[snafu(display(
-        "Stream returned does not contain any streams that match {}",
-        stream_name
-    ))]
-    NoMatchingStreamName { stream_name: String },
 }
 
 pub struct KinesisClientBuilder;
@@ -42,7 +37,7 @@ pub struct KinesisClientBuilder;
 impl ClientBuilder for KinesisClientBuilder {
     type Client = KinesisClient;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         KinesisClient::new(config)
     }
 }
@@ -104,11 +99,13 @@ impl KinesisStreamsSinkConfig {
 
     pub async fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         create_client::<KinesisClientBuilder>(
+            &KinesisClientBuilder {},
             &self.base.auth,
             self.base.region.region(),
             self.base.region.endpoint(),
             proxy,
-            &self.base.tls,
+            self.base.tls.as_ref(),
+            None,
         )
         .await
     }

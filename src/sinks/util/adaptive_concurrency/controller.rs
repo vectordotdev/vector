@@ -242,11 +242,14 @@ impl<L> Controller<L> {
         else if inner.current_limit > 1
             && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt.mean + threshold)
         {
-            // Decrease (multiplicative) the current concurrency limit
-            let to_forget = inner.current_limit
-                - (inner.current_limit as f64 * self.settings.decrease_ratio) as usize;
-            self.semaphore.forget_permits(to_forget);
-            inner.current_limit -= to_forget;
+            // Decrease (multiplicative) the current concurrency limit. The floor rounding in the
+            // `usize` conversion guarantees the new limit is smaller than the current limit, and
+            // the `.max` ensures the new limit is above zero.
+            let new_limit =
+                ((inner.current_limit as f64 * self.settings.decrease_ratio) as usize).max(1);
+            self.semaphore
+                .forget_permits(inner.current_limit - new_limit);
+            inner.current_limit = new_limit;
         }
         self.limit.emit(AdaptiveConcurrencyLimitData {
             concurrency: inner.current_limit as u64,
@@ -288,7 +291,6 @@ where
                     warn!(
                         message = "Unhandled error response.",
                         %error,
-                        internal_log_rate_limit = true
                     );
                     false
                 }

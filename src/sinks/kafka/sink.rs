@@ -1,19 +1,23 @@
+use std::time::Duration;
+
 use rdkafka::{
-    consumer::{BaseConsumer, Consumer},
     error::KafkaError,
-    producer::FutureProducer,
+    producer::{BaseProducer, FutureProducer, Producer},
     ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::time::Duration;
+use tower::limit::RateLimit;
 use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
-use super::config::{KafkaRole, KafkaSinkConfig};
+use super::config::KafkaSinkConfig;
 use crate::{
+    config::SinkHealthcheckOptions,
     kafka::KafkaStatisticsContext,
-    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
-    sinks::prelude::*,
+    sinks::{
+        kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
+        prelude::*,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -21,14 +25,12 @@ use crate::{
 pub(super) enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
 }
 
 pub struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    service: KafkaService,
+    service: RateLimit<KafkaService>,
     topic: Template,
     key_field: Option<OwnedTargetPath>,
     headers_key: Option<OwnedTargetPath>,
@@ -48,7 +50,7 @@ pub(crate) fn create_producer(
 
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig) -> crate::Result<Self> {
-        let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
+        let producer_config = config.to_rdkafka()?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
@@ -58,7 +60,12 @@ impl KafkaSink {
             headers_key: config.headers_key.map(|key| key.0),
             transformer,
             encoder,
-            service: KafkaService::new(producer),
+            service: ServiceBuilder::new()
+                .rate_limit(
+                    config.rate_limit_num,
+                    Duration::from_secs(config.rate_limit_duration_secs),
+                )
+                .service(KafkaService::new(producer)),
             topic: config.topic,
             key_field: config.key_field.map(|key| key.0),
         })
@@ -105,26 +112,33 @@ impl KafkaSink {
     }
 }
 
-pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
+pub(crate) async fn healthcheck(
+    config: KafkaSinkConfig,
+    healthcheck_options: SinkHealthcheckOptions,
+) -> crate::Result<()> {
     trace!("Healthcheck started.");
-    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match config.topic.render_string(&LogEvent::from_str_legacy("")) {
-        Ok(topic) => Some(topic),
-        Err(error) => {
-            warn!(
-                message = "Could not generate topic for healthcheck.",
-                %error,
-            );
-            None
-        }
+    let client_config = config.to_rdkafka().unwrap();
+    let topic: Option<String> = match config.healthcheck_topic {
+        Some(topic) => Some(topic),
+        _ => match config.topic.render_string(&LogEvent::from_str_legacy("")) {
+            Ok(topic) => Some(topic),
+            Err(error) => {
+                warn!(
+                    message = "Could not generate topic for healthcheck.",
+                    %error,
+                );
+                None
+            }
+        },
     };
 
     tokio::task::spawn_blocking(move || {
-        let consumer: BaseConsumer = client.create().unwrap();
+        let producer: BaseProducer = client_config.create().unwrap();
         let topic = topic.as_ref().map(|topic| &topic[..]);
 
-        consumer
-            .fetch_metadata(topic, Duration::from_secs(3))
+        producer
+            .client()
+            .fetch_metadata(topic, healthcheck_options.timeout)
             .map(|_| ())
     })
     .await??;

@@ -1,21 +1,66 @@
+# Rust
 cargo-timing*.html
+**/*.rs.bk
+target
+tests/data/wasm/*/target
+bench_output.txt
+
+# Python
 *.pyc
+
+# Ruby
+miniodat
+
+# Node.js / JavaScript / TypeScript
+node_modules
+scripts/package-lock.json
+
+# Yarn
+yarn.lock
+
+# JetBrains IDEs
+.idea/
 *.iml
+
+# macOS
+.DS_Store
+
+# Emacs
+.dir-locals.el
+
+# Temporary files
+tmp/
 *.tmp
 *~
-**/*.rs.bk
-.DS_Store
-.dir-locals.el
-checkpoints/*
-miniodat
-bench_output.txt
 sample.log
-scripts/package-lock.json
-target
-node_modules
-tests/data/wasm/*/target
+
+# Profiling tools
 heaptrack.*
 massif.*
 
-# tilt
+# Checkpoints
+checkpoints/*
+
+# Tilt
 tilt_modules/
+
+# Docker
+**/Dockerfile~
+**/Dockerfile.*~
+.dockerignore
+
+# Docker Compose
+docker-compose.override.yml
+docker-compose.override.*.yml
+**/compose-temp-*.yaml
+
+# Compose project volume mounts
+volumes/
+*.volume/
+
+# Environment variable files (can contain secrets)
+*.env
+.env.*
+
+# LLM tools
+copilot-instructions.md

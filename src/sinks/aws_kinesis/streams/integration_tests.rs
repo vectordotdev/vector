@@ -76,9 +76,8 @@ async fn kinesis_put_records_with_partition_key() {
 
     let mut output_lines = records
         .into_iter()
-        .map(|e| {
+        .inspect(|e| {
             assert_eq!(partition_value, e.partition_key());
-            e
         })
         .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();
@@ -177,9 +176,17 @@ async fn client() -> aws_sdk_kinesis::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
     let region = RegionOrEndpoint::with_both("us-east-1", kinesis_address());
-    create_client::<KinesisClientBuilder>(&auth, region.region(), region.endpoint(), &proxy, &None)
-        .await
-        .unwrap()
+    create_client::<KinesisClientBuilder>(
+        &KinesisClientBuilder {},
+        &auth,
+        region.region(),
+        region.endpoint(),
+        &proxy,
+        None,
+        None,
+    )
+    .await
+    .unwrap()
 }
 
 async fn ensure_stream(stream_name: String) {

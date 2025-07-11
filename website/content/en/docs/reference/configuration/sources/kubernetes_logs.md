@@ -1,7 +1,7 @@
 ---
 title: Kubernetes logs
 description: Collect logs from [Kubernetes](https://kubernetes.io) Nodes
-kind: source
+component_kind: source
 layout: component
 tags: ["kubernetes", "k8s", "node", "component", "source", "logs"]
 ---

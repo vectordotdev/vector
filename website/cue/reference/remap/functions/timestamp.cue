@@ -30,9 +30,9 @@ remap: functions: timestamp: {
 			title: "Declare a timestamp type"
 			input: log: timestamp: "2020-10-10T16:00:00Z"
 			source: #"""
-				ok, err = timestamp(.timestamp)
+				timestamp(t'2020-10-10T16:00:00Z')
 				"""#
-			return: "function call error for \"timestamp\" at (10:31): expected timestamp, got string"
+			return: "2020-10-10T16:00:00Z"
 		},
 	]
 }

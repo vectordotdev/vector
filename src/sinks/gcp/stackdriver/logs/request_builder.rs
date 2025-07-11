@@ -16,7 +16,7 @@ impl RequestBuilder<Vec<Event>> for StackdriverLogsRequestBuilder {
     type Events = Vec<Event>;
     type Encoder = StackdriverLogsEncoder;
     type Payload = Bytes;
-    type Request = HttpRequest;
+    type Request = HttpRequest<()>;
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
@@ -42,6 +42,6 @@ impl RequestBuilder<Vec<Event>> for StackdriverLogsRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata)
+        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
     }
 }

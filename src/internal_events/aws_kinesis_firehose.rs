@@ -11,7 +11,7 @@ pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub source_arn: Option<&'a str>,
 }
 
-impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
+impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
     fn emit(self) {
         debug!(
             message = "Handling AWS Kinesis Firehose request.",
@@ -39,7 +39,7 @@ impl<'a> AwsKinesisFirehoseRequestError<'a> {
     }
 }
 
-impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
+impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
     fn emit(self) {
         error!(
             message = "Error occurred while handling request.",
@@ -48,14 +48,14 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
             error_type = error_type::REQUEST_FAILED,
             error_code = %self.error_code,
             request_id = %self.request_id.unwrap_or(""),
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
             "error_code" => self.error_code,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -74,13 +74,14 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             error_type = error_type::PARSER_FAILED,
             error_code = %io_error_code(&self.error),
             compression = %self.compression,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "error_code" => io_error_code(&self.error),
-        );
+        )
+        .increment(1);
     }
 }

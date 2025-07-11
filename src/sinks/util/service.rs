@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, num::NonZeroU64, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::stream::{self, BoxStream};
 use serde_with::serde_as;
@@ -44,7 +44,10 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<FibonacciRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+    Retry<
+        FibonacciRetryPolicy<RL>,
+        Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+    >,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
     BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
@@ -88,10 +91,10 @@ pub trait TowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::Adaptive;
     const TIMEOUT_SECS: u64 = 60;
     const RATE_LIMIT_DURATION_SECS: u64 = 1;
-    const RATE_LIMIT_NUM: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
-    const RETRY_ATTEMPTS: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-    const RETRY_MAX_DURATION_SECS: u64 = 30;
-    const RETRY_INITIAL_BACKOFF_SECS: u64 = 1;
+    const RATE_LIMIT_NUM: u64 = i64::MAX as u64; // i64 avoids TOML deserialize issue
+    const RETRY_ATTEMPTS: usize = isize::MAX as usize; // isize avoids TOML deserialize issue
+    const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(30).unwrap();
+    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(1).unwrap();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,7 +104,7 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 
 /// Middleware settings for outbound requests.
 ///
-/// Various settings can be configured, such as concurrency and rate limits, timeouts, retry behavior, etc.
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 ///
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
@@ -144,7 +147,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Max Retry Duration"))]
     #[serde(default = "default_retry_max_duration_secs::<D>")]
-    pub retry_max_duration_secs: u64,
+    pub retry_max_duration_secs: NonZeroU64,
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
@@ -152,7 +155,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]
-    pub retry_initial_backoff_secs: u64,
+    pub retry_initial_backoff_secs: NonZeroU64,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -190,11 +193,11 @@ const fn default_retry_attempts<D: TowerRequestConfigDefaults>() -> usize {
     D::RETRY_ATTEMPTS
 }
 
-const fn default_retry_max_duration_secs<D: TowerRequestConfigDefaults>() -> u64 {
+const fn default_retry_max_duration_secs<D: TowerRequestConfigDefaults>() -> NonZeroU64 {
     D::RETRY_MAX_DURATION_SECS
 }
 
-const fn default_retry_initial_backoff_secs<D: TowerRequestConfigDefaults>() -> u64 {
+const fn default_retry_initial_backoff_secs<D: TowerRequestConfigDefaults>() -> NonZeroU64 {
     D::RETRY_INITIAL_BACKOFF_SECS
 }
 
@@ -225,8 +228,8 @@ impl<D: TowerRequestConfigDefaults> TowerRequestConfig<D> {
             rate_limit_duration: Duration::from_secs(self.rate_limit_duration_secs),
             rate_limit_num: self.rate_limit_num,
             retry_attempts: self.retry_attempts,
-            retry_max_duration: Duration::from_secs(self.retry_max_duration_secs),
-            retry_initial_backoff: Duration::from_secs(self.retry_initial_backoff_secs),
+            retry_max_duration: Duration::from_secs(self.retry_max_duration_secs.get()),
+            retry_initial_backoff: Duration::from_secs(self.retry_initial_backoff_secs.get()),
             adaptive_concurrency: self.adaptive_concurrency,
             retry_jitter_mode: self.retry_jitter_mode,
         }
@@ -352,7 +355,7 @@ impl TowerRequestSettings {
                     )
             })
             .enumerate()
-            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
         // Build sink service
@@ -444,10 +447,10 @@ mod tests {
         toml::from_str::<TowerRequestConfig>(r#"concurrency = "broken""#)
             .expect_err("Invalid concurrency setting didn't fail");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = 0"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = 0")
             .expect_err("Invalid concurrency setting didn't fail on zero");
 
-        toml::from_str::<TowerRequestConfig>(r#"concurrency = -9"#)
+        toml::from_str::<TowerRequestConfig>(r"concurrency = -9")
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
@@ -459,8 +462,8 @@ mod tests {
         assert_eq!(settings.concurrency, None);
         assert_eq!(settings.timeout, Duration::from_secs(60));
         assert_eq!(settings.rate_limit_duration, Duration::from_secs(1));
-        assert_eq!(settings.rate_limit_num, i64::max_value() as u64);
-        assert_eq!(settings.retry_attempts, isize::max_value() as usize);
+        assert_eq!(settings.rate_limit_num, i64::MAX as u64);
+        assert_eq!(settings.retry_attempts, isize::MAX as usize);
         assert_eq!(settings.retry_max_duration, Duration::from_secs(30));
         assert_eq!(settings.retry_initial_backoff, Duration::from_secs(1));
     }
@@ -474,8 +477,8 @@ mod tests {
         const RATE_LIMIT_DURATION_SECS: u64 = 2;
         const RATE_LIMIT_NUM: u64 = 3;
         const RETRY_ATTEMPTS: usize = 4;
-        const RETRY_MAX_DURATION_SECS: u64 = 5;
-        const RETRY_INITIAL_BACKOFF_SECS: u64 = 6;
+        const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(5).unwrap();
+        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(6).unwrap();
     }
 
     #[test]
@@ -496,14 +499,14 @@ mod tests {
     fn into_settings_with_populated_config() {
         // Populate with values not equal to the global defaults.
         let cfg = toml::from_str::<TowerRequestConfig>(
-            r#" concurrency = 16
+            r" concurrency = 16
             timeout_secs = 1
             rate_limit_duration_secs = 2
             rate_limit_num = 3
             retry_attempts = 4
             retry_max_duration_secs = 5
             retry_initial_backoff_secs = 6
-        "#,
+        ",
         )
         .expect("Config failed to parse");
 

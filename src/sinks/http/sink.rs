@@ -12,7 +12,7 @@ pub(super) struct HttpSink<S> {
 
 impl<S> HttpSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,
@@ -62,7 +62,7 @@ where
 #[async_trait::async_trait]
 impl<S> StreamSink<Event> for HttpSink<S>
 where
-    S: Service<HttpRequest> + Send + 'static,
+    S: Service<HttpRequest<()>> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: std::fmt::Debug + Into<crate::Error> + Send,

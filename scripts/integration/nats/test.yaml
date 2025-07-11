@@ -21,7 +21,7 @@ paths:
 - "src/internal_events/nats.rs"
 - "src/sources/nats.rs"
 - "src/sources/util/**"
-- "src/sinks/nats.rs"
+- "src/sinks/nats/**"
 - "src/sinks/util/**"
 - "src/nats.rs"
 - "scripts/integration/nats/**"

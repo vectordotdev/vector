@@ -1,1 +1,1 @@
-{"metric":{"name":"s","namespace":"q","tags":{"s":"b"},"timestamp":"1969-12-31T22:01:14.000008272Z","interval_ms":656882712,"kind":"absolute","counter":{"value":-189248.0}}}
+{"metric":{"name":"j","tags":{"f":"k"},"timestamp":"1969-12-31T18:05:17.000026769Z","kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[],"n":[]},"count":0,"min":1.7976931348623157e308,"max":-1.7976931348623157e308,"sum":-481728.0,"avg":590528.0}}}}}

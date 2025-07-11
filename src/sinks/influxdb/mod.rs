@@ -471,7 +471,7 @@ pub mod test_util {
 
     pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
-            .get(&format!("{}/query", endpoint))
+            .get(format!("{}/query", endpoint))
             .query(&[("q", query)])
             .send()
             .await
@@ -597,8 +597,8 @@ mod tests {
 
     #[test]
     fn test_influxdb_settings_missing() {
-        let config = r#"
-    "#;
+        let config = r"
+    ";
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(

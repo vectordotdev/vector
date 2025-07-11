@@ -28,6 +28,17 @@ remap: functions: parse_json: {
 			required: false
 			type: ["integer"]
 		},
+		{
+			name: "lossy"
+			description: """
+				Whether to parse the JSON in a lossy manner. Replaces invalid UTF-8 characters
+				with the Unicode character `�` (U+FFFD) if set to true, otherwise returns an error
+				if there are any invalid UTF-8 characters present.
+				"""
+			required: false
+			default:  true
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` is not a valid JSON-formatted payload.",

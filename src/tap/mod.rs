@@ -13,7 +13,7 @@ use crate::config::api::default_graphql_url;
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Interval to sample logs at, in milliseconds
+    /// Interval to sample events at, in milliseconds
     #[arg(default_value = "500", short = 'i', long)]
     interval: u32,
 
@@ -52,6 +52,10 @@ pub struct Opts {
     /// Whether to reconnect if the underlying API connection drops. By default, tap will attempt to reconnect if the connection drops.
     #[arg(short, long)]
     no_reconnect: bool,
+
+    /// Specifies a duration (in milliseconds) to sample logs (e.g. specifying 10000 will sample logs for 10 seconds then exit)
+    #[arg(short = 'd', long)]
+    duration_ms: Option<u64>,
 }
 
 impl Opts {

@@ -14,7 +14,10 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-use super::{ElasticsearchCommon, ElasticsearchConfig};
+use super::{
+    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
+    ElasticsearchCommon, ElasticsearchConfig, VersionType,
+};
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -116,12 +119,32 @@ pub(super) fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) =
-        id_key_field.and_then(|key| log.remove((PathPrefix::Event, key)))
-    {
-        Some(String::from_utf8_lossy(&key).into_owned())
-    } else {
-        None
+
+    let id = id_key_field
+        .and_then(|key| log.remove((PathPrefix::Event, key)))
+        .and_then(|id| id.as_str().map(Into::into));
+    let document_metadata = match (id, mode.version_type(), mode.version(&log)) {
+        (None, _, _) => DocumentMetadata::WithoutId,
+        (Some(id), None, None) | (Some(id), None, Some(_)) | (Some(id), Some(_), None) => {
+            DocumentMetadata::Id(id)
+        }
+        (Some(id), Some(version_type), Some(version)) => match version_type {
+            VersionType::Internal => DocumentMetadata::Id(id),
+            VersionType::External => DocumentMetadata::IdAndVersion(
+                id,
+                DocumentVersion {
+                    kind: DocumentVersionType::External,
+                    value: version,
+                },
+            ),
+            VersionType::ExternalGte => DocumentMetadata::IdAndVersion(
+                id,
+                DocumentVersion {
+                    kind: DocumentVersionType::ExternalGte,
+                    value: version,
+                },
+            ),
+        },
     };
     let log = {
         let mut event = Event::from(log);
@@ -132,7 +155,7 @@ pub(super) fn process_log(
         index,
         bulk_action,
         log,
-        id,
+        document_metadata,
     })
 }
 

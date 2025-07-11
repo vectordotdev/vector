@@ -2,12 +2,11 @@ use std::{
     cmp,
     io::{self, Write},
     mem,
-    sync::{Arc, OnceLock},
+    sync::{Arc, LazyLock, OnceLock},
 };
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
 use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
@@ -34,7 +33,7 @@ pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
 
-pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
+pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
     option_env!("DD_ORIGIN_PRODUCT")
         .map(|p| {
             p.parse::<u32>()
@@ -237,7 +236,7 @@ impl DatadogMetricsEncoder {
         // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
         // single value for the given field.
         //
-        // Similary, `MetricPayload` has a single repeated `series` field.
+        // Similarly, `MetricPayload` has a single repeated `series` field.
 
         match self.endpoint {
             // V1 Series metrics are encoded via JSON, in an incremental fashion.
@@ -735,9 +734,8 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
         // Generally that means the Origin Metadata will have been set as a pass through.
         // However, if the upstream Vector instance did not set Origin Metadata (for example if it is an
         // older version version), we will at least set the OriginProduct and OriginCategory.
-        "kafka" | "nats" | "redis" | "gcp_pubsub" | "http_client" | "http_server" | "vector" => {
-            Some(0)
-        }
+        "kafka" | "nats" | "redis" | "gcp_pubsub" | "http_client" | "http_server" | "vector"
+        | "pulsar" => Some(0),
 
         // This scenario should not occur- if it does it means we added a source that deals with metrics,
         // and did not update this function.

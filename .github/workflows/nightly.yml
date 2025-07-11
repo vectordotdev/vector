@@ -1,9 +1,13 @@
 name: Nightly
 
+permissions:
+  contents: write
+  packages: write
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 4 * * *"
+    - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
 
 jobs:
   Nightly:

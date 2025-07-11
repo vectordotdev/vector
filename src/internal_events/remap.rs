@@ -19,13 +19,14 @@ impl InternalEvent for RemapMappingError {
             error = ?self.error,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         if self.event_dropped {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,

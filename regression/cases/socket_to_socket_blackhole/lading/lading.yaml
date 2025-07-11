@@ -5,9 +5,12 @@ generator:
       addr: "0.0.0.0:8282"
       variant: "syslog5424"
       bytes_per_second: "500 Mb"
-      block_sizes: ["1Mb", "0.5Mb", "0.25Mb", "0.125Mb", "128Kb"]
       maximum_prebuild_cache_size_bytes: "256 Mb"
 
 blackhole:
   - tcp:
       binding_addr: "0.0.0.0:8080"
+
+target_metrics:
+  - prometheus: # internal telemetry
+      uri: "http://127.0.0.1:9090/metrics"

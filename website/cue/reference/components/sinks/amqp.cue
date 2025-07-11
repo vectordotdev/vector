@@ -50,7 +50,7 @@ components: sinks: amqp: {
 
 	support: components._amqp.support
 
-	configuration: base.components.sinks.amqp.configuration
+	configuration: generated.components.sinks.amqp.configuration
 
 	input: {
 		logs:    true

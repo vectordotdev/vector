@@ -15,7 +15,7 @@ pub struct TestBackend {
 impl_generate_config_from_default!(TestBackend);
 
 impl SecretBackend for TestBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         _: &mut signal::SignalRx,

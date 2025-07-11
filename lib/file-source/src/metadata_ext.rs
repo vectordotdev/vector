@@ -95,7 +95,7 @@ impl PortableFileExt for File {
 
 // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/a916ac22b9f7f1f0f7aba0a41a789b3ecd765018/src/libstd/sys/windows/c.rs#L380-L386
 #[cfg(windows)]
-#[allow(non_snake_case, non_camel_case_types)]
+#[allow(dead_code, non_snake_case, non_camel_case_types)]
 pub struct REPARSE_DATA_BUFFER {
     pub ReparseTag: libc::c_uint,
     pub ReparseDataLength: libc::c_ushort,

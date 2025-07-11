@@ -9,9 +9,12 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
+use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
-    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
+    buffer::{read_until_with_max_size, ReadResult},
+    metadata_ext::PortableFileExt,
+    FilePosition, ReadFrom,
 };
 #[cfg(test)]
 mod tests;
@@ -25,6 +28,12 @@ mod tests;
 pub(super) struct RawLine {
     pub offset: u64,
     pub bytes: Bytes,
+}
+
+#[derive(Debug)]
+pub struct RawLineResult {
+    pub raw_line: Option<RawLine>,
+    pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
@@ -42,8 +51,10 @@ pub struct FileWatcher {
     devno: u64,
     inode: u64,
     is_dead: bool,
+    reached_eof: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
@@ -143,8 +154,10 @@ impl FileWatcher {
             devno,
             inode: ino,
             is_dead: false,
+            reached_eof: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            last_seen: ts,
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
@@ -176,6 +189,9 @@ impl FileWatcher {
 
     pub fn set_file_findable(&mut self, f: bool) {
         self.findable = f;
+        if f {
+            self.last_seen = Instant::now();
+        }
     }
 
     pub fn file_findable(&self) -> bool {
@@ -199,7 +215,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+    pub(super) fn read_line(&mut self) -> io::Result<RawLineResult> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
@@ -212,14 +228,23 @@ impl FileWatcher {
             &mut self.buf,
             self.max_line_bytes,
         ) {
-            Ok(Some(_)) => {
+            Ok(ReadResult {
+                successfully_read: Some(_),
+                discarded_for_size_and_truncated,
+            }) => {
                 self.track_read_success();
-                Ok(Some(RawLine {
-                    offset: initial_position,
-                    bytes: self.buf.split().freeze(),
-                }))
+                Ok(RawLineResult {
+                    raw_line: Some(RawLine {
+                        offset: initial_position,
+                        bytes: self.buf.split().freeze(),
+                    }),
+                    discarded_for_size_and_truncated,
+                })
             }
-            Ok(None) => {
+            Ok(ReadResult {
+                successfully_read: None,
+                discarded_for_size_and_truncated,
+            }) => {
                 if !self.file_findable() {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it
@@ -228,15 +253,26 @@ impl FileWatcher {
                     let buf = self.buf.split().freeze();
                     if buf.is_empty() {
                         // EOF
-                        Ok(None)
+                        self.reached_eof = true;
+                        Ok(RawLineResult {
+                            raw_line: None,
+                            discarded_for_size_and_truncated,
+                        })
                     } else {
-                        Ok(Some(RawLine {
-                            offset: initial_position,
-                            bytes: buf,
-                        }))
+                        Ok(RawLineResult {
+                            raw_line: Some(RawLine {
+                                offset: initial_position,
+                                bytes: buf,
+                            }),
+                            discarded_for_size_and_truncated,
+                        })
                     }
                 } else {
-                    Ok(None)
+                    self.reached_eof = true;
+                    Ok(RawLineResult {
+                        raw_line: None,
+                        discarded_for_size_and_truncated,
+                    })
                 }
             }
             Err(e) => {
@@ -268,13 +304,23 @@ impl FileWatcher {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
     }
+
+    #[inline]
+    pub fn last_seen(&self) -> Instant {
+        self.last_seen
+    }
+
+    #[inline]
+    pub fn reached_eof(&self) -> bool {
+        self.reached_eof
+    }
 }
 
 fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
     let header_bytes = r.fill_buf()?;
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
-    Ok(header_bytes.starts_with(&[0x1f, 0x8b]))
+    Ok(header_bytes.starts_with(GZIP_MAGIC))
 }
 
 fn null_reader() -> impl BufRead {

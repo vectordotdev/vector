@@ -20,7 +20,7 @@ pub enum RecordStatus {
     /// The record was able to be read from the buffer, and the checksum is valid.
     ///
     /// Contains the ID for the given record, as well as the metadata.
-    Valid { id: u64, metadata: u32 },
+    Valid { id: u64 },
     /// The record was able to be read from the buffer, but the checksum was not valid.
     Corrupted { calculated: u32, actual: u32 },
     /// The record was not able to be read from the buffer due to an error during deserialization.
@@ -127,7 +127,7 @@ impl<'a> Record<'a> {
     }
 }
 
-impl<'a> ArchivedRecord<'a> {
+impl ArchivedRecord<'_> {
     /// Gets the metadata of this record.
     pub fn metadata(&self) -> u32 {
         self.metadata
@@ -142,10 +142,7 @@ impl<'a> ArchivedRecord<'a> {
     pub fn verify_checksum(&self, checksummer: &Hasher) -> RecordStatus {
         let calculated = generate_checksum(checksummer, self.id, self.metadata, &self.payload);
         if self.checksum == calculated {
-            RecordStatus::Valid {
-                id: self.id,
-                metadata: self.metadata,
-            }
+            RecordStatus::Valid { id: self.id }
         } else {
             RecordStatus::Corrupted {
                 calculated,

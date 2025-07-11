@@ -1,7 +1,7 @@
 ---
 title: Axiom
 description: Deliver log events to [Axiom](https://axiom.co)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["axiom", "component", "sink", "logs", "metrics"]
 ---

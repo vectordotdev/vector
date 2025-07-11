@@ -14,7 +14,9 @@ remap: functions: parse_float: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` is not a string.",
+	]
 	return: types: ["float"]
 
 	examples: [

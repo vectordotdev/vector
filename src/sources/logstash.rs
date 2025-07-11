@@ -5,6 +5,7 @@ use std::{
     convert::TryFrom,
     io::{self, Read},
 };
+use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
@@ -44,6 +45,9 @@ pub struct LogstashConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
+    pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
@@ -117,6 +121,7 @@ impl Default for LogstashConfig {
         Self {
             address: SocketListenAddr::SocketAddr("0.0.0.0:5044".parse().unwrap()),
             keepalive: None,
+            permit_origin: None,
             tls: None,
             receive_buffer_bytes: None,
             acknowledgements: Default::default(),
@@ -150,7 +155,7 @@ impl SourceConfig for LogstashConfig {
             .and_then(|tls| tls.client_metadata_key.clone())
             .and_then(|k| k.path);
 
-        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true)?;
         source.run(
             self.address,
             self.keepalive,
@@ -162,6 +167,7 @@ impl SourceConfig for LogstashConfig {
             cx,
             self.acknowledgements,
             self.connection_limit,
+            self.permit_origin.clone().map(Into::into),
             LogstashConfig::NAME,
             log_namespace,
         )
@@ -170,7 +176,7 @@ impl SourceConfig for LogstashConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             DataType::Log,
             self.schema_definition(global_log_namespace.merge(self.log_namespace)),
         )]
@@ -514,148 +520,174 @@ impl Decoder for LogstashDecoder {
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#data-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Data) => {
-                    let mut rest = src.as_ref();
-
-                    if rest.remaining() < 8 {
+                    let Some(frame) = decode_data_frame(protocol, src) else {
                         return Ok(None);
-                    }
-                    let sequence_number = rest.get_u32();
-                    let pair_count = rest.get_u32();
+                    };
 
-                    let mut fields = BTreeMap::<KeyString, serde_json::Value>::new();
-                    for _ in 0..pair_count {
-                        if src.remaining() < 4 {
-                            return Ok(None);
-                        }
-                        let key_length = rest.get_u32() as usize;
-
-                        if rest.remaining() < key_length {
-                            return Ok(None);
-                        }
-                        let (key, right) = rest.split_at(key_length);
-                        rest = right;
-
-                        if src.remaining() < 4 {
-                            return Ok(None);
-                        }
-                        let value_length = rest.get_u32() as usize;
-                        if rest.remaining() < value_length {
-                            return Ok(None);
-                        }
-                        let (value, right) = rest.split_at(value_length);
-                        rest = right;
-
-                        fields.insert(
-                            String::from_utf8_lossy(key).into(),
-                            String::from_utf8_lossy(value).into(),
-                        );
-                    }
-
-                    let remaining = rest.remaining();
-                    let byte_size = src.remaining() - remaining;
-
-                    src.advance(byte_size);
-
-                    let frames = vec![(
-                        LogstashEventFrame {
-                            protocol,
-                            sequence_number,
-                            fields,
-                        },
-                        byte_size,
-                    )]
-                    .into();
-
-                    LogstashDecoderReadState::PendingFrames(frames)
+                    LogstashDecoderReadState::PendingFrames([frame].into())
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#json-frame-type
                 LogstashDecoderReadState::ReadFrame(protocol, LogstashFrameType::Json) => {
-                    let mut rest = src.as_ref();
-
-                    if rest.remaining() < 8 {
+                    let Some(frame) = decode_json_frame(protocol, src)? else {
                         return Ok(None);
-                    }
-                    let sequence_number = rest.get_u32();
-                    let payload_size = rest.get_u32() as usize;
+                    };
 
-                    if rest.remaining() < payload_size {
-                        return Ok(None);
-                    }
-
-                    let (slice, right) = rest.split_at(payload_size);
-                    rest = right;
-
-                    let fields_result: Result<BTreeMap<KeyString, serde_json::Value>, _> =
-                        serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {});
-
-                    let remaining = rest.remaining();
-                    let byte_size = src.remaining() - remaining;
-
-                    src.advance(byte_size);
-
-                    match fields_result {
-                        Ok(fields) => {
-                            let frames = vec![(
-                                LogstashEventFrame {
-                                    protocol,
-                                    sequence_number,
-                                    fields,
-                                },
-                                byte_size,
-                            )]
-                            .into();
-
-                            LogstashDecoderReadState::PendingFrames(frames)
-                        }
-                        Err(err) => return Err(err),
-                    }
+                    LogstashDecoderReadState::PendingFrames([frame].into())
                 }
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#compressed-frame-type
                 LogstashDecoderReadState::ReadFrame(_protocol, LogstashFrameType::Compressed) => {
-                    let mut rest = src.as_ref();
-
-                    if rest.remaining() < 4 {
+                    let Some(frames) = decode_compressed_frame(src)? else {
                         return Ok(None);
-                    }
-                    let payload_size = rest.get_u32() as usize;
-
-                    if rest.remaining() < payload_size {
-                        src.reserve(payload_size);
-                        return Ok(None);
-                    }
-
-                    let (slice, right) = rest.split_at(payload_size);
-                    rest = right;
-
-                    let mut buf = {
-                        let mut buf = Vec::new();
-
-                        let res = ZlibDecoder::new(io::Cursor::new(slice))
-                            .read_to_end(&mut buf)
-                            .context(DecompressionFailedSnafu)
-                            .map(|_| BytesMut::from(&buf[..]));
-
-                        let remaining = rest.remaining();
-                        let byte_size = src.remaining() - remaining;
-
-                        src.advance(byte_size);
-
-                        res
-                    }?;
-
-                    let mut decoder = LogstashDecoder::new();
-
-                    let mut frames = VecDeque::new();
-
-                    while let Some(s) = decoder.decode(&mut buf)? {
-                        frames.push_back(s);
-                    }
+                    };
 
                     LogstashDecoderReadState::PendingFrames(frames)
                 }
             };
         }
     }
+}
+
+/// Decode the Lumberjack version 1 protocol, which use the Key:Value format.
+fn decode_data_frame(
+    protocol: LogstashProtocolVersion,
+    src: &mut BytesMut,
+) -> Option<(LogstashEventFrame, usize)> {
+    let mut rest = src.as_ref();
+
+    if rest.remaining() < 8 {
+        return None;
+    }
+    let sequence_number = rest.get_u32();
+    let pair_count = rest.get_u32();
+    if pair_count == 0 {
+        return None; // Invalid number of fields
+    }
+
+    let mut fields = BTreeMap::<KeyString, serde_json::Value>::new();
+    for _ in 0..pair_count {
+        let (key, value, right) = decode_pair(rest)?;
+        rest = right;
+
+        fields.insert(
+            String::from_utf8_lossy(key).into(),
+            String::from_utf8_lossy(value).into(),
+        );
+    }
+
+    let byte_size = bytes_remaining(src, rest);
+    src.advance(byte_size);
+
+    Some((
+        LogstashEventFrame {
+            protocol,
+            sequence_number,
+            fields,
+        },
+        byte_size,
+    ))
+}
+
+fn decode_pair(mut rest: &[u8]) -> Option<(&[u8], &[u8], &[u8])> {
+    if rest.remaining() < 4 {
+        return None;
+    }
+    let key_length = rest.get_u32() as usize;
+
+    if rest.remaining() < key_length {
+        return None;
+    }
+    let (key, right) = rest.split_at(key_length);
+    rest = right;
+
+    if rest.remaining() < 4 {
+        return None;
+    }
+    let value_length = rest.get_u32() as usize;
+    if rest.remaining() < value_length {
+        return None;
+    }
+    let (value, right) = rest.split_at(value_length);
+    Some((key, value, right))
+}
+
+fn decode_json_frame(
+    protocol: LogstashProtocolVersion,
+    src: &mut BytesMut,
+) -> Result<Option<(LogstashEventFrame, usize)>, DecodeError> {
+    let mut rest = src.as_ref();
+
+    if rest.remaining() < 8 {
+        return Ok(None);
+    }
+    let sequence_number = rest.get_u32();
+    let payload_size = rest.get_u32() as usize;
+
+    if rest.remaining() < payload_size {
+        return Ok(None);
+    }
+
+    let (slice, right) = rest.split_at(payload_size);
+    rest = right;
+
+    let fields: BTreeMap<KeyString, serde_json::Value> =
+        serde_json::from_slice(slice).context(JsonFrameFailedDecodeSnafu {})?;
+
+    let byte_size = bytes_remaining(src, rest);
+    src.advance(byte_size);
+
+    Ok(Some((
+        LogstashEventFrame {
+            protocol,
+            sequence_number,
+            fields,
+        },
+        byte_size,
+    )))
+}
+
+fn decode_compressed_frame(
+    src: &mut BytesMut,
+) -> Result<Option<VecDeque<(LogstashEventFrame, usize)>>, DecodeError> {
+    let mut rest = src.as_ref();
+
+    if rest.remaining() < 4 {
+        return Ok(None);
+    }
+    let payload_size = rest.get_u32() as usize;
+
+    if rest.remaining() < payload_size {
+        src.reserve(payload_size);
+        return Ok(None);
+    }
+
+    let (slice, right) = rest.split_at(payload_size);
+    rest = right;
+
+    let mut buf = Vec::new();
+
+    let res = ZlibDecoder::new(io::Cursor::new(slice))
+        .read_to_end(&mut buf)
+        .context(DecompressionFailedSnafu)
+        .map(|_| BytesMut::from(&buf[..]));
+
+    let byte_size = bytes_remaining(src, rest);
+    src.advance(byte_size);
+
+    let mut buf = res?;
+
+    let mut decoder = LogstashDecoder::new();
+
+    let mut frames = VecDeque::new();
+
+    while let Some(s) = decoder.decode(&mut buf)? {
+        frames.push_back(s);
+    }
+    Ok(Some(frames))
+}
+
+fn bytes_remaining(src: &BytesMut, rest: &[u8]) -> usize {
+    let remaining = rest.remaining();
+    src.remaining() - remaining
 }
 
 impl From<LogstashEventFrame> for Event {
@@ -679,7 +711,8 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use bytes::BufMut;
-    use rand::{thread_rng, Rng};
+    use futures::Stream;
+    use rand::{rng, Rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
@@ -709,25 +742,32 @@ mod test {
         test_protocol(EventStatus::Rejected, false).await;
     }
 
+    async fn start_logstash(
+        status: EventStatus,
+    ) -> (SocketAddr, impl Stream<Item = Event> + Unpin) {
+        let (sender, recv) = SourceSender::new_test_finalize(status);
+        let address = next_addr();
+        let source = LogstashConfig {
+            address: address.into(),
+            tls: None,
+            permit_origin: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: true.into(),
+            connection_limit: None,
+            log_namespace: None,
+        }
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+        (address, recv)
+    }
+
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
         let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let (sender, recv) = SourceSender::new_test_finalize(status);
-            let address = next_addr();
-            let source = LogstashConfig {
-                address: address.into(),
-                tls: None,
-                keepalive: None,
-                receive_buffer_bytes: None,
-                acknowledgements: true.into(),
-                connection_limit: None,
-                log_namespace: None,
-            }
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap();
-            tokio::spawn(source);
-            wait_for_tcp(address).await;
-
+            let (address, recv) = start_logstash(status).await;
             spawn_collect_n(
                 send_req(address, &[("message", "Hello, world!")], sends_ack),
                 recv,
@@ -766,8 +806,20 @@ mod test {
         req.into()
     }
 
+    #[test]
+    fn v1_decoder_does_not_panic() {
+        let seq = rng().random_range(1..u32::MAX);
+        let req = encode_req(seq, &[("message", "Hello, World!")]);
+        for i in 0..req.len() - 1 {
+            assert!(
+                decode_data_frame(LogstashProtocolVersion::V1, &mut BytesMut::from(&req[..i]))
+                    .is_none()
+            );
+        }
+    }
+
     async fn send_req(address: SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
-        let seq = thread_rng().gen_range(1..u32::MAX);
+        let seq = rng().random_range(1..u32::MAX);
         let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
 
         let req = encode_req(seq, pairs);
@@ -946,19 +998,16 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> + Unpin {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: SocketAddr = address.parse().unwrap();
-        let tls_options = match tls {
-            Some(options) => options,
-            None => TlsEnableableConfig::default(),
-        };
         let tls_config = TlsSourceConfig {
             client_metadata_key: None,
-            tls_config: tls_options,
+            tls_config: tls.unwrap_or_default(),
         };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
                 tls: Some(tls_config),
                 keepalive: None,
+                permit_origin: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
                 connection_limit: None,

@@ -15,19 +15,55 @@ VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
-REPO="${REPO:-"timberio/vector"}"
+REPOS="${REPOS:-"timberio/vector"}"
+IFS=, read -ra REPO_LIST <<< "$REPOS"
+
+IFS=, read -ra REQUESTED_PLATFORMS <<< "$PLATFORM"
+declare -A SUPPORTED_PLATFORMS=(
+  [debian]="linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8"
+  [alpine]="linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8"
+  [distroless-static]="linux/amd64,linux/arm/v7,linux/arm64/v8"
+  [distroless-libc]="linux/amd64,linux/arm/v7,linux/arm64/v8"
+)
 
 #
 # Functions
 #
 
+evaluate_supported_platforms_for_base() {
+  local BASE="$1"
+  IFS=, read -ra SUPPORTED_PLATFORMS_FOR_BASE <<< "${SUPPORTED_PLATFORMS["$BASE"]}"
+
+  local BUILDABLE_PLATFORMS=""
+  for platform in "${REQUESTED_PLATFORMS[@]}"
+  do
+    if [[ ${SUPPORTED_PLATFORMS_FOR_BASE[*]} =~ $platform ]]
+    then
+      BUILDABLE_PLATFORMS+="$platform,"
+    else
+      >&2 echo "WARN: skipping $platform for $BASE, no base image for platform"
+    fi
+  done
+
+  echo "${BUILDABLE_PLATFORMS%?}"
+}
+
 build() {
   local BASE="$1"
   local VERSION="$2"
-
-  local TAG="$REPO:$VERSION-$BASE"
   local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
+  local BUILDABLE_PLATFORMS=""
+  if [ -n "$PLATFORM" ]; then
+    BUILDABLE_PLATFORMS=$(evaluate_supported_platforms_for_base "$BASE")
+  fi
 
+  # Collect all tags
+  TAGS=()
+  for REPO in "${REPO_LIST[@]}"; do
+    TAGS+=(--tag "$REPO:$VERSION-$BASE")
+  done
+
+  # Build once with all tags
   if [ -n "$PLATFORM" ]; then
     ARGS=()
     if [[ "$PUSH" == "true" ]]; then
@@ -35,20 +71,22 @@ build() {
     fi
 
     docker buildx build \
-      --platform="$PLATFORM" \
-      --tag "$TAG" \
+      --platform="$BUILDABLE_PLATFORMS" \
+      "${TAGS[@]}" \
       target/artifacts \
       -f "$DOCKERFILE" \
       "${ARGS[@]}"
   else
     docker build \
-      --tag "$TAG" \
+      "${TAGS[@]}" \
       target/artifacts \
       -f "$DOCKERFILE"
 
-      if [[ "$PUSH" == "true" ]]; then
+    if [[ "$PUSH" == "true" ]]; then
+      for TAG in "${TAGS[@]}"; do
         docker push "$TAG"
-      fi
+      done
+    fi
   fi
 }
 
@@ -56,7 +94,7 @@ build() {
 # Build
 #
 
-echo "Building $REPO:* Docker images"
+echo "Building Docker images for $REPOS"
 
 if [[ "$CHANNEL" == "release" ]]; then
   VERSION_EXACT="$VERSION"

@@ -1,10 +1,14 @@
 use std::collections::BTreeMap;
+use std::io::Cursor;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use chrono::Utc;
+use databend_client::APIClient as DatabendAPIClient;
+use databend_client::Error as DatabendError;
 use futures::future::BoxFuture;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
@@ -13,11 +17,6 @@ use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, Reques
 use vector_lib::stream::DriverResponse;
 
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
-
-use super::{
-    api::{DatabendAPIClient, DatabendHttpRequest, DatabendPresignedResponse},
-    error::DatabendError,
-};
 
 #[derive(Clone)]
 pub struct DatabendRetryLogic;
@@ -28,16 +27,20 @@ impl RetryLogic for DatabendRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            DatabendError::Server { code, message: _ } => match *code {
-                429 => true,
-                // general server error
-                500 => true,
-                // storage doesn't support presign operation
-                3902 => false,
-                // fail to parse stage attachment
-                1046 => false,
-                _ => false,
-            },
+            DatabendError::Response { status, .. } => {
+                match status.as_u16() {
+                    429 => true,
+                    // general server error
+                    500 => true,
+                    // storage doesn't support presign operation
+                    3902 => false,
+                    // fail to parse stage attachment
+                    1046 => false,
+                    _ => false,
+                }
+            }
+            DatabendError::WithContext(boxed_error, ..) => self.is_retriable_error(boxed_error),
+            DatabendError::IO(_) => true,
             _ => false,
         }
     }
@@ -45,11 +48,10 @@ impl RetryLogic for DatabendRetryLogic {
 
 #[derive(Clone)]
 pub struct DatabendService {
-    client: DatabendAPIClient,
-    database: String,
+    client: Arc<DatabendAPIClient>,
     table: String,
-    file_format_options: BTreeMap<String, String>,
-    copy_options: BTreeMap<String, String>,
+    file_format_options: BTreeMap<&'static str, &'static str>,
+    copy_options: BTreeMap<&'static str, &'static str>,
 }
 
 #[derive(Clone)]
@@ -96,98 +98,51 @@ impl DriverResponse for DatabendResponse {
 
 impl DatabendService {
     pub(super) fn new(
-        client: DatabendAPIClient,
-        database: String,
+        client: Arc<DatabendAPIClient>,
         table: String,
-        file_format_options: BTreeMap<String, String>,
-        copy_options: BTreeMap<String, String>,
+        file_format_options: BTreeMap<&'static str, &'static str>,
+        copy_options: BTreeMap<&'static str, &'static str>,
     ) -> Result<Self, DatabendError> {
-        if database.is_empty() {
-            return Err(DatabendError::InvalidConfig {
-                message: "database is required".to_string(),
-            });
-        }
         if table.is_empty() {
-            return Err(DatabendError::InvalidConfig {
-                message: "table is required".to_string(),
-            });
+            return Err(DatabendError::BadArgument("table is required".to_string()));
         }
         Ok(Self {
             client,
-            database,
             table,
             file_format_options,
             copy_options,
         })
     }
 
-    pub(super) fn new_stage_location(&self) -> String {
+    async fn new_stage_location(&self) -> String {
         let now = Utc::now().timestamp();
-        let suffix = thread_rng()
+        let database = self
+            .client
+            .current_database()
+            .unwrap_or("default".to_string());
+        let suffix = rng()
             .sample_iter(&Alphanumeric)
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!(
-            "@~/vector/{}/{}/{}-{}",
-            self.database, self.table, now, suffix,
-        )
+        format!("@~/vector/{}/{}/{}-{}", database, self.table, now, suffix,)
     }
 
-    pub(super) async fn get_presigned_url(
-        &self,
-        stage_location: &str,
-    ) -> Result<DatabendPresignedResponse, DatabendError> {
-        let req = DatabendHttpRequest::new(format!("PRESIGN UPLOAD {}", stage_location));
-        let resp = self.client.query(req).await?;
-
-        if resp.data.len() != 1 {
-            return Err(DatabendError::Server {
-                code: 500,
-                message: "Empty response from server for presigned request".to_string(),
-            });
-        }
-        if resp.data[0].len() != 3 {
-            return Err(DatabendError::Server {
-                code: 500,
-                message: "Invalid response from server for presigned request".to_string(),
-            });
-        }
-
-        // resp.data[0]: [ "PUT", "{\"host\":\"s3.us-east-2.amazonaws.com\"}", "https://s3.us-east-2.amazonaws.com/query-storage-xxxxx/tnxxxxx/stage/user/xxxx/xxx?" ]
-        let method = resp.data[0][0].clone();
-        let headers: BTreeMap<String, String> =
-            serde_json::from_str(resp.data[0][1].clone().as_str())?;
-        let url = resp.data[0][2].clone();
-
-        if method != "PUT" {
-            return Err(DatabendError::Server {
-                code: 500,
-                message: "Invalid method for presigned request".to_string(),
-            });
-        }
-
-        Ok(DatabendPresignedResponse {
-            method,
-            headers,
-            url,
-        })
-    }
-
-    pub(crate) async fn insert_with_stage(
-        &self,
-        stage_location: String,
-    ) -> Result<(), DatabendError> {
-        let mut req = DatabendHttpRequest::new(format!(
-            "INSERT INTO `{}`.`{}` VALUES",
-            self.database, self.table
-        ));
-        req.add_stage_attachment(
-            stage_location,
-            Some(self.file_format_options.clone()),
-            Some(self.copy_options.clone()),
-        );
-        _ = self.client.query(req).await?;
+    pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {
+        let stage = self.new_stage_location().await;
+        let size = data.len() as u64;
+        let reader = Box::new(Cursor::new(data));
+        self.client.upload_to_stage(&stage, reader, size).await?;
+        let sql = format!("INSERT INTO `{}` VALUES", self.table);
+        let _ = self
+            .client
+            .insert_with_stage(
+                &sql,
+                &stage,
+                self.file_format_options.clone(),
+                self.copy_options.clone(),
+            )
+            .await?;
         Ok(())
     }
 }
@@ -206,16 +161,11 @@ impl Service<DatabendRequest> for DatabendService {
 
         let future = async move {
             let metadata = request.get_metadata().clone();
-            let stage_location = service.new_stage_location();
-            let protocol = service.client.get_protocol();
-            let endpoint = service.client.get_host();
+            let protocol = service.client.scheme();
+            let host_port = format!("{}:{}", service.client.host(), service.client.port());
+            let endpoint = host_port.as_str();
             let byte_size = request.data.len();
-            let presigned_resp = service.get_presigned_url(&stage_location).await?;
-            service
-                .client
-                .upload_with_presigned(presigned_resp, request.data)
-                .await?;
-            service.insert_with_stage(stage_location).await?;
+            service.insert_with_stage(request.data).await?;
             emit!(EndpointBytesSent {
                 byte_size,
                 protocol,

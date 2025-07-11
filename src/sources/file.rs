@@ -44,22 +44,6 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("data_dir option required, but not given here or globally"))]
-    NoDataDir,
-    #[snafu(display(
-        "could not create subdirectory {:?} inside of data_dir {:?}",
-        subdir,
-        data_dir
-    ))]
-    MakeSubdirectoryError {
-        subdir: PathBuf,
-        data_dir: PathBuf,
-        source: std::io::Error,
-    },
-    #[snafu(display("data_dir {:?} does not exist", data_dir))]
-    MissingDataDir { data_dir: PathBuf },
-    #[snafu(display("data_dir {:?} is not writable", data_dir))]
-    DataDirNotWritable { data_dir: PathBuf },
     #[snafu(display(
         "message_start_indicator {:?} is not a valid regex: {}",
         indicator,
@@ -138,9 +122,8 @@ pub struct FileConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
     #[configurable(metadata(docs::examples = "hostname"))]
-    pub host_key: OptionalValuePath,
+    pub host_key: Option<OptionalValuePath>,
 
     /// The directory used to persist file checkpoint positions.
     ///
@@ -252,6 +235,13 @@ pub struct FileConfig {
     #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
+
+    /// How long to keep an open handle to a rotated log file.
+    /// The default value represents "no limit"
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
+    pub rotate_wait: Duration,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -260,10 +250,6 @@ fn default_max_line_bytes() -> usize {
 
 fn default_file_key() -> OptionalValuePath {
     OptionalValuePath::from(owned_value_path!("file"))
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -284,6 +270,10 @@ const fn default_max_read_bytes() -> usize {
 
 fn default_line_delimiter() -> String {
     "\n".to_string()
+}
+
+const fn default_rotate_wait() -> Duration {
+    Duration::from_secs(u64::MAX / 2)
 }
 
 /// Configuration for how files should be identified.
@@ -308,14 +298,18 @@ pub enum FingerprintConfig {
         bytes: Option<usize>,
 
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
+        /// If the file is compressed, the number of bytes refer to the header in the uncompressed content. Only
+        /// gzip is supported at this time.
         ///
         /// This can be helpful if all files share a common header that should be skipped.
+        #[serde(default = "default_ignored_header_bytes")]
         #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
         /// The number of lines to read for generating the checksum.
         ///
-        /// If your files share a common header that is not always a fixed size,
+        /// The number of lines are determined from the uncompressed content if the file is compressed. Only
+        /// gzip is supported at this time.
         ///
         /// If the file has less than this amount of lines, it won’t be read at all.
         #[serde(default = "default_lines")]
@@ -338,6 +332,10 @@ impl Default for FingerprintConfig {
             lines: default_lines(),
         }
     }
+}
+
+const fn default_ignored_header_bytes() -> usize {
+    0
 }
 
 const fn default_lines() -> usize {
@@ -389,7 +387,7 @@ impl Default for FileConfig {
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::default(),
             ignore_not_found: false,
-            host_key: default_host_key(),
+            host_key: None,
             offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
@@ -404,6 +402,7 @@ impl Default for FileConfig {
             acknowledgements: Default::default(),
             log_namespace: None,
             internal_metrics: Default::default(),
+            rotate_wait: default_rotate_wait(),
         }
     }
 }
@@ -452,7 +451,12 @@ impl SourceConfig for FileConfig {
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let file_key = self.file_key.clone().path.map(LegacyKey::Overwrite);
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
 
         let offset_key = self
             .offset_key
@@ -485,7 +489,10 @@ impl SourceConfig for FileConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -507,6 +514,11 @@ pub fn file_source(
         return Box::pin(future::ready(Err(())));
     }
 
+    let exclude_patterns = config
+        .exclude
+        .iter()
+        .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
+        .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let glob_minimum_cooldown = config.glob_minimum_cooldown_ms;
     let (ignore_checkpoints, read_from) = reconcile_position_options(
@@ -521,7 +533,7 @@ pub fn file_source(
 
     let paths_provider = Glob::new(
         &config.include,
-        &config.exclude,
+        &exclude_patterns,
         MatchOptions::default(),
         emitter.clone(),
     )
@@ -556,10 +568,15 @@ pub fn file_source(
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         handle: tokio::runtime::Handle::current(),
+        rotate_wait: config.rotate_wait,
     };
 
     let event_metadata = EventMetadata {
-        host_key: config.host_key.clone().path,
+        host_key: config
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path,
         hostname: crate::get_hostname().ok(),
         file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
@@ -961,7 +978,7 @@ mod tests {
         let local_dir = tempdir().unwrap();
 
         let mut config = Config::default();
-        config.global.data_dir = global_dir.into_path().into();
+        config.global.data_dir = global_dir.keep().into();
 
         // local path given -- local should win
         let res = config
@@ -1396,6 +1413,52 @@ mod tests {
         }
 
         assert_eq!(is, [n as usize; 3]);
+    }
+
+    #[tokio::test]
+    async fn file_exclude_paths() {
+        let n = 5;
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("a//b/*.log.*")],
+            exclude: vec![dir.path().join("a//b/test.log.*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path1 = dir.path().join("a//b/a.log.1");
+        let path2 = dir.path().join("a//b/test.log.1");
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+            std::fs::create_dir_all(dir.path().join("a/b")).unwrap();
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+            for i in 0..n {
+                writeln!(&mut file1, "1 {}", i).unwrap();
+                writeln!(&mut file2, "2 {}", i).unwrap();
+            }
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let mut is = [0; 1];
+
+        for event in received {
+            let line =
+                event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
+            let mut split = line.split(' ');
+            let file = split.next().unwrap().parse::<usize>().unwrap();
+            assert_ne!(file, 4);
+            let i = split.next().unwrap().parse::<usize>().unwrap();
+
+            assert_eq!(is[file - 1], i);
+            is[file - 1] += 1;
+        }
+
+        assert_eq!(is, [n as usize; 1]);
     }
 
     #[tokio::test]

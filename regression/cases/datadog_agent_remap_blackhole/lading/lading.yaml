@@ -11,3 +11,6 @@ generator:
         post:
           variant: "datadog_log"
           maximum_prebuild_cache_size_bytes: "256 Mb"
+target_metrics:
+  - prometheus: # internal telemetry
+      uri: "http://127.0.0.1:9090/metrics"

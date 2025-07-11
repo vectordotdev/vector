@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock, RwLock},
     time::Duration,
 };
 
@@ -13,10 +13,9 @@ use goauth::{
 };
 use http::{uri::PathAndQuery, Uri};
 use hyper::header::AUTHORIZATION;
-use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::watch, time::Instant};
+use tokio::sync::watch;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -25,9 +24,14 @@ use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
+// See https://cloud.google.com/compute/docs/access/authenticate-workloads#applications
+const METADATA_TOKEN_EXPIRY_MARGIN_SECS: u64 = 200;
+
+const METADATA_TOKEN_ERROR_RETRY_SECS: u64 = 2;
+
 pub const PUBSUB_URL: &str = "https://pubsub.googleapis.com";
 
-pub static PUBSUB_ADDRESS: Lazy<String> = Lazy::new(|| {
+pub static PUBSUB_ADDRESS: LazyLock<String> = LazyLock::new(|| {
     std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
 });
 
@@ -194,19 +198,34 @@ impl GcpAuthenticator {
     async fn token_regenerator(self, sender: watch::Sender<()>) {
         match self {
             Self::Credentials(inner) => {
-                let period =
-                    Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
-                let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+                let mut expires_in = inner.token.read().unwrap().expires_in() as u64;
                 loop {
-                    interval.tick().await;
-                    debug!("Renewing GCP authentication token.");
+                    let deadline = Duration::from_secs(
+                        expires_in
+                            .saturating_sub(METADATA_TOKEN_EXPIRY_MARGIN_SECS)
+                            .max(METADATA_TOKEN_ERROR_RETRY_SECS),
+                    );
+                    debug!(
+                        deadline = deadline.as_secs(),
+                        "Sleeping before refreshing GCP authentication token.",
+                    );
+                    tokio::time::sleep(deadline).await;
                     match inner.regenerate_token().await {
-                        Ok(()) => sender.send_replace(()),
+                        Ok(()) => {
+                            sender.send_replace(());
+                            debug!("GCP authentication token renewed.");
+                            // Rather than an expected fresh token, the Metadata Server may return
+                            // the same (cached) token during the last 300 seconds of its lifetime.
+                            // This scenario is handled by retrying the token refresh after the
+                            // METADATA_TOKEN_ERROR_RETRY_SECS period when a fresh token is expected
+                            expires_in = inner.token.read().unwrap().expires_in() as u64;
+                        }
                         Err(error) => {
                             error!(
                                 message = "Failed to update GCP authentication token.",
                                 %error
                             );
+                            expires_in = METADATA_TOKEN_EXPIRY_MARGIN_SECS;
                         }
                     }
                 }
@@ -238,7 +257,7 @@ impl InnerCreds {
 }
 
 async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
-    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
+    let claims = JwtClaims::new(creds.iss(), &[scope.clone()], creds.token_uri(), None, None);
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 

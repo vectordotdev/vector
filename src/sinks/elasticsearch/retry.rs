@@ -56,6 +56,8 @@ enum EsResultItem {
     Index(EsIndexResult),
     #[serde(rename = "create")]
     Create(EsIndexResult),
+    #[serde(rename = "update")]
+    Update(EsIndexResult),
 }
 
 impl EsResultItem {
@@ -64,6 +66,7 @@ impl EsResultItem {
         match self {
             EsResultItem::Index(r) => r,
             EsResultItem::Create(r) => r,
+            EsResultItem::Update(r) => r,
         }
     }
 }
@@ -179,7 +182,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Rejected,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::DontRetry(_)
@@ -200,7 +202,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Errored,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::Retry(_)

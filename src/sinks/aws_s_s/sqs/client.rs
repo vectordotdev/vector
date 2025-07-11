@@ -16,7 +16,6 @@ impl SqsMessagePublisher {
     }
 }
 
-#[async_trait::async_trait]
 impl Client<SendMessageError> for SqsMessagePublisher {
     async fn send_message(
         &self,

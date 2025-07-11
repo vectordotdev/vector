@@ -249,7 +249,7 @@ mod test {
 
     quickcheck! {
         fn from_u64(input: u64) -> () {
-            if input > i64::max_value() as u64 {
+            if input > i64::MAX as u64 {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
                            Value::Bytes(input.to_string().into()))
             } else {

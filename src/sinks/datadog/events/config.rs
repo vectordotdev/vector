@@ -5,18 +5,16 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::schema;
 use vrl::value::Kind;
 
+use super::{
+    service::{DatadogEventsResponse, DatadogEventsService},
+    sink::DatadogEventsSink,
+};
 use crate::{
     common::datadog,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{
-            events::{
-                service::{DatadogEventsResponse, DatadogEventsService},
-                sink::DatadogEventsSink,
-            },
-            get_api_base_endpoint, DatadogCommonConfig, LocalDatadogCommonConfig,
-        },
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
         util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
@@ -49,16 +47,8 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
-    fn get_api_events_endpoint(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
-        let api_base_endpoint =
-            get_api_base_endpoint(dd_common.endpoint.as_ref(), dd_common.site.as_str());
-
-        // We know this URI will be valid since we have just built it up ourselves.
-        http::Uri::try_from(format!("{}/api/v1/events", api_base_endpoint)).expect("URI not valid")
-    }
-
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.dd_common.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(self.dd_common.tls.as_ref(), false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
@@ -69,7 +59,7 @@ impl DatadogEventsConfig {
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
-            self.get_api_events_endpoint(dd_common),
+            dd_common.get_api_endpoint("/api/v1/events")?,
             dd_common.default_api_key.clone(),
             client,
         );

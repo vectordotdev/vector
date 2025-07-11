@@ -45,7 +45,7 @@ impl Default for BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -59,7 +59,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -69,7 +69,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: Some(data.into()),
         }
@@ -82,7 +82,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -136,7 +136,7 @@ impl SourceConfig for BasicSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.data_type.unwrap(),
             Definition::default_legacy_namespace(),
         )]

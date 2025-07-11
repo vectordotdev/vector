@@ -388,7 +388,7 @@ async fn test_graceful_shutdown() {
         String::from("bash"),
         String::from("-c"),
         String::from(
-            r#"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done"#,
+            r"trap 'echo signal received ; sleep 1; echo slept ; exit' SIGTERM; while true ; do sleep 10 ; done",
         ),
     ];
     let hostname = Some("Some.Machine".to_string());

@@ -1,1 +1,1 @@
-{"metric":{"name":"q","namespace":"x","tags":{"e":"o","k":"q","z":"f"},"kind":"absolute","gauge":{"value":238016.0}}}
+{"metric":{"name":"v","tags":{"n":"z","p":"p"},"interval_ms":983509443,"kind":"incremental","counter":{"value":170368.0}}}

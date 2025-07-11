@@ -26,7 +26,7 @@ should be used for all pull requests:
 - [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backward compatibility](#backward-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
-- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
+- [ ] Is there a risk of performance regressions? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
 For component changes, especially pull requests introducing new components, the
@@ -66,7 +66,7 @@ This checklist is specific for Vector's sinks.
 
 #### Documentation
 
-- [ ] Look at the doc preview on Netlify. Does it look good?
+- [ ] Generate a local website: `cd website & make serve`. Does it look good?
 - [ ] Is there a `cue` file linking to `base`?
 - [ ] Is there a markdown file under `/website/content/en/docs/reference/configuration/sinks/`?
 - [ ] Are module comments included in `mod.rs` linking to any relevant areas in the external services documentation?

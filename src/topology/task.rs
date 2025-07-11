@@ -79,6 +79,7 @@ impl Task {
         self.key.id()
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     pub fn typetag(&self) -> &str {
         &self.typetag
     }

@@ -1,7 +1,7 @@
 ---
 title: AppSignal
 description: Deliver events to [AppSignal](https://www.appsignal.com/)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["appsignal", "component", "sink", "logs", "metrics"]
 aliases: ["/docs/reference/configuration/sinks/appsignal"]

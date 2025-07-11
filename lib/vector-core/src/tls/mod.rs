@@ -100,6 +100,8 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting SNI: {}", source))]
+    SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]
     SetAlpnProtocols { source: ErrorStack },
     #[snafu(display(
@@ -183,13 +185,15 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
 }
 
 fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
-    let verify_hostname = settings
-        .tls()
-        .map_or(true, |settings| settings.verify_hostname);
-    let configure = tls_connector_builder(settings)?
+    let mut configure = tls_connector_builder(settings)?
         .build()
         .configure()
-        .context(TlsBuildConnectorSnafu)?
-        .verify_hostname(verify_hostname);
+        .context(TlsBuildConnectorSnafu)?;
+    let tls_setting = settings.tls().cloned();
+    if let Some(tls_setting) = &tls_setting {
+        tls_setting
+            .apply_connect_configuration(&mut configure)
+            .context(SetSniSnafu)?;
+    }
     Ok(configure)
 }

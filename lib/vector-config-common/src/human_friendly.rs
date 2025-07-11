@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use convert_case::{Boundary, Case, Converter};
-use once_cell::sync::Lazy;
 
 /// Well-known replacements.
 ///
 /// Replacements are instances of strings with unique capitalization that cannot be achieved
 /// programmatically, as well as the potential insertion of additional characters, such as the
 /// replacement of "pubsub" with "Pub/Sub".
-static WELL_KNOWN_REPLACEMENTS: Lazy<HashMap<String, &'static str>> = Lazy::new(|| {
+static WELL_KNOWN_REPLACEMENTS: LazyLock<HashMap<String, &'static str>> = LazyLock::new(|| {
     let pairs = vec![
         ("eventstoredb", "EventStoreDB"),
         ("mongodb", "MongoDB"),
@@ -43,7 +43,7 @@ static WELL_KNOWN_REPLACEMENTS: Lazy<HashMap<String, &'static str>> = Lazy::new(
 /// Acronyms are distinct from replacements because they should be entirely capitalized (i.e. "aws"
 /// or "aWs" or "Aws" should always be replaced with "AWS") whereas replacements may insert
 /// additional characters or capitalize specific characters within the original string.
-static WELL_KNOWN_ACRONYMS: Lazy<HashSet<String>> = Lazy::new(|| {
+static WELL_KNOWN_ACRONYMS: LazyLock<HashSet<String>> = LazyLock::new(|| {
     let acronyms = &[
         "api", "amqp", "aws", "ec2", "ecs", "gcp", "hec", "http", "https", "nats", "nginx", "s3",
         "sqs", "tls", "ssl", "otel", "gelf", "csv", "json", "rfc3339", "lz4", "us", "eu", "bsd",
@@ -70,7 +70,7 @@ pub fn generate_human_friendly_string(input: &str) -> String {
     // respectively.
     let converter = Converter::new()
         .to_case(Case::Title)
-        .remove_boundaries(&[Boundary::LowerDigit, Boundary::UpperDigit]);
+        .remove_boundaries(&[Boundary::LOWER_DIGIT, Boundary::UPPER_DIGIT]);
     let normalized = converter.convert(input);
 
     let replaced_segments = normalized

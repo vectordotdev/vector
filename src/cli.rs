@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 
-use std::sync::atomic::Ordering;
 use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -153,7 +152,33 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 
+    /// Method for configuration watching.
+    ///
+    /// By default, `vector` uses recommended watcher for host OS
+    /// - `inotify` for Linux-based systems.
+    /// - `kqueue` for unix/macos
+    /// - `ReadDirectoryChangesWatcher` for windows
+    ///
+    /// The `poll` watcher can be used in cases where `inotify` doesn't work, e.g., when attaching the configuration via NFS.
+    #[arg(
+        long,
+        default_value = "recommended",
+        env = "VECTOR_WATCH_CONFIG_METHOD"
+    )]
+    pub watch_config_method: WatchConfigMethod,
+
+    /// Poll for changes in the configuration file at the given interval.
+    ///
+    /// This setting is only applicable if `Poll` is set in `--watch-config-method`.
+    #[arg(
+        long,
+        env = "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS",
+        default_value = "30"
+    )]
+    pub watch_config_poll_interval_seconds: NonZeroU64,
+
     /// Set the internal log rate limit
+    /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(
         short,
         long,
@@ -212,13 +237,6 @@ pub struct RootOpts {
     /// `--watch-config`.
     #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
     pub allow_empty_config: bool,
-
-    /// Turn on strict mode for environment variable interpolation. When set, interpolation of a
-    /// missing environment variable in configuration files will cause an error instead of a
-    /// warning, which will result in a failure to load any such configuration file. This defaults
-    /// to false, but that default is deprecated and will be changed to strict in future versions.
-    #[arg(long, env = "VECTOR_STRICT_ENV_VARS", default_value = "false")]
-    pub strict_env_vars: bool,
 }
 
 impl RootOpts {
@@ -240,13 +258,12 @@ impl RootOpts {
     }
 
     pub fn init_global(&self) {
-        crate::config::STRICT_ENV_VARS.store(self.strict_env_vars, Ordering::Relaxed);
-
         if !self.openssl_no_probe {
-            openssl_probe::init_ssl_cert_env_vars();
+            unsafe {
+                openssl_probe::init_openssl_env_vars();
+            }
         }
 
-        #[cfg(not(feature = "enterprise-tests"))]
         crate::metrics::init_global().expect("metrics initialization failed");
     }
 }
@@ -270,11 +287,13 @@ pub enum SubCommand {
 
     /// Generate the configuration schema for this version of Vector. (experimental)
     ///
-    /// A JSON Schema document will be written to stdout that represents the valid schema for a
+    /// A JSON Schema document will be generated that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
     /// only when concatenated together.
-    GenerateSchema,
+    ///
+    /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
+    GenerateSchema(generate_schema::Opts),
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[command(hide = true)]
@@ -316,7 +335,7 @@ impl SubCommand {
             Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
-            Self::GenerateSchema => generate_schema::cmd(),
+            Self::GenerateSchema(opts) => generate_schema::cmd(opts),
             Self::Graph(g) => graph::cmd(g),
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
@@ -363,6 +382,15 @@ impl Color {
 pub enum LogFormat {
     Text,
     Json,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchConfigMethod {
+    /// Recommended watcher for the current OS, usually `inotify` for Linux-based systems.
+    Recommended,
+    /// Poll-based watcher, typically used for watching files on EFS/NFS-like network storage systems.
+    /// The interval is determined by  [`RootOpts::watch_config_poll_interval_seconds`].
+    Poll,
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {

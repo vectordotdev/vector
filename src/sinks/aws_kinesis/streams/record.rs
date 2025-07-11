@@ -38,7 +38,7 @@ impl Record for KinesisStreamRecord {
         let data_len = self.record.data.as_ref().len();
         let key_len = self.record.partition_key.len();
 
-        (data_len + 2) / 3 * 4 + hash_key_size + key_len + 10
+        data_len.div_ceil(3) * 4 + hash_key_size + key_len + 10
     }
 
     fn get(self) -> Self::T {
@@ -51,7 +51,6 @@ pub struct KinesisStreamClient {
     pub client: KinesisClient,
 }
 
-#[async_trait::async_trait]
 impl SendRecord for KinesisStreamClient {
     type T = KinesisRecord;
     type E = KinesisError;

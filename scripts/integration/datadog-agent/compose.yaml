@@ -14,6 +14,7 @@ services:
     - DD_CMD_PORT=5001
     - DD_USE_DOGSTATSD=false
     - DD_HOSTNAME=datadog-agent
+    - DD_SERIALIZER_COMPRESSOR_KIND=zstd
     volumes:
     - ../../../tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   datadog-trace-agent:

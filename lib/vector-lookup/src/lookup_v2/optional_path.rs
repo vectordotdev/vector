@@ -7,6 +7,7 @@ use crate::{OwnedTargetPath, OwnedValuePath};
 
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 /// An optional path that deserializes an empty string to `None`.
 pub struct OptionalTargetPath {
@@ -67,6 +68,7 @@ impl From<OwnedTargetPath> for OptionalTargetPath {
 
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 /// An optional path that deserializes an empty string to `None`.
 pub struct OptionalValuePath {

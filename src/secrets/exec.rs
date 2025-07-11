@@ -58,7 +58,7 @@ struct ExecResponse {
 }
 
 impl SecretBackend for ExecBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
@@ -117,12 +117,10 @@ async fn query_backend(
     let mut stderr_stream = child
         .stderr
         .map(|s| codec::FramedRead::new(s, codec::LinesCodec::new()))
-        .take()
         .ok_or("unable to acquire stderr")?;
     let mut stdout_stream = child
         .stdout
         .map(|s| codec::FramedRead::new(s, codec::BytesCodec::new()))
-        .take()
         .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;

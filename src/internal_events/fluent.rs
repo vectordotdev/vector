@@ -12,7 +12,7 @@ pub struct FluentMessageReceived {
 impl InternalEvent for FluentMessageReceived {
     fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
-        counter!("component_received_events_total", 1);
+        counter!("component_received_events_total").increment(1);
     }
 }
 
@@ -22,7 +22,7 @@ pub struct FluentMessageDecodeError<'a> {
     pub base64_encoded_message: String,
 }
 
-impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
+impl InternalEvent for FluentMessageDecodeError<'_> {
     fn emit(self) {
         error!(
             message = "Error decoding fluent message.",
@@ -30,12 +30,13 @@ impl<'a> InternalEvent for FluentMessageDecodeError<'a> {
             base64_encoded_message = %self.base64_encoded_message,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }

@@ -5,7 +5,7 @@ use snafu::ResultExt;
 use crate::sinks::prelude::*;
 
 use super::{
-    config::{NatsSinkConfig, NatsTowerRequestConfigDefaults},
+    config::{NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
     request_builder::{NatsEncoder, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError,
@@ -20,7 +20,7 @@ pub(super) struct NatsSink {
     request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
     transformer: Transformer,
     encoder: Encoder<()>,
-    connection: Arc<async_nats::Client>,
+    publisher: Arc<NatsPublisher>,
     subject: Template,
 }
 
@@ -42,7 +42,7 @@ impl NatsSink {
     }
 
     pub(super) async fn new(config: NatsSinkConfig) -> Result<Self, NatsError> {
-        let connection = Arc::new(config.connect().await?);
+        let publisher = Arc::new(config.publisher().await?);
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
@@ -51,9 +51,9 @@ impl NatsSink {
 
         Ok(NatsSink {
             request,
-            connection,
             transformer,
             encoder,
+            publisher,
             subject,
         })
     }
@@ -71,7 +71,7 @@ impl NatsSink {
         let service = ServiceBuilder::new()
             .settings(request, NatsRetryLogic)
             .service(NatsService {
-                connection: Arc::clone(&self.connection),
+                publisher: Arc::clone(&self.publisher),
             });
 
         input

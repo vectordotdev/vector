@@ -1,9 +1,10 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{InternalEvent, INTENTIONAL};
 use vector_lib::{
     internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
     json_size::JsonSize,
 };
+use vrl::core::Value;
 
 use crate::event::Event;
 
@@ -33,15 +34,23 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 let pod_name = pod_info.name;
                 let pod_namespace = pod_info.namespace;
 
-                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone());
-                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name, "pod_namespace" => pod_namespace);
-            }
-            None => {
-                counter!("component_received_events_total", 1);
+                counter!(
+                    "component_received_events_total",
+                    "pod_name" => pod_name.clone(),
+                    "pod_namespace" => pod_namespace.clone(),
+                )
+                .increment(1);
                 counter!(
                     "component_received_event_bytes_total",
-                    self.byte_size.get() as u64
-                );
+                    "pod_name" => pod_name,
+                    "pod_namespace" => pod_namespace,
+                )
+                .increment(self.byte_size.get() as u64);
+            }
+            None => {
+                counter!("component_received_events_total").increment(1);
+                counter!("component_received_event_bytes_total")
+                    .increment(self.byte_size.get() as u64);
             }
         }
     }
@@ -62,14 +71,15 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -86,15 +96,16 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        counter!("k8s_event_namespace_annotation_failures_total", 1);
+        )
+        .increment(1);
+        counter!("k8s_event_namespace_annotation_failures_total").increment(1);
     }
 }
 
@@ -111,15 +122,16 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        counter!("k8s_event_node_annotation_failures_total", 1);
+        )
+        .increment(1);
+        counter!("k8s_event_node_annotation_failures_total").increment(1);
     }
 }
 
@@ -134,7 +146,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
             message = "Encountered format picker edge case.",
             what = %self.what,
         );
-        counter!("k8s_format_picker_edge_cases_total", 1);
+        counter!("k8s_format_picker_edge_cases_total").increment(1);
     }
 }
 
@@ -150,14 +162,15 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        counter!("k8s_docker_format_parse_failures_total", 1);
+        )
+        .increment(1);
+        counter!("k8s_docker_format_parse_failures_total").increment(1);
     }
 }
 
@@ -178,17 +191,50 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => KUBERNETES_LIFECYCLE,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: self.message,
+        });
+    }
+}
+
+#[derive(Debug)]
+pub struct KubernetesMergedLineTooBigError<'a> {
+    pub event: &'a Value,
+    pub configured_limit: usize,
+    pub encountered_size_so_far: usize,
+}
+
+impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Found line that exceeds max_merged_line_bytes; discarding.",
+            event = ?self.event,
+            configured_limit = self.configured_limit,
+            encountered_size_so_far = self.encountered_size_so_far,
+            internal_log_rate_limit = true,
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "reading_line_from_kubernetes_log",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Found line that exceeds max_merged_line_bytes; discarding.",
         });
     }
 }

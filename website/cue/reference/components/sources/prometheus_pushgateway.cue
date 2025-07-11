@@ -14,6 +14,7 @@ components: sources: prometheus_pushgateway: {
 
 	features: {
 		auto_generated:   true
+		has_auth:         true
 		acknowledgements: true
 		multiline: enabled: false
 		receive: {
@@ -49,7 +50,7 @@ components: sources: prometheus_pushgateway: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.prometheus_pushgateway.configuration
+	configuration: generated.components.sources.prometheus_pushgateway.configuration
 
 	output: metrics: {
 		counter:   output._passthrough_counter

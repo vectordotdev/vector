@@ -1,7 +1,7 @@
 ---
 title: Loki
 description: Deliver log event data to the [Loki](https://grafana.com/oss/loki) aggregation system
-kind: sink
+component_kind: sink
 layout: component
 tags: ["loki", "grafana", "component", "sink", "logs"]
 ---

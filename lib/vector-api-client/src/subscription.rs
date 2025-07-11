@@ -39,15 +39,6 @@ pub struct Payload {
 }
 
 impl Payload {
-    /// Returns an "init" payload to confirm the connection to the server.
-    pub fn init(id: Uuid) -> Self {
-        Self {
-            id,
-            payload_type: "connection_init".to_owned(),
-            payload: json!({}),
-        }
-    }
-
     /// Returns a "start" payload necessary for starting a new subscription.
     pub fn start<T: GraphQLQuery + Send + Sync>(
         id: Uuid,
@@ -141,7 +132,7 @@ impl SubscriptionClient {
     }
 
     /// Start a new subscription request.
-    pub fn start<T: GraphQLQuery + Send + Sync>(
+    pub fn start<T>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> BoxedSubscription<T>
@@ -158,8 +149,7 @@ impl SubscriptionClient {
 
         self.subscriptions.lock().unwrap().insert(id, tx);
 
-        // Initialize the connection with the relevant control messages.
-        _ = self.tx.send(Payload::init(id));
+        // Send start subscription command with the relevant control messages.
         _ = self.tx.send(Payload::start::<T>(id, request_body));
 
         Box::pin(
@@ -181,6 +171,11 @@ pub async fn connect_subscription_client(
 
     let (send_tx, mut send_rx) = mpsc::unbounded_channel::<Payload>();
     let (recv_tx, recv_rx) = mpsc::unbounded_channel::<Payload>();
+
+    // Initialize the connection
+    _ = ws_tx
+        .send(Message::Text(r#"{"type":"connection_init"}"#.to_string()))
+        .await;
 
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {

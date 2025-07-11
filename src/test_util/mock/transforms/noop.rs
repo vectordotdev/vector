@@ -46,7 +46,7 @@ impl TransformConfig for NoopTransformConfig {
         _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
-            DataType::all(),
+            DataType::all_bits(),
             definitions
                 .iter()
                 .map(|(output, definition)| (output.clone(), definition.clone()))

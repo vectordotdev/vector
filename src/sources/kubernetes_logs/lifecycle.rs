@@ -12,7 +12,7 @@ use futures::{
     FutureExt, StreamExt,
 };
 
-use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
+use crate::shutdown::ShutdownSignal;
 
 /// Lifecycle encapsulates logic for managing a lifecycle of multiple futures
 /// that are bounded together by a shared shutdown condition.
@@ -31,12 +31,11 @@ pub struct Lifecycle<'bound> {
 /// after the shutdown is complete.
 #[derive(Debug)]
 pub enum GlobalShutdownToken {
-    /// The global shutdown signal was consumed, and we have a raw
-    /// [`ShutdownSignalToken`] now.
-    Token(ShutdownSignalToken),
+    /// The global shutdown signal was consumed.
+    Token,
     /// The [`ShutdownSignal`] wasn't consumed, and still holds on to the
-    /// [`ShutdownSignalToken`]. Keep it around.
-    Unused(ShutdownSignal),
+    /// [`ShutdownSignalToken`].
+    Unused,
 }
 
 impl<'bound> Lifecycle<'bound> {
@@ -71,15 +70,15 @@ impl<'bound> Lifecycle<'bound> {
         let token = match select(first_task_fut, &mut global_shutdown).await {
             Either::Left((None, _)) => {
                 trace!(message = "Lifecycle had no tasks upon run, we're done.");
-                GlobalShutdownToken::Unused(global_shutdown)
+                GlobalShutdownToken::Unused
             }
             Either::Left((Some(()), _)) => {
                 trace!(message = "Lifecycle had the first task completed.");
-                GlobalShutdownToken::Unused(global_shutdown)
+                GlobalShutdownToken::Unused
             }
-            Either::Right((shutdown_signal_token, _)) => {
+            Either::Right((_shutdown_signal_token, _)) => {
                 trace!(message = "Lifecycle got a global shutdown request.");
-                GlobalShutdownToken::Token(shutdown_signal_token)
+                GlobalShutdownToken::Token
             }
         };
 
@@ -112,7 +111,7 @@ pub struct Slot<'bound, 'lc> {
     shutdown_trigger: oneshot::Sender<()>,
 }
 
-impl<'bound, 'lc> Slot<'bound, 'lc> {
+impl<'bound> Slot<'bound, '_> {
     /// Bind the lifecycle slot to a concrete future.
     /// The passed future MUST start it's shutdown process when requested to
     /// shutdown via the signal passed from the corresponding

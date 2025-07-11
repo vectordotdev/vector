@@ -9,11 +9,14 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 
@@ -25,6 +28,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
+    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
     config::{
         log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
@@ -33,9 +37,12 @@ use crate::{
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        http::{add_query_parameters, HttpMethod},
-        ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    sources::{
+        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
+        util::{
+            http::{add_query_parameters, HttpMethod},
+            HttpSource,
+        },
     },
     tls::TlsEnableableConfig,
 };
@@ -51,16 +58,23 @@ pub struct LogplexConfig {
 
     /// A list of URL query parameters to include in the log event.
     ///
+    /// Accepts the wildcard (`*`) character for query parameters matching a specified pattern.
+    ///
+    /// Specifying "*" results in all query parameters included in the log event.
+    ///
     /// These override any values included in the body with conflicting names.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "application", docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "application"))]
+    #[configurable(metadata(docs::examples = "source"))]
+    #[configurable(metadata(docs::examples = "param*"))]
+    #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
-    auth: Option<HttpSourceAuthConfig>,
+    auth: Option<HttpServerAuthConfig>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -173,7 +187,10 @@ impl SourceConfig for LogplexConfig {
                 .build()?;
 
         let source = LogplexSource {
-            query_parameters: self.query_parameters.clone(),
+            query_parameters: build_param_matcher(&remove_duplicates(
+                self.query_parameters.clone(),
+                "query_parameters",
+            ))?,
             decoder,
             log_namespace,
         };
@@ -184,8 +201,8 @@ impl SourceConfig for LogplexConfig {
             HttpMethod::Post,
             StatusCode::OK,
             true,
-            &self.tls,
-            &self.auth,
+            self.tls.as_ref(),
+            self.auth.as_ref(),
             cx,
             self.acknowledgements,
             self.keepalive.clone(),
@@ -196,10 +213,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_logs(
-            self.decoding.output_type(),
-            schema_def,
-        )]
+        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_def)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -213,7 +227,7 @@ impl SourceConfig for LogplexConfig {
 
 #[derive(Clone, Default)]
 struct LogplexSource {
-    query_parameters: Vec<String>,
+    query_parameters: Vec<HttpConfigParamKind>,
     decoder: Decoder,
     log_namespace: LogNamespace,
 }
@@ -287,6 +301,7 @@ impl HttpSource for LogplexSource {
         _request_path: &str,
         _headers_config: &HeaderMap,
         query_parameters: &HashMap<String, String>,
+        _source_ip: Option<&SocketAddr>,
     ) {
         add_query_parameters(
             events,
@@ -392,7 +407,6 @@ fn line_to_events(
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
-            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -424,7 +438,8 @@ mod tests {
     };
     use vrl::value::{kind::Collection, Kind};
 
-    use super::{HttpSourceAuthConfig, LogplexConfig};
+    use super::LogplexConfig;
+    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
@@ -441,7 +456,7 @@ mod tests {
     }
 
     async fn source(
-        auth: Option<HttpSourceAuthConfig>,
+        auth: Option<HttpServerAuthConfig>,
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
@@ -474,13 +489,13 @@ mod tests {
     async fn send(
         address: SocketAddr,
         body: &str,
-        auth: Option<HttpSourceAuthConfig>,
+        auth: Option<HttpServerAuthConfig>,
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
-        if let Some(auth) = auth {
-            req = req.basic_auth(auth.username, Some(auth.password.inner()));
+        if let Some(HttpServerAuthConfig::Basic { username, password }) = auth {
+            req = req.basic_auth(username, Some(password.inner()));
         }
         req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
@@ -493,8 +508,8 @@ mod tests {
             .as_u16()
     }
 
-    fn make_auth() -> HttpSourceAuthConfig {
-        HttpSourceAuthConfig {
+    fn make_auth() -> HttpServerAuthConfig {
+        HttpServerAuthConfig::Basic {
             username: random_string(16),
             password: random_string(16).into(),
         }
@@ -545,6 +560,51 @@ mod tests {
             assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
             assert_eq!(log["appname"], "lumberjack-store".into());
             assert_eq!(log["absent"], Value::Null);
+        }).await;
+    }
+
+    #[tokio::test]
+    async fn logplex_query_parameters_wildcard() {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
+
+            let (rx, addr) = source(
+                Some(auth.clone()),
+                vec!["*".to_string()],
+                EventStatus::Delivered,
+                true,
+            )
+            .await;
+
+            let mut events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
+
+            let event = events.remove(0);
+            let log = event.as_log();
+
+            assert_eq!(
+                *log.get_message().unwrap(),
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[log_schema().timestamp_key().unwrap().to_string()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(*log.get_host().unwrap(), "host".into());
+            assert_eq!(*log.get_source_type().unwrap(), "heroku_logs".into());
+            assert_eq!(log["appname"], "lumberjack-store".into());
         }).await;
     }
 

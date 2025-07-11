@@ -55,7 +55,7 @@ components: sources: statsd: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.statsd.configuration
+	configuration: generated.components.sources.statsd.configuration
 
 	output: metrics: {
 		counter:      output._passthrough_counter
@@ -65,6 +65,15 @@ components: sources: statsd: {
 	}
 
 	how_it_works: {
+		timings: {
+			title: "StatsD timings"
+			body: """
+				Incoming timings are emitted as distributions. By default, timings in milliseconds (`ms`)
+				are converted to seconds (`s`). This behavior can be controlled via the
+				`convert_to` configuration option. Setting `convert_to` to "milliseconds" will preserve
+				the original timing values.
+				"""
+		}
 		timestamps: {
 			title: "Timestamps"
 			body:  """
@@ -76,5 +85,8 @@ components: sources: statsd: {
 				[metric data model](\(urls.vector_metric)) page for more info.
 				"""
 		}
+	}
+	telemetry: metrics: {
+		component_received_bytes: components.sources.internal_metrics.output.metrics.component_received_bytes
 	}
 }

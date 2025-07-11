@@ -147,7 +147,7 @@ impl SourceConfig for AwsSqsConfig {
                 Some("timestamp"),
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -161,11 +161,13 @@ impl SourceConfig for AwsSqsConfig {
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &self.auth,
             self.region.region(),
             self.region.endpoint(),
             &cx.proxy,
-            &self.tls,
+            self.tls.as_ref(),
+            None,
         )
         .await
     }

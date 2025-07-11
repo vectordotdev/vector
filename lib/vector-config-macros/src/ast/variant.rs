@@ -166,7 +166,7 @@ impl<'a> Variant<'a> {
     }
 }
 
-impl<'a> ToTokens for Variant<'a> {
+impl ToTokens for Variant<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.original.to_tokens(tokens)
     }
@@ -204,7 +204,7 @@ impl Attributes {
     }
 }
 
-impl<'a> PartialEq for Variant<'a> {
+impl PartialEq for Variant<'_> {
     fn eq(&self, other: &Self) -> bool {
         // Equality checking between variants is only used to drive conformance checks around making
         // sure no duplicate variants exist when in untagged mode, so all we care about is what

@@ -11,7 +11,7 @@ use std::{
 };
 
 use arr_macro::arr;
-use metrics::{counter, decrement_gauge, increment_gauge};
+use metrics::{counter, gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
@@ -20,7 +20,7 @@ pub(crate) use self::allocator::{
     without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
 };
 
-const NUM_GROUPS: usize = 128;
+const NUM_GROUPS: usize = 256;
 
 // Allocations are not tracked during startup.
 // We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
@@ -55,8 +55,8 @@ impl GroupMemStats {
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
-            allocations: arr![AtomicU64::new(0) ; 128],
-            deallocations: arr![AtomicU64::new(0) ; 128],
+            allocations: arr![AtomicU64::new(0) ; 256],
+            deallocations: arr![AtomicU64::new(0) ; 256],
         }));
         let group_mem_stats = GroupMemStats { stats: stats_ref };
         mutex.push(stats_ref);
@@ -84,7 +84,7 @@ impl GroupInfo {
     }
 }
 
-static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 128];
+static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -145,35 +145,29 @@ pub fn init_allocation_tracing() {
                     let group_info = group.lock().unwrap();
                     if allocations_diff > 0 {
                         counter!(
-                            "component_allocated_bytes_total",
-                            allocations_diff,
-                            "component_kind" => group_info.component_kind.clone(),
+                            "component_allocated_bytes_total", "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone());
+                            "component_id" => group_info.component_id.clone()).increment(allocations_diff);
                     }
                     if deallocations_diff > 0 {
                         counter!(
-                            "component_deallocated_bytes_total",
-                            deallocations_diff,
-                            "component_kind" => group_info.component_kind.clone(),
+                            "component_deallocated_bytes_total", "component_kind" => group_info.component_kind.clone(),
                             "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone());
+                            "component_id" => group_info.component_id.clone()).increment(deallocations_diff);
                     }
                     if mem_used_diff > 0 {
-                        increment_gauge!(
-                            "component_allocated_bytes",
-                            mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
-                            "component_kind" => group_info.component_kind.clone(),
-                            "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone());
+                        gauge!(
+                            "component_allocated_bytes", "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone(),
+                            "component_kind" => group_info.component_kind.clone())
+                            .increment(mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                     if mem_used_diff < 0 {
-                        decrement_gauge!(
-                            "component_allocated_bytes",
-                            -mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"),
-                            "component_kind" => group_info.component_kind.clone(),
-                            "component_type" => group_info.component_type.clone(),
-                            "component_id" => group_info.component_id.clone());
+                        gauge!(
+                            "component_allocated_bytes", "component_type" => group_info.component_type.clone(),
+                            "component_id" => group_info.component_id.clone(),
+                            "component_kind" => group_info.component_kind.clone())
+                            .decrement(-mem_used_diff.to_f64().expect("failed to convert mem_used from int to float"));
                     }
                 }
                 thread::sleep(Duration::from_millis(
@@ -209,9 +203,6 @@ pub fn acquire_allocation_group_id(
         }
     }
 
-    // TODO: Technically, `NUM_GROUPS` is lower (128) than the upper bound for the
-    // `AllocationGroupId::register` call itself (253), so we can hardcode `NUM_GROUPS` here knowing
-    // it's the lower of the two values and will trigger first.. but this may not always be true.
     warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
     AllocationGroupId::ROOT
 }

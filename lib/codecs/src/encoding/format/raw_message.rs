@@ -34,13 +34,6 @@ impl RawMessageSerializerConfig {
 #[derive(Debug, Clone)]
 pub struct RawMessageSerializer;
 
-impl RawMessageSerializer {
-    /// Creates a new `RawMessageSerializer`.
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
 impl Encoder<Event> for RawMessageSerializer {
     type Error = vector_common::Error;
 

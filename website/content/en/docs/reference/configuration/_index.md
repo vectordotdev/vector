@@ -3,6 +3,7 @@ title: Configuring Vector
 short: Configuration
 weight: 2
 aliases: ["/docs/configuration", "/docs/setup/configuration"]
+tags: ["configuration", "env", "environment variables", "interpolation"]
 ---
 
 Vector is configured using a configuration file. This section contains a
@@ -23,6 +24,7 @@ data_dir: "/var/lib/vector"
 
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
+# NOTE: this is _enabled_ for helm chart deployments, see: https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/examples/datadog-values.yaml#L78-L81
 api:
   enabled: false
 # address = "127.0.0.1:8686"
@@ -33,7 +35,7 @@ sources:
     type: "file"
     include:
       - "/var/log/apache2/*.log" # supports globbing
-    ignore_older: 86400          # 1 day
+    ignore_older_secs: 86400     # 1 day
 
 # Structure and parse via Vector's Remap Language
 transforms:
@@ -93,9 +95,9 @@ enabled = false
 
 # Ingest data by tailing one or more files
 [sources.apache_logs]
-type         = "file"
-include      = ["/var/log/apache2/*.log"]    # supports globbing
-ignore_older = 86400                         # 1 day
+type              = "file"
+include           = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older_secs = 86400                         # 1 day
 
 # Structure and parse via Vector's Remap Language
 [transforms.apache_parser]
@@ -243,47 +245,7 @@ vector --config /etc/vector/vector.json
 
 ### Environment variables
 
-Vector interpolates environment variables within your configuration file with
-the following syntax:
-
-```yaml
-transforms:
-  add_host:
-    type: "remap"
-    source: |
-      # Basic usage. "$HOSTNAME" also works.
-      .host = "${HOSTNAME}" # or "$HOSTNAME"
-
-      # Setting a default value when not present.
-      .environment = "${ENV:-development}"
-
-      # Requiring an environment variable to be present.
-      .tenant = "${TENANT:?tenant must be supplied}"
-```
-
-#### Default values
-
-Default values can be supplied using `:-` or `-` syntax:
-
-```yaml
-option: "${ENV_VAR:-default}" # default value if variable is unset or empty
-option: "${ENV_VAR-default}" # default value only if variable is unset
-```
-
-#### Required variables
-
-Environment variables that are required can be specified using `:?` or `?` syntax:
-
-```yaml
-option: "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
-option: "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
-```
-
-#### Escaping
-
-You can escape environment variables by prefacing them with a `$` character. For
-example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
-environment variable example.
+Refer to the [Environment Variables](docs/reference/environment_variables/) page.
 
 ### Formats
 
@@ -432,6 +394,161 @@ sinks:
   archive:
     type: "aws_s3"
     inputs: ["app*", "system_logs"]
+```
+
+### Enrichment tables
+
+#### Memory enrichment table
+
+Memory enrichment table has to be used as a sink to feed it data, which can then be queried like any
+other enrichment table. The data has to conform to a specific format - the memory table will only
+accept [VRL objects](/docs/reference/vrl/expressions/#object), where each key-value pair will be
+stored as a separate entry in the table, associating the value with the key in the table. Value here
+can be any VRL type.
+
+```yaml
+enrichment_tables:
+  memory_table:
+    type: memory
+    ttl: 60
+    flush_interval: 5
+    inputs: ["cache_generator"]
+
+sources:
+  demo_logs_test:
+    type: "demo_logs"
+    format: "json"
+
+transforms:
+  demo_logs_processor:
+    type: "remap"
+    inputs: ["demo_logs_test"]
+    source: |
+      . = parse_json!(.message)
+      user_id = get!(., path: ["user-identifier"])
+
+      # Look for existing value in the table, using "user-identifier" as key
+      existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
+
+      if err == null {
+        # Value found, just use the cached value
+        # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
+        # Where value is the value we cached, ttl is the time left before this value is removed from
+        # the cache and key is the key we queried the table with
+        . = existing.value
+        .source = "cache"
+      } else {
+        # Do some processing, because we don't have this value in the table
+        .referer = parse_url!(.referer)
+        .referer.host = encode_punycode!(.referer.host)
+        .source = "transform"
+      }
+
+  cache_generator:
+    type: "remap"
+    inputs: ["demo_logs_processor"]
+    source: |
+      existing, err = get_enrichment_table_record("memory_table", { "key": get!(., path: ["user-identifier"]) })
+      if err != null {
+        # We don't have this key cached, so we need to prepare it for the table
+        data = .
+        # Since the memory enrichment table takes in all key value pairs it receives and stores them
+        # We want to produce an object that has the value of "user-identifier" as its key and
+        # rest of the object as its value
+        . = set!(value: {}, path: [get!(data, path: ["user-identifier"])], data: data)
+      } else {
+        . = {}
+      }
+
+# We can observe that after some time that some events have "source" set to "cache"
+sinks:
+  console:
+    inputs: ["demo_logs_processor"]
+    target: "stdout"
+    type: "console"
+    encoding:
+      codec: "json"
+```
+
+#### Using memory enrichment table as a source
+
+The memory enrichment table can serve as a source by periodically exporting its stored data and making it available to downstream components.
+
+```yaml
+enrichment_tables:
+  memory_table:
+    type: memory
+    ttl: 60
+    flush_interval: 5
+    inputs: ["cache_generator"]
+    source_config:
+       # Export the cache every 3 minutes (100 seconds).
+       export_interval: 180
+       # If set to false (which is the default) it will not remove data from cache after exporting.
+       remove_after_export: false
+       # Source key has to be defined and be different from the main key ("memory_table").
+       # This key is then used to define this component as an input to other components
+       source_key: "memory_table_source"
+       # export_batch_size can be used to reduce memory usage when handling larger tables.
+       # When set, data will be exported from the table in batches, waiting for downstream components
+       # to process the data
+       # export_batch_size: 10000
+
+
+sources:
+  demo_logs_test:
+    type: "demo_logs"
+    format: "json"
+
+transforms:
+  demo_logs_processor:
+    type: "remap"
+    inputs: ["demo_logs_test"]
+    source: |
+      . = parse_json!(.message)
+      user_id = get!(., path: ["user-identifier"])
+
+      # Look for existing value in the table, using "user-identifier" as key
+      existing, err = get_enrichment_table_record("memory_table", { "key": user_id })
+
+      if err == null {
+        # Value found, just use the cached value
+        # In this case existing looks like this { "key": user_id, "value": {}, "ttl": 50 }
+        # Where value is the value we cached, ttl is the time left before this value is removed from
+        # the cache and key is the key we queried the table with
+        . = existing.value
+        .source = "cache"
+      } else {
+        # Do some processing, because we don't have this value in the table
+        .referer = parse_url!(.referer)
+        .referer.host = encode_punycode!(.referer.host)
+        .source = "transform"
+      }
+
+  cache_generator:
+    type: "remap"
+    inputs: ["demo_logs_processor"]
+    source: |
+      existing, err = get_enrichment_table_record("memory_table", { "key": get!(., path: ["user-identifier"]) })
+      if err != null {
+        # We don't have this key cached, so we need to prepare it for the table
+        data = .
+        # Since the memory enrichment table takes in all key value pairs it receives and stores them
+        # We want to produce an object that has the value of "user-identifier" as its key and
+        # rest of the object as its value
+        . = set!(value: {}, path: [get!(data, path: ["user-identifier"])], data: data)
+      } else {
+        . = {}
+      }
+
+# We can observe that after some time data will be exported to console from the cache
+sinks:
+  console:
+    inputs: ["memory_table_source"]
+    target: "stdout"
+    type: "console"
+    encoding:
+      codec: "json"
 ```
 
 ## Sections

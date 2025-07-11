@@ -62,7 +62,7 @@ fn azure_blob_build_request_without_compression() {
         encoder: (
             Default::default(),
             Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
             ),
         ),
@@ -110,7 +110,7 @@ fn azure_blob_build_request_with_compression() {
         encoder: (
             Default::default(),
             Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
             ),
         ),
@@ -158,7 +158,7 @@ fn azure_blob_build_request_with_time_format() {
         encoder: (
             Default::default(),
             Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
             ),
         ),
@@ -209,7 +209,7 @@ fn azure_blob_build_request_with_uuid() {
         encoder: (
             Default::default(),
             Encoder::<Framer>::new(
-                NewlineDelimitedEncoder::new().into(),
+                NewlineDelimitedEncoder::default().into(),
                 TextSerializerConfig::default().build().into(),
             ),
         ),

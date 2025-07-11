@@ -11,12 +11,12 @@ crate-type = ["cdylib"]
 [dependencies]
 wasm-bindgen = "0.2"
 vrl.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-serde-wasm-bindgen = "0.6"
+serde.workspace = true
 gloo-utils = { version = "0.2", features = ["serde"] }
-getrandom = { version = "0.2", features = ["js"] }
 vector-vrl-functions = { path = "../functions" }
 enrichment = { path = "../../enrichment" }
+# Required per https://docs.rs/getrandom/latest/getrandom/#webassembly-support
+getrandom = { version = "0.2.15", features = ["js"] }
 
 [build-dependencies]
-cargo_toml = "0.18.0"
+cargo-lock = "10.1.0"

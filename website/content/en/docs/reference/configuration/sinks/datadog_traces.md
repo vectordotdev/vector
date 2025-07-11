@@ -1,7 +1,7 @@
 ---
 title: Datadog traces
 description: Publish traces to [Datadog](https://docs.datadoghq.com)
-kind: sink
+component_kind: sink
 layout: component
 tags: ["datadog", "component", "sink", "traces"]
 ---

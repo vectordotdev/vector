@@ -1,1 +1,11 @@
 optimization_goal: egress_throughput
+erratic: true
+
+target:
+  name: vector
+  command: /usr/bin/vector
+  cpu_allotment: 7
+  memory_allotment: 8GiB
+
+  environment:
+    VECTOR_THREADS: 4

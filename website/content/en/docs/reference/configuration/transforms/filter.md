@@ -1,7 +1,7 @@
 ---
 title: Filter
 description: Filter events based on a set of conditions
-kind: transform
+component_kind: transform
 layout: component
 tags: ["filter", "component", "transform"]
 ---

@@ -1,31 +1,14 @@
-<div
-  x-cloak
-  x-show="show"
-  x-data="{ show: $store.global.banner }"
-  x-on:toggle-banner="show = !show"
-  class="relative bg-gradient-to-l from-purple-v to-primary">
+<div class="relative bg-gradient-to-l from-purple-v to-primary">
   <div class="max-w-7xl mx-auto py-1 px-3 sm:px-6 lg:px-8">
     <div class="pr-16 sm:text-center sm:px-16">
       <p class="font-medium text-gray-800 tracking-tight">
         <span class="md:inline">
-          Vector is joining Datadog!
+          APT and RPM repositories at repositories.timber.io have been decommissioned. See
         </span>
         <span class="block sm:ml-2 sm:inline-block">
-          <a href="/blog/datadog-acquisition" class="text-black font-semibold"> Learn more <span aria-hidden="true">&rarr;</span></a>
+          <a href="/highlights/2023-11-07-new-linux-repos/" class="text-black font-semibold"> Migration instructions <span aria-hidden="true">&rarr;</span></a>
         </span>
       </p>
-    </div>
-    <div class="absolute inset-y-0 right-0 pr-2 flex items-center sm:pr-2">
-      <button @click="$store.global.toggleBanner(); $dispatch('toggle-banner')" type="button" class="flex rounded-md hover:bg-black hover:text-purple-v focus:outline-none focus:ring-2 focus:ring-white">
-        <span class="sr-only">
-          Dismiss announcement banner
-        </span>
-
-        {{/* Heroicon name: outline/x */}}
-        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
     </div>
   </div>
 </div>

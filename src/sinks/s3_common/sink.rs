@@ -1,21 +1,22 @@
-use std::fmt;
+use std::{fmt, hash::Hash};
 
 use crate::sinks::prelude::*;
 
-use super::partitioner::{S3KeyPartitioner, S3PartitionKey};
+use super::partitioner::S3PartitionKey;
+use vector_lib::{event::Event, partition::Partitioner};
 
-pub struct S3Sink<Svc, RB> {
+pub struct S3Sink<Svc, RB, P> {
     service: Svc,
     request_builder: RB,
-    partitioner: S3KeyPartitioner,
+    partitioner: P,
     batcher_settings: BatcherSettings,
 }
 
-impl<Svc, RB> S3Sink<Svc, RB> {
+impl<Svc, RB, P> S3Sink<Svc, RB, P> {
     pub const fn new(
         service: Svc,
         request_builder: RB,
-        partitioner: S3KeyPartitioner,
+        partitioner: P,
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
@@ -27,7 +28,7 @@ impl<Svc, RB> S3Sink<Svc, RB> {
     }
 }
 
-impl<Svc, RB> S3Sink<Svc, RB>
+impl<Svc, RB, P> S3Sink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -36,6 +37,9 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<S3PartitionKey>> + Unpin + Send,
+    P::Key: Eq + Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
@@ -62,7 +66,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink<Event> for S3Sink<Svc, RB>
+impl<Svc, RB, P> StreamSink<Event> for S3Sink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -71,6 +75,9 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<S3PartitionKey>> + Unpin + Send,
+    P::Key: Eq + Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

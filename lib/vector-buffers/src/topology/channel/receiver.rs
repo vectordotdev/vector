@@ -54,7 +54,6 @@ where
                             // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
                             // keep trying to read the next available record.
                             emit(re);
-                            continue;
                         }
                         None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },
@@ -160,7 +159,7 @@ impl<T: Bufferable> BufferReceiver<T> {
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,
-    Closed(BufferReceiver<T>),
+    Closed,
 }
 
 pub struct BufferReceiverStream<T: Bufferable> {
@@ -183,7 +182,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             match mem::replace(&mut self.state, StreamState::Polling) {
-                s @ StreamState::Closed(_) => {
+                s @ StreamState::Closed => {
                     self.state = s;
                     return Poll::Ready(None);
                 }
@@ -193,7 +192,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
                 StreamState::Polling => {
                     let (result, receiver) = ready!(self.recv_fut.poll(cx));
                     self.state = if result.is_none() {
-                        StreamState::Closed(receiver)
+                        StreamState::Closed
                     } else {
                         StreamState::Idle(receiver)
                     };

@@ -52,7 +52,7 @@ pub trait MetricsFilter<'a> {
     fn sent_events_total(&self) -> Option<SentEventsTotal>;
 }
 
-impl<'a> MetricsFilter<'a> for Vec<Metric> {
+impl MetricsFilter<'_> for Vec<Metric> {
     fn received_bytes_total(&self) -> Option<ReceivedBytesTotal> {
         let sum = sum_metrics(
             self.iter()

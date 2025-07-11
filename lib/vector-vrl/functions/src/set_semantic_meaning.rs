@@ -163,6 +163,6 @@ impl FunctionExpression for SetSemanticMeaningFn {
     }
 
     fn type_def(&self, _: &TypeState) -> TypeDef {
-        TypeDef::null().infallible()
+        TypeDef::null().infallible().impure()
     }
 }

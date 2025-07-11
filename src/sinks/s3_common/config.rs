@@ -158,11 +158,17 @@ pub enum S3StorageClass {
     /// Infrequently Accessed.
     StandardIa,
 
+    /// High Performance (single Availability zone).
+    ExpressOnezone,
+
     /// Infrequently Accessed (single Availability zone).
     OnezoneIa,
 
     /// Glacier Flexible Retrieval.
     Glacier,
+
+    /// Glacier Instant Retrieval.
+    GlacierIr,
 
     /// Glacier Deep Archive.
     DeepArchive,
@@ -175,8 +181,10 @@ impl From<S3StorageClass> for StorageClass {
             S3StorageClass::ReducedRedundancy => Self::ReducedRedundancy,
             S3StorageClass::IntelligentTiering => Self::IntelligentTiering,
             S3StorageClass::StandardIa => Self::StandardIa,
+            S3StorageClass::ExpressOnezone => Self::ExpressOnezone,
             S3StorageClass::OnezoneIa => Self::OnezoneIa,
             S3StorageClass::Glacier => Self::Glacier,
+            S3StorageClass::GlacierIr => Self::GlacierIr,
             S3StorageClass::DeepArchive => Self::DeepArchive,
         }
     }
@@ -358,13 +366,24 @@ pub async fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
+    force_path_style: impl Into<bool>,
 ) -> crate::Result<S3Service> {
     let endpoint = region.endpoint();
     let region = region.region();
-    let client =
-        create_client::<S3ClientBuilder>(auth, region.clone(), endpoint, proxy, tls_options)
-            .await?;
+    let force_path_style_value: bool = force_path_style.into();
+    let client = create_client::<S3ClientBuilder>(
+        &S3ClientBuilder {
+            force_path_style: Some(force_path_style_value),
+        },
+        auth,
+        region.clone(),
+        endpoint,
+        proxy,
+        tls_options,
+        None,
+    )
+    .await?;
     Ok(S3Service::new(client))
 }
 
@@ -378,7 +397,9 @@ mod tests {
         for &(name, storage_class) in &[
             ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
             ("GLACIER", S3StorageClass::Glacier),
+            ("GLACIER_IR", S3StorageClass::GlacierIr),
             ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
+            ("EXPRESS_ONEZONE", S3StorageClass::ExpressOnezone),
             ("ONEZONE_IA", S3StorageClass::OnezoneIa),
             ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
             ("STANDARD", S3StorageClass::Standard),

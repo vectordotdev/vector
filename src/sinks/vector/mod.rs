@@ -222,7 +222,6 @@ mod tests {
         .await
         .into_iter()
         .flatten()
-        .map(Into::into)
         .collect()
     }
 

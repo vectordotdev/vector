@@ -10,7 +10,7 @@ use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
-    http::HttpClient,
+    http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
@@ -19,7 +19,7 @@ use crate::{
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
             ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode,
+            ElasticsearchCommonMode, ElasticsearchMode, VersionType,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
@@ -38,6 +38,34 @@ use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
+
+/// The Amazon OpenSearch service type, either managed or serverless; primarily, selects the
+/// correct AWS service to use when calculating the AWS v4 signature + disables features
+/// unsupported by serverless: Elasticsearch API version autodetection, health checks
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum OpenSearchServiceType {
+    /// Elasticsearch or OpenSearch Managed domain
+    Managed,
+    /// OpenSearch Serverless collection
+    Serverless,
+}
+
+impl OpenSearchServiceType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            OpenSearchServiceType::Managed => "es",
+            OpenSearchServiceType::Serverless => "aoss",
+        }
+    }
+}
+
+impl Default for OpenSearchServiceType {
+    fn default() -> Self {
+        Self::Managed
+    }
+}
 
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]
@@ -75,6 +103,8 @@ pub struct ElasticsearchConfig {
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
+    ///
+    /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
     #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
@@ -145,12 +175,16 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    pub query: Option<HashMap<String, String>>,
+    pub query: Option<QueryParameters>,
 
     #[serde(default)]
     #[configurable(derived)]
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
+
+    /// Amazon OpenSearch service type
+    #[serde(default)]
+    pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -214,6 +248,7 @@ impl Default for ElasticsearchConfig {
             query: None,
             #[cfg(feature = "aws-core")]
             aws: None,
+            opensearch_service_type: Default::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
@@ -229,7 +264,10 @@ impl ElasticsearchConfig {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 index: self.bulk.index.clone(),
+                template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
+                version: self.bulk.version.clone(),
+                version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -245,7 +283,7 @@ impl ElasticsearchConfig {
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
     ///
-    /// Only `index` and `create` actions are supported.
+    /// Only `index`, `create` and `update` actions are supported.
     ///
     /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     #[serde(default = "default_bulk_action")]
@@ -258,6 +296,25 @@ pub struct BulkConfig {
     #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
+
+    /// The default index to write events to if the template in `bulk.index` cannot be resolved
+    #[configurable(metadata(docs::examples = "test-index"))]
+    pub template_fallback_index: Option<String>,
+
+    /// Version field value.
+    #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "123"))]
+    pub version: Option<Template>,
+
+    /// Version type.
+    ///
+    /// Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+    ///
+    /// [es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+    #[serde(default = "default_version_type")]
+    #[configurable(metadata(docs::examples = "internal"))]
+    #[configurable(metadata(docs::examples = "external"))]
+    pub version_type: VersionType,
 }
 
 fn default_bulk_action() -> Template {
@@ -268,11 +325,18 @@ fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
+const fn default_version_type() -> VersionType {
+    VersionType::Internal
+}
+
 impl Default for BulkConfig {
     fn default() -> Self {
         Self {
             action: default_bulk_action(),
             index: default_index(),
+            template_fallback_index: Default::default(),
+            version: Default::default(),
+            version_type: default_version_type(),
         }
     }
 }

@@ -290,7 +290,7 @@ impl BufferType {
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
-        };
+        }
 
         Ok(())
     }
@@ -322,7 +322,7 @@ impl BufferType {
     description = r#"More information about the individual buffer types, and buffer behavior, can be found in the
 [Buffering Model][buffering_model] section.
 
-[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/"#
+[buffering_model]: /docs/architecture/buffering-model/"#
 )]
 pub enum BufferConfig {
     /// A single stage buffer topology.
