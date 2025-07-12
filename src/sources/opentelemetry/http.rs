@@ -371,15 +371,17 @@ async fn handle_request(
             Ok(resp)
         };
 
-    if let Err(err) = events {
-        return reply_with_status(
-            err.status_code(),
-            2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            err.message().into(),
-        );
-    }
+    let mut events = match events {
+        Err(err) => {
+            return reply_with_status(
+                err.status_code(),
+                2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+                err.message().into(),
+            );
+        }
+        Ok(events) => events,
+    };
 
-    let mut events = events.unwrap();
     let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
     let count = events.len();
 
@@ -426,7 +428,9 @@ async fn handle_rejection(err: Rejection) -> Result<Response, Infallible> {
     };
 
     let mut resp = reply.into_response();
-    resp.headers_mut()
-        .insert(http::header::CONTENT_TYPE, "text/plain".parse().unwrap());
+    resp.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        http::header::HeaderValue::from_static("text/plain"),
+    );
     Ok(resp)
 }
