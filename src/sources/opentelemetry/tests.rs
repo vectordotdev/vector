@@ -1222,6 +1222,8 @@ async fn invalid_payload_metrics() {
 
 #[tokio::test]
 async fn delivery_error() {
+    // logs that fail to deliver inside vector (so the request and payload are valid)
+    // need to trigger a http 500 with status code 2 in the response
     assert_source_compliance(&SOURCE_TAGS, async {
         let env = build_otlp_test_env_status(LOGS, None, EventStatus::Rejected, false).await;
 
@@ -1244,7 +1246,7 @@ async fn delivery_error() {
         let status = Status::decode(&mut body.as_ref()).expect("Failed to decode as Status");
 
         assert!(status.code == 2);
-        assert!(status.message.contains("not decode"));
+        assert!(status.message.contains("Error delivering contents to sink"));
     })
     .await;
 }
