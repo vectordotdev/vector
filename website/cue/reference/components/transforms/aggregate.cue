@@ -26,7 +26,7 @@ components: transforms: aggregate: {
 		warnings: []
 	}
 
-	configuration: base.components.transforms.aggregate.configuration
+	configuration: generated.components.transforms.aggregate.configuration
 
 	input: {
 		logs: false
