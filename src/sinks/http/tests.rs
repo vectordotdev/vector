@@ -35,8 +35,8 @@ use crate::{
     },
     test_util::{
         components::{
-            self, init_test, run_and_assert_sink_compliance, run_and_assert_sink_error,
-            run_and_assert_sink_error_with_events, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+            self, init_test, run_and_assert_sink_compliance, run_and_assert_sink_error_with_events,
+            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
         },
         create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },
@@ -704,7 +704,7 @@ async fn missing_field_in_uri_template() {
 
     tokio::spawn(server);
     let expected_emitted_error_events = ["TemplateRenderingError"];
-    run_and_assert_sink_error(
+    run_and_assert_sink_error_with_events(
         sink,
         stream::once(ready(event)),
         &expected_emitted_error_events,
