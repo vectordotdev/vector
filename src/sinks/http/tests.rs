@@ -12,8 +12,8 @@ use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
-
 use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+use vector_lib::finalization::AddBatchNotifier;
 
 use crate::{
     assert_downcast_matches,
@@ -695,7 +695,8 @@ async fn missing_field_in_uri_template() {
     let (rx, trigger, server) = build_test_server(in_addr);
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Event::Log(LogEvent::default()).with_batch_notifier(&batch);
+    let mut event = Event::Log(LogEvent::default());
+    event.add_batch_notifier(batch);
 
     tokio::spawn(server);
 
@@ -703,11 +704,11 @@ async fn missing_field_in_uri_template() {
 
     drop(trigger);
 
-    // TODO: Currently, When the KeyPartitioner fails to build the batch key from
+    // TODO(https://github.com/vectordotdev/vector/issues/23366): Currently, When the KeyPartitioner fails to build the batch key from
     // an event, the finalizer is not notified with
     // EventStatus::Rejected. The error is silently ignored.
     // See src/sinks/http/sink.rs:47
-    assert!(matches!(receiver.try_recv(), Err(_)));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     // No requests should have been made to the server
     let requests = rx.collect::<Vec<_>>().await;
@@ -736,7 +737,8 @@ async fn http_uri_auth_conflict() {
     let (rx, trigger, server) = build_test_server(in_addr);
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Event::Log(LogEvent::default()).with_batch_notifier(&batch);
+    let mut event = Event::Log(LogEvent::default());
+    event.add_batch_notifier(batch);
 
     tokio::spawn(server);
 
@@ -744,11 +746,7 @@ async fn http_uri_auth_conflict() {
 
     drop(trigger);
 
-    // TODO: Currently, When the request builder fails to build a request from
-    // an event/batch of events, the finalizer is not notified with
-    // EventStatus::Rejected. The error is silently ignored
-    // See src/sinks/http/sink.rs:54
-    assert!(matches!(receiver.try_recv(), Err(_)));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
     // No requests should have been made to the server
     let requests = rx.collect::<Vec<_>>().await;
