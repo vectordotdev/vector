@@ -1,6 +1,9 @@
 //! Unit tests for the `http` sink.
 
-use std::sync::{atomic, Arc};
+use std::{
+    future::ready,
+    sync::{atomic, Arc},
+};
 
 use bytes::{Buf, Bytes};
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
@@ -32,7 +35,8 @@ use crate::{
     },
     test_util::{
         components::{
-            self, init_test, run_and_assert_sink_compliance, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+            self, init_test, run_and_assert_sink_compliance, run_and_assert_sink_error_with_events,
+            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
         },
         create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },
@@ -699,8 +703,14 @@ async fn missing_field_in_uri_template() {
     event.add_batch_notifier(batch);
 
     tokio::spawn(server);
-
-    sink.run_events([event]).await.unwrap();
+    let expected_emitted_error_events = ["TemplateRenderingError"];
+    run_and_assert_sink_error(
+        sink,
+        stream::once(ready(event)),
+        &expected_emitted_error_events,
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
 
     drop(trigger);
 
@@ -742,7 +752,14 @@ async fn http_uri_auth_conflict() {
 
     tokio::spawn(server);
 
-    sink.run_events([event]).await.unwrap();
+    let expected_emitted_error_events = ["ServiceCallError", "SinkRequestBuildError"];
+    run_and_assert_sink_error_with_events(
+        sink,
+        stream::once(ready(event)),
+        &expected_emitted_error_events,
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
 
     drop(trigger);
 
