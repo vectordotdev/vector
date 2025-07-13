@@ -45,46 +45,13 @@ impl ElasticsearchCommon {
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
     ) -> crate::Result<Self> {
-        // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", endpoint);
-        let uri = uri
-            .parse::<Uri>()
-            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
-        if uri.host().is_none() {
-            return Err(ParseError::HostMustIncludeHostname {
-                host: endpoint.to_string(),
-            }
-            .into());
-        }
+        // Test the configured host
+        Self::check_endpoint(endpoint)?;
 
         let uri = endpoint.parse::<UriSerde>()?;
-        let auth = match &config.auth {
-            Some(ElasticsearchAuthConfig::Basic { user, password }) => {
-                let auth = Some(crate::http::Auth::Basic {
-                    user: user.clone(),
-                    password: password.clone(),
-                });
-                // basic auth must be some for now
-                let auth = auth.choose_one(&uri.auth)?.unwrap();
-                Some(Auth::Basic(auth))
-            }
-            #[cfg(feature = "aws-core")]
-            Some(ElasticsearchAuthConfig::Aws(aws)) => {
-                let region = config
-                    .aws
-                    .as_ref()
-                    .map(|config| config.region())
-                    .ok_or(ParseError::RegionRequired)?
-                    .ok_or(ParseError::RegionRequired)?;
-                Some(Auth::Aws {
-                    credentials_provider: aws
-                        .credentials_provider(region.clone(), proxy_config, config.tls.as_ref())
-                        .await?,
-                    region,
-                })
-            }
-            None => None,
-        };
+
+        // get auth from config or uri
+        let auth = Self::extract_auth(config, proxy_config, &uri).await?;
 
         if config.opensearch_service_type == OpenSearchServiceType::Serverless {
             match &config.auth {
@@ -255,6 +222,67 @@ impl ElasticsearchCommon {
             tls_settings,
             metric_to_log,
         })
+    }
+
+    fn check_endpoint(endpoint: &str) -> crate::Result<()> {
+        let uri = format!("{}/_test", endpoint);
+        let uri = uri
+            .parse::<Uri>()
+            .with_context(|_| InvalidHostSnafu { host: endpoint })?;
+        if uri.host().is_none() {
+            return Err(ParseError::HostMustIncludeHostname {
+                host: endpoint.to_string(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    // extract the authentication from config or endpoint
+    async fn extract_auth(
+        config: &ElasticsearchConfig,
+        proxy_config: &ProxyConfig,
+        uri: &UriSerde,
+    ) -> crate::Result<Option<Auth>> {
+        let auth = match &config.auth {
+            Some(ElasticsearchAuthConfig::Basic { user, password }) => {
+                let auth = Some(crate::http::Auth::Basic {
+                    user: user.clone(),
+                    password: password.clone(),
+                });
+                // get whichever auth is provided between config and uri, prevent duplicate auth.
+                let auth = auth.choose_one(&uri.auth)?.unwrap();
+                Some(Auth::Basic(auth))
+            }
+            #[cfg(feature = "aws-core")]
+            Some(ElasticsearchAuthConfig::Aws(aws)) => {
+                let region = config
+                    .aws
+                    .as_ref()
+                    .map(|config| config.region())
+                    .ok_or(ParseError::RegionRequired)?
+                    .ok_or(ParseError::RegionRequired)?;
+                Some(Auth::Aws {
+                    credentials_provider: aws
+                        .credentials_provider(region.clone(), proxy_config, config.tls.as_ref())
+                        .await?,
+                    region,
+                })
+            }
+            None => {
+                // Use the authentication from the URL if it exists
+                uri.auth.as_ref().and_then(|auth| match auth {
+                    crate::http::Auth::Basic { user, password } => {
+                        Some(Auth::Basic(crate::http::Auth::Basic {
+                            user: user.clone(),
+                            password: password.clone(),
+                        }))
+                    }
+                    _ => None,
+                })
+            }
+        };
+        Ok(auth)
     }
 
     /// Parses endpoints into a vector of ElasticsearchCommons. The resulting vector is guaranteed to not be empty.
