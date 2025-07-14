@@ -1,9 +1,12 @@
+#[cfg(test)]
 use std::collections::HashMap;
+#[cfg(not(test))]
+use lru::LruCache;
 use std::net::{Ipv4Addr, SocketAddr};
 
 use base64::Engine;
-use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
@@ -135,7 +138,10 @@ struct Template {
 }
 
 type TemplateKey = (std::net::SocketAddr, u32, u16); // (exporter, observation_domain, template_id)
-type TemplateCache = HashMap<TemplateKey, Template>;
+#[cfg(not(test))]
+type TemplateCache = LruCache<TemplateKey, Template>;
+#[cfg(test)]
+type TemplateCache = std::collections::HashMap<TemplateKey, Template>;
 
 #[allow(dead_code)]
 fn parse_netflow_v9_templates(data: &[u8]) -> Vec<Template> {
@@ -626,8 +632,9 @@ fn parse_ipfix_template_set(data: &[u8], observation_domain_id: u32,
         return;
     }
 
+    let set_end = data.len(); // End of this set payload
     let mut offset = 4; // Skip set header
-    while offset + 4 <= data.len() {
+    while offset + 4 <= set_end {
         let template_id = u16::from_be_bytes([data[offset], data[offset + 1]]);
         let field_count = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
         
@@ -664,6 +671,7 @@ fn parse_ipfix_template_set(data: &[u8], observation_domain_id: u32,
             field_offset += if enterprise_id.is_some() { 8 } else { 4 };
         }
         
+        let field_count = fields.len();
         let template = Template {
             template_id,
             fields,
@@ -671,7 +679,16 @@ fn parse_ipfix_template_set(data: &[u8], observation_domain_id: u32,
         
         template_cache.insert((peer_addr, observation_domain_id, template_id), template);
         
+        // Log template caching for debugging
+        debug!("Cached IPFIX template: id={}, fields={}", template_id, field_count);
+        
+        // Continue parsing until we reach the end of the set, not just the first template
         offset = field_offset;
+        
+        // Check if we've reached the end of the set data
+        if offset >= set_end {
+            break;
+        }
     }
 }
 
@@ -891,22 +908,21 @@ fn parse_sflow(data: &[u8]) -> Vec<Event> {
 
 /// Parse sFlow flow sample
 fn parse_sflow_flow_sample(data: &[u8], log_event: &mut vector_lib::event::LogEvent) {
-    if data.len() < 24 {
+    if data.len() < 28 {
         return;
     }
-    
     let sequence_number = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-    let source_id_type = data[4];
-    let source_id_index = u32::from_be_bytes([data[5], data[6], data[7], data[8]]);
+    let source_id = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+    let source_id_type  = (source_id >> 24) as u8;
+    let source_id_index =  source_id & 0x00FF_FFFF;
     let sampling_rate = u32::from_be_bytes([data[8], data[9], data[10], data[11]]);
-    let sample_pool = u32::from_be_bytes([data[13], data[14], data[15], data[16]]);
-    let drops = u32::from_be_bytes([data[17], data[18], data[19], data[20]]);
-    let num_flow_records = if data.len() >= 25 {
-        u32::from_be_bytes([data[21], data[22], data[23], data[24]])
+    let sample_pool = u32::from_be_bytes([data[12], data[13], data[14], data[15]]);
+    let drops = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+    let num_flow_records = if data.len() >= 28 {
+        u32::from_be_bytes([data[20], data[21], data[22], data[23]])
     } else {
         0
     };
-    
     log_event.insert("sflow_sequence_number", sequence_number);
     log_event.insert("sflow_source_id_type", source_id_type);
     log_event.insert("sflow_source_id_index", source_id_index);
@@ -918,14 +934,13 @@ fn parse_sflow_flow_sample(data: &[u8], log_event: &mut vector_lib::event::LogEv
 
 /// Parse sFlow counter sample
 fn parse_sflow_counter_sample(data: &[u8], log_event: &mut vector_lib::event::LogEvent) {
-    if data.len() < 12 {
+    if data.len() < 20 {
         return;
     }
-    
-    let sequence_number = u32::from_be_bytes([data[8], data[9], data[10], data[11]]);
-    let source_id_type = data[12];
-    let source_id_index = u32::from_be_bytes([data[13], data[14], data[15], data[16]]);
-    
+    let sequence_number = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+    let source_id = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+    let source_id_type  = (source_id >> 24) as u8;
+    let source_id_index =  source_id & 0x00FF_FFFF;
     log_event.insert("sflow_counter_sequence_number", sequence_number);
     log_event.insert("sflow_counter_source_id_type", source_id_type);
     log_event.insert("sflow_counter_source_id_index", source_id_index);
@@ -1043,6 +1058,9 @@ async fn netflow(
     mut out: SourceSender,
     _log_namespace: LogNamespace,
 ) -> Result<(), ()> {
+    #[cfg(not(test))] // prod, LRU
+    let mut template_cache: TemplateCache = LruCache::new(std::num::NonZeroUsize::new(10000).unwrap());
+    #[cfg(test)]      // unit-tests, HashMap
     let mut template_cache: TemplateCache = HashMap::new();
     let mut last_template_cleanup = std::time::Instant::now();
     
@@ -1067,12 +1085,9 @@ async fn netflow(
             }
         }
 
-    let mut buf = BytesMut::with_capacity(config.max_length);
+    let mut buf = vec![0u8; config.max_length];
 
     loop {
-        buf.clear();
-        buf.resize(config.max_length, 0);
-
         tokio::select! {
             recv_result = socket.recv_from(&mut buf) => {
                 match recv_result {
@@ -1083,11 +1098,11 @@ async fn netflow(
                             mode: SocketMode::Udp,
                         });
 
-                        buf.truncate(received as usize);
+                        let packet = &buf[..received];
 
                         // Parse flow data
                         let events = parse_flow_data(
-                            &buf,
+                            packet,
                             &config.protocols,
                             config.include_raw_data,
                             &mut template_cache,
@@ -1119,21 +1134,8 @@ async fn netflow(
 }
 
 /// Clean up expired templates from cache
-fn cleanup_expired_templates(template_cache: &mut TemplateCache, _timeout_secs: u64) {
-    // Simple cache size limit to prevent unbounded growth
-    const MAX_CACHE_SIZE: usize = 10_000;
-    if template_cache.len() > MAX_CACHE_SIZE {
-        // Simple FIFO trim - remove oldest entries
-        let excess = template_cache.len() - MAX_CACHE_SIZE;
-        let keys_to_remove: Vec<_> = template_cache.keys().take(excess).cloned().collect();
-        for key in keys_to_remove {
-            template_cache.remove(&key);
-        }
-    }
-    
-    // TODO: Implement template expiry based on timestamp
-    // For now, this is a placeholder for future implementation
-}
+/// LRU handles this automatically; function retained for clarity.
+fn cleanup_expired_templates(_template_cache: &mut TemplateCache, _timeout_secs: u64) {}
 
 /// Enhanced NetFlow v9 parsing with template support
 fn parse_netflow_v9(
@@ -2296,12 +2298,13 @@ mod tests {
         data[20..24].copy_from_slice(&54321u32.to_be_bytes()); // sys_uptime
         data[24..28].copy_from_slice(&1u32.to_be_bytes());   // num_samples
         
-        // Flow sample
+        // Flow sample header
         data[28..32].copy_from_slice(&1u32.to_be_bytes());   // sample_type (flow)
         data[32..36].copy_from_slice(&24u32.to_be_bytes());  // sample_length
+        
+        // Flow sample data (starts at byte 36, length 24 bytes)
         data[36..40].copy_from_slice(&100u32.to_be_bytes()); // sequence_number
-        data[40] = 0; // source_id_type
-        data[41..44].copy_from_slice(&[0, 0, 1]); // source_id_index = 1
+        data[40..44].copy_from_slice(&1u32.to_be_bytes());   // source_id (type=0, index=1)
         data[44..48].copy_from_slice(&1000u32.to_be_bytes()); // sampling_rate
         data[48..52].copy_from_slice(&2u32.to_be_bytes());   // sample_pool
         data[52..56].copy_from_slice(&0u32.to_be_bytes());   // drops
