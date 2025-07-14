@@ -21,10 +21,11 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct IncrementalToAbsoluteConfig {
-    /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
-    /// after having not been updated before they expire and are removed.
+    /// The amount of time, in seconds, that incremental metrics will persist in the internal
+    /// metrics cache after having not been updated before they expire and are removed.
+    /// Once removed, incremental counters are reset to 0.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = true))]
+    #[configurable(metadata(docs::common = false, docs::required = true, docs::examples = "120"))]
     pub expire_metrics_secs: u64,
 }
 
