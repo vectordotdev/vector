@@ -13,24 +13,6 @@ env:
 runs:
   using: "composite"
   steps:
-    - name: Check prepare.sh
-      id: check-prepare-sh
-      shell: bash
-      run: |
-        if [ -f scripts/environment/prepare.sh ]; then
-          echo "has_prepare_sh=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_prepare_sh=false" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Fetch prepare.sh
-      if: steps.check-prepare-sh.outputs.has_prepare_sh == 'false'
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-        sparse-checkout: |
-          scripts/environment/prepare.sh
-
     - name: Pull cached environment
       if: ${{ inputs.check-only != 'true' }}
       id: pull-cache
