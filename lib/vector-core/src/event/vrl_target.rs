@@ -437,7 +437,7 @@ impl Target for VrlTarget {
                             }),
                             ["tags", field] => {
                                 if *multi_value_tags {
-                                    metric.series.remove_tag(field).map(|value| value.into())
+                                    metric.series.remove_tag(field).map(Into::into)
                                 } else {
                                     metric.remove_tag(field).map(Into::into)
                                 }
