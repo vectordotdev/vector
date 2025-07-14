@@ -96,6 +96,7 @@ jobs:
         post_comment: 0
         use_sarif: ${{ (!github.event.pull_request || (github.event.pull_request.head.repo.full_name == github.repository)) && 1 }}
         extra_dictionary_limit: 20
+        experimental_path: website
         extra_dictionaries:
           cspell:aws/aws.txt
           cspell:cpp/src/compiler-clang-attributes.txt
