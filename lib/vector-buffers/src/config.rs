@@ -5,7 +5,7 @@ use std::{
     slice,
 };
 
-use serde::{de, ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 use vector_common::{config::ComponentKey, finalization::Finalizable};
@@ -95,9 +95,7 @@ impl BufferTypeVisitor {
                     }
                     (_, Some(max_size)) => {
                         if let Ok(bounded_max_bytes) = usize::try_from(max_size.get()) {
-                            MemoryBufferSize::MaxSize {
-                                max_size: NonZeroUsize::new(bounded_max_bytes).unwrap(),
-                            }
+                            MemoryBufferSize::MaxSize(NonZeroUsize::new(bounded_max_bytes).unwrap())
                         } else {
                             return Err(de::Error::invalid_value(
                                 de::Unexpected::Unsigned(max_size.into()),
@@ -109,9 +107,9 @@ impl BufferTypeVisitor {
                             ));
                         }
                     }
-                    _ => MemoryBufferSize::MaxEvents {
-                        max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
-                    },
+                    _ => MemoryBufferSize::MaxEvents(
+                        max_events.unwrap_or_else(memory_buffer_default_max_events),
+                    ),
                 };
                 Ok(BufferType::Memory { size, when_full })
             }
@@ -194,49 +192,21 @@ impl DiskUsage {
 }
 
 /// Enumeration to define exactly what terms the bounds of the buffer is expressed in: length, or
-/// byte_size.
+/// `byte_size`.
 #[configurable_component(no_deser)]
-#[serde(rename_all = "snake_case", tag = "type")]
+#[serde(rename_all = "snake_case")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[configurable(metadata(
-    docs::enum_tag_description = "Size configuration parameter for the Buffer."
-))]
 pub enum MemoryBufferSize {
-    /// Express the maximum size of the buffer as number of elements.
-    MaxEvents {
-        /// The maximum number of events allowed in the buffer.
-        #[serde(default = "memory_buffer_default_max_events")]
-        max_events: NonZeroUsize,
-    },
+    /// The maximum number of events allowed in the buffer.
+    MaxEvents(#[serde(default = "memory_buffer_default_max_events")] NonZeroUsize),
 
-    /// Express the maximum size of the buffer in terms of bytes allocated.
-    MaxSize {
-        /// The maximum allowed amount of allocated memory the buffer can hold.
-        ///
-        /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
-        #[configurable(metadata(docs::type_unit = "bytes"))]
-        max_size: NonZeroUsize,
-    },
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn serialize_memory_config<S>(
-    value: &MemoryBufferSize,
-    when_full: &WhenFull,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut sv = serializer.serialize_map(Some(2))?;
-    match value {
-        MemoryBufferSize::MaxEvents { max_events } => {
-            sv.serialize_entry("max_events", max_events)?;
-        }
-        MemoryBufferSize::MaxSize { max_size } => sv.serialize_entry("max_size", max_size)?,
-    }
-    sv.serialize_entry("when_full", when_full)?;
-    sv.end()
+    // Doc string is duplicated here as a workaround due to a name collision with the `max_size`
+    // field with the DiskV2 variant of `BufferType`.
+    /// The maximum allowed amount of allocated memory the buffer can hold.
+    ///
+    /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    MaxSize(NonZeroUsize),
 }
 
 /// A specific type of buffer stage.
@@ -251,7 +221,6 @@ pub enum BufferType {
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
     #[serde(rename = "memory")]
-    #[serde(serialize_with = "serialize_memory_config")]
     Memory {
         /// The terms around how to express buffering limits, can be in size or bytes_size.
         #[serde(flatten)]
@@ -397,9 +366,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         Self::Single(BufferType::Memory {
-            size: MemoryBufferSize::MaxEvents {
-                max_events: memory_buffer_default_max_events(),
-            },
+            size: MemoryBufferSize::MaxEvents(memory_buffer_default_max_events()),
             when_full: WhenFull::default(),
         })
     }
@@ -503,9 +470,7 @@ max_events: 42
           max_events: 100
           ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxEvents {
-                    max_events: NonZeroUsize::new(100).unwrap(),
-                },
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
@@ -518,9 +483,7 @@ max_events: 42
         max_size: 4096
         ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxSize {
-                    max_size: NonZeroUsize::new(4096).unwrap(),
-                },
+                size: MemoryBufferSize::MaxSize(NonZeroUsize::new(4096).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
@@ -536,15 +499,11 @@ max_events: 42
           ",
             &[
                 BufferType::Memory {
-                    size: MemoryBufferSize::MaxEvents {
-                        max_events: NonZeroUsize::new(42).unwrap(),
-                    },
+                    size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(42).unwrap()),
                     when_full: WhenFull::Block,
                 },
                 BufferType::Memory {
-                    size: MemoryBufferSize::MaxEvents {
-                        max_events: NonZeroUsize::new(100).unwrap(),
-                    },
+                    size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
                     when_full: WhenFull::DropNewest,
                 },
             ],
@@ -558,9 +517,7 @@ max_events: 42
           type: memory
           ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxEvents {
-                    max_events: NonZeroUsize::new(500).unwrap(),
-                },
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
@@ -571,9 +528,7 @@ max_events: 42
           max_events: 100
           ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxEvents {
-                    max_events: NonZeroUsize::new(100).unwrap(),
-                },
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
@@ -584,9 +539,7 @@ max_events: 42
           when_full: drop_newest
           ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxEvents {
-                    max_events: NonZeroUsize::new(500).unwrap(),
-                },
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::DropNewest,
             },
         );
@@ -597,9 +550,7 @@ max_events: 42
           when_full: overflow
           ",
             BufferType::Memory {
-                size: MemoryBufferSize::MaxEvents {
-                    max_events: NonZeroUsize::new(500).unwrap(),
-                },
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::Overflow,
             },
         );
