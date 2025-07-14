@@ -9,7 +9,7 @@ on:
 
 # Wrapper workflow
 concurrency:
-  group: cache-${{ github.event.number || github.event.merge_group.head_sha || github.sha }}
+  group: ensure-cache-${{ github.event.number || github.event.merge_group.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:

@@ -36,6 +36,9 @@ env:
 jobs:
   ensure-cache:
     uses: ./.github/workflows/cache.yml
+    concurrency:
+      group: ensure-cache-${{ github.event.number || github.event.merge_group.head_sha }}
+      cancel-in-progress: false
 
   changes:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'

@@ -131,6 +131,9 @@ jobs:
   # Ensure caches are available before running any jobs that rely on them
   ensure-cache:
     uses: ./.github/workflows/cache.yml
+    concurrency:
+      group: ensure-cache-${{ github.event.number || github.event.merge_group.head_sha || github.sha }}
+      cancel-in-progress: false
 
   # Detects changes that are not specific to integration tests
   source:
