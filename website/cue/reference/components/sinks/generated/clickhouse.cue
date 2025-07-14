@@ -337,6 +337,70 @@ generated: components: sinks: clickhouse: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	query_settings: {
+		description: "Query settings for the `clickhouse` sink."
+		required:    false
+		type: object: options: async_insert_settings: {
+			description: "Async insert-related settings."
+			required:    false
+			type: object: options: {
+				deduplicate: {
+					description: """
+						Sets `async_insert_deduplicate`, allowing ClickHouse to perform deduplication when inserting blocks in the replicated table.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
+				}
+				enabled: {
+					description: """
+						Sets `async_insert`, allowing ClickHouse to queue the inserted data and later flush to table in the background.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
+				}
+				max_data_size: {
+					description: """
+						Sets `async_insert_max_data_size`, the maximum size in bytes of unparsed data collected per query before being inserted.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
+				}
+				max_query_number: {
+					description: """
+						Sets `async_insert_max_query_number`, the maximum number of insert queries before being inserted
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
+				}
+				wait_for_processing: {
+					description: """
+						Sets `wait_for`, allowing ClickHouse to wait for processing of asynchronous insertion.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: bool: {}
+				}
+				wait_for_processing_timeout: {
+					description: """
+						Sets 'wait_for_processing_timeout`, to control the timeout for waiting for processing asynchronous insertion.
+
+						If left unspecified, use the default provided by the `ClickHouse` server.
+						"""
+					required: false
+					type: uint: {}
+				}
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
