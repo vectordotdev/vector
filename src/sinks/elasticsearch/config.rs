@@ -89,8 +89,9 @@ pub struct ElasticsearchConfig {
     /// The endpoint may include basic authentication credentials,
     /// e.g., `https://user:password@example.com`. If credentials are provided in the endpoint,
     /// they will be used to authenticate against Elasticsearch.
-    /// Specifying credentials in the endpoint conflicts with the `auth` configuration option
-    /// and will raise a configuration error.
+	///
+	/// If `auth` is specified and the endpoint contain credentials,
+	/// a configuration error will be raised.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
