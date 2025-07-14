@@ -205,8 +205,7 @@ pub enum MemoryBufferSize {
     /// The maximum allowed amount of allocated memory the buffer can hold.
     ///
     /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    MaxSize(NonZeroUsize),
+    MaxSize(#[configurable(metadata(docs::type_unit = "bytes"))] NonZeroUsize),
 }
 
 /// A specific type of buffer stage.

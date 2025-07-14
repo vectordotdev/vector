@@ -25,7 +25,7 @@ generated: components: sinks: configuration: {
 					If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
 					"""
 				required: true
-				type: uint: {}
+				type: uint: unit: "bytes"
 			}
 			type: {
 				description: "The type of buffer to use."
