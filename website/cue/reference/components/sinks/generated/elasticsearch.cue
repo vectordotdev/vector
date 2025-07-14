@@ -495,6 +495,11 @@ generated: components: sinks: elasticsearch: configuration: {
 
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
+			The endpoint may include basic authentication credentials,
+			e.g., `https://user:password@example.com`. If credentials are provided in the endpoint,
+			they will be used to authenticate against Elasticsearch.
+			Specifying credentials in the endpoint conflicts with the `auth` configuration option
+			and will raise a configuration error.
 			"""
 		required: false
 		type: array: {
