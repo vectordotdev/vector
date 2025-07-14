@@ -66,7 +66,7 @@ components: sinks: splunk_hec_metrics: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.splunk_hec_metrics.configuration
+	configuration: generated.components.sinks.splunk_hec_metrics.configuration
 
 	input: {
 		logs: false

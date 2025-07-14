@@ -18,6 +18,10 @@ on:
 
 jobs:
   validate-changelog:
+    permissions:
+      contents: read
+      pull-requests: none
+
     runs-on: ubuntu-24.04
 
     env:

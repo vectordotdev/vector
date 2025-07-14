@@ -73,7 +73,7 @@ components: sinks: aws_s3: components._aws & {
 		warnings: []
 	}
 
-	configuration: base.components.sinks.aws_s3.configuration & {
+	configuration: generated.components.sinks.aws_s3.configuration & {
 		_aws_include: false
 	}
 

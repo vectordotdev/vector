@@ -61,7 +61,7 @@ components: sinks: appsignal: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.appsignal.configuration
+	configuration: generated.components.sinks.appsignal.configuration
 
 	input: {
 		logs: true
