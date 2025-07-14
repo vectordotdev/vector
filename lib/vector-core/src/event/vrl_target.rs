@@ -104,7 +104,7 @@ impl VrlTarget {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info);
+                let value = precompute_metric_value(&metric, info, multi_value_metric_tags);
 
                 VrlTarget::Metric {
                     metric,
@@ -242,9 +242,13 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
 
 fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
     if multi_value_tags {
-        let tag_values = value
-            .as_array()
-            .unwrap_or(&[])
+        let values = if let Value::Array(values) = value {
+            values.as_slice()
+        } else {
+            std::slice::from_ref(value)
+        };
+
+        let tag_values = values
             .iter()
             .filter_map(|value| match value {
                 Value::Bytes(bytes) => {
@@ -406,7 +410,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value,
-                    multi_value_tags: _,
+                    multi_value_tags,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -431,7 +435,13 @@ impl Target for VrlTarget {
                                     .map(|(k, v)| (k, v.into()))
                                     .collect::<vrl::value::Value>()
                             }),
-                            ["tags", field] => metric.remove_tag(field).map(Into::into),
+                            ["tags", field] => {
+                                if *multi_value_tags {
+                                    metric.series.remove_tag(field).map(|value| value.into())
+                                } else {
+                                    metric.remove_tag(field).map(Into::into)
+                                }
+                            }
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &target_path.path.to_string(),
@@ -548,15 +558,15 @@ fn target_get_mut_metric<'a>(
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
-fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
+fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags: bool) -> Value {
     struct MetricProperty {
         property: &'static str,
-        getter: fn(&Metric) -> Option<Value>,
+        getter: fn(&Metric, bool) -> Option<Value>,
         set: bool,
     }
 
     impl MetricProperty {
-        fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
+        fn new(property: &'static str, getter: fn(&Metric, bool) -> Option<Value>) -> Self {
             Self {
                 property,
                 getter,
@@ -564,36 +574,59 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             }
         }
 
-        fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
+        fn insert(&mut self, metric: &Metric, multi_value_tags: bool, map: &mut ObjectMap) {
             if self.set {
                 return;
             }
-            if let Some(value) = (self.getter)(metric) {
+            if let Some(value) = (self.getter)(metric, multi_value_tags) {
                 map.insert(self.property.into(), value);
                 self.set = true;
             }
         }
     }
 
-    let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
-    let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
-    let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
-    let mut namespace = MetricProperty::new("namespace", |metric| {
+    let mut name = MetricProperty::new("name", |metric, _multi_value_tags| {
+        Some(metric.name().to_owned().into())
+    });
+    let mut kind = MetricProperty::new("kind", |metric, _multi_value_tags| {
+        Some(metric.kind().into())
+    });
+    let mut type_ = MetricProperty::new("type", |metric, _multi_value_tags| {
+        Some(metric.value().clone().into())
+    });
+    let mut namespace = MetricProperty::new("namespace", |metric, _multi_value_tags| {
         metric.namespace().map(String::from).map(Into::into)
     });
-    let mut interval_ms =
-        MetricProperty::new("interval_ms", |metric| metric.interval_ms().map(Into::into));
-    let mut timestamp =
-        MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
-    let mut tags = MetricProperty::new("tags", |metric| {
+    let mut interval_ms = MetricProperty::new("interval_ms", |metric, _multi_value_tags| {
+        metric.interval_ms().map(Into::into)
+    });
+    let mut timestamp = MetricProperty::new("timestamp", |metric, _multi_value_tags| {
+        metric.timestamp().map(Into::into)
+    });
+    let mut tags = MetricProperty::new("tags", |metric, multi_value_tags| {
         metric.tags().cloned().map(|tags| {
-            tags.into_iter_single()
-                .map(|(tag, value)| (tag.into(), value.into()))
-                .collect::<ObjectMap>()
-                .into()
+            if multi_value_tags {
+                tags.iter_sets()
+                    .map(|(tag, tag_set)| {
+                        let array_values: Vec<Value> = tag_set
+                            .iter()
+                            .map(|v| match v {
+                                Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
+                                None => Value::Null,
+                            })
+                            .collect();
+                        (tag.into(), Value::Array(array_values))
+                    })
+                    .collect::<ObjectMap>()
+                    .into()
+            } else {
+                tags.into_iter_single()
+                    .map(|(tag, value)| (tag.into(), value.into()))
+                    .collect::<ObjectMap>()
+                    .into()
+            }
         })
     });
-
     let mut map = ObjectMap::default();
 
     for target_path in &info.target_queries {
@@ -610,7 +643,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
             ];
             properties
                 .iter_mut()
-                .for_each(|property| property.insert(metric, &mut map));
+                .for_each(|property| property.insert(metric, multi_value_tags, &mut map));
             break;
         }
 
@@ -628,7 +661,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
                 _ => None,
             };
             if let Some(property) = property {
-                property.insert(metric, &mut map);
+                property.insert(metric, multi_value_tags, &mut map);
             }
         }
     }
