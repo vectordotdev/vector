@@ -561,12 +561,12 @@ fn target_get_mut_metric<'a>(
 fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags: bool) -> Value {
     struct MetricProperty {
         property: &'static str,
-        getter: fn(&Metric, bool) -> Option<Value>,
+        getter: fn(&Metric) -> Option<Value>,
         set: bool,
     }
 
     impl MetricProperty {
-        fn new(property: &'static str, getter: fn(&Metric, bool) -> Option<Value>) -> Self {
+        fn new(property: &'static str, getter: fn(&Metric) -> Option<Value>) -> Self {
             Self {
                 property,
                 getter,
@@ -574,59 +574,62 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
             }
         }
 
-        fn insert(&mut self, metric: &Metric, multi_value_tags: bool, map: &mut ObjectMap) {
+        fn insert(&mut self, metric: &Metric, map: &mut ObjectMap) {
             if self.set {
                 return;
             }
-            if let Some(value) = (self.getter)(metric, multi_value_tags) {
+            if let Some(value) = (self.getter)(metric) {
                 map.insert(self.property.into(), value);
                 self.set = true;
             }
         }
     }
 
-    let mut name = MetricProperty::new("name", |metric, _multi_value_tags| {
-        Some(metric.name().to_owned().into())
-    });
-    let mut kind = MetricProperty::new("kind", |metric, _multi_value_tags| {
-        Some(metric.kind().into())
-    });
-    let mut type_ = MetricProperty::new("type", |metric, _multi_value_tags| {
-        Some(metric.value().clone().into())
-    });
-    let mut namespace = MetricProperty::new("namespace", |metric, _multi_value_tags| {
+    fn get_single_value_tags(metric: &Metric) -> Option<Value> {
+        metric.tags().cloned().map(|tags| {
+            tags.into_iter_single()
+                .map(|(tag, value)| (tag.into(), value.into()))
+                .collect::<ObjectMap>()
+                .into()
+        })
+    }
+
+    fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
+        metric.tags().cloned().map(|tags| {
+            tags.iter_sets()
+                .map(|(tag, tag_set)| {
+                    let array_values: Vec<Value> = tag_set
+                        .iter()
+                        .map(|v| match v {
+                            Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
+                            None => Value::Null,
+                        })
+                        .collect();
+                    (tag.into(), Value::Array(array_values))
+                })
+                .collect::<ObjectMap>()
+                .into()
+        })
+    }
+
+    let tags_getter: fn(&Metric) -> Option<Value> = if multi_value_tags {
+        get_multi_value_tags
+    } else {
+        get_single_value_tags
+    };
+
+    let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
+    let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
+    let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
+    let mut namespace = MetricProperty::new("namespace", |metric| {
         metric.namespace().map(String::from).map(Into::into)
     });
-    let mut interval_ms = MetricProperty::new("interval_ms", |metric, _multi_value_tags| {
-        metric.interval_ms().map(Into::into)
-    });
-    let mut timestamp = MetricProperty::new("timestamp", |metric, _multi_value_tags| {
-        metric.timestamp().map(Into::into)
-    });
-    let mut tags = MetricProperty::new("tags", |metric, multi_value_tags| {
-        metric.tags().cloned().map(|tags| {
-            if multi_value_tags {
-                tags.iter_sets()
-                    .map(|(tag, tag_set)| {
-                        let array_values: Vec<Value> = tag_set
-                            .iter()
-                            .map(|v| match v {
-                                Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
-                                None => Value::Null,
-                            })
-                            .collect();
-                        (tag.into(), Value::Array(array_values))
-                    })
-                    .collect::<ObjectMap>()
-                    .into()
-            } else {
-                tags.into_iter_single()
-                    .map(|(tag, value)| (tag.into(), value.into()))
-                    .collect::<ObjectMap>()
-                    .into()
-            }
-        })
-    });
+    let mut interval_ms =
+        MetricProperty::new("interval_ms", |metric| metric.interval_ms().map(Into::into));
+    let mut timestamp =
+        MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
+    let mut tags = MetricProperty::new("tags", tags_getter);
+
     let mut map = ObjectMap::default();
 
     for target_path in &info.target_queries {
@@ -643,7 +646,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
             ];
             properties
                 .iter_mut()
-                .for_each(|property| property.insert(metric, multi_value_tags, &mut map));
+                .for_each(|property| property.insert(metric, &mut map));
             break;
         }
 
@@ -661,7 +664,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
                 _ => None,
             };
             if let Some(property) = property {
-                property.insert(metric, multi_value_tags, &mut map);
+                property.insert(metric, &mut map);
             }
         }
     }
