@@ -150,7 +150,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
         untagged_counters: &[],
     });
 
-impl<'a, 'b, 'c> ComponentTests<'a, 'b, 'c> {
+impl ComponentTests<'_, '_, '_> {
     /// Run the test specification, and assert that all tests passed.
     #[track_caller]
     pub fn assert(&self, tags: &[&str]) {
@@ -252,8 +252,8 @@ impl ComponentTester {
 }
 
 /// Runs and returns a future and asserts that the provided test specification passes.
-pub async fn assert_source<'a, 'b, 'c, T>(
-    tests: &LazyLock<ComponentTests<'a, 'b, 'c>>,
+pub async fn assert_source<T>(
+    tests: &LazyLock<ComponentTests>,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {
@@ -342,12 +342,12 @@ where
 }
 
 /// Runs and asserts source test specifications with configurations.
-pub async fn run_and_assert_source_advanced<'a, 'b, 'c, SC>(
+pub async fn run_and_assert_source_advanced<SC>(
     source: SC,
     setup: impl FnOnce(&mut SourceContext),
     timeout: Option<Duration>,
     event_count: Option<usize>,
-    tests: &LazyLock<ComponentTests<'a, 'b, 'c>>,
+    tests: &LazyLock<ComponentTests>,
     tags: &[&str],
 ) -> Vec<Event>
 where
@@ -500,8 +500,8 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
 }
 
 // Convenience wrapper for running sink error tests with a specific component test specification
-async fn assert_sink_error_with_component_tests<'a, 'b, 'c, T>(
-    component_tests: &ComponentTests<'a, 'b, 'c>,
+async fn assert_sink_error_with_component_tests<T>(
+    component_tests: &ComponentTests,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {

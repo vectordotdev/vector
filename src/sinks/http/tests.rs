@@ -539,7 +539,7 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
 async fn templateable_uri_path() {
     init_test();
     fn create_event_with_id(id: i64) -> Event {
-        log_event!["id" => id].into()
+        log_event!["id" => id]
     }
 
     let num_events_per_id = 100;
@@ -581,7 +581,7 @@ async fn templateable_uri_path() {
 
     let request_batches = rx
         .inspect(|(parts, body)| {
-            let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+            let events: Vec<serde_json::Value> = serde_json::from_slice(body).unwrap();
 
             // Assert that all the events are received
             assert_eq!(events.len(), num_events_per_id);
@@ -608,7 +608,7 @@ async fn templateable_uri_auth() {
     init_test();
 
     fn create_event_with_user_and_pass(user: &str, pass: &str) -> Event {
-        log_event!["user" => user, "pass" => pass].into()
+        log_event!["user" => user, "pass" => pass]
     }
 
     let num_events_per_auth = 100;
@@ -655,7 +655,7 @@ async fn templateable_uri_auth() {
 
     let request_batches = rx
         .inspect(|(parts, body)| {
-            let events: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+            let events: Vec<serde_json::Value> = serde_json::from_slice(body).unwrap();
 
             // Assert that all the events are received
             assert_eq!(events.len(), num_events_per_auth);

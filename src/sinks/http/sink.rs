@@ -92,7 +92,7 @@ struct KeyPartitioner {
 }
 
 impl KeyPartitioner {
-    fn new(uri: Template) -> Self {
+    const fn new(uri: Template) -> Self {
         Self { uri }
     }
 }
