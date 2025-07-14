@@ -1,0 +1,91 @@
+# NetFlow source configuration example
+# This source collects network flow data from NetFlow/IPFIX/sFlow exporters
+
+sources:
+  netflow:
+    type: netflow
+    address: "0.0.0.0:2055"  # Default NetFlow port
+    max_length: 65536  # Maximum packet size
+    protocols:
+      - "netflow_v5"
+      - "netflow_v9" 
+      - "ipfix"
+      - "sflow"
+    include_raw_data: false  # Set to true for debugging
+    max_templates: 1000  # Maximum templates to cache per observation domain
+    template_timeout_secs: 3600  # Template cache timeout (1 hour)
+    multicast_groups:  # Optional: join multicast groups
+      - "224.0.0.2"
+      - "224.0.0.4"
+    receive_buffer_bytes: 262144  # Optional: set socket receive buffer
+
+# Example transforms to process the flow data
+transforms:
+  netflow_enrich:
+    type: remap
+    inputs: ["netflow"]
+    source: |
+      # Add timestamp if not present
+      if !exists(.timestamp) {
+        .timestamp = now()
+      }
+      
+      # Add source information
+      .source = "netflow"
+      
+      # Parse IP addresses for better visualization
+      if exists(.src_addr) {
+        .src_ip = .src_addr
+      }
+      if exists(.dst_addr) {
+        .dst_ip = .dst_addr
+      }
+      
+      # Add protocol names
+      if exists(.protocol) {
+        .protocol_name = match(.protocol) {
+          1 => "ICMP",
+          6 => "TCP", 
+          17 => "UDP",
+          _ => "Unknown"
+        }
+      }
+
+# Example sinks to send the data
+sinks:
+  console:
+    type: console
+    inputs: ["netflow_enrich"]
+    encoding:
+      codec: json
+
+  elasticsearch:
+    type: elasticsearch
+    inputs: ["netflow_enrich"]
+    endpoints: ["http://localhost:9200"]
+    index: "netflow-%Y.%m.%d"
+    compression: gzip
+
+  prometheus:
+    type: prometheus_remote_write
+    inputs: ["netflow_enrich"]
+    endpoint: "http://localhost:9090/api/v1/write"
+    default_namespace: "netflow"
+    metrics:
+      - name: "netflow_packets_total"
+        type: "counter"
+        inputs: ["netflow_enrich"]
+        field: "packets"
+        tags:
+          src_ip: ".src_ip"
+          dst_ip: ".dst_ip"
+          protocol: ".protocol_name"
+      
+      - name: "netflow_bytes_total"
+        type: "counter" 
+        inputs: ["netflow_enrich"]
+        field: "octets"
+        tags:
+          src_ip: ".src_ip"
+          dst_ip: ".dst_ip"
+          protocol: ".protocol_name" 

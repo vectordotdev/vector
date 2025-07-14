@@ -591,7 +591,8 @@ sources-logs = [
   "sources-file_descriptor",
   "sources-redis",
   "sources-socket",
-  "sources-splunk_hec",
+"sources-netflow",
+"sources-splunk_hec",
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
@@ -652,6 +653,7 @@ sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vec
 sources-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
+sources-netflow = ["sources-utils-net-udp", "tokio-util/net", "dep:base64"]
 sources-splunk_hec = ["dep:roaring"]
 sources-statsd = ["sources-utils-net", "tokio-util/net"]
 sources-stdin = ["tokio-util/io"]
