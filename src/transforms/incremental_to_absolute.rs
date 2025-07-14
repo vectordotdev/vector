@@ -1,0 +1,227 @@
+use std::{collections::HashMap, pin::Pin, time::Duration};
+
+use async_stream::stream;
+use futures::{Stream, StreamExt};
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+
+use crate::sinks::util::buffer::metrics::{MetricSet, TtlPolicy};
+use crate::{
+    config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
+    event::Event,
+    schema,
+    transforms::{TaskTransform, Transform},
+};
+
+/// Configuration for the `incremental_to_absolute` transform.
+#[configurable_component(transform(
+    "incremental_to_absolute",
+    "Convert incremental metrics to absolute."
+))]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct IncrementalToAbsoluteConfig {
+    /// The amount of time, in seconds, that incremental metrics will persist in the internal metrics cache
+    /// after having not been updated before they expire and are removed.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = true))]
+    pub expire_metrics_secs: u64,
+}
+
+impl_generate_config_from_default!(IncrementalToAbsoluteConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "aggregate")]
+impl TransformConfig for IncrementalToAbsoluteConfig {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+        IncrementalToAbsolute::new(self).map(Transform::event_task)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+
+    fn outputs(
+        &self,
+        _: vector_lib::enrichment::TableRegistry,
+        _: &[(OutputId, schema::Definition)],
+        _: LogNamespace,
+    ) -> Vec<TransformOutput> {
+        vec![TransformOutput::new(DataType::Metric, HashMap::new())]
+    }
+}
+#[derive(Debug)]
+pub struct IncrementalToAbsolute {
+    data: MetricSet,
+}
+
+impl IncrementalToAbsolute {
+    pub fn new(config: &IncrementalToAbsoluteConfig) -> crate::Result<Self> {
+        Ok(Self {
+            data: MetricSet::with_ttl_policy(TtlPolicy::new(Duration::from_secs(
+                config.expire_metrics_secs,
+            ))),
+        })
+    }
+}
+
+impl TaskTransform<Event> for IncrementalToAbsolute {
+    fn transform(
+        mut self: Box<Self>,
+        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        Box::pin(stream! {
+            let mut done = false;
+            while !done {
+                tokio::select! {
+                    maybe_event = input_rx.next() => {
+                        match maybe_event {
+                            None => done = true,
+                            Some(event) => {
+                                if let Some(metric) = self.data.make_absolute(event.as_metric().clone()) {
+                                    // Create a new Event from the metric and yield it
+                                    yield Event::Metric(metric);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures_util::SinkExt;
+    use similar_asserts::assert_eq;
+    use std::sync::Arc;
+    use vector_lib::config::ComponentKey;
+
+    use super::*;
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        Metric,
+    };
+
+    fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
+        let mut event = Event::Metric(Metric::new(name, kind, value))
+            .with_source_id(Arc::new(ComponentKey::from("in")))
+            .with_upstream_id(Arc::new(OutputId::from("transform")));
+
+        event.metadata_mut().set_source_type("unit_test_stream");
+
+        event
+    }
+
+    async fn assert_metric_eq(
+        tx: &mut futures::channel::mpsc::Sender<Event>,
+        mut out_stream: impl Stream<Item = Event> + Unpin,
+        metric: Event,
+        expected_metric: Event,
+    ) {
+        tx.send(metric).await.unwrap();
+        if let Some(out_event) = out_stream.next().await {
+            let result = out_event;
+            assert_eq!(result, expected_metric);
+        } else {
+            panic!("Unexpectedly received None in output stream");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_incremental_to_absolute() {
+        let config = toml::from_str::<IncrementalToAbsoluteConfig>(
+            r#"
+expire_metrics_secs = 9999
+"#,
+        )
+        .unwrap();
+        let incremental_to_absolute = IncrementalToAbsolute::new(&config)
+            .map(Transform::event_task)
+            .unwrap();
+        let incremental_to_absolute = incremental_to_absolute.into_task();
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = incremental_to_absolute.transform_events(Box::pin(rx));
+
+        let inc_counter_1 = make_metric(
+            "incremental_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        );
+        let expected_inc_counter_1 = make_metric(
+            "incremental_counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 10.0 },
+        );
+        assert_metric_eq(
+            &mut tx,
+            &mut out_stream,
+            inc_counter_1,
+            expected_inc_counter_1,
+        )
+        .await;
+
+        let inc_counter_2 = make_metric(
+            "incremental_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        );
+        let expected_inc_counter_2 = make_metric(
+            "incremental_counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 20.0 },
+        );
+        assert_metric_eq(
+            &mut tx,
+            &mut out_stream,
+            inc_counter_2,
+            expected_inc_counter_2,
+        )
+        .await;
+
+        let inc_counter_3 = make_metric(
+            "incremental_counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        );
+        let expected_inc_counter_3 = make_metric(
+            "incremental_counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 30.0 },
+        );
+        assert_metric_eq(
+            &mut tx,
+            &mut out_stream,
+            inc_counter_3,
+            expected_inc_counter_3,
+        )
+        .await;
+
+        // Absolute counters and gauges are emitted unchanged
+        let gauge = make_metric(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 42.0 },
+        );
+        let expected_gauge = gauge.clone();
+        assert_metric_eq(&mut tx, &mut out_stream, gauge, expected_gauge).await;
+
+        let absolute_counter = make_metric(
+            "absolute_counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 42.0 },
+        );
+        let absolute_counter_expected = absolute_counter.clone();
+        assert_metric_eq(
+            &mut tx,
+            &mut out_stream,
+            absolute_counter,
+            absolute_counter_expected,
+        )
+        .await;
+    }
+}
