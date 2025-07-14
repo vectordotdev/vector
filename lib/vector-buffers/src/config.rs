@@ -220,7 +220,6 @@ pub enum BufferType {
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
-    #[serde(rename = "memory")]
     Memory {
         /// The terms around how to express buffering limits, can be in size or bytes_size.
         #[serde(flatten)]
