@@ -612,12 +612,6 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
         })
     }
 
-    let tags_getter: fn(&Metric) -> Option<Value> = if multi_value_tags {
-        get_multi_value_tags
-    } else {
-        get_single_value_tags
-    };
-
     let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
     let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
     let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
@@ -628,7 +622,14 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
         MetricProperty::new("interval_ms", |metric| metric.interval_ms().map(Into::into));
     let mut timestamp =
         MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
-    let mut tags = MetricProperty::new("tags", tags_getter);
+    let mut tags = MetricProperty::new(
+        "tags",
+        if multi_value_tags {
+            get_multi_value_tags
+        } else {
+            get_single_value_tags
+        },
+    );
 
     let mut map = ObjectMap::default();
 
