@@ -81,7 +81,7 @@ impl VrlDiagnosticResult {
     }
 }
 
-fn compile(mut input: Input, tz_str: &str) -> Result<VrlCompileResult, VrlDiagnosticResult> {
+fn compile(mut input: Input, tz_str: Option<String>) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
@@ -91,15 +91,15 @@ fn compile(mut input: Input, tz_str: &str) -> Result<VrlCompileResult, VrlDiagno
     let mut runtime = Runtime::default();
     let config = CompileConfig::default();
 
-    let timezone = match tz_str {
+    let timezone = match tz_str.as_deref() {
         // Empty or "Default" tz string will default to tz default
-        "" | "Default" => TimeZone::default(),
-        other => match other.parse() {
+        None | Some("") | Some("Default") => TimeZone::default(),
+        Some(other) => match other.parse() {
             Ok(tz) => TimeZone::Named(tz),
             Err(_) => {
                 // Returns error message if tz parsing has failed.
                 // This avoids head scratching, instead of it silently using the default timezone.
-                let error_message = format!("Invalid timezone identifier: '{}'", tz_str);
+                let error_message = format!("Invalid timezone identifier: '{}'", other);
                 return Err(VrlDiagnosticResult {
                     list: vec![error_message.clone()],
                     msg: error_message.clone(),
@@ -145,7 +145,7 @@ fn compile(mut input: Input, tz_str: &str) -> Result<VrlCompileResult, VrlDiagno
 pub fn run_vrl(incoming: &JsValue, tz_str: &str) -> JsValue {
     let input: Input = incoming.into_serde().unwrap();
 
-    match compile(input, tz_str) {
+    match compile(input, Some(tz_str.to_string())) {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
         Err(err) => JsValue::from_serde(&err).unwrap(),
     }
