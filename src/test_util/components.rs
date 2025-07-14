@@ -253,7 +253,7 @@ impl ComponentTester {
 
 /// Runs and returns a future and asserts that the provided test specification passes.
 pub async fn assert_source<T>(
-    tests: &LazyLock<ComponentTests>,
+    tests: &LazyLock<ComponentTests<'_, '_, '_>>,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {
@@ -347,7 +347,7 @@ pub async fn run_and_assert_source_advanced<SC>(
     setup: impl FnOnce(&mut SourceContext),
     timeout: Option<Duration>,
     event_count: Option<usize>,
-    tests: &LazyLock<ComponentTests>,
+    tests: &LazyLock<ComponentTests<'_, '_, '_>>,
     tags: &[&str],
 ) -> Vec<Event>
 where
@@ -501,7 +501,7 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
 
 // Convenience wrapper for running sink error tests with a specific component test specification
 async fn assert_sink_error_with_component_tests<T>(
-    component_tests: &ComponentTests,
+    component_tests: &ComponentTests<'_, '_, '_>,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {
