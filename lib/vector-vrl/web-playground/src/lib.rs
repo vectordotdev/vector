@@ -81,7 +81,10 @@ impl VrlDiagnosticResult {
     }
 }
 
-fn compile(mut input: Input, tz_str: Option<String>) -> Result<VrlCompileResult, VrlDiagnosticResult> {
+fn compile(
+    mut input: Input,
+    tz_str: Option<String>,
+) -> Result<VrlCompileResult, VrlDiagnosticResult> {
     let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
     functions.extend(enrichment::vrl_functions());
