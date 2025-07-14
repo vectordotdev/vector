@@ -1,14 +1,16 @@
 //! Service implementation for the `http` sink.
 
+use std::str::FromStr;
+
 use bytes::Bytes;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_TYPE},
-    HeaderName, HeaderValue, Method, Request, Uri,
+    HeaderName, HeaderValue, Method, Request,
 };
 use indexmap::IndexMap;
 
 use crate::{
-    http::Auth,
+    http::{Auth, MaybeAuth},
     sinks::{
         util::{
             http::{HttpRequest, HttpServiceRequestBuilder},
@@ -20,10 +22,10 @@ use crate::{
 use snafu::ResultExt;
 
 use super::config::HttpMethod;
+use super::sink::PartitionKey;
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {
-    uri: UriSerde,
     method: HttpMethod,
     auth: Option<Auth>,
     headers: IndexMap<HeaderName, HeaderValue>,
@@ -34,7 +36,6 @@ pub(super) struct HttpSinkRequestBuilder {
 impl HttpSinkRequestBuilder {
     /// Creates a new `HttpSinkRequestBuilder`
     pub(super) const fn new(
-        uri: UriSerde,
         method: HttpMethod,
         auth: Option<Auth>,
         headers: IndexMap<HeaderName, HeaderValue>,
@@ -42,7 +43,6 @@ impl HttpSinkRequestBuilder {
         content_encoding: Option<String>,
     ) -> Self {
         Self {
-            uri,
             method,
             auth,
             headers,
@@ -52,10 +52,19 @@ impl HttpSinkRequestBuilder {
     }
 }
 
-impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
-    fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
+impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
+    fn build(
+        &self,
+        mut request: HttpRequest<PartitionKey>,
+    ) -> Result<Request<Bytes>, crate::Error> {
+        let metadata = request.get_additional_metadata();
+        let uri_serde = UriSerde::from_str(&metadata.uri)?;
+        let uri_auth = uri_serde.auth;
+        let uri = uri_serde.uri;
+
+        let auth = self.auth.choose_one(&uri_auth)?;
+
         let method: Method = self.method.into();
-        let uri: Uri = self.uri.uri.clone();
         let mut builder = Request::builder().method(method).uri(uri);
 
         if let Some(content_type) = &self.content_type {
@@ -81,7 +90,7 @@ impl HttpServiceRequestBuilder<()> for HttpSinkRequestBuilder {
             .context(HTTPRequestBuilderSnafu)
             .map_err(Into::<crate::Error>::into)?;
 
-        if let Some(auth) = &self.auth {
+        if let Some(auth) = auth {
             auth.apply(&mut request);
         }
 
