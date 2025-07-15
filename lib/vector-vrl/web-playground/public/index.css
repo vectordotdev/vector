@@ -176,7 +176,7 @@ div#output-section {
   border-bottom: 1px solid var(--datadog-gray-light);
 }
 
-/*  BUTTONS */
+/* BUTTONS */
 .btn {
   display: inline-block;
   outline: 0;
@@ -408,4 +408,15 @@ div#output-section {
   color: #212529;
   height: 36px;
   box-sizing: border-box;
+}
+
+#output-cell-title .cell-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#elapsed-time {
+  font-weight: normal;
+  font-size: 12px;
 }

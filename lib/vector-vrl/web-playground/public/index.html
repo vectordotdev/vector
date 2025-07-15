@@ -52,9 +52,8 @@
       <div id="toolbar-section">
         <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
         <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
-        <code id="elapsed-time"></code>
         <div class="timezone-container">
-          <label for="timezone-input" id="timezone-label">TZ</label>
+          <label for="timezone-input" id="timezone-label">Select Timezone</label>
           <input
             type="text"
             id="timezone-input"
@@ -96,7 +95,10 @@
 
         <div id="output-cell">
           <div id="output-cell-title">
-            <p class="cell-title">Output</p>
+            <p class="cell-title">
+              <span>Output</span>
+              <code id="elapsed-time"></code>
+            </p>
           </div>
           <div id="container-output"></div>
         </div>
