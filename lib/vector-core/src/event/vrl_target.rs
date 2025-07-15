@@ -410,7 +410,7 @@ impl Target for VrlTarget {
                 VrlTarget::Metric {
                     ref mut metric,
                     value,
-                    multi_value_tags,
+                    multi_value_tags: _,
                 } => {
                     if target_path.path.is_root() {
                         return Err(MetricPathError::SetPathError.to_string());
@@ -435,13 +435,7 @@ impl Target for VrlTarget {
                                     .map(|(k, v)| (k, v.into()))
                                     .collect::<vrl::value::Value>()
                             }),
-                            ["tags", field] => {
-                                if *multi_value_tags {
-                                    metric.series.remove_tag(field).map(Into::into)
-                                } else {
-                                    metric.remove_tag(field).map(Into::into)
-                                }
-                            }
+                            ["tags", field] => metric.remove_tag(field).map(Into::into),
                             _ => {
                                 return Err(MetricPathError::InvalidPath {
                                     path: &target_path.path.to_string(),
