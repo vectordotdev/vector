@@ -4,8 +4,6 @@
 # committing changelog fragments before executing the script. If the script
 # finds an issue with your changelog fragment, you can un-stage the fragment
 # from being committed and fix the issue.
-#
-echo "I am from the branch"
 
 CHANGELOG_DIR="changelog.d"
 
