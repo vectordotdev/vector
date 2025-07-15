@@ -4,7 +4,7 @@ remap: functions: encode_lz4: {
 	category:    "Codec"
 	description: """
 		Encodes the `value` to [Lz4](\(urls.lz4)). This function compresses the input string into an lz4 block.
-		If `prepend_size` is set to `true`, it will prepend the original uncompressed size to the compressed data.
+		If `prepend_size` is set to `true`, it prepends the original uncompressed size to the compressed data.
 		This is useful for some implementations of lz4 that require the original size to be known before decoding.
 		"""
 
