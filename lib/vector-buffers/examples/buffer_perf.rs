@@ -21,7 +21,7 @@ use vector_buffers::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType, Bufferable, EventCount, WhenFull,
+    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::finalization::{
@@ -261,7 +261,7 @@ where
                 max_size_events
             );
             BufferType::Memory {
-                max_events: max_size_events,
+                size: MemoryBufferSize::MaxEvents(max_size_events),
                 when_full,
             }
         }
