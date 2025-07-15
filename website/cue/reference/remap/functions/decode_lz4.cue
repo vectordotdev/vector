@@ -4,7 +4,7 @@ remap: functions: decode_lz4: {
 	category: "Codec"
 	description: """
 		Decodes the `value` (an lz4 string) into its original string. `buf_size` is the size of the buffer to decode into, this must be equal to or larger than the uncompressed size. 
-		If `prepended_size` is set to `true`, it will expect the original uncompressed size to be prepended to the compressed data. 
+		If `prepended_size` is set to `true`, it expects the original uncompressed size to be prepended to the compressed data. 
 		`prepended_size` is useful for some implementations of lz4 that require the original size to be known before decoding.
 		"""
 
