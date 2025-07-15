@@ -61,8 +61,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-fmt
         env:
           VDEV: vdev
@@ -88,8 +88,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-clippy
         env:
           VDEV: vdev
@@ -115,8 +115,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make test
         env:
           VDEV: vdev
@@ -142,8 +142,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make test-component-validation
         env:
           VDEV: vdev
@@ -159,8 +159,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-version
         env:
           VDEV: vdev
@@ -174,8 +174,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: make check-scripts
         env:
@@ -202,8 +202,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-events
         env:
           VDEV: vdev
@@ -229,8 +229,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: cargo install dd-rust-license-tool --version 0.2.0
       - run: make check-licenses
         env:
@@ -257,8 +257,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-docs
         env:
           VDEV: vdev
@@ -273,8 +273,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - uses: ruby/setup-ruby@v1
       - run: gem install mdl
       - run: make check-markdown
@@ -302,8 +302,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make check-component-docs
         env:
           VDEV: vdev
@@ -329,8 +329,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: cd rust-doc && make docs
         env:
           VDEV: vdev
@@ -356,8 +356,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: make test-vrl
         env:
           VDEV: vdev
@@ -383,8 +383,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vdev
-          path: .
-      - run: chmod +x vdev && mv vdev /usr/local/bin/
+          path: /usr/local/bin/
+      - run: chmod +x /usr/local/bin/vdev
       - run: |
           cd lib/vector-vrl/web-playground/
           ~/.cargo/bin/rustup target add wasm32-unknown-unknown
