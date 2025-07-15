@@ -90,6 +90,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: bash ./scripts/environment/install-protoc.sh
       - run: make check-clippy
         env:
           VDEV: vdev
@@ -231,7 +232,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
-      - run: cargo install dd-rust-license-tool --version 0.2.0
+      - run: cargo install dd-rust-license-tool --version 1.0.2 --force --locked
       - run: make check-licenses
         env:
           VDEV: vdev
@@ -304,6 +305,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: bash ./scripts/environment/install-protoc.sh
       - run: make check-component-docs
         env:
           VDEV: vdev
@@ -358,6 +360,8 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: bash ./scripts/environment/install-protoc.sh
+      - run: cargo install --force --locked --version 0.13.1 wasm-pack
       - run: make test-vrl
         env:
           VDEV: vdev
