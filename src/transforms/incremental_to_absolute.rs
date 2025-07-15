@@ -1,6 +1,5 @@
-use std::{collections::HashMap, pin::Pin, time::Duration};
+use std::{collections::HashMap, future::ready, pin::Pin, time::Duration};
 
-use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
@@ -64,34 +63,26 @@ impl IncrementalToAbsolute {
             ))),
         })
     }
+    pub fn transform_one(&mut self, event: Event) -> Option<Event> {
+        if let Some(metric) = self.data.make_absolute(event.as_metric().clone()) {
+            // Create a new Event from the metric
+            Some(Event::Metric(metric))
+        } else {
+            None
+        }
+    }
 }
 
 impl TaskTransform<Event> for IncrementalToAbsolute {
     fn transform(
-        mut self: Box<Self>,
-        mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
-        Box::pin(stream! {
-            let mut done = false;
-            while !done {
-                tokio::select! {
-                    maybe_event = input_rx.next() => {
-                        match maybe_event {
-                            None => done = true,
-                            Some(event) => {
-                                if let Some(metric) = self.data.make_absolute(event.as_metric().clone()) {
-                                    // Create a new Event from the metric and yield it
-                                    yield Event::Metric(metric);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
+        let mut inner = self;
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
     }
 }
 
