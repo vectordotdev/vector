@@ -1029,6 +1029,9 @@ generated: components: sinks: http: configuration: {
 			This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
 			"""
 		required: true
-		type: string: examples: ["https://10.22.212.22:9000/endpoint"]
+		type: string: {
+			examples: ["https://10.22.212.22:9000/endpoint"]
+			syntax: "template"
+		}
 	}
 }
