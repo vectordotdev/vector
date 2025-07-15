@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: master
           path: base
           sparse-checkout: scripts/check_changelog_fragments.sh
           sparse-checkout-cone-mode: false
