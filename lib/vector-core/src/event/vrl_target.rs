@@ -104,7 +104,7 @@ impl VrlTarget {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
                 // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(&metric, info);
+                let value = precompute_metric_value(&metric, info, multi_value_metric_tags);
 
                 VrlTarget::Metric {
                     metric,
@@ -242,9 +242,13 @@ fn merge_array_definitions(mut definition: Definition) -> Definition {
 
 fn set_metric_tag_values(name: String, value: &Value, metric: &mut Metric, multi_value_tags: bool) {
     if multi_value_tags {
-        let tag_values = value
-            .as_array()
-            .unwrap_or(&[])
+        let values = if let Value::Array(values) = value {
+            values.as_slice()
+        } else {
+            std::slice::from_ref(value)
+        };
+
+        let tag_values = values
             .iter()
             .filter_map(|value| match value {
                 Value::Bytes(bytes) => {
@@ -548,7 +552,7 @@ fn target_get_mut_metric<'a>(
 ///
 /// This structure is partially populated based on the fields accessed by
 /// the VRL program as informed by `ProgramInfo`.
-fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
+fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags: bool) -> Value {
     struct MetricProperty {
         property: &'static str,
         getter: fn(&Metric) -> Option<Value>,
@@ -575,6 +579,33 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
         }
     }
 
+    fn get_single_value_tags(metric: &Metric) -> Option<Value> {
+        metric.tags().cloned().map(|tags| {
+            tags.into_iter_single()
+                .map(|(tag, value)| (tag.into(), value.into()))
+                .collect::<ObjectMap>()
+                .into()
+        })
+    }
+
+    fn get_multi_value_tags(metric: &Metric) -> Option<Value> {
+        metric.tags().cloned().map(|tags| {
+            tags.iter_sets()
+                .map(|(tag, tag_set)| {
+                    let array_values: Vec<Value> = tag_set
+                        .iter()
+                        .map(|v| match v {
+                            Some(s) => Value::Bytes(s.as_bytes().to_vec().into()),
+                            None => Value::Null,
+                        })
+                        .collect();
+                    (tag.into(), Value::Array(array_values))
+                })
+                .collect::<ObjectMap>()
+                .into()
+        })
+    }
+
     let mut name = MetricProperty::new("name", |metric| Some(metric.name().to_owned().into()));
     let mut kind = MetricProperty::new("kind", |metric| Some(metric.kind().into()));
     let mut type_ = MetricProperty::new("type", |metric| Some(metric.value().clone().into()));
@@ -585,14 +616,14 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
         MetricProperty::new("interval_ms", |metric| metric.interval_ms().map(Into::into));
     let mut timestamp =
         MetricProperty::new("timestamp", |metric| metric.timestamp().map(Into::into));
-    let mut tags = MetricProperty::new("tags", |metric| {
-        metric.tags().cloned().map(|tags| {
-            tags.into_iter_single()
-                .map(|(tag, value)| (tag.into(), value.into()))
-                .collect::<ObjectMap>()
-                .into()
-        })
-    });
+    let mut tags = MetricProperty::new(
+        "tags",
+        if multi_value_tags {
+            get_multi_value_tags
+        } else {
+            get_single_value_tags
+        },
+    );
 
     let mut map = ObjectMap::default();
 
