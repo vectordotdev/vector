@@ -51,7 +51,7 @@ remap: functions: haversine: {
 		{
 			title: "Haversine in kilometers"
 			source: #"""
-				haversine(0, 0, 10, 10)
+				haversine(0.0, 0.0, 10.0, 10.0)
 				"""#
 			return: {
 				distance: 1568.5227233
@@ -61,7 +61,7 @@ remap: functions: haversine: {
 		{
 			title: "Haversine in miles"
 			source: #"""
-				haversine(0, 0, 10, 10, "miles")
+				haversine(0.0, 0.0, 10.0, 10.0, "miles")
 				"""#
 			return: {
 				distance: 974.6348468
