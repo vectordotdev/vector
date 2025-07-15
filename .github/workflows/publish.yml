@@ -677,7 +677,7 @@ jobs:
         run: make release-s3
 
   publish-github:
-    name: Publish to GitHub
+    name: Publish release to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
     if: inputs.channel == 'release'
     runs-on: ubuntu-24.04
