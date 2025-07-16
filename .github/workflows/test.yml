@@ -119,6 +119,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make test
@@ -148,6 +149,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: make test-component-validation
         env:
