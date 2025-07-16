@@ -183,7 +183,6 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: make check-scripts
         env:
           VDEV: vdev
@@ -313,6 +312,7 @@ jobs:
       - run: chmod +x /usr/local/bin/vdev
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: make check-component-docs
         env:
           VDEV: vdev
