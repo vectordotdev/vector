@@ -212,8 +212,12 @@ impl<'a> Widgets<'a> {
         for (_, r) in state.components.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
-                if !r.has_displayable_outputs() { "--" } else { Default::default() }
-                    .to_string(),
+                if !r.has_displayable_outputs() {
+                    "--"
+                } else {
+                    Default::default()
+                }
+                .to_string(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];

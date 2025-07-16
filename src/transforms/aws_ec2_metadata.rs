@@ -509,9 +509,8 @@ impl MetadataClient {
                     let mac = String::from_utf8_lossy(&mac[..]);
 
                     if self.fields.contains(SUBNET_ID_KEY) {
-                        let subnet_path = format!(
-                            "/latest/meta-data/network/interfaces/macs/{mac}/subnet-id"
-                        );
+                        let subnet_path =
+                            format!("/latest/meta-data/network/interfaces/macs/{mac}/subnet-id");
 
                         let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),

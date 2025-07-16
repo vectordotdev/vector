@@ -165,10 +165,7 @@ macro_rules! series {
 
 pub fn assert_counter(metrics: &SplitMetrics, series: MetricSeries, expected: f64) {
     let actual_counter = read_counter_value(metrics, series.clone());
-    assert!(
-        actual_counter.is_some(),
-        "counter '{series}' was not found"
-    );
+    assert!(actual_counter.is_some(), "counter '{series}' was not found");
 
     let actual_counter_value = actual_counter.expect("counter must be valid");
     assert_eq!(

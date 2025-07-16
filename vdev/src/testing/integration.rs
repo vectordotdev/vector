@@ -223,7 +223,9 @@ impl Compose {
         let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
         match original_path.try_exists() {
-            Err(error) => Err(error).with_context(|| format!("Could not lookup {}", original_path.display())),
+            Err(error) => {
+                Err(error).with_context(|| format!("Could not lookup {}", original_path.display()))
+            }
             Ok(false) => Ok(None),
             Ok(true) => {
                 let mut config = ComposeConfig::parse(&original_path)?;
@@ -386,8 +388,9 @@ mod unix {
                 for entry in fs::read_dir(path)
                     .with_context(|| format!("Could not read directory {}", path.display()))?
                 {
-                    let entry = entry
-                        .with_context(|| format!("Could not read directory entry in {}", path.display()))?;
+                    let entry = entry.with_context(|| {
+                        format!("Could not read directory entry in {}", path.display())
+                    })?;
                     add_read_permission(&entry.path())?;
                 }
             }

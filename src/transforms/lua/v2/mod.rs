@@ -1001,8 +1001,7 @@ mod tests {
             "#,
             |tx, out| async move {
                 let n: usize = 10;
-                let events =
-                    (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
+                let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
                 for event in events {
                     tx.send(event).await.unwrap();
                     assert!(out.lock().await.recv().await.is_some());

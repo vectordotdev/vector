@@ -278,9 +278,9 @@ impl Query {
         functions: &[Box<dyn Function>],
     ) -> CompiledQueryParameterValue {
         match value {
-            QueryParameterValue::SingleParam(param) => {
-                CompiledQueryParameterValue::SingleParam(Box::new(Self::compile_value(param, functions)))
-            }
+            QueryParameterValue::SingleParam(param) => CompiledQueryParameterValue::SingleParam(
+                Box::new(Self::compile_value(param, functions)),
+            ),
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()

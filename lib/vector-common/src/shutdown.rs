@@ -260,12 +260,11 @@ impl SourceShutdownCoordinator {
         id: &ComponentKey,
         deadline: Instant,
     ) -> impl Future<Output = bool> {
-        let (_, begin_shutdown_trigger) =
-            self.begun_triggers.remove(id).unwrap_or_else(|| {
-                panic!(
+        let (_, begin_shutdown_trigger) = self.begun_triggers.remove(id).unwrap_or_else(|| {
+            panic!(
                 "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"
             )
-            });
+        });
         // This is what actually triggers the source to begin shutting down.
         begin_shutdown_trigger.cancel();
 

@@ -241,8 +241,7 @@ impl DnsMessageParser {
                 }
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
-                        write!(port_string, "{current_bit} ")
-                            .expect("can always write to String");
+                        write!(port_string, "{current_bit} ").expect("can always write to String");
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -280,10 +279,7 @@ impl DnsMessageParser {
             parse_ipv6_address(&mut dec)?
         };
         let domain_name = Self::parse_domain_name(&mut decoder, &self.options)?;
-        Ok((
-            Some(format!("{prefix} {ipv6_address} {domain_name}")),
-            None,
-        ))
+        Ok((Some(format!("{prefix} {ipv6_address} {domain_name}")), None))
     }
 
     fn parse_loc_rdata(
@@ -366,11 +362,8 @@ impl DnsMessageParser {
                 let mut dec = BinDecoder::new(&address_vec);
                 parse_ipv6_address(&mut dec)?
             };
-            write!(
-                apl_rdata,
-                "{negation}{address_family}:{address}/{prefix}"
-            )
-            .expect("can always write to String");
+            write!(apl_rdata, "{negation}{address_family}:{address}/{prefix}")
+                .expect("can always write to String");
             apl_rdata.push(' ');
         }
         Ok((Some(apl_rdata.trim_end().to_string()), None))
@@ -511,10 +504,7 @@ impl DnsMessageParser {
                 let data_len = raw_rdata.len() as u16 - 3;
                 let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
 
-                Ok((
-                    Some(format!("{meaning} {coding} {subcoding} {data}")),
-                    None,
-                ))
+                Ok((Some(format!("{meaning} {coding} {subcoding} {data}")), None))
             }
 
             dns_message::RTYPE_APL => self.parse_apl_rdata(rdata.anything()),
@@ -1077,9 +1067,7 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let exponent = data & 0x0F;
     if exponent > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!(
-                "The exponent shouldn't be greater than 9. Exponent: {exponent}"
-            ),
+            cause: format!("The exponent shouldn't be greater than 9. Exponent: {exponent}"),
         });
     }
 

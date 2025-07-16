@@ -598,8 +598,7 @@ mod test {
                             info_span!("span", component_id = &key, vrl_position = &line_number);
                         let _enter = span.enter();
                         info!(
-                            message =
-                                format!("Hello {key} on line_number {line_number}!").as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
                         );
                     }
                 }
@@ -659,8 +658,7 @@ mod test {
                 for key in &["foo", "bar"] {
                     for line_number in &[1, 2] {
                         info!(
-                            message =
-                                format!("Hello {key} on line_number {line_number}!").as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
                             component_id = &key,
                             vrl_position = &line_number
                         );

@@ -118,10 +118,9 @@ impl GelfDeserializer {
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if parsed.version != GELF_VERSION {
-            return Err(format!(
-                "{VERSION} does not match GELF spec version ({GELF_VERSION})"
-            )
-            .into());
+            return Err(
+                format!("{VERSION} does not match GELF spec version ({GELF_VERSION})").into(),
+            );
         }
 
         log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());

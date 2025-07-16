@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    io::Error,
-    path::PathBuf,
-    process::ExitStatus,
-};
+use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -480,9 +475,10 @@ async fn run_command(
 
     // Optionally include stderr
     if config.include_stderr {
-        let stderr = child.stderr.take().ok_or_else(|| {
-            Error::other("Unable to take stderr of spawned process")
-        })?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| Error::other("Unable to take stderr of spawned process"))?;
 
         // Create stderr async reader
         let stderr_reader = BufReader::new(stderr);

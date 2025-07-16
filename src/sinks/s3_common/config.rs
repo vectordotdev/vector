@@ -456,9 +456,7 @@ mod tests {
         ] {
             assert_eq!(name, to_string(storage_class));
             let result: S3StorageClass = serde_json::from_str(&format!("{name:?}"))
-                .unwrap_or_else(|error| {
-                    panic!("Unparsable storage class name {name:?}: {error}")
-                });
+                .unwrap_or_else(|error| panic!("Unparsable storage class name {name:?}: {error}"));
             assert_eq!(result, storage_class);
         }
     }

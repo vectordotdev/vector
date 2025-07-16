@@ -53,7 +53,8 @@ impl EnvsDir {
             Ok(json) => json,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => {
-                return Err(error).context(format!("Could not read state file {}", self.path.display()))
+                return Err(error)
+                    .context(format!("Could not read state file {}", self.path.display()))
             }
         };
         let state: State = serde_json::from_str(&json)

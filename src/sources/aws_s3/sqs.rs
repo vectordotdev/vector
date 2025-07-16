@@ -1124,9 +1124,8 @@ mod urlencoded_string {
                 percent_decode(s).decode_utf8().map(Into::into)
             };
 
-            decoded.map_err(|err| {
-                D::Error::custom(format!("error url decoding S3 object key: {err}"))
-            })
+            decoded
+                .map_err(|err| D::Error::custom(format!("error url decoding S3 object key: {err}")))
         })
     }
 

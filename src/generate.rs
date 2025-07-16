@@ -157,9 +157,7 @@ pub(crate) fn generate_example(
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    errs.push(format!(
-                        "failed to generate source '{source_type}': {err}"
-                    ));
+                    errs.push(format!("failed to generate source '{source_type}': {err}"));
                     Value::Table(Map::new())
                 }
             };

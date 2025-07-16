@@ -79,9 +79,8 @@ impl BuildConstants {
 
         for (name, desc, value) in self.values {
             let (const_type, const_val) = value.as_parts();
-            let full = format!(
-                "#[doc=r#\"{desc}\"#]\npub const {name}: {const_type} = {const_val};\n"
-            );
+            let full =
+                format!("#[doc=r#\"{desc}\"#]\npub const {name}: {const_type} = {const_val};\n");
             output_file.write_all(full.as_ref())?;
         }
 
@@ -201,9 +200,7 @@ fn main() {
         .map_err(|e| {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!(
-                    "Unable to determine git short hash from rev-parse command: {e}"
-                );
+                eprintln!("Unable to determine git short hash from rev-parse command: {e}");
             }
         })
         .expect("git hash detection failed");

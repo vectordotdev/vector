@@ -290,9 +290,7 @@ impl StringCollector {
 
     fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
         let r#type = prometheus_metric_type(value).as_str();
-        format!(
-            "# HELP {fullname} {name}\n# TYPE {fullname} {type}\n"
-        )
+        format!("# HELP {fullname} {name}\n# TYPE {fullname} {type}\n")
     }
 
     fn format_tag(key: &str, mut value: &str) -> String {

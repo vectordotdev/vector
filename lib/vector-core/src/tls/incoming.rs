@@ -374,9 +374,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
                     Poll::Ready(Err(error))
                 }
             },
-            StreamState::AcceptError(error) => {
-                Poll::Ready(Err(io::Error::other(error.clone())))
-            }
+            StreamState::AcceptError(error) => Poll::Ready(Err(io::Error::other(error.clone()))),
             StreamState::Closed => Poll::Ready(Ok(())),
         }
     }

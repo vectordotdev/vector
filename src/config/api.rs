@@ -95,9 +95,7 @@ impl Options {
             // Prefer non default address
             (Some(a), Some(b)) => {
                 match (Some(a) == default_address(), Some(b) == default_address()) {
-                    (false, false) => {
-                        return Err(format!("Conflicting `api` address: {a}, {b} ."))
-                    }
+                    (false, false) => return Err(format!("Conflicting `api` address: {a}, {b} .")),
                     (false, true) => Some(a),
                     (true, _) => Some(b),
                 }

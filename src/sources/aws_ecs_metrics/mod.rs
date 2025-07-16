@@ -600,9 +600,7 @@ mod test {
                     None => panic!("No tags for metric. {m:?}"),
                 }
             }
-            None => panic!(
-                "Could not find 'network_receive_bytes_total' in {metrics:?}."
-            ),
+            None => panic!("Could not find 'network_receive_bytes_total' in {metrics:?}."),
         }
     }
 }

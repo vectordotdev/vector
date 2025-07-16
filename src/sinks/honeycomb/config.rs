@@ -190,9 +190,6 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     } else {
         let body = String::from_utf8_lossy(&body[..]);
 
-        Err(format!(
-            "Server returned unexpected error status: {status} body: {body}"
-        )
-        .into())
+        Err(format!("Server returned unexpected error status: {status} body: {body}").into())
     }
 }

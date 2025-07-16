@@ -99,7 +99,11 @@ impl DatadogMetricOriginMetadata {
     /// initially contain all of the metadata fields, is in the `log_to_metric` transform.
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
-        Self { product, category, service }
+        Self {
+            product,
+            category,
+            service,
+        }
     }
 
     /// Returns a reference to the `OriginProduct`.

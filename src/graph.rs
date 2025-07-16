@@ -85,10 +85,7 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     if !attrs.contains_key("shape") {
         attrs.insert("shape".to_string(), default_shape.to_string());
     }
-    attrs
-        .iter()
-        .map(|(k, v)| format!("{k}=\"{v}\""))
-        .join(" ")
+    attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -147,8 +144,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"")
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
@@ -171,8 +167,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"")
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
