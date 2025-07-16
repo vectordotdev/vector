@@ -162,7 +162,7 @@ where
 
                 RetryAction::RetryPartial(rebuild_request_fn) => {
                     if self.remaining_attempts == 0 {
-                        error!(
+                        warn!(
                             message =
                                 "OK/retry response but retries exhausted; dropping the request.",
                             internal_log_rate_limit = true,
