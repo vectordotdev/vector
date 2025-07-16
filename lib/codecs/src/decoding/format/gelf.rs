@@ -119,8 +119,7 @@ impl GelfDeserializer {
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if parsed.version != GELF_VERSION {
             return Err(format!(
-                "{} does not match GELF spec version ({})",
-                VERSION, GELF_VERSION
+                "{VERSION} does not match GELF spec version ({GELF_VERSION})"
             )
             .into());
         }
@@ -166,16 +165,15 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field names must be prefixed with an underscore
                 if !key.starts_with('_') {
                     return Err(format!(
-                        "'{}' field is invalid. \
-                                       Additional field names must be prefixed with an underscore.",
-                        key
+                        "'{key}' field is invalid. \
+                                       Additional field names must be prefixed with an underscore."
                     )
                     .into());
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
                 if !VALID_FIELD_REGEX.is_match(key) {
-                    return Err(format!("'{}' field contains invalid characters. Field names may \
-                                       contain only letters, numbers, underscores, dashes and dots.", key).into());
+                    return Err(format!("'{key}' field contains invalid characters. Field names may \
+                                       contain only letters, numbers, underscores, dashes and dots.").into());
                 }
 
                 // per GELF spec, Additional field values must be either strings or numbers
@@ -191,8 +189,8 @@ impl GelfDeserializer {
                         serde_json::Value::Array(_) => "array",
                         serde_json::Value::Object(_) => "object",
                     };
-                    return Err(format!("The value type for field {} is an invalid type ({}). Additional field values \
-                                       should be either strings or numbers.", key, type_).into());
+                    return Err(format!("The value type for field {key} is an invalid type ({type_}). Additional field values \
+                                       should be either strings or numbers.").into());
                 }
             }
         }

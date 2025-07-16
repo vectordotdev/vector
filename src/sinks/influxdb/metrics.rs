@@ -219,7 +219,7 @@ fn create_build_request(
     token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
-    let auth = format!("Token {}", token);
+    let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(
             hyper::Request::post(uri.clone())
@@ -415,7 +415,7 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
             statistic
                 .quantiles
                 .iter()
-                .map(|&(p, val)| (format!("quantile_{:.2}", p).into(), Field::Float(val))),
+                .map(|&(p, val)| (format!("quantile_{p:.2}").into(), Field::Float(val))),
         )
         .collect(),
     )

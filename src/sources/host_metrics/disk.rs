@@ -106,8 +106,7 @@ mod tests {
             assert_eq!(
                 count_name(&metrics, name),
                 metrics.len() / 4,
-                "name={}",
-                name
+                "name={name}"
             );
         }
 

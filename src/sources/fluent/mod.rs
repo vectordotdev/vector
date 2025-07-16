@@ -460,13 +460,13 @@ pub enum DecodeError {
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeError::IO(err) => write!(f, "{}", err),
-            DecodeError::Decode(err) => write!(f, "{}", err),
+            DecodeError::IO(err) => write!(f, "{err}"),
+            DecodeError::Decode(err) => write!(f, "{err}"),
             DecodeError::UnknownCompression(compression) => {
-                write!(f, "unknown compression: {}", compression)
+                write!(f, "unknown compression: {compression}")
             }
             DecodeError::UnexpectedValue(value) => {
-                write!(f, "unexpected msgpack value, ignoring: {}", value)
+                write!(f, "unexpected msgpack value, ignoring: {value}")
             }
         }
     }

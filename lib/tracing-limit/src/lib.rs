@@ -386,7 +386,7 @@ impl Visit for RateLimitedSpanKeys {
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        self.record(field, format!("{:?}", value).into());
+        self.record(field, format!("{value:?}").into());
     }
 }
 
@@ -434,7 +434,7 @@ impl Visit for MessageVisitor {
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if self.message.is_none() && field.name() == MESSAGE_FIELD {
-            self.message = Some(format!("{:?}", value));
+            self.message = Some(format!("{value:?}"));
         }
     }
 }
@@ -599,7 +599,7 @@ mod test {
                         let _enter = span.enter();
                         info!(
                             message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                                format!("Hello {key} on line_number {line_number}!").as_str(),
                         );
                     }
                 }
@@ -660,7 +660,7 @@ mod test {
                     for line_number in &[1, 2] {
                         info!(
                             message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                                format!("Hello {key} on line_number {line_number}!").as_str(),
                             component_id = &key,
                             vrl_position = &line_number
                         );

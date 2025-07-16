@@ -20,7 +20,7 @@ impl TrackedEnv {
 
     pub fn emit_rerun_stanzas(&self) {
         for env_var in &self.tracked {
-            println!("cargo:rerun-if-env-changed={}", env_var);
+            println!("cargo:rerun-if-env-changed={env_var}");
         }
     }
 }
@@ -33,9 +33,9 @@ enum ConstantValue {
 impl ConstantValue {
     pub fn as_parts(&self) -> (&'static str, String) {
         match &self {
-            ConstantValue::Required(value) => ("&str", format!("\"{}\"", value)),
+            ConstantValue::Required(value) => ("&str", format!("\"{value}\"")),
             ConstantValue::Optional(value) => match value {
-                Some(value) => ("Option<&str>", format!("Some(\"{}\")", value)),
+                Some(value) => ("Option<&str>", format!("Some(\"{value}\")")),
                 None => ("Option<&str>", "None".to_string()),
             },
         }
@@ -80,8 +80,7 @@ impl BuildConstants {
         for (name, desc, value) in self.values {
             let (const_type, const_val) = value.as_parts();
             let full = format!(
-                "#[doc=r#\"{}\"#]\npub const {}: {} = {};\n",
-                desc, name, const_type, const_val
+                "#[doc=r#\"{desc}\"#]\npub const {name}: {const_type} = {const_val};\n"
             );
             output_file.write_all(full.as_ref())?;
         }
@@ -203,8 +202,7 @@ fn main() {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!(
-                    "Unable to determine git short hash from rev-parse command: {}",
-                    e
+                    "Unable to determine git short hash from rev-parse command: {e}"
                 );
             }
         })

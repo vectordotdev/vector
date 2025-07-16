@@ -255,7 +255,7 @@ impl Lua {
             let current_paths = package
                 .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths)?;
         }
 
@@ -1002,7 +1002,7 @@ mod tests {
             |tx, out| async move {
                 let n: usize = 10;
                 let events =
-                    (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
+                    (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
                 for event in events {
                     tx.send(event).await.unwrap();
                     assert!(out.lock().await.recv().await.is_some());

@@ -260,7 +260,7 @@ where
         {
             if let Some(caps) = PERCENT_REGEX.captures(value) {
                 caps[1].parse::<usize>().map_err(|err| {
-                    Error::custom(format!("could not parse percent value into usize: {}", err))
+                    Error::custom(format!("could not parse percent value into usize: {err}"))
                 })
             } else {
                 Err(de::Error::invalid_value(

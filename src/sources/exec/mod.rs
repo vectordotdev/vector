@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{Error, ErrorKind},
+    io::Error,
     path::PathBuf,
     process::ExitStatus,
 };
@@ -481,7 +481,7 @@ async fn run_command(
     // Optionally include stderr
     if config.include_stderr {
         let stderr = child.stderr.take().ok_or_else(|| {
-            Error::new(ErrorKind::Other, "Unable to take stderr of spawned process")
+            Error::other("Unable to take stderr of spawned process")
         })?;
 
         // Create stderr async reader
@@ -493,7 +493,7 @@ async fn run_command(
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
+        .ok_or_else(|| Error::other("Unable to take stdout of spawned process"))?;
 
     // Create stdout async reader
     let stdout_reader = BufReader::new(stdout);

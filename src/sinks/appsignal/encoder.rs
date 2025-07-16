@@ -29,8 +29,7 @@ impl Encoder<Vec<Event>> for AppsignalEncoder {
                 Event::Log(log) => json!({ "log": log }),
                 Event::Metric(metric) => json!({ "metric": metric }),
                 _ => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
+                    return Err(std::io::Error::other(
                         format!(
                             "The AppSignal sink does not support this type of event: {event:?}"
                         ),

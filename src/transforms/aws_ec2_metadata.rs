@@ -510,8 +510,7 @@ impl MetadataClient {
 
                     if self.fields.contains(SUBNET_ID_KEY) {
                         let subnet_path = format!(
-                            "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                            mac
+                            "/latest/meta-data/network/interfaces/macs/{mac}/subnet-id"
                         );
 
                         let subnet_path = subnet_path.parse().context(ParsePathSnafu {
@@ -525,7 +524,7 @@ impl MetadataClient {
 
                     if self.fields.contains(VPC_ID_KEY) {
                         let vpc_path =
-                            format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+                            format!("/latest/meta-data/network/interfaces/macs/{mac}/vpc-id");
 
                         let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
@@ -562,7 +561,7 @@ impl MetadataClient {
             }
 
             for tag in self.tags.clone() {
-                let tag_path = format!("/latest/meta-data/tags/instance/{}", tag);
+                let tag_path = format!("/latest/meta-data/tags/instance/{tag}");
 
                 let tag_path = tag_path.parse().context(ParsePathSnafu {
                     value: tag_path.clone(),

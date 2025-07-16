@@ -87,7 +87,7 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     }
     attrs
         .iter()
-        .map(|(k, v)| format!("{}=\"{}\"", k, v))
+        .map(|(k, v)| format!("{k}=\"{v}\""))
         .join(" ")
 }
 
@@ -103,7 +103,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errs) => {
             #[allow(clippy::print_stderr)]
             for err in errs {
-                eprintln!("{}", err);
+                eprintln!("{err}");
             }
             return exitcode::CONFIG;
         }
@@ -147,7 +147,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                writeln!(dot, "  \"{input}\" -> \"{id}\"")
                     .expect("write to String never fails");
             }
         }
@@ -171,7 +171,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                writeln!(dot, "  \"{input}\" -> \"{id}\"")
                     .expect("write to String never fails");
             }
         }
@@ -181,7 +181,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", dot);
+        println!("{dot}");
     }
 
     exitcode::OK
@@ -223,7 +223,7 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", mermaid);
+        println!("{mermaid}");
     }
 
     exitcode::OK

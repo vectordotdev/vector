@@ -372,7 +372,7 @@ mod tests {
             .and(path("/services/collector/event"))
             .and(header(
                 "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
+                format!("Splunk {TOKEN}").as_str(),
             ))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
@@ -387,7 +387,7 @@ mod tests {
             .and(path("/services/collector/ack"))
             .and(header(
                 "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
+                format!("Splunk {TOKEN}").as_str(),
             ))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(ack_response)
@@ -530,7 +530,7 @@ mod tests {
             .and(path("/services/collector/event"))
             .and(header(
                 "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
+                format!("Splunk {TOKEN}").as_str(),
             ))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {

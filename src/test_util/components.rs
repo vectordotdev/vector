@@ -195,7 +195,7 @@ impl ComponentTester {
             event_test_util::debug_print_events();
             metrics.sort_by(|a, b| a.name().cmp(b.name()));
             for metric in &metrics {
-                println!("{}", metric);
+                println!("{metric}");
             }
         }
 
@@ -235,8 +235,7 @@ impl ComponentTester {
                 let partial = partial_matches.join("");
 
                 self.errors.push(format!(
-                    "  - Missing metric `{}{}`{}",
-                    name, tag_suffix, partial
+                    "  - Missing metric `{name}{tag_suffix}`{partial}"
                 ));
             }
         }
@@ -245,7 +244,7 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if let Err(err_msg) = event_test_util::contains_name_once(name) {
-                self.errors.push(format!("  - {}", err_msg));
+                self.errors.push(format!("  - {err_msg}"));
             }
         }
     }

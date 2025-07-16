@@ -291,8 +291,7 @@ mod tests {
         assert_eq!(
             d.decode_to_utf8(Bytes::from(problematic_input)),
             Bytes::from(format!(
-                "{}{}123",
-                REPLACEMENT_CHARACTER, REPLACEMENT_CHARACTER
+                "{REPLACEMENT_CHARACTER}{REPLACEMENT_CHARACTER}123"
             ))
         );
     }

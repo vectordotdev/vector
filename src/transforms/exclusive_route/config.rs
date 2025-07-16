@@ -112,8 +112,7 @@ impl TransformConfig for ExclusiveRouteConfig {
 
         if !duplicates.is_empty() {
             errors.push(format!(
-                "Found routes with duplicate names: {:?}",
-                duplicates
+                "Found routes with duplicate names: {duplicates:?}"
             ));
         }
 

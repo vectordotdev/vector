@@ -235,7 +235,7 @@ async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto
         let (rx, trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+        let config = format!("endpoint = \"http://{addr}/write\"\n{config}");
         let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
         let cx = SinkContext::default();
 

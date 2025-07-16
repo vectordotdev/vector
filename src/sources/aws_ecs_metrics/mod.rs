@@ -572,7 +572,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = AwsEcsMetricsSourceConfig {
-            endpoint: format!("http://{}", in_addr),
+            endpoint: format!("http://{in_addr}"),
             version: Version::V4,
             scrape_interval_secs: Duration::from_secs(1),
             namespace: default_namespace(),
@@ -597,12 +597,11 @@ mod test {
 
                 match m.tags() {
                     Some(tags) => assert_eq!(tags.get("device"), Some("eth1")),
-                    None => panic!("No tags for metric. {:?}", m),
+                    None => panic!("No tags for metric. {m:?}"),
                 }
             }
             None => panic!(
-                "Could not find 'network_receive_bytes_total' in {:?}.",
-                metrics
+                "Could not find 'network_receive_bytes_total' in {metrics:?}."
             ),
         }
     }

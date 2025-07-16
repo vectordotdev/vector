@@ -212,9 +212,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     let max_level = compression.max_compression_level_val();
                     if level > max_level {
                         let msg = std::format!(
-                            "invalid value `{}`, expected value in range [0, {}]",
-                            level,
-                            max_level
+                            "invalid value `{level}`, expected value in range [0, {max_level}]"
                         );
                         return Err(de::Error::custom(msg));
                     }
@@ -455,8 +453,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
                     de::Error::custom(format!(
-                        "unsigned integer could not be converted to u32: {}",
-                        err
+                        "unsigned integer could not be converted to u32: {err}"
                     ))
                 })
             }
@@ -466,7 +463,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                 E: de::Error,
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
-                    de::Error::custom(format!("integer could not be converted to u32: {}", err))
+                    de::Error::custom(format!("integer could not be converted to u32: {err}"))
                 })
             }
         }

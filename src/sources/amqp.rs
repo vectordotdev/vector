@@ -512,7 +512,7 @@ pub mod test {
         let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
         config.connection.connection_string =
-            format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+            format!("amqp://{user}:{pass}@{host}:5672/{vhost}");
 
         config
     }
@@ -529,7 +529,7 @@ pub mod test {
         let ca_file =
             std::env::var("AMQP_CA_FILE").unwrap_or_else(|_| "/certs/ca.cert.pem".to_string());
         config.connection.connection_string =
-            format!("amqps://{}:{}@{}/{}", user, pass, host, vhost);
+            format!("amqps://{user}:{pass}@{host}/{vhost}");
         let tls = TlsConfig {
             ca_file: Some(ca_file.as_str().into()),
             ..Default::default()

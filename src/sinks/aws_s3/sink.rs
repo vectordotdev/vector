@@ -116,9 +116,9 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
 fn format_s3_key(s3_key: &str, filename: &str, extension: &str) -> String {
     if extension.is_empty() {
-        format!("{}{}", s3_key, filename)
+        format!("{s3_key}{filename}")
     } else {
-        format!("{}{}.{}", s3_key, filename, extension)
+        format!("{s3_key}{filename}.{extension}")
     }
 }
 

@@ -18,8 +18,7 @@ impl EsResultResponse {
     fn parse(body: &str) -> Result<Self, String> {
         serde_json::from_str::<EsResultResponse>(body).map_err(|json_error| {
             format!(
-                "some messages failed, could not parse response, error: {}",
-                json_error
+                "some messages failed, could not parse response, error: {json_error}"
             )
         })
     }
@@ -45,7 +44,7 @@ impl EsResultResponse {
             .find_map(|item| item.result().error.as_ref())
         {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
-            None => format!("error response: {}", body),
+            None => format!("error response: {body}"),
         }
     }
 }
@@ -115,7 +114,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
             ),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
-                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body).into())
+                RetryAction::DontRetry(format!("client-side error, {status}: {body}").into())
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
@@ -139,7 +138,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             status, error.err_type, error.reason
                                         )
                                     } else {
-                                        format!("partial error, status: {}", status)
+                                        format!("partial error, status: {status}")
                                     };
                                     return RetryAction::Retry(msg.into());
                                 }
@@ -153,7 +152,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                     RetryAction::Successful
                 }
             }
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
