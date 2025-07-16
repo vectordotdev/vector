@@ -1,5 +1,7 @@
 use std::{collections::HashMap, future::ready, pin::Pin, time::Duration};
 
+use serde_with::serde_as;
+
 use futures::{Stream, StreamExt};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
@@ -13,6 +15,7 @@ use crate::{
 };
 
 /// Configuration for the `incremental_to_absolute` transform.
+#[serde_as]
 #[configurable_component(transform(
     "incremental_to_absolute",
     "Convert incremental metrics to absolute."
@@ -23,9 +26,14 @@ pub struct IncrementalToAbsoluteConfig {
     /// The amount of time, in seconds, that incremental metrics will persist in the internal
     /// metrics cache after having not been updated before they expire and are removed.
     /// Once removed, incremental counters are reset to 0.
-    #[serde(skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(metadata(docs::common = false, docs::required = true, docs::examples = "120"))]
-    pub expire_metrics_secs: u64,
+    #[serde(default = "default_expire_metrics_secs")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::examples = "240"))]
+    pub expire_metrics_secs: Duration,
+}
+
+pub const fn default_expire_metrics_secs() -> Duration {
+    Duration::from_secs(120)
 }
 
 impl_generate_config_from_default!(IncrementalToAbsoluteConfig);
@@ -58,9 +66,7 @@ pub struct IncrementalToAbsolute {
 impl IncrementalToAbsolute {
     pub fn new(config: &IncrementalToAbsoluteConfig) -> crate::Result<Self> {
         Ok(Self {
-            data: MetricSet::with_ttl_policy(TtlPolicy::new(Duration::from_secs(
-                config.expire_metrics_secs,
-            ))),
+            data: MetricSet::with_ttl_policy(TtlPolicy::new(config.expire_metrics_secs)),
         })
     }
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {

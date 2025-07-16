@@ -40,7 +40,7 @@ components: transforms: incremental_to_absolute: {
 	}
 
 	output: {
-		logs: "": {
+		metrics: "": {
 			description: "The modified input `metric` event."
 		}
 	}
