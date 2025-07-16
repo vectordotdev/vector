@@ -389,6 +389,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: cargo install --force --locked --version 0.13.1 wasm-pack
       - run: |
           cd lib/vector-vrl/web-playground/
           ~/.cargo/bin/rustup target add wasm32-unknown-unknown
