@@ -53,11 +53,11 @@ impl EnvsDir {
             Ok(json) => json,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => {
-                return Err(error).context(format!("Could not read state file {:?}", self.path))
+                return Err(error).context(format!("Could not read state file {}", self.path.display()))
             }
         };
         let state: State = serde_json::from_str(&json)
-            .with_context(|| format!("Could not parse state file {:?}", self.path))?;
+            .with_context(|| format!("Could not parse state file {}", self.path.display()))?;
         Ok(Some(state))
     }
 
@@ -69,18 +69,18 @@ impl EnvsDir {
         let path = &*DATA_DIR;
         if !path.is_dir() {
             fs::create_dir_all(path)
-                .with_context(|| format!("failed to create directory {path:?}"))?;
+                .with_context(|| format!("failed to create directory {}", path.display()))?;
         }
 
         let config = serde_json::to_string(&config)?;
         fs::write(&self.path, config)
-            .with_context(|| format!("failed to write file {:?}", self.path))
+            .with_context(|| format!("failed to write file {}", self.path.display()))
     }
 
     pub fn remove(&self) -> Result<()> {
         if util::exists(&self.path)? {
             fs::remove_file(&self.path)
-                .with_context(|| format!("failed to remove {:?}", self.path))?;
+                .with_context(|| format!("failed to remove {}", self.path.display()))?;
         }
 
         Ok(())

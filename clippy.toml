@@ -1,4 +1,5 @@
 cognitive-complexity-threshold = 75
+large-error-threshold = 256  # in bytes
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method

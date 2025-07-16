@@ -202,7 +202,7 @@ pub struct CompiledParam {
 
 #[derive(Clone)]
 pub enum CompiledQueryParameterValue {
-    SingleParam(CompiledParam),
+    SingleParam(Box<CompiledParam>),
     MultiParams(Vec<CompiledParam>),
 }
 
@@ -279,7 +279,7 @@ impl Query {
     ) -> CompiledQueryParameterValue {
         match value {
             QueryParameterValue::SingleParam(param) => {
-                CompiledQueryParameterValue::SingleParam(Self::compile_value(param, functions))
+                CompiledQueryParameterValue::SingleParam(Box::new(Self::compile_value(param, functions)))
             }
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params

@@ -82,13 +82,15 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
                     .with_timezone(&offset)
                     .format(self.filename_time_format.as_str()),
                 None => Utc::now()
-                    .with_timezone(&chrono::Utc)
+                    .with_timezone(&Utc)
                     .format(self.filename_time_format.as_str()),
             };
 
-            self.filename_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
-                .unwrap_or_else(|| formatted_ts.to_string())
+            if self.filename_append_uuid {
+                format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+            } else {
+                formatted_ts.to_string()
+            }
         };
 
         let ssekms_key_id = s3metadata.partition_key.ssekms_key_id.clone();

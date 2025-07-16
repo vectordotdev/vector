@@ -507,6 +507,7 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 enum StatsPayload {

@@ -468,6 +468,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.

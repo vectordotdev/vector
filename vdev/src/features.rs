@@ -65,7 +65,7 @@ struct Component {
 
 pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
     let config =
-        fs::read_to_string(filename).with_context(|| format!("failed to read {filename:?}"))?;
+        fs::read_to_string(filename).with_context(|| format!("failed to read {}", filename.display()))?;
 
     let config: VectorConfig = match filename
         .extension()
