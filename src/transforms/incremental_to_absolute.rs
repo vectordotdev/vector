@@ -31,7 +31,7 @@ pub struct IncrementalToAbsoluteConfig {
 impl_generate_config_from_default!(IncrementalToAbsoluteConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "aggregate")]
+#[typetag::serde(name = "incremental_to_absolute")]
 impl TransformConfig for IncrementalToAbsoluteConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         IncrementalToAbsolute::new(self).map(Transform::event_task)
