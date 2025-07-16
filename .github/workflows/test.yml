@@ -91,6 +91,7 @@ jobs:
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
       - run: sudo bash ./scripts/environment/install-protoc.sh
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-clippy
         env:
           VDEV: vdev
@@ -119,6 +120,7 @@ jobs:
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make test
         env:
           VDEV: vdev
@@ -308,6 +310,7 @@ jobs:
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
       - run: sudo bash ./scripts/environment/install-protoc.sh
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-component-docs
         env:
           VDEV: vdev
