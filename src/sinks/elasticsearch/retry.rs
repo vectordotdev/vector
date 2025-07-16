@@ -109,7 +109,7 @@ impl RetryPartialFunction for EsRetryClosure {
             }
             Err(request) => {
                 //leave it unmodified
-                Box::new(request)
+                request
             }
         }
     }
