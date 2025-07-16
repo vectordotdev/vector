@@ -118,6 +118,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: make test
         env:
           VDEV: vdev
@@ -145,6 +146,7 @@ jobs:
           name: vdev
           path: /usr/local/bin/
       - run: chmod +x /usr/local/bin/vdev
+      - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: make test-component-validation
         env:
           VDEV: vdev
