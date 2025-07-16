@@ -1,9 +1,6 @@
 use std::{
     future,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{Arc, Mutex as StdMutex},
 };
 
 use redis::{
@@ -11,7 +8,7 @@ use redis::{
     sentinel::{Sentinel, SentinelNodeConnectionInfo},
     RedisResult,
 };
-use tokio::sync::RwLock;
+use tokio::sync::Mutex as TokioMutex;
 
 use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
@@ -26,15 +23,15 @@ use super::{
 pub(super) enum RedisConnection {
     Direct(ConnectionManager),
     Sentinel {
-        // Tokio's RwLock was used instead of std since we need to hold it
+        // Tokio's Mutex was used instead of std since we need to hold it
         // across await points in [`Self::get_connection_manager`]
-        sentinel: Arc<RwLock<Sentinel>>,
+        sentinel: Arc<TokioMutex<Sentinel>>,
         service_name: String,
         node_connection_info: SentinelNodeConnectionInfo,
-        last_conn: Arc<RwLock<ConnectionManager>>,
+        connection_manager: Arc<TokioMutex<ConnectionManager>>,
         // Flag needed as we cannot call async methods to fix the redis
-        // connection with sentinel from the sync `RetryLogic::is_retriable_error`.
-        needs_fix: Arc<AtomicBool>,
+        // connection from sentinel with the sync `RetryLogic::on_retriable_error`.
+        needs_fix: Arc<StdMutex<bool>>,
     },
 }
 
@@ -67,11 +64,11 @@ impl RedisConnection {
         .await?;
 
         Ok(Self::Sentinel {
-            sentinel: Arc::new(RwLock::new(sentinel)),
+            sentinel: Arc::new(TokioMutex::new(sentinel)),
             service_name,
             node_connection_info,
-            last_conn: Arc::new(RwLock::new(conn)),
-            needs_fix: Arc::new(AtomicBool::new(false)),
+            connection_manager: Arc::new(TokioMutex::new(conn)),
+            needs_fix: Arc::new(StdMutex::new(false)),
         })
     }
 
@@ -82,33 +79,48 @@ impl RedisConnection {
                 sentinel,
                 service_name,
                 node_connection_info,
-                last_conn,
+                connection_manager,
                 needs_fix,
             } => {
-                // Get fix flag and reset to false, return early if no fix is needed
-                if !needs_fix.swap(false, Ordering::SeqCst) {
-                    return Ok(last_conn.read().await.clone());
+                // We need this in both branches
+                let mut conn_mngr = connection_manager.lock().await;
+
+                // Scope needed since Rust compiler cannot understand the explicitly dropped
+                // MutexGuard isn't held anymore
+                // See: https://github.com/rust-lang/rust/issues/128095
+                {
+                    // SAFETY: if another thread panicked while holding this, we should panic too
+                    let needs_fix = needs_fix.lock().unwrap();
+
+                    if !*needs_fix {
+                        return Ok(conn_mngr.clone());
+                    }
                 }
 
-                let mut sentinel = sentinel.write().await;
-                let mngr = Self::sentinel_connection_manager(
+                let mut sentinel = sentinel.lock().await;
+
+                let new_conn_mngr = Self::sentinel_connection_manager(
                     &mut sentinel,
                     service_name.as_str(),
                     node_connection_info,
                 )
                 .await?;
 
-                let mut last_conn = last_conn.write().await;
-                *last_conn = mngr.clone();
+                *conn_mngr = new_conn_mngr.clone();
 
-                Ok(mngr)
+                // Have to reacquire since we needed to do a few awaits
+                // SAFETY: if another thread panicked while holding this, we should panic too
+                let mut needs_fix = needs_fix.lock().unwrap();
+                *needs_fix = false;
+                Ok(new_conn_mngr)
             }
         }
     }
 
     pub(super) fn signal_needs_fix(&self) {
         if let Self::Sentinel { needs_fix, .. } = self {
-            needs_fix.store(true, Ordering::SeqCst);
+            // SAFETY: if another thread panicked while holding this, we should panic too
+            *needs_fix.lock().unwrap() = true;
         }
     }
 }
@@ -180,7 +192,7 @@ impl RedisSink {
             .settings(
                 request,
                 RedisRetryLogic {
-                    conn: self.conn.clone(),
+                    connection: self.conn.clone(),
                 },
             )
             .service(service);
@@ -209,27 +221,27 @@ impl StreamSink<Event> for RedisSink {
 
 #[derive(Clone)]
 pub(super) struct RedisRetryLogic {
-    conn: RedisConnection,
+    connection: RedisConnection,
 }
 
 impl RetryLogic for RedisRetryLogic {
     type Error = RedisSinkError;
     type Response = RedisResponse;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RedisSinkError::SendError { source }
-                if matches!(
-                    source.kind(),
-                    redis::ErrorKind::MasterDown
-                        | redis::ErrorKind::ReadOnly
-                        | redis::ErrorKind::IoError
-                ) =>
-            {
-                self.conn.signal_needs_fix();
-                true
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn on_retriable_error(&self, error: &Self::Error) {
+        if let RedisSinkError::SendError { source } = error {
+            if matches!(
+                source.kind(),
+                redis::ErrorKind::MasterDown
+                    | redis::ErrorKind::ReadOnly
+                    | redis::ErrorKind::IoError
+            ) {
+                self.connection.signal_needs_fix();
             }
-            _ => true,
         }
     }
 

@@ -220,11 +220,11 @@ impl RedisSinkConfig {
 pub struct SentinelConnectionSettings {
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) tls: TlsSettings,
+    pub tls: MaybeTlsMode,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) connections: Option<RedisConnectionSettings>,
+    pub connections: Option<RedisConnectionSettings>,
 }
 
 impl From<SentinelConnectionSettings> for SentinelNodeConnectionInfo {
@@ -241,7 +241,7 @@ impl From<SentinelConnectionSettings> for SentinelNodeConnectionInfo {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum TlsSettings {
+pub enum MaybeTlsMode {
     /// Don't use TLS.
     ///
     /// This is the default.
@@ -255,12 +255,12 @@ pub enum TlsSettings {
     Insecure,
 }
 
-impl From<TlsSettings> for Option<TlsMode> {
-    fn from(value: TlsSettings) -> Self {
+impl From<MaybeTlsMode> for Option<TlsMode> {
+    fn from(value: MaybeTlsMode) -> Self {
         match value {
-            TlsSettings::None => None,
-            TlsSettings::Secure => Some(TlsMode::Secure),
-            TlsSettings::Insecure => Some(TlsMode::Insecure),
+            MaybeTlsMode::None => None,
+            MaybeTlsMode::Secure => Some(TlsMode::Secure),
+            MaybeTlsMode::Insecure => Some(TlsMode::Insecure),
         }
     }
 }
@@ -272,16 +272,16 @@ impl From<TlsSettings> for Option<TlsMode> {
 #[derivative(Default)]
 pub struct RedisConnectionSettings {
     /// The database number to use. Usually `0`.
-    pub(super) db: i64,
+    pub db: i64,
 
     /// Optionally, the username to connection with.
-    pub(super) username: Option<String>,
+    pub username: Option<String>,
 
     /// Optionally, the password to connection with.
-    pub(super) password: Option<String>,
+    pub password: Option<String>,
 
     /// The version of RESP to use.
-    pub(super) protocol: RedisProtocolVersion,
+    pub protocol: RedisProtocolVersion,
 }
 
 impl From<RedisConnectionSettings> for RedisConnectionInfo {
