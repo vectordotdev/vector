@@ -618,6 +618,7 @@ mod tests {
     use vector_lib::config::LogNamespace;
     use vector_lib::lookup::{metadata_path, PathPrefix};
     use vector_lib::metric_tags;
+    use vrl::event_path;
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
@@ -976,10 +977,7 @@ mod tests {
 
         let template = UnsignedIntTemplate::try_from("%Y%m%d%H").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts,
-        );
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
 
         let tz: Tz = "Asia/Singapore".parse().unwrap();
         let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
@@ -1017,10 +1015,7 @@ mod tests {
         let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
-            ts,
-        );
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
 
         assert_eq!(
             Err(TemplateRenderingError::NotNumeric {
