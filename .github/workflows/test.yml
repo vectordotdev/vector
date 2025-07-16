@@ -121,7 +121,6 @@ jobs:
       - run: chmod +x /usr/local/bin/vdev
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make test
         env:
           VDEV: vdev
