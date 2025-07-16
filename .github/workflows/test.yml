@@ -398,7 +398,7 @@ jobs:
       - run: cargo install --force --locked --version 0.13.1 wasm-pack
       - run: |
           cd lib/vector-vrl/web-playground/
-          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+          rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
         env:
           VDEV: vdev
