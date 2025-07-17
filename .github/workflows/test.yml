@@ -187,35 +187,3 @@ jobs:
           cd lib/vector-vrl/web-playground/
           rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
-
-  all-checks:
-    name: Test Suite
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    if: always()
-    needs:
-      - changes
-      - check-fmt
-      - check-clippy
-      - test
-      - test-component-validation
-      - check-version
-      - check-scripts
-      - check-events
-      - check-licenses
-      - check-docs
-      - check-markdown
-      - check-component-docs
-      - check-rust-docs
-      - test-vrl
-      - build-vrl-playground
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
-    steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
-            exit 1
-          else
-            exit 0
-          fi
