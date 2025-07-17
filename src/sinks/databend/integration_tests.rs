@@ -92,9 +92,8 @@ async fn prepare_config(
 }
 
 async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
-    let create_table_sql = format!(
-        "create table `{table}` (host String, timestamp String, message String)"
-    );
+    let create_table_sql =
+        format!("create table `{table}` (host String, timestamp String, message String)");
     client.query_all(&create_table_sql).await.unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();

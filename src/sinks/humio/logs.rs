@@ -499,9 +499,7 @@ mod integration_tests {
                 return logs[0].clone();
             }
         }
-        panic!(
-            "did not find event in Humio repository {repository_name} with message {message}"
-        );
+        panic!("did not find event in Humio repository {repository_name} with message {message}");
     }
 
     #[derive(Debug)]

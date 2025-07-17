@@ -42,9 +42,7 @@ type FakeIntakeResponseJson = FakeIntakeResponse<FakeIntakePayloadJson>;
 
 impl FakeIntakeResponseT for FakeIntakeResponseJson {
     fn build_url(base: &str, endpoint: &str) -> String {
-        format!(
-            "{base}/fakeintake/payloads?endpoint={endpoint}&format=json",
-        )
+        format!("{base}/fakeintake/payloads?endpoint={endpoint}&format=json",)
     }
 }
 

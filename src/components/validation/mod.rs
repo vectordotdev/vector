@@ -368,9 +368,9 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                     );
                 }
             }
-            Err(e) => panic!(
-                "Failed to complete validation run for component '{component_name}': {e}"
-            ),
+            Err(e) => {
+                panic!("Failed to complete validation run for component '{component_name}': {e}")
+            }
         }
     });
 }

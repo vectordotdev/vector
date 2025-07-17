@@ -1711,10 +1711,7 @@ mod integration_test {
                     event.as_log()[log_schema().message_key().unwrap().to_string()],
                     format!("{TEXT} {i:03}").into()
                 );
-                assert_eq!(
-                    event.as_log()["message_key"],
-                    format!("{KEY} {i}").into()
-                );
+                assert_eq!(event.as_log()["message_key"], format!("{KEY} {i}").into());
                 assert_eq!(
                     event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                     "kafka".into()

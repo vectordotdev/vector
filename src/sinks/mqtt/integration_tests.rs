@@ -9,12 +9,10 @@ use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 
 fn mqtt_broker_address() -> String {
-    
     std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into())
 }
 
 fn mqtt_broker_port() -> u16 {
-    
     std::env::var("MQTT_BROKER_PORT")
         .unwrap_or_else(|_| "1883".into())
         .parse::<u16>()

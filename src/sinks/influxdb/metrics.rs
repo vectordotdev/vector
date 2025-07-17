@@ -1037,8 +1037,7 @@ mod integration_tests {
                 _ => unreachable!(),
             };
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
-            let res =
-                query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
+            let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
             assert_eq!(
                 res,
