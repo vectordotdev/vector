@@ -176,7 +176,7 @@ div#output-section {
   border-bottom: 1px solid var(--datadog-gray-light);
 }
 
-/*  BUTTONS */
+/* BUTTONS */
 .btn {
   display: inline-block;
   outline: 0;
@@ -372,4 +372,51 @@ div#output-section {
   #description-cell p {
     font-size: 11px;
   }
+}
+
+#toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timezone-container {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+#timezone-label {
+  margin-right: 8px;
+  font-weight: bold;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+  Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+}
+
+#timezone-input {
+  padding: 0px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border-width: 1px;
+  border-style: solid;
+  font-size: 14px;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+  Cantarell, "Helvetica Neue", sans-serif;
+  line-height: 1.5;
+  color: #212529;
+  height: 36px;
+  box-sizing: border-box;
+}
+
+#output-cell-title .cell-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#elapsed-time {
+  font-weight: normal;
+  font-size: 12px;
 }
