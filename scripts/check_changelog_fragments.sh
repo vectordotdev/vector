@@ -21,7 +21,7 @@ FRAGMENTS=$(git diff --name-only --diff-filter=A --merge-base origin/master ${CH
 
 if [ -z "$FRAGMENTS" ]; then
   echo "No changelog fragments detected"
-  echo "If no changes  necessitate user-facing explanations, add the GH label 'no-changelog'"
+  echo "If no changes necessitate user-facing explanations, add the GH label 'no-changelog'"
   echo "Otherwise, add changelog fragments to changelog.d/"
   echo "For details, see 'changelog.d/README.md'"
   exit 1

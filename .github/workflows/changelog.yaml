@@ -18,6 +18,10 @@ on:
 
 jobs:
   validate-changelog:
+    permissions:
+      contents: read
+      pull-requests: none
+
     runs-on: ubuntu-24.04
 
     env:
@@ -34,6 +38,16 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Checkout trusted changelog script
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: master
+          path: base
+          sparse-checkout: scripts/check_changelog_fragments.sh
+          sparse-checkout-cone-mode: false
+          clean: false
+
       - name: Bypass when no‑changelog label is present
         if: env.PR_HAS_LABEL == 'true'
         run: |
@@ -48,4 +62,4 @@ jobs:
 
       - name: Run changelog fragment checker
         if: ${{ env.PR_HAS_LABEL == 'false' && github.event_name != 'merge_group' }}
-        run: ./scripts/check_changelog_fragments.sh
+        run: ./base/scripts/check_changelog_fragments.sh
