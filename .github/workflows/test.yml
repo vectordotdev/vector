@@ -133,8 +133,7 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: ruby/setup-ruby@v1
-      - run: gem install mdl
+      - run: sudo npm -g install markdownlint-cli@0.30
       - run: make check-markdown
 
   check-component-docs:
