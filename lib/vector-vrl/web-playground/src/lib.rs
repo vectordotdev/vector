@@ -102,7 +102,7 @@ fn compile(
             Err(_) => {
                 // Returns error message if tz parsing has failed.
                 // This avoids head scratching, instead of it silently using the default timezone.
-                let error_message = format!("Invalid timezone identifier: '{}'", other);
+                let error_message = format!("Invalid timezone identifier: '{other}'");
                 return Err(VrlDiagnosticResult {
                     list: vec![error_message.clone()],
                     msg: error_message.clone(),
