@@ -34,6 +34,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-fmt
 
   check-clippy:
@@ -43,17 +45,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-clippy
@@ -65,17 +58,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: make test
@@ -88,17 +72,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
       - run: make test-component-validation
@@ -110,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # fetch everything
+          fetch-depth: 0
       - run: make check-version
 
   check-scripts:
@@ -128,17 +103,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-events
 
   check-licenses:
@@ -148,17 +114,6 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - run: cargo install dd-rust-license-tool --version 1.0.2 --force --locked
       - run: make check-licenses
 
@@ -169,17 +124,6 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - run: make check-docs
 
   check-markdown:
@@ -200,17 +144,6 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
@@ -223,17 +156,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cd rust-doc && make docs
 
   test-vrl:
@@ -243,17 +167,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: cargo install --force --locked --version 0.13.1 wasm-pack
       - run: make test-vrl
@@ -265,17 +180,8 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install --force --locked --version 0.13.1 wasm-pack
       - run: |
           cd lib/vector-vrl/web-playground/
