@@ -14,7 +14,7 @@ impl Cli {
         println!("Container tool:  {:?}", CONTAINER_TOOL.display());
         println!("Data path:       {:?}", platform::data_dir().display());
         println!("Repository:      {:?}", app::path());
-        println!("Shell:           {:?}", app::SHELL.display());
+        println!("Shell:           {}", app::SHELL.display());
 
         println!("\nConfig:");
         match config::path() {
