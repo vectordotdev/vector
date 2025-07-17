@@ -1,6 +1,6 @@
 # NetFlow Source
 
-The NetFlow source collects network flow data from NetFlow/IPFIX/sFlow exporters. It supports multiple flow protocols and can handle template-based protocols like NetFlow v9 and IPFIX.
+The NetFlow source collects network flow data from NetFlow/IPFIX/sFlow exporters. It supports multiple flow protocols and can handle template-based protocols like NetFlow v9 and IPFIX with enterprise-specific field support.
 
 ## Configuration
 
@@ -16,6 +16,8 @@ sources:
       - "ipfix"
       - "sflow"
     include_raw_data: false  # Set to true for debugging
+    drop_events_without_templates: false  # Drop events when no template is available
+    max_field_length: 1024  # Maximum length for field values
     max_templates: 1000  # Maximum templates to cache per observation domain
     template_timeout_secs: 3600  # Template cache timeout (1 hour)
     multicast_groups:  # Optional: join multicast groups
@@ -32,6 +34,8 @@ sources:
 | `max_length` | `integer` | `65536` | Maximum size of incoming packets |
 | `protocols` | `array` | `["netflow_v5", "netflow_v9", "ipfix", "sflow"]` | List of supported flow protocols |
 | `include_raw_data` | `boolean` | `false` | Whether to include raw packet data in events for debugging |
+| `drop_events_without_templates` | `boolean` | `false` | Whether to drop events when no template is available |
+| `max_field_length` | `integer` | `1024` | Maximum length for field values to prevent memory issues |
 | `max_templates` | `integer` | `1000` | Maximum number of templates to cache per observation domain |
 | `template_timeout_secs` | `integer` | `3600` | Template cache timeout in seconds |
 | `multicast_groups` | `array` | `[]` | List of IPv4 multicast groups to join |
@@ -40,170 +44,98 @@ sources:
 ## Supported Protocols
 
 ### NetFlow v5
-- Fixed format flow records
+- Fixed format flow records (48 bytes per record)
 - No templates required
 - Most common NetFlow version
+- Includes source/destination addresses, ports, protocol, packet/byte counts
 
 ### NetFlow v9
-- Template-based format
-- Supports variable-length fields
+- Template-based format with variable-length fields
 - Templates are cached automatically
-
-### IPFIX
-- Modern standard (RFC 7011)
-- Template-based format
 - Supports enterprise-specific fields
-- Templates are cached automatically
+- More flexible than v5 but requires template management
 
-### sFlow
-- Sampled flow data
-- Different header format
-- Includes counter samples
+### IPFIX (Internet Protocol Flow Information Export)
+- Modern standard (RFC 7011)
+- Template-based format with variable-length fields
+- Supports enterprise-specific fields (e.g., HPE Aruba)
+- RFC-compliant set IDs (2=Template, 3=Options Template, 256+=Data)
+- Variable-length field support (length=65535)
 
-## Output Events
+### sFlow (Sampled Flow)
+- Sampled flow data with different record types
+- Supports flow samples, counter samples, and expanded variants
+- Includes agent address and sampling information
 
-The source generates log events with the following structure:
+## Enterprise Field Support
 
-### NetFlow v5 Events
-```json
-{
-  "flow_type": "netflow_v5",
-  "version": 5,
-  "sys_uptime": 123456,
-  "unix_secs": 1640995200,
-  "flow_sequence": 1,
-  "engine_type": 0,
-  "engine_id": 0,
-  "sampling_interval": 1000,
-  "src_addr": "192.168.1.1",
-  "dst_addr": "10.0.0.1",
-  "src_port": 80,
-  "dst_port": 443,
-  "protocol": 6,
-  "protocol_name": "TCP",
-  "packets": 100,
-  "octets": 1024,
-  "tcp_flags": 2,
-  "tos": 0,
-  "src_as": 65000,
-  "dst_as": 65001,
-  "input": 1,
-  "output": 2,
-  "first": 1000,
-  "last": 2000,
-  "flow_duration_ms": 1000
-}
-```
+The NetFlow source supports enterprise-specific fields through the field parser registry:
 
-### NetFlow v9/IPFIX Events
-```json
-{
-  "flow_type": "netflow_v9_data",
-  "template_id": 256,
-  "source_id": 1,
-  "in_bytes": 1024,
-  "in_packets": 100,
-  "ipv4_src_addr": "192.168.1.1",
-  "ipv4_dst_addr": "10.0.0.1",
-  "l4_src_port": 80,
-  "l4_dst_port": 443,
-  "protocol": 6,
-  "tcp_flags": 2
-}
-```
+### HPE Aruba Enterprise (ID: 23867)
+- Client and server IPv4 addresses
+- Connection statistics and delays
+- Application information and zones
+- Transaction duration metrics
 
-### sFlow Events
-```json
-{
-  "flow_type": "sflow",
-  "version": 5,
-  "agent_address": "192.168.1.1",
-  "sub_agent_id": 0,
-  "sequence_number": 1,
-  "sys_uptime": 123456,
-  "num_samples": 1
-}
-```
+### Custom Enterprise Support
+You can extend the source with custom enterprise field parsers by implementing the `FieldParser` trait.
 
-## Template Caching
+## Template Management
 
-For template-based protocols (NetFlow v9 and IPFIX), the source automatically caches templates received from exporters. Templates are keyed by:
+For template-based protocols (NetFlow v9, IPFIX):
 
-- Exporter address (peer_addr)
-- Observation domain ID
-- Template ID
+- **Automatic Caching**: Templates are automatically cached per observation domain
+- **Timeout Management**: Templates expire after configurable timeout
+- **Memory Management**: Configurable maximum templates per domain
+- **Validation**: Templates are validated before caching
 
-Templates are automatically cleaned up after the configured timeout period.
+## Variable-Length Fields
 
-## Multicast Support
+IPFIX and NetFlow v9 support variable-length fields:
 
-The source can join multicast groups to receive NetFlow traffic from multiple sources. When using multicast:
+- **1-byte length**: For fields ≤ 254 bytes
+- **3-byte length**: For fields > 254 bytes (length=255 + 2-byte actual length)
+- **Automatic parsing**: Handled transparently by the protocol parsers
 
-1. Set the listening address to `0.0.0.0` (not a specific interface)
-2. Configure the `multicast_groups` option with the desired multicast addresses
-3. Ensure your network infrastructure supports the multicast groups
+## Error Handling
+
+The source provides comprehensive error handling:
+
+- **Parse Errors**: Invalid packets are logged with details
+- **Template Errors**: Missing or invalid templates are handled gracefully
+- **Field Errors**: Unparseable fields are logged with raw data (if enabled)
+- **Memory Protection**: Field length limits prevent memory issues
 
 ## Performance Considerations
 
-- **Template Cache Size**: Monitor memory usage if you have many exporters with different templates
-- **Packet Size**: Adjust `max_length` based on your network's MTU
-- **Receive Buffer**: Increase `receive_buffer_bytes` if you experience packet drops
-- **Protocol Filtering**: Only enable the protocols you need to reduce processing overhead
-
-## Troubleshooting
-
-### Enable Raw Data
-Set `include_raw_data: true` to include base64-encoded raw packet data in events for debugging.
-
-### Check Template Cache
-Monitor template cache size and cleanup frequency. If templates are expiring too quickly, increase `template_timeout_secs`.
-
-### Multicast Issues
-- Ensure the listening address is `0.0.0.0`
-- Check that multicast groups are valid IPv4 addresses
-- Verify network infrastructure supports the multicast groups
-
-### Packet Drops
-- Increase `receive_buffer_bytes`
-- Check system UDP buffer limits
-- Monitor network interface statistics
+- **Template Caching**: Reduces parsing overhead for repeated templates
+- **Field Length Limits**: Prevents memory issues with large fields
+- **Event Filtering**: Option to drop events without templates
+- **Buffer Management**: Configurable receive buffer sizes
 
 ## Examples
 
-### Basic NetFlow v5 Collection
+### Basic Configuration
 ```yaml
 sources:
   netflow:
     type: netflow
     address: "0.0.0.0:2055"
-    protocols:
-      - "netflow_v5"
+    protocols: ["netflow_v5", "ipfix"]
 ```
 
-### IPFIX with Template Caching
+### Production Configuration
 ```yaml
 sources:
-  ipfix:
+  netflow_prod:
     type: netflow
-    address: "0.0.0.0:4739"
-    protocols:
-      - "ipfix"
-    max_templates: 2000
-    template_timeout_secs: 7200
-```
-
-### Multicast NetFlow Collection
-```yaml
-sources:
-  netflow_multicast:
-    type: netflow
-    address: "0.0.0.0:2055"
-    multicast_groups:
-      - "224.0.0.2"
-      - "224.0.0.4"
-    protocols:
-      - "netflow_v5"
-      - "netflow_v9"
+    address: "0.0.0.0:9995"
+    protocols: ["ipfix"]
+    include_raw_data: false
+    drop_events_without_templates: true
+    max_field_length: 512
+    max_templates: 100
+    template_timeout_secs: 1800
 ```
 
 ### Debug Configuration
@@ -212,12 +144,32 @@ sources:
   netflow_debug:
     type: netflow
     address: "0.0.0.0:2055"
-    protocols:
-      - "netflow_v5"
-      - "netflow_v9"
-      - "ipfix"
-      - "sflow"
+    protocols: ["netflow_v5", "netflow_v9", "ipfix", "sflow"]
     include_raw_data: true
-    max_templates: 100
-    template_timeout_secs: 1800
-``` 
+    drop_events_without_templates: false
+    max_field_length: 2048
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No events received**: Check firewall settings and multicast group configuration
+2. **Memory usage high**: Reduce `max_templates` and `max_field_length`
+3. **Parse errors**: Enable `include_raw_data` to see packet contents
+4. **Missing templates**: Set `drop_events_without_templates: false` to see raw data
+
+### Debug Mode
+
+Enable debug mode to see detailed parsing information:
+
+```yaml
+sources:
+  netflow:
+    type: netflow
+    address: "0.0.0.0:2055"
+    include_raw_data: true
+    drop_events_without_templates: false
+```
+
+This will include raw packet data and template information in events for debugging. 

@@ -1,0 +1,21 @@
+# Test configuration for NetFlow source
+sources:
+  netflow_test:
+    type: netflow
+    address: "0.0.0.0:2055"
+    protocols: ["netflow_v5", "netflow_v9", "ipfix", "sflow"]
+    include_raw_data: false  # Set to false to reduce noise
+    max_templates: 1000
+
+transforms:
+  filter_netflow:
+    type: filter
+    inputs: ["netflow_test"]
+    condition: '.flow_type != null'
+
+sinks:
+  console:
+    type: console
+    inputs: ["filter_netflow"]
+    encoding:
+      codec: json 
