@@ -25,9 +25,9 @@ registered_event! {
 
     fn emit(&self, data: AdaptiveConcurrencyLimitData) {
         self.limit.record(data.concurrency as f64);
-        let reached_limit = data.reached_limit.then_some(1.0).unwrap_or_default();
+        let reached_limit = if data.reached_limit { 1.0 } else { Default::default() };
         self.reached_limit.record(reached_limit);
-        let back_pressure = data.had_back_pressure.then_some(1.0).unwrap_or_default();
+        let back_pressure = if data.had_back_pressure { 1.0 } else { Default::default() };
         self.back_pressure.record(back_pressure);
         self.past_rtt_mean.record(data.past_rtt);
         // past_rtt_deviation is unrecorded

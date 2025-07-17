@@ -242,13 +242,12 @@ mod tests {
             r#"
             [sources.in]
             type = "demo_logs"
-            format = "${{{}}}"
+            format = "${{{env_var}}}"
 
             [sinks.out]
             type = "blackhole"
-            inputs = ["${{{}}}"]
-        "#,
-            env_var, env_var_in_arr
+            inputs = ["${{{env_var_in_arr}}}"]
+        "#
         );
         let interpolated_config_source = vars::interpolate(
             config_source.as_ref(),
@@ -319,18 +318,18 @@ mod tests {
             "{}/{}/{}",
             sources
                 .iter()
-                .map(|source| format!("{}:{}", source, source))
+                .map(|source| format!("{source}:{source}"))
                 .collect::<Vec<_>>()
                 .join(","),
             transforms
                 .iter()
-                .map(|transform| format!("{}:{}", transform, transform))
+                .map(|transform| format!("{transform}:{transform}"))
                 .chain(vec!["manually-added-remap:remap".to_string()])
                 .collect::<Vec<_>>()
                 .join(","),
             sinks
                 .iter()
-                .map(|sink| format!("{}:{}", sink, sink))
+                .map(|sink| format!("{sink}:{sink}"))
                 .collect::<Vec<_>>()
                 .join(","),
         );

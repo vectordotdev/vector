@@ -1173,7 +1173,7 @@ async fn http_headers() {
             }],
         };
         let _res = client
-            .post(format!("http://{}/v1/logs", http_addr))
+            .post(format!("http://{http_addr}/v1/logs"))
             .header("Content-Type", "application/x-protobuf")
             .header("User-Agent", "Test")
             .body(req.encode_to_vec())

@@ -256,7 +256,7 @@ fn sum_counters(
                     sum += *value;
                 }
             }
-            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
+            _ => errs.push(format!("{metric_name}: metric value is not a counter",)),
         }
     }
 

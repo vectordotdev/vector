@@ -100,8 +100,7 @@ pub(super) mod process {
                     }
                     Err(err) => {
                         errors.push(format!(
-                            "Could not read entry in config dir: {:?}, {}.",
-                            path, err
+                            "Could not read entry in config dir: {path:?}, {err}."
                         ));
                     }
                 };

@@ -525,20 +525,20 @@ where
             },
             Event::Metric(ref mut metric) => {
                 if let Some(metadata_key) = log_schema().metadata_key() {
-                    metric.replace_tag(format!("{}.dropped.reason", metadata_key), reason.into());
+                    metric.replace_tag(format!("{metadata_key}.dropped.reason"), reason.into());
                     metric.replace_tag(
-                        format!("{}.dropped.component_id", metadata_key),
+                        format!("{metadata_key}.dropped.component_id"),
                         self.component_key
                             .as_ref()
                             .map(ToString::to_string)
                             .unwrap_or_default(),
                     );
                     metric.replace_tag(
-                        format!("{}.dropped.component_type", metadata_key),
+                        format!("{metadata_key}.dropped.component_type"),
                         "remap".into(),
                     );
                     metric.replace_tag(
-                        format!("{}.dropped.component_kind", metadata_key),
+                        format!("{metadata_key}.dropped.component_kind"),
                         "transform".into(),
                     );
                 }
@@ -1621,7 +1621,7 @@ mod tests {
         match (buf.pop(), err_buf.pop()) {
             (Some(good), None) => Ok(good),
             (None, Some(bad)) => Err(bad),
-            (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
+            (a, b) => panic!("expected output xor error output, got {a:?} and {b:?}"),
         }
     }
 
