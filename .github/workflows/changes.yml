@@ -177,7 +177,7 @@ jobs:
             - "vdev/**"
           cue:
             - 'website/cue/**'
-            - "vdev"
+            - "vdev/**"
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
