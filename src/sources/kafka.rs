@@ -1602,8 +1602,8 @@ mod integration_test {
 
         (0..count)
             .map(|i| async move {
-                let text = format!("{} {:03}", TEXT, i);
-                let key = format!("{} {}", KEY, i);
+                let text = format!("{TEXT} {i:03}");
+                let key = format!("{KEY} {i}");
                 let record = FutureRecord::to(topic_name)
                     .payload(&text)
                     .key(&key)
@@ -1613,7 +1613,7 @@ mod integration_test {
                         value: Some(HEADER_VALUE),
                     }));
                 if let Err(error) = producer.send(record, Timeout::Never).await {
-                    panic!("Cannot send event to Kafka: {:?}", error);
+                    panic!("Cannot send event to Kafka: {error:?}");
                 }
             })
             .collect::<FuturesUnordered<_>>()
@@ -1709,11 +1709,11 @@ mod integration_test {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
                     event.as_log()[log_schema().message_key().unwrap().to_string()],
-                    format!("{} {:03}", TEXT, i).into()
+                    format!("{TEXT} {i:03}").into()
                 );
                 assert_eq!(
                     event.as_log()["message_key"],
-                    format!("{} {}", KEY, i).into()
+                    format!("{KEY} {i}").into()
                 );
                 assert_eq!(
                     event.as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -1937,14 +1937,14 @@ mod integration_test {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events1.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         match fetch_tpl_offset(&group_id, &topic, 1) {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events2.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         let mut all_events = events1
@@ -1965,7 +1965,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
@@ -2037,7 +2037,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")

@@ -800,7 +800,7 @@ mod integration_tests {
             metrics
                 .iter()
                 .find(|metric| metric.name() == name)
-                .unwrap_or_else(|| panic!("Missing metric {:?}", name))
+                .unwrap_or_else(|| panic!("Missing metric {name:?}"))
         };
 
         // Sample some well-known metrics

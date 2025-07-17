@@ -1003,7 +1003,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.expect("error when building config");
         run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
-        let res = query_v1_json(url, &format!("show series on {}", database)).await;
+        let res = query_v1_json(url, &format!("show series on {database}")).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -1038,7 +1038,7 @@ mod integration_tests {
             };
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
             let res =
-                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+                query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
             assert_eq!(
                 res,
@@ -1120,7 +1120,7 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{metric}\")"));
         body.insert("type", "flux".to_owned());
 
         let client = reqwest::Client::builder()
@@ -1183,7 +1183,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("counter-{}", i),
+                format!("counter-{i}"),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )

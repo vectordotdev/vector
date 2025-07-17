@@ -984,7 +984,7 @@ mod integration_tests {
             .unwrap();
 
         let res = client
-            .post(format!("{}/api/v2/query?org=my-org", endpoint))
+            .post(format!("{endpoint}/api/v2/query?org=my-org"))
             .json(&body)
             .header("accept", "application/json")
             .header("Authorization", "Token my-token")

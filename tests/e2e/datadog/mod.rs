@@ -43,8 +43,7 @@ type FakeIntakeResponseJson = FakeIntakeResponse<FakeIntakePayloadJson>;
 impl FakeIntakeResponseT for FakeIntakeResponseJson {
     fn build_url(base: &str, endpoint: &str) -> String {
         format!(
-            "{}/fakeintake/payloads?endpoint={}&format=json",
-            base, endpoint,
+            "{base}/fakeintake/payloads?endpoint={endpoint}&format=json",
         )
     }
 }
@@ -53,7 +52,7 @@ type FakeIntakeResponseRaw = FakeIntakeResponse<FakeIntakePayloadRaw>;
 
 impl FakeIntakeResponseT for FakeIntakeResponseRaw {
     fn build_url(base: &str, endpoint: &str) -> String {
-        format!("{}/fakeintake/payloads?endpoint={}", base, endpoint,)
+        format!("{base}/fakeintake/payloads?endpoint={endpoint}",)
     }
 }
 
@@ -66,7 +65,7 @@ where
         .request(Method::GET, url)
         .send()
         .await
-        .unwrap_or_else(|_| panic!("Sending GET request to {} failed", url))
+        .unwrap_or_else(|_| panic!("Sending GET request to {url} failed"))
         .json::<R>()
         .await
         .expect("Parsing fakeintake payloads failed")

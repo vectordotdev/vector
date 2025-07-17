@@ -514,7 +514,7 @@ mod integration_tests {
             .iter()
             .map(|msg| {
                 // convert to JSON object
-                format!(r#"{{"message": "{}"}}"#, msg)
+                format!(r#"{{"message": "{msg}"}}"#)
             })
             .collect();
 

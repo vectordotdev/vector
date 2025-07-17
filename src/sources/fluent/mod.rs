@@ -1280,7 +1280,7 @@ mod integration_tests {
     fn make_file(name: &str, content: &str) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join(name)).unwrap();
-        write!(&mut file, "{}", content).unwrap();
+        write!(&mut file, "{content}").unwrap();
         dir
     }
 
@@ -1334,7 +1334,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(format!("http://{}/", test_address))
+                        .post(format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1415,7 +1415,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(format!("http://{}/", test_address))
+                        .post(format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()

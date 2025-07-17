@@ -904,7 +904,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             ..Default::default()
         };
@@ -935,7 +935,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             required: false,
             ..Default::default()
@@ -1014,10 +1014,10 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
+            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
+            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{}\"", TAGS_KEY).as_str(),
+                format!("\"{TAGS_KEY}\"").as_str(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),

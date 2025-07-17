@@ -61,7 +61,7 @@ async fn cloudwatch_metrics_put_data() {
     let gauge_name = random_string(10);
     for i in 0..10 {
         let event = Event::Metric(Metric::new(
-            format!("gauge-{}", gauge_name),
+            format!("gauge-{gauge_name}"),
             MetricKind::Absolute,
             MetricValue::Gauge { value: i as f64 },
         ));
@@ -72,7 +72,7 @@ async fn cloudwatch_metrics_put_data() {
     for i in 0..10 {
         let event = Event::Metric(
             Metric::new(
-                format!("distribution-{}", distribution_name),
+                format!("distribution-{distribution_name}"),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: vector_lib::samples![i as f64 => 100],

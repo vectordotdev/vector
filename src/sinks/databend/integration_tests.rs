@@ -43,11 +43,10 @@ async fn prepare_config(
 
     let mut cfg = format!(
         r#"
-            endpoint = "{}"
-            table = "{}"
+            endpoint = "{endpoint}"
+            table = "{table}"
             batch.max_events = 1
         "#,
-        endpoint, table,
     );
     match codec {
         "json" => {
@@ -94,8 +93,7 @@ async fn prepare_config(
 
 async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
     let create_table_sql = format!(
-        "create table `{}` (host String, timestamp String, message String)",
-        table
+        "create table `{table}` (host String, timestamp String, message String)"
     );
     client.query_all(&create_table_sql).await.unwrap();
 
@@ -110,7 +108,7 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendA
     )
     .await;
 
-    let select_all_sql = format!("select * from `{}`", table);
+    let select_all_sql = format!("select * from `{table}`");
     let resp = client.query_all(&select_all_sql).await.unwrap();
     assert_eq!(1, resp.data.len());
 
