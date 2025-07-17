@@ -225,7 +225,7 @@ impl ElasticsearchCommon {
     }
 
     fn check_endpoint(endpoint: &str) -> crate::Result<()> {
-        let uri = format!("{}/_test", endpoint);
+        let uri = format!("{endpoint}/_test");
         let uri = uri
             .parse::<Uri>()
             .with_context(|_| InvalidHostSnafu { host: endpoint })?;
@@ -393,7 +393,7 @@ async fn get_version(
         "/",
     )
     .await
-    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
+    .map_err(|error| format!("Failed to get Elasticsearch API version: {error}"))?;
 
     let (_, body) = response.into_parts();
     let mut body = body::aggregate(body).await?;
@@ -420,7 +420,7 @@ async fn get(
     client: HttpClient,
     path: &str,
 ) -> crate::Result<Response<Body>> {
-    let mut builder = Request::get(format!("{}{}", base_url, path));
+    let mut builder = Request::get(format!("{base_url}{path}"));
 
     for (header, value) in &request.headers {
         builder = builder.header(&header[..], &value[..]);
