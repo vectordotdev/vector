@@ -181,7 +181,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 } else {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
-                        message: &format!("Internal error: {:?}", r)
+                        message: &format!("Internal error: {r:?}")
                     });
                     Err(r)
                 }

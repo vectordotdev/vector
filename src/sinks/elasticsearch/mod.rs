@@ -122,7 +122,7 @@ impl TryFrom<&str> for BulkAction {
             "index" => Ok(BulkAction::Index),
             "create" => Ok(BulkAction::Create),
             "update" => Ok(BulkAction::Update),
-            _ => Err(format!("Invalid bulk action: {}", input)),
+            _ => Err(format!("Invalid bulk action: {input}")),
         }
     }
 }
@@ -161,7 +161,7 @@ impl TryFrom<&str> for VersionType {
             "internal" => Ok(VersionType::Internal),
             "external" | "external_gt" => Ok(VersionType::External),
             "external_gte" => Ok(VersionType::ExternalGte),
-            _ => Err(format!("Invalid versioning mode: {}", input)),
+            _ => Err(format!("Invalid versioning mode: {input}")),
         }
     }
 }

@@ -230,17 +230,17 @@ async fn validate_healthchecks(
                     .healthcheck()
                     .enabled
                 {
-                    fmt.success(format!("Health check \"{}\"", id));
+                    fmt.success(format!("Health check \"{id}\""));
                 } else {
-                    fmt.warning(format!("Health check disabled for \"{}\"", id));
+                    fmt.warning(format!("Health check disabled for \"{id}\""));
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(e)) => failed(format!("Health check for \"{}\" failed: {}", id, e)),
+            Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{}\" was cancelled", id))
+                failed(format!("Health check for \"{id}\" was cancelled"))
             }
-            Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
+            Err(_) => failed(format!("Health check for \"{id}\" panicked")),
         }
         trace!("Healthcheck for {id} done.");
     }

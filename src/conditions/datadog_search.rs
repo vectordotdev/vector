@@ -84,7 +84,7 @@ impl Filter<LogEvent> for EventFilter {
     fn exists(&self, field: Field) -> Result<Box<dyn Matcher<LogEvent>>, PathParseError> {
         Ok(match field {
             Field::Tag(tag) => {
-                let starts_with = format!("{}:", tag);
+                let starts_with = format!("{tag}:");
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| {
                     value == tag || value.starts_with(&starts_with)
@@ -125,7 +125,7 @@ impl Filter<LogEvent> for EventFilter {
             }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
-                let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
+                let value_bytes = Value::Bytes(format!("{tag}:{to_match}").into());
 
                 array_match_multiple(vec!["ddtags", "tags"], move |values| {
                     values.contains(&value_bytes)
@@ -160,13 +160,13 @@ impl Filter<LogEvent> for EventFilter {
         Ok(match field {
             // Default fields are matched by word boundary.
             Field::Default(field) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = word_regex(&format!("{prefix}*"));
 
                 string_match(field, move |value| re.is_match(&value))
             }
             // Tags are recursed until a match is found.
             Field::Tag(tag) => {
-                let starts_with = format!("{}:{}", tag, prefix);
+                let starts_with = format!("{tag}:{prefix}");
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| {
                     value.starts_with(&starts_with)
@@ -202,7 +202,7 @@ impl Filter<LogEvent> for EventFilter {
                 string_match(field, move |value| re.is_match(&value))
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = wildcard_regex(&format!("{tag}:{wildcard}"));
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| re.is_match(&value))
             }
@@ -1611,7 +1611,7 @@ mod test {
             // Every query should build successfully.
             let cond = config
                 .build(&Default::default())
-                .unwrap_or_else(|_| panic!("build failed: {}", source));
+                .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(
                 cond.check_with_context(pass.clone()).0.is_ok(),

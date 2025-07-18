@@ -188,7 +188,7 @@ impl NginxMetrics {
         let uri: Uri = endpoint.parse().context(HostInvalidUriSnafu)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
             (host, None) => host.to_owned(),
-            (host, Some(port)) => format!("{}:{}", host, port),
+            (host, Some(port)) => format!("{host}:{port}"),
         })
     }
 

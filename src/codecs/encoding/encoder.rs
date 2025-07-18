@@ -239,7 +239,7 @@ mod tests {
         fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
             self.0.encode((), dst)?;
             let result = if self.1 == self.2 {
-                Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "error")) as _)
+                Err(Box::new(std::io::Error::other("error")) as _)
             } else {
                 Ok(())
             };

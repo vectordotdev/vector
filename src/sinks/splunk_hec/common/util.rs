@@ -92,7 +92,7 @@ pub async fn build_healthcheck(
         .context(UriParseSnafu)?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
+        .header("Authorization", format!("Splunk {token}"))
         .body(Body::empty())
         .unwrap();
 

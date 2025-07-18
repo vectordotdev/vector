@@ -1,4 +1,4 @@
-use std::{convert::TryInto, io::ErrorKind};
+use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
 use aws_smithy_types::byte_stream::ByteStream;
@@ -317,7 +317,7 @@ async fn s3_object_decoder(
                     yield next;
                 }
             }))
-            .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
+            .map_err(std::io::Error::other),
     ));
 
     let compression = match compression {
@@ -414,10 +414,7 @@ mod test {
             assert_eq!(
                 super::determine_compression(content_encoding, content_type, key),
                 expected,
-                "key={:?} content_encoding={:?} content_type={:?}",
-                key,
-                content_encoding,
-                content_type,
+                "key={key:?} content_encoding={content_encoding:?} content_type={content_type:?}",
             );
         }
     }
@@ -517,7 +514,7 @@ mod integration_tests {
             .iter()
             .map(|msg| {
                 // convert to JSON object
-                format!(r#"{{"message": "{}"}}"#, msg)
+                format!(r#"{{"message": "{msg}"}}"#)
             })
             .collect();
 

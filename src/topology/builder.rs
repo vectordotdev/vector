@@ -174,7 +174,7 @@ impl<'a> Builder<'a> {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
-                            .push(format!("Enrichment Table \"{}\": {}", name, error));
+                            .push(format!("Enrichment Table \"{name}\": {error}"));
                         continue;
                     }
                 };
@@ -353,7 +353,7 @@ impl<'a> Builder<'a> {
             let source = source.inner.build(context).await;
             let server = match source {
                 Err(error) => {
-                    self.errors.push(format!("Source \"{}\": {}", key, error));
+                    self.errors.push(format!("Source \"{key}\": {error}"));
                     continue;
                 }
                 Ok(server) => server,
@@ -501,8 +501,7 @@ impl<'a> Builder<'a> {
                 .await
             {
                 Err(error) => {
-                    self.errors
-                        .push(format!("Transform \"{}\": {}", key, error));
+                    self.errors.push(format!("Transform \"{key}\": {error}"));
                     continue;
                 }
                 Ok(transform) => transform,
@@ -591,7 +590,7 @@ impl<'a> Builder<'a> {
                     .await;
                 match buffer {
                     Err(error) => {
-                        self.errors.push(format!("Sink \"{}\": {}", key, error));
+                        self.errors.push(format!("Sink \"{key}\": {error}"));
                         continue;
                     }
                     Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
@@ -611,7 +610,7 @@ impl<'a> Builder<'a> {
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
-                    self.errors.push(format!("Sink \"{}\": {}", key, error));
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
                     continue;
                 }
                 Ok(built) => built,

@@ -104,7 +104,7 @@ fn prepare_log_ingester_url(
     metadata: &PartitionKey,
     extra_params: &Option<HashMap<String, String>>,
 ) -> String {
-    let path = format!("{}/v1/events/logs", endpoint);
+    let path = format!("{endpoint}/v1/events/logs");
     let mut url = url::Url::parse(&path).unwrap();
     let mut url_builder = url.query_pairs_mut();
     url_builder

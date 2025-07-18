@@ -51,8 +51,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({error})"),
         }
     }
 }
@@ -468,6 +468,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.

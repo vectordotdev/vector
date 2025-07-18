@@ -171,7 +171,7 @@ impl OutputFormat {
         let line = lines.choose(&mut rand::rng()).unwrap();
 
         if sequence {
-            format!("{} {}", n, line)
+            format!("{n} {line}")
         } else {
             line.into()
         }

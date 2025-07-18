@@ -894,7 +894,7 @@ mod test {
                     // read resulting with 0 bytes -> the connection was closed
                     Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
                     Ok(_) => panic!("unexpectedly read data from stream"),
-                    Err(e) => panic!("{:}", e)
+                    Err(e) => panic!("{e:}")
                  }
              }
         }
@@ -923,7 +923,7 @@ mod test {
         packets: impl IntoIterator<Item = Bytes>,
     ) -> SocketAddr {
         let socket = UdpSocket::bind(from)
-            .map_err(|error| panic!("{:}", error))
+            .map_err(|error| panic!("{error:}"))
             .ok()
             .unwrap();
 
@@ -931,7 +931,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(&packet, to)
-                    .map_err(|error| panic!("{:}", error))
+                    .map_err(|error| panic!("{error:}"))
                     .ok()
                     .unwrap(),
                 packet.len()
@@ -1537,10 +1537,9 @@ mod test {
     fn parses_unix_config(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }
@@ -1549,11 +1548,10 @@ mod test {
     fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
                socket_file_mode = 0o777
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }

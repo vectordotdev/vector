@@ -111,7 +111,7 @@ impl Deserializer for JsonDeserializer {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
-        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         // If the root is an Array, split it into multiple events
         let mut events = match json {

@@ -86,8 +86,7 @@ async fn nats_no_auth() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -149,8 +148,7 @@ async fn nats_userpass_auth_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }
 
@@ -181,8 +179,7 @@ async fn nats_token_auth_valid() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -213,8 +210,7 @@ async fn nats_token_auth_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }
 
@@ -246,8 +242,7 @@ async fn nats_nkey_auth_valid() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -279,8 +274,7 @@ async fn nats_nkey_auth_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Config, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Config, got: {r:?}"
     );
 }
 
@@ -313,8 +307,7 @@ async fn nats_tls_valid() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -341,8 +334,7 @@ async fn nats_tls_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }
 
@@ -377,8 +369,7 @@ async fn nats_tls_client_cert_valid() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -411,8 +402,7 @@ async fn nats_tls_client_cert_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }
 
@@ -449,8 +439,7 @@ async fn nats_tls_jwt_auth_valid() {
     let r = publish_and_check(conf).await;
     assert!(
         r.is_ok(),
-        "publish_and_check failed, expected Ok(()), got: {:?}",
-        r
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
 }
 
@@ -487,7 +476,6 @@ async fn nats_tls_jwt_auth_invalid() {
     let r = publish_and_check(conf).await;
     assert!(
         matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {:?}",
-        r
+        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }

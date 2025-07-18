@@ -533,7 +533,7 @@ impl RetryLogic for HttpRetryLogic {
                 format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
@@ -581,10 +581,10 @@ where
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
             _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {}", status).into())
+                RetryAction::Retry(format!("Http Status: {status}").into())
             }
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
         }
     }
 }
@@ -919,7 +919,7 @@ mod test {
                 async move {
                     let mut body = hyper::body::aggregate(req.into_body())
                         .await
-                        .map_err(|error| format!("error: {}", error))?;
+                        .map_err(|error| format!("error: {error}"))?;
                     let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
@@ -933,7 +933,7 @@ mod test {
 
         tokio::spawn(async move {
             if let Err(error) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("Server error: {}", error);
+                eprintln!("Server error: {error}");
             }
         });
 

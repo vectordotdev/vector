@@ -105,7 +105,7 @@ where
     let cfg = toml::to_string(&T::generate_config()).unwrap();
 
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {

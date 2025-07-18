@@ -34,11 +34,11 @@ impl SecretBackend for FileBackend {
         for k in secret_keys.into_iter() {
             if let Some(secret) = output.get(&k) {
                 if secret.is_empty() {
-                    return Err(format!("secret for key '{}' was empty", k).into());
+                    return Err(format!("secret for key '{k}' was empty").into());
                 }
                 secrets.insert(k, secret.to_string());
             } else {
-                return Err(format!("secret for key '{}' was not retrieved", k).into());
+                return Err(format!("secret for key '{k}' was not retrieved").into());
             }
         }
         Ok(secrets)
