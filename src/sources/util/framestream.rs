@@ -674,11 +674,11 @@ async fn handle_tcp_frame<T>(
             frame_handler.max_frame_handling_tasks(),
         )
         .await;
-    } else { match frame_handler.handle_event(received_from, frame) { Some(event) => {
+    } else if let Some(event) = frame_handler.handle_event(received_from, frame) {
         if let Err(e) = event_sink.send_event(event).await {
             error!("Error sending event: {e:?}.");
         }
-    } _ => {}}}
+    }
 }
 
 /**
