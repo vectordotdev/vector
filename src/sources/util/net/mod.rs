@@ -83,7 +83,7 @@ impl SocketListenAddr {
 impl fmt::Display for SocketListenAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::SocketAddr(ref addr) => addr.fmt(f),
+            Self::SocketAddr(addr) => addr.fmt(f),
             Self::SystemdFd(offset) => write!(f, "systemd socket #{offset}"),
         }
     }

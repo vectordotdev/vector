@@ -250,7 +250,7 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = SourceSenderItem> + Unpin {
+    ) -> impl Stream<Item = SourceSenderItem> + Unpin + use<> {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
         let output_id = OutputId {

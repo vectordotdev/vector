@@ -1346,7 +1346,7 @@ mod tests {
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin + use<>, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =

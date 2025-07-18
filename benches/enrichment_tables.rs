@@ -2,6 +2,7 @@ use std::time::SystemTime;
 
 use chrono::prelude::*;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use vector::enrichment_tables::file::FileData;
 use vector::enrichment_tables::{
     file::File,
     geoip::{Geoip, GeoipConfig},
@@ -49,12 +50,13 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
 
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            data,
-            // Headers.
-            (0..10)
-                .map(|header| format!("field-{}", header))
-                .collect::<Vec<_>>(),
+            FileData {
+                data,
+                headers: (0..10)
+                    .map(|header| format!("field-{header}"))
+                    .collect::<Vec<_>>(),
+                modified: SystemTime::now(),
+            },
         );
 
         let (condition, index, result_offset) = if date_range {

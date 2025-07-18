@@ -171,10 +171,11 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
-        pieces
-    } else {
-        return false;
+    let mut pieces = match validate_components(config, &diff, fmt).await {
+        Some(pieces) => pieces,
+        _ => {
+            return false;
+        }
     };
     opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }

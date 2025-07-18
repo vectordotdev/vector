@@ -572,28 +572,30 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
-                buffer
-            } else {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{key}\": {error}"));
-                        continue;
+            let (tx, rx) = match self.buffers.remove(key) {
+                Some(buffer) => buffer,
+                _ => {
+                    let buffer_type =
+                        match sink.buffer.stages().first().expect("cant ever be empty") {
+                            BufferType::Memory { .. } => "memory",
+                            BufferType::DiskV2 { .. } => "disk",
+                        };
+                    let buffer_span = error_span!("sink", buffer_type);
+                    let buffer = sink
+                        .buffer
+                        .build(
+                            self.config.global.data_dir.clone(),
+                            key.to_string(),
+                            buffer_span,
+                        )
+                        .await;
+                    match buffer {
+                        Err(error) => {
+                            self.errors.push(format!("Sink \"{key}\": {error}"));
+                            continue;
+                        }
+                        Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                     }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                 }
             };
 
