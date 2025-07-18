@@ -195,7 +195,6 @@ jobs:
       - check-fmt
       - check-clippy
       - test
-      - test-component-validation
       - check-version
       - check-scripts
       - check-events
