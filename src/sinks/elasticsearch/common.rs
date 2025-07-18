@@ -244,6 +244,9 @@ impl ElasticsearchCommon {
         proxy_config: &ProxyConfig,
         uri: &UriSerde,
     ) -> crate::Result<Option<Auth>> {
+        #[cfg(not(feature = "aws-core"))]
+        let _ = proxy_config;
+
         let auth = match &config.auth {
             Some(ElasticsearchAuthConfig::Basic { user, password }) => {
                 let auth = Some(crate::http::Auth::Basic {
