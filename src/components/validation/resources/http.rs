@@ -330,7 +330,6 @@ impl HttpResourceOutputContext<'_> {
                             loop {
                                 match decoder.decode_eof(&mut body) {
                                     Ok(Some((events, decoded_byte_size))) => {
-                                        dbg!(events.len());
                                         if should_reject {
                                             info!("HTTP server external output resource decoded {decoded_byte_size} bytes but test case configured to reject.");
                                         } else {
