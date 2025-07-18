@@ -1,3 +1,7 @@
+[![Nightly](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml)
+[![E2E Test Suite](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml)
+[![Component Features](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml)
+
 <p align="center">
   <strong>
     <a href="https://vector.dev/docs/setup/quickstart/">Quickstart</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
