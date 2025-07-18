@@ -1008,7 +1008,8 @@ impl ContainerLogInfo {
                 // the created timestamp.
                 match self.last_log.as_ref() {
                     Some(&(last, generation)) => {
-                        if last < timestamp || (last == timestamp && generation == self.generation) {
+                        if last < timestamp || (last == timestamp && generation == self.generation)
+                        {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.

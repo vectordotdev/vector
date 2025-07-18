@@ -37,7 +37,9 @@ impl Configurable for BoxedSink {
         metadata
     }
 
-    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         vector_lib::configurable::component::SinkDescription::generate_schemas(generator)
     }
 }

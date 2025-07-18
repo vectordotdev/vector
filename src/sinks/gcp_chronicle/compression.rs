@@ -61,7 +61,9 @@ impl Configurable for ChronicleCompression {
         Compression::metadata()
     }
 
-    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
