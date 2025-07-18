@@ -16,7 +16,7 @@ pub use decoding::{
     LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
     NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
-    StreamDecodingError,
+    StreamDecodingError, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
