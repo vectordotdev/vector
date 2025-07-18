@@ -140,10 +140,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         Err(conflicting_components
             .into_iter()
             .map(|(resource, components)| {
-                format!(
-                    "Resource `{}` is claimed by multiple components: {:?}",
-                    resource, components
-                )
+                format!("Resource `{resource}` is claimed by multiple components: {components:?}")
             })
             .collect())
     }

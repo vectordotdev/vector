@@ -585,8 +585,7 @@ impl Source {
         {
             std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
                 format!(
-                    "self_node_name config value or {} env var is not set",
-                    SELF_NODE_NAME_ENV_KEY
+                    "self_node_name config value or {SELF_NODE_NAME_ENV_KEY} env var is not set"
                 )
             })?
         } else {
@@ -612,7 +611,7 @@ impl Source {
             }
             None => ClientConfig::infer().await?,
         };
-        if let Ok(user_agent) = HeaderValue::from_str(&format!("{}/{}", PKG_NAME, PKG_VERSION)) {
+        if let Ok(user_agent) = HeaderValue::from_str(&format!("{PKG_NAME}/{PKG_VERSION}")) {
             client_config
                 .headers
                 .push((HeaderName::from_static("user-agent"), user_agent));
@@ -1120,7 +1119,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
         ?self_node_name
     );
 
-    let field_selector = format!("spec.nodeName={}", self_node_name);
+    let field_selector = format!("spec.nodeName={self_node_name}");
 
     if config.extra_field_selector.is_empty() {
         return Ok(field_selector);
@@ -1134,7 +1133,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
 fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
-    Ok(format!("metadata.name={}", self_node_name))
+    Ok(format!("metadata.name={self_node_name}"))
 }
 
 // This function constructs the effective label selector to use, based on
@@ -1146,7 +1145,7 @@ fn prepare_label_selector(selector: &str) -> String {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, selector)
+    format!("{BUILT_IN},{selector}")
 }
 
 #[cfg(test)]

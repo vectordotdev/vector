@@ -204,12 +204,12 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         for (test_name, fails) in aggregated_test_errors {
             #[allow(clippy::print_stdout)]
             {
-                println!("\ntest {}:\n", test_name);
+                println!("\ntest {test_name}:\n");
             }
             for fail in fails {
                 #[allow(clippy::print_stdout)]
                 {
-                    println!("{}\n", fail);
+                    println!("{fail}\n");
                 }
             }
         }

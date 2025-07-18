@@ -379,7 +379,6 @@ jobs:
           - ubuntu:20.04
           - ubuntu:22.04
           - ubuntu:24.04
-          - debian:10
           - debian:11
           - debian:12
     container:
@@ -678,7 +677,7 @@ jobs:
         run: make release-s3
 
   publish-github:
-    name: Publish to GitHub
+    name: Publish release to GitHub
     # We only publish to GitHub for versioned releases, not nightlies.
     if: inputs.channel == 'release'
     runs-on: ubuntu-24.04

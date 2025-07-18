@@ -221,7 +221,7 @@ async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
-        endpoint: format!("http://{}", addr),
+        endpoint: format!("http://{addr}"),
         host_key: None,
         indexed_fields: Vec::new(),
         index: None,

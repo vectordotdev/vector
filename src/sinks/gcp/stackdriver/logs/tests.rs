@@ -208,9 +208,7 @@ fn severity_remaps_strings() {
         assert_eq!(
             remap_severity(s.into()),
             Value::Integer(n),
-            "remap_severity({:?}) != {}",
-            s,
-            n
+            "remap_severity({s:?}) != {n}"
         );
     }
 }

@@ -110,7 +110,7 @@ async fn main() {
 
     fs::write(
         "lib/vector-api-client/graphql/schema.json",
-        format!("{}\n", json),
+        format!("{json}\n"),
     )
     .expect("Couldn't save schema file");
 }

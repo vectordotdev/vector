@@ -817,14 +817,14 @@ async fn coordinate_kafka_callbacks(
                         for tp in assigned_partitions.drain(0..) {
                             let topic = tp.0.as_str();
                             let partition = tp.1;
-                            if let Some(pq) = consumer.split_partition_queue(topic, partition) {
+                            match consumer.split_partition_queue(topic, partition) { Some(pq) => {
                                 debug!("Consuming partition {}:{}.", &tp.0, tp.1);
                                 let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
                                 abort_handles.insert(tp.clone(), handle);
                                 end_signals.insert(tp, end_tx);
-                            } else {
+                            } _ => {
                                 warn!("Failed to get queue for assigned partition {}:{}.", &tp.0, tp.1);
-                            }
+                            }}
                         }
                         // ensure this is retained until all individual queues are set up
                         drop(done);
@@ -843,12 +843,12 @@ async fn coordinate_kafka_callbacks(
                         let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, false);
 
                         for tp in revoked_partitions.drain(0..) {
-                            if let Some(end) = end_signals.remove(&tp) {
+                            match end_signals.remove(&tp) { Some(end) => {
                                 debug!("Revoking partition {}:{}", &tp.0, tp.1);
                                 state.revoke_partition(tp, end);
-                            } else {
+                            } _ => {
                                 debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
-                            }
+                            }}
                         }
 
                         state.keep_draining(deadline)
@@ -878,12 +878,12 @@ async fn coordinate_kafka_callbacks(
                                 .for_each(|el| {
 
                                 let tp: TopicPartition = (el.topic().into(), el.partition());
-                                if let Some(end) = end_signals.remove(&tp) {
+                                match end_signals.remove(&tp) { Some(end) => {
                                     debug!("Shutting down and revoking partition {}:{}", &tp.0, tp.1);
                                     state.revoke_partition(tp, end);
-                                } else {
+                                } _ => {
                                     debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
-                                }
+                                }}
                             });
                         }
                         // If shutdown was initiated by partition EOF mode, the drain phase
@@ -994,7 +994,7 @@ fn parse_stream<'a>(
     decoder: Decoder,
     keys: &'a Keys,
     log_namespace: LogNamespace,
-) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
+) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
@@ -1100,7 +1100,7 @@ impl ReceivedMessage {
     }
 
     fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             match log_namespace {
                 LogNamespace::Vector => {
                     // We'll only use this function in Vector namespaces because we don't want
@@ -1602,8 +1602,8 @@ mod integration_test {
 
         (0..count)
             .map(|i| async move {
-                let text = format!("{} {:03}", TEXT, i);
-                let key = format!("{} {}", KEY, i);
+                let text = format!("{TEXT} {i:03}");
+                let key = format!("{KEY} {i}");
                 let record = FutureRecord::to(topic_name)
                     .payload(&text)
                     .key(&key)
@@ -1613,7 +1613,7 @@ mod integration_test {
                         value: Some(HEADER_VALUE),
                     }));
                 if let Err(error) = producer.send(record, Timeout::Never).await {
-                    panic!("Cannot send event to Kafka: {:?}", error);
+                    panic!("Cannot send event to Kafka: {error:?}");
                 }
             })
             .collect::<FuturesUnordered<_>>()
@@ -1709,12 +1709,9 @@ mod integration_test {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
                     event.as_log()[log_schema().message_key().unwrap().to_string()],
-                    format!("{} {:03}", TEXT, i).into()
+                    format!("{TEXT} {i:03}").into()
                 );
-                assert_eq!(
-                    event.as_log()["message_key"],
-                    format!("{} {}", KEY, i).into()
-                );
+                assert_eq!(event.as_log()["message_key"], format!("{KEY} {i}").into());
                 assert_eq!(
                     event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                     "kafka".into()
@@ -1937,14 +1934,14 @@ mod integration_test {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events1.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         match fetch_tpl_offset(&group_id, &topic, 1) {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events2.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         let mut all_events = events1
@@ -1965,7 +1962,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
@@ -2037,7 +2034,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")

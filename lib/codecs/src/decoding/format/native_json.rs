@@ -97,7 +97,7 @@ impl Deserializer for NativeJsonDeserializer {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
-        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         let events = match json {
             serde_json::Value::Array(values) => values

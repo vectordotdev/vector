@@ -370,10 +370,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 let ack_id =
@@ -385,10 +382,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/ack"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(ack_response)
             .mount(&mock_server)
@@ -528,10 +522,7 @@ mod tests {
         // Override the usual event endpoint
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 ResponseTemplate::new(200).set_body_json(r#"{ "new": "a new response body" }"#)
