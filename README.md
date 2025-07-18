@@ -3,6 +3,10 @@
 [![Component Features](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml)
 
 <p align="center">
+  <img src="website/static/img/diagram.svg" alt="Vector">
+</p>
+
+<p align="center">
   <strong>
     <a href="https://vector.dev/docs/setup/quickstart/">Quickstart</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -12,9 +16,6 @@
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
   </strong>
-</p>
-<p align="center">
-  <img src="website/static/img/diagram.svg" alt="Vector">
 </p>
 
 ## What is Vector?
