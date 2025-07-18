@@ -20,8 +20,6 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, Transformer},
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
-    emit,
-    dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},
     sinks::util::StreamSink,

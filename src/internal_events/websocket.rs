@@ -1,8 +1,8 @@
 use std::error::Error;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter, Result};
 
 use metrics::{counter, histogram};
-use vector_core::internal_event::InternalEvent;
+use vector_lib::internal_event::InternalEvent;
 
 use vector_common::{
     internal_event::{error_stage, error_type},
@@ -108,6 +108,12 @@ pub enum WsKind {
     Frame,
 }
 
+impl Display for WsKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{self:?}")
+    }
+}
+
 #[derive(Debug)]
 pub struct WsBytesReceived<'a> {
     pub byte_size: usize,
@@ -122,13 +128,16 @@ impl InternalEvent for WsBytesReceived<'_> {
             message = "Bytes received.",
             byte_size = %self.byte_size,
             url = %self.url,
-            protocol = %self.protocol
+            protocol = %self.protocol,
+            kind = %self.kind
         );
-        counter!(
-            "component_received_bytes_total", self.byte_size as u64,
+        let counter = counter!(
+            "component_received_bytes_total",
             "url" => self.url.to_string(),
             "protocol" => self.protocol,
+            "kind" => self.kind.to_string()
         );
+        counter.increment(self.byte_size as u64);
     }
 }
 
@@ -149,20 +158,25 @@ impl InternalEvent for WsMessageReceived<'_> {
             byte_size = %self.byte_size,
             url =  %self.url,
             protcol = %self.protocol,
+            kind = %self.kind
         );
 
-        histogram!("component_received_events_count", self.count as f64);
-        counter!(
-            "component_received_events_total", self.count as u64,
+        let histogram = histogram!("component_received_events_count");
+        histogram.record(self.count as f64);
+        let counter = counter!(
+            "component_received_events_total",
             "uri" => self.url.to_string(),
             "protocol" => PROTOCOL,
+            "kind" => self.kind.to_string()
         );
-        counter!(
+        counter.increment(self.count as u64);
+        let counter = counter!(
             "component_received_event_bytes_total",
-            self.byte_size.get() as u64,
             "url" => self.url.to_string(),
             "protocol" => PROTOCOL,
+            "kind" => self.kind.to_string()
         );
+        counter.increment(self.byte_size.get() as u64);
     }
 
     fn name(&self) -> Option<&'static str> {

@@ -47,7 +47,7 @@ impl ExponentialBackoff {
     }
 
     /// Resents the exponential back-off strategy to its initial state.
-    pub(crate) fn reset(&mut self) {
+    pub(crate) const fn reset(&mut self) {
         self.current = self.base;
     }
 }
@@ -60,7 +60,7 @@ impl Iterator for ExponentialBackoff {
         let duration = if let Some(duration) = self.current.checked_mul(self.factor) {
             Duration::from_millis(duration)
         } else {
-            Duration::from_millis(std::u64::MAX)
+            Duration::from_millis(u64::MAX)
         };
 
         // check if we reached max delay
@@ -73,7 +73,7 @@ impl Iterator for ExponentialBackoff {
         if let Some(next) = self.current.checked_mul(self.base) {
             self.current = next;
         } else {
-            self.current = std::u64::MAX;
+            self.current = u64::MAX;
         }
 
         Some(duration)

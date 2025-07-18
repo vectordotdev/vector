@@ -1,6 +1,6 @@
 use std::num::NonZeroU64;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde_with::serde_as;
 use snafu::ResultExt;
 
@@ -14,7 +14,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 use vector_config::configurable_component;
-use vector_core::config::{LogNamespace, SourceOutput};
+use vector_lib::config::{LogNamespace, SourceOutput};
 
 /// Configuration for the `websocket` source.
 #[serde_as]
@@ -103,7 +103,7 @@ impl WebSocketConfig {
 #[typetag::serde(name = "websocket")]
 impl SourceConfig for super::config::WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(ConnectSnafu)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false).context(ConnectSnafu)?;
         let connector = WebSocketConnector::new(self.uri.clone(), tls, self.auth.clone())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -128,7 +128,7 @@ impl SourceConfig for super::config::WebSocketConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]

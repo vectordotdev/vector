@@ -1,15 +1,15 @@
 use std::{io, num::NonZeroU64};
 use vector_common::json_size::JsonSize;
-use vector_core::{
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::{Event, EventArray, EventContainer, LogEvent},
+    lookup::{metadata_path, path},
     EstimatedJsonEncodedSizeOf,
 };
 
 use bytes::BytesMut;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
-use lookup::{metadata_path, path};
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
 use tokio_util::codec::Decoder as DecoderTrait;
@@ -32,7 +32,7 @@ struct WebSocketEvent<'a> {
 }
 
 impl WebSocketEvent<'_> {
-    const NAME: &str = "websocket";
+    const NAME: &'static str = "websocket";
 }
 
 impl From<WebSocketEvent<'_>> for LogEvent {
@@ -49,7 +49,7 @@ impl From<WebSocketEvent<'_>> for LogEvent {
         }
 
         log_namespace.insert_source_metadata(
-            &WebSocketEvent::NAME,
+            WebSocketEvent::NAME,
             &mut log,
             Some(LegacyKey::Overwrite(path!("payload"))),
             path!("payload"),
