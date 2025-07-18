@@ -18,6 +18,7 @@ use crate::{
 };
 
 /// Adapter for papering over various receiver backends.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum ReceiverAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
@@ -156,6 +157,7 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,

@@ -166,7 +166,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
-        message = format!("{:?}", err);
+        message = format!("{err:?}");
         request_id = None;
     }
 

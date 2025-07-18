@@ -59,8 +59,7 @@ pub fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
             Ok(json)
         }
         Err(error) => Err(NewRelicSinkError::new(&format!(
-            "Failed generating JSON: {}",
-            error
+            "Failed generating JSON: {error}"
         ))),
     }
 }

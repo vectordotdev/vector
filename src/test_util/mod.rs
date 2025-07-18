@@ -75,7 +75,7 @@ pub mod integration;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
-    ($e:expr, $t:ty, $v:pat) => {{
+    ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
@@ -85,7 +85,7 @@ macro_rules! assert_downcast_matches {
 
 #[macro_export]
 macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
+    ($($key:expr_2021 => $value:expr_2021),*  $(,)?) => {
         #[allow(unused_variables)]
         {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
@@ -105,7 +105,7 @@ where
     let cfg = toml::to_string(&T::generate_config()).unwrap();
 
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {

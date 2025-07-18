@@ -107,7 +107,7 @@ where
     let server = Server::bind(&addr)
         .serve(service)
         .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-        .map_err(|error| panic!("Server error: {}", error));
+        .map_err(|error| panic!("Server error: {error}"));
 
     (rx, trigger, server)
 }

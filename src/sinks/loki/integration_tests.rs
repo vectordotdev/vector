@@ -94,7 +94,7 @@ async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::U
 }
 
 fn line_generator(index: usize) -> String {
-    format!("random line {}", index)
+    format!("random line {index}")
 }
 
 fn event_generator(index: usize) -> Event {
@@ -675,7 +675,7 @@ fn get_timestamp(event: &Event) -> DateTime<Utc> {
 }
 
 async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
-    let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
+    let query = format!("%7Btest_name%3D\"{stream}\"%7D");
     let query = format!(
         "{}/loki/api/v1/query_range?query={}&direction=forward",
         loki_address(),

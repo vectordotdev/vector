@@ -214,8 +214,8 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = WsError>,
-        impl Stream<Item = Result<Message, WsError>>,
+        impl Sink<Message, Error = WsError> + use<>,
+        impl Stream<Item = Result<Message, WsError>> + use<>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
@@ -415,7 +415,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -438,7 +438,7 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -460,7 +460,7 @@ mod tests {
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{}", addr),
+            uri: format!("wss://{addr}"),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
@@ -486,7 +486,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,

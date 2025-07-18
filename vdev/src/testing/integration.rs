@@ -223,7 +223,9 @@ impl Compose {
         let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
         match original_path.try_exists() {
-            Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
+            Err(error) => {
+                Err(error).with_context(|| format!("Could not lookup {}", original_path.display()))
+            }
             Ok(false) => Ok(None),
             Ok(true) => {
                 let mut config = ComposeConfig::parse(&original_path)?;
@@ -376,7 +378,7 @@ mod unix {
     fn add_read_permission(path: &Path) -> Result<()> {
         let metadata = path
             .metadata()
-            .with_context(|| format!("Could not get permissions on {path:?}"))?;
+            .with_context(|| format!("Could not get permissions on {}", path.display()))?;
 
         if metadata.is_file() {
             add_permission(path, &metadata, ALL_READ)
@@ -384,10 +386,11 @@ mod unix {
             if metadata.is_dir() {
                 add_permission(path, &metadata, ALL_READ_DIR)?;
                 for entry in fs::read_dir(path)
-                    .with_context(|| format!("Could not read directory {path:?}"))?
+                    .with_context(|| format!("Could not read directory {}", path.display()))?
                 {
-                    let entry = entry
-                        .with_context(|| format!("Could not read directory entry in {path:?}"))?;
+                    let entry = entry.with_context(|| {
+                        format!("Could not read directory entry in {}", path.display())
+                    })?;
                     add_read_permission(&entry.path())?;
                 }
             }
@@ -400,7 +403,7 @@ mod unix {
         let new_perms = Permissions::from_mode(perms.mode() | bits);
         if new_perms != perms {
             fs::set_permissions(path, new_perms)
-                .with_context(|| format!("Could not set permissions on {path:?}"))?;
+                .with_context(|| format!("Could not set permissions on {}", path.display()))?;
         }
         Ok(())
     }

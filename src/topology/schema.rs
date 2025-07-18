@@ -329,7 +329,7 @@ pub(super) fn validate_sink_expectations(
                     .errors()
                     .iter()
                     .cloned()
-                    .map(|err| format!("schema error in component {}: {}", key, err))
+                    .map(|err| format!("schema error in component {key}: {err}"))
                     .collect(),
             );
         }

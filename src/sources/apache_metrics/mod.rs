@@ -380,7 +380,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
-                            Some(&format!("http://{}/metrics", in_addr)[..])
+                            Some(&format!("http://{in_addr}/metrics")[..])
                         );
                         assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
                     }

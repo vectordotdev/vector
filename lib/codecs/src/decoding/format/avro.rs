@@ -41,7 +41,7 @@ impl AvroDeserializerConfig {
     /// Build the `AvroDeserializer` from this configuration.
     pub fn build(&self) -> AvroDeserializer {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {}", error))
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))
             .unwrap();
         AvroDeserializer {
             schema,

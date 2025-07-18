@@ -139,7 +139,7 @@ impl GreptimeClient {
 
 fn create_event(i: i32, base_time: DateTime<Utc>) -> Event {
     let mut event = LogEvent::default();
-    event.insert("message", format!("test message {}", i));
+    event.insert("message", format!("test message {i}"));
     event.insert("timestamp", base_time);
     event.insert("name", "test");
     event.insert("namespace", "default");

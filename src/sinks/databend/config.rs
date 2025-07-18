@@ -113,13 +113,13 @@ impl SinkConfig for DatabendConfig {
         let endpoint = match self.endpoint.uri.scheme().map(|s| s.as_str()) {
             Some("databend") => self.endpoint.to_string(),
             // for backward compatibility, build DSN from endpoint
-            Some("http") => format!("databend://{}/?sslmode=disable", authority),
-            Some("https") => format!("databend://{}", authority),
+            Some("http") => format!("databend://{authority}/?sslmode=disable"),
+            Some("https") => format!("databend://{authority}"),
             None => {
                 return Err("Missing scheme for Databend endpoint. Expected `databend`.".into());
             }
             Some(s) => {
-                return Err(format!("Unsupported scheme for Databend endpoint: {}", s).into());
+                return Err(format!("Unsupported scheme for Databend endpoint: {s}").into());
             }
         };
         let mut endpoint = url::Url::parse(&endpoint)?;
@@ -136,7 +136,7 @@ impl SinkConfig for DatabendConfig {
             _ => {}
         }
         if let Some(database) = &self.database {
-            endpoint.set_path(&format!("/{}", database));
+            endpoint.set_path(&format!("/{database}"));
         }
         let endpoint = endpoint.to_string();
         let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
