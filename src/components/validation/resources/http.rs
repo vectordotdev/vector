@@ -329,6 +329,8 @@ impl HttpResourceOutputContext<'_> {
                             let mut body = BytesMut::from(&body[..]);
                             loop {
                                 match decoder.decode_eof(&mut body) {
+                                    // `decoded_byte_size` is the decoded size of an individual frame. `byte_size` represents the size of the
+                                    // entire payload which may contain multiple frames and their delimiters.
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
                                             info!("HTTP server external output resource decoded {decoded_byte_size} bytes but test case configured to reject.");
