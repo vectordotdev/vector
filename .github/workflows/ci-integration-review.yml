@@ -36,8 +36,6 @@ permissions:
   statuses: write
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
