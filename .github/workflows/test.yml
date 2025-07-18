@@ -52,7 +52,7 @@ jobs:
       - run: make check-clippy
 
   test:
-    name: Unit - x86_64-unknown-linux-gnu
+    name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
     runs-on: ubuntu-24.04-8core
     if: needs.changes.outputs.source == 'true'
     needs: changes
@@ -62,21 +62,19 @@ jobs:
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: cargo install cargo-nextest --version 0.9.95 --force --locked
-      - run: make test
+
+      - name: Unit Test
+        run: make test
         env:
           CARGO_BUILD_JOBS: 5
 
-  test-component-validation:
-    name: Check Component Spec
-    runs-on: ubuntu-24.04
-    needs: changes
-    steps:
-      - uses: actions/checkout@v4
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo bash ./scripts/environment/install-protoc.sh
-      - run: cargo install cargo-nextest --version 0.9.95 --force --locked
-      - run: make test-component-validation
+      # Validates components for adherence to the Component Specification
+      - name: Check Component Spec
+        run: make test-component-validation
+
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
 
   check-version:
     name: Check version
