@@ -4,10 +4,10 @@
 //! into structured log events.
 
 use crate::config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput};
-use crate::event::Event;
 use crate::shutdown::ShutdownSignal;
 use crate::sources::Source;
 use crate::SourceSender;
+use crate::sources::netflow::events::*;
 use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use vector_lib::internal_event::InternalEvent;
@@ -19,7 +19,6 @@ pub mod protocols;
 pub mod templates;
 
 pub use config::NetflowConfig;
-pub use events::*;
 
 /// Main netflow source implementation
 async fn netflow_source(

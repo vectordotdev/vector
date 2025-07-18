@@ -7,13 +7,10 @@
 use crate::sources::netflow::events::*;
 use crate::sources::netflow::fields::FieldParser;
 use crate::sources::netflow::templates::{
-    TemplateCache, Template, TemplateField,
-    parse_ipfix_template_fields,
+    TemplateCache, Template,
 };
-
-use base64::Engine;
+use crate::sources::netflow::templates::parse_ipfix_template_fields;
 use std::net::SocketAddr;
-use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
 
@@ -325,7 +322,7 @@ impl IpfixParser {
                 }
                 Err(e) => {
                     emit!(NetflowTemplateError {
-                        error: &e,
+                        error: e.as_str(),
                         template_id,
                         peer_addr,
                     });
@@ -556,9 +553,10 @@ impl vector_lib::internal_event::InternalEvent for IpfixTemplateReceived {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::netflow::config::NetflowConfig;
+    use crate::sources::netflow::NetflowConfig;
     use crate::sources::netflow::fields::FieldParser;
-    use crate::sources::netflow::templates::TemplateCache;
+    use crate::sources::netflow::templates::{TemplateCache, TemplateField};
+    use base64::Engine;
     use std::net::{IpAddr, Ipv4Addr};
 
     fn test_peer_addr() -> SocketAddr {

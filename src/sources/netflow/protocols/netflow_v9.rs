@@ -11,10 +11,7 @@ use crate::sources::netflow::templates::{
     TemplateCache, Template, TemplateField,
     parse_netflow_v9_template_fields,
 };
-
-use base64::Engine;
 use std::net::SocketAddr;
-use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
 
@@ -302,6 +299,7 @@ impl NetflowV9Parser {
             );
 
             // Validate template ID range (256-65535 for data templates)
+            // Note: Options templates can have IDs < 256, so we validate here for regular templates
             if template_id < 256 {
                 warn!("Invalid template ID {}, must be >= 256", template_id);
                 offset += 4;
@@ -352,7 +350,7 @@ impl NetflowV9Parser {
                 }
                 Err(e) => {
                     emit!(NetflowTemplateError {
-                        error: &e,
+                        error: e.as_str(),
                         template_id,
                         peer_addr,
                     });
@@ -592,6 +590,7 @@ mod tests {
     use crate::sources::netflow::config::NetflowConfig;
     use crate::sources::netflow::fields::FieldParser;
     use crate::sources::netflow::templates::TemplateCache;
+    use base64::Engine;
     use std::net::{IpAddr, Ipv4Addr};
 
     fn test_peer_addr() -> SocketAddr {
@@ -795,9 +794,15 @@ mod tests {
         // Should parse options template
         assert!(!events.is_empty());
         
-        // Template should be cached
+        // Debug: print all cached templates
+        let debug_templates = template_cache.debug_templates(10);
+        println!("Cached templates: {:?}", debug_templates);
+        println!("Template cache stats: {:?}", template_cache.stats());
+        
+        // Template should be cached - check with correct key
         let key = (test_peer_addr(), 1, 257);
-        assert!(template_cache.get(&key).is_some());
+        let template = template_cache.get(&key);
+        assert!(template.is_some(), "Template should be cached for key {:?}", key);
     }
 
    #[test]

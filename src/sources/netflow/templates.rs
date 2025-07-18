@@ -4,7 +4,6 @@
 //! This module provides thread-safe template caching with automatic cleanup.
 
 
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -13,6 +12,8 @@ use std::time::{Duration, Instant};
 use lru::LruCache;
 #[cfg(not(test))]
 use std::num::NonZeroUsize;
+#[cfg(test)]
+use std::collections::HashMap;
 
 use crate::sources::netflow::events::*;
 use tracing::debug;
@@ -566,9 +567,12 @@ mod tests {
         template.last_used = Instant::now() - Duration::from_secs(7200); // 2 hours ago
         cache.insert(key, template);
         
-        // Should find it before cleanup
-        assert!(cache.get(&key).is_some());
+        // Should find it before cleanup (but don't call get() as it updates last_used)
+        let debug_templates = cache.debug_templates(10);
+        assert!(!debug_templates.is_empty());
         
+        // Debug: print templates before cleanup
+        println!("Templates before cleanup: {:?}", debug_templates);
         // Cleanup with 1 hour timeout should remove it
         cache.cleanup_expired(3600);
         

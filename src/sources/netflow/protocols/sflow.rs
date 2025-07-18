@@ -5,10 +5,7 @@
 //! exports raw packet samples and interface counters at regular intervals.
 
 use crate::sources::netflow::events::*;
-
-use base64::Engine;
 use std::net::SocketAddr;
-use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
 
@@ -1119,8 +1116,9 @@ impl vector_lib::internal_event::InternalEvent for SflowPacketProcessed {
 #[cfg(test)]
 mod tests {
    use super::*;
-   use crate::sources::netflow::config::NetflowConfig;
+   use crate::sources::netflow::NetflowConfig;
    use crate::sources::netflow::fields::FieldParser;
+   use base64::Engine;
    use std::net::{IpAddr, Ipv4Addr};
 
    fn test_peer_addr() -> SocketAddr {
@@ -1372,8 +1370,8 @@ mod tests {
            assert!(log.get("raw_data").is_some());
            let raw_data = log.get("raw_data").unwrap().as_str().unwrap();
            
-           // Should be valid base64
-           assert!(base64::engine::general_purpose::STANDARD.decode(raw_data.as_bytes()).is_ok());
+                       // Should be valid base64
+            assert!(base64::engine::general_purpose::STANDARD.decode(raw_data.as_bytes()).is_ok());
        }
 
        // Test without raw data inclusion
