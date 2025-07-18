@@ -85,8 +85,8 @@ pub(crate) async fn recv_from_websocket(
 ) -> Result<(), ()> {
     const PING: &[u8] = b"PING";
     const PONG: &[u8] = b"PONG";
-    let ping_interval = config.ping_interval;
-    let ping_timeout = config.ping_timeout;
+    let ping_interval = config.common.ping_interval;
+    let ping_timeout = config.common.ping_timeout;
 
     let (ws_sink, ws_source) = create_sink_and_stream(params.connector.clone()).await;
     pin_mut!(ws_sink);
@@ -129,7 +129,7 @@ pub(crate) async fn recv_from_websocket(
                     Ok(Message::Ping(ping)) => {
                         emit!(WsBytesReceived{
                             byte_size: ping.len(),
-                            url: &config.uri,
+                            url: &config.common.uri,
                             protocol: PROTOCOL,
                             kind: WsKind::Ping,
                         });
@@ -149,7 +149,7 @@ pub(crate) async fn recv_from_websocket(
                     Ok(Message::Text(msg_txt)) => {
                         emit!(WsBytesReceived{
                             byte_size: msg_txt.len(),
-                            url: &config.uri,
+                            url: &config.common.uri,
                             protocol: PROTOCOL,
                             kind: WsKind::Text,
                         });
@@ -160,7 +160,7 @@ pub(crate) async fn recv_from_websocket(
                             payload: msg_txt,
                             log_namespace: &params.log_namespace,
                         },
-                        &config.uri,
+                        &config.common.uri,
                         ).await;
 
                         Ok(())
@@ -169,12 +169,12 @@ pub(crate) async fn recv_from_websocket(
                     Ok(Message::Binary(msg_bytes)) => {
                         emit!(WsBytesReceived{
                             byte_size: msg_bytes.len(),
-                            url: &config.uri,
+                            url: &config.common.uri,
                             protocol: PROTOCOL,
                             kind: WsKind::Binary,
                         });
 
-                        handle_binary_payload(msg_bytes, &params, &config.uri, out.clone()).await
+                        handle_binary_payload(msg_bytes, &params, &config.common.uri, out.clone()).await
                     },
 
                     Ok(Message::Close(_)) => {

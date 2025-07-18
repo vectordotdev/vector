@@ -1,9 +1,11 @@
 use std::{
     fmt::Debug,
     net::SocketAddr,
+    num::NonZeroU64,
     task::{Context, Poll},
     time::Duration,
 };
+use vector_config_macros::configurable_component;
 
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
@@ -24,7 +26,7 @@ use crate::{
     dns,
     http::Auth,
     internal_events::{WsConnectionEstablished, WsConnectionFailedError},
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
 
 #[allow(unreachable_pub)]
@@ -176,5 +178,56 @@ impl PingInterval {
 
     pub(crate) async fn tick(&mut self) -> time::Instant {
         std::future::poll_fn(|cx| self.poll_tick(cx)).await
+    }
+}
+
+/// Shared websocket configuration for sources and sinks.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct WebSocketCommonConfig {
+    /// The WebSocket URI to connect to.
+    ///
+    /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+    pub uri: String,
+
+    /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
+    ///
+    /// If this option is not configured, pings are not sent on an interval.
+    ///
+    /// If the `ping_timeout` is not set, pings are still sent but there is no expectation of pong
+    /// response times.
+    ///
+    /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub ping_interval: Option<NonZeroU64>,
+
+    /// The number of seconds to wait for a [Pong][pong] response from the remote peer.
+    ///
+    /// If a response is not received within this time, the connection is re-established.
+    ///
+    /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
+    // NOTE: this option is not relevant if the `ping_interval` is not configured.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub ping_timeout: Option<NonZeroU64>,
+
+    /// TLS configuration.
+    #[configurable(derived)]
+    pub tls: Option<TlsEnableableConfig>,
+
+    /// HTTP Authentication.
+    #[configurable(derived)]
+    pub auth: Option<Auth>,
+}
+
+impl Default for WebSocketCommonConfig {
+    fn default() -> Self {
+        Self {
+            uri: "ws://127.0.0.1:8080".to_owned(),
+            ping_interval: None,
+            ping_timeout: None,
+            tls: None,
+            auth: None,
+        }
     }
 }

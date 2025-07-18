@@ -47,8 +47,8 @@ impl WebSocketSink {
             transformer,
             encoder,
             connector,
-            ping_interval: config.ping_interval,
-            ping_timeout: config.ping_timeout,
+            ping_interval: config.common.ping_interval,
+            ping_timeout: config.common.ping_timeout,
         })
     }
 
@@ -235,6 +235,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        common::websocket::WebSocketCommonConfig,
         config::{SinkConfig, SinkContext},
         http::Auth,
         test_util::{
@@ -250,13 +251,15 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{addr}"),
-            tls: None,
+                common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -273,13 +276,15 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{addr}"),
-            tls: None,
+                common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -294,22 +299,25 @@ mod tests {
         let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
+    
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{addr}"),
-            tls: Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    verify_certificate: Some(false),
-                    verify_hostname: Some(true),
-                    ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                    ..Default::default()
+            common: WebSocketCommonConfig {
+                uri: format!("wss://{addr}"),
+                tls: Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(false),
+                        verify_hostname: Some(true),
+                        ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        ..Default::default()
+                    },
+                }),
+                ping_timeout: None,
+                ping_interval: None,
+                    auth: None,
                 },
-            }),
             encoding: JsonSerializerConfig::default().into(),
-            ping_timeout: None,
-            ping_interval: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
 
         send_events_and_assert(addr, config, tls, None).await;
@@ -321,13 +329,15 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{addr}"),
-            tls: None,
+                common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
