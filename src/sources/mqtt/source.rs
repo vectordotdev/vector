@@ -107,7 +107,7 @@ impl MqttSource {
     }
 
     fn apply_metadata(&self, publish: &Publish, event: &mut Event) {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             self.log_namespace.insert_source_metadata(
                 MqttSourceConfig::NAME,
                 log,

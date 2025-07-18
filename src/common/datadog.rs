@@ -93,7 +93,7 @@ pub struct DatadogPoint<T>(pub i64, pub T);
 ///
 /// If `endpoint` is not specified, we fallback to `site`.
 pub(crate) fn get_api_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
-    endpoint.map_or_else(|| format!("https://api.{}", site), compute_api_endpoint)
+    endpoint.map_or_else(|| format!("https://api.{site}"), compute_api_endpoint)
 }
 
 /// Computes the Datadog API endpoint from a given endpoint string.

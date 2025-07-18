@@ -541,7 +541,7 @@ mod tests {
                 let (req, _) = req.into_parts();
                 if delay.swap(false, AcqRel) {
                     // Error on first request
-                    future::err::<(), _>(std::io::Error::new(std::io::ErrorKind::Other, "")).boxed()
+                    future::err::<(), _>(std::io::Error::other("")).boxed()
                 } else {
                     sent_requests.lock().unwrap().push(req);
                     future::ok::<_, std::io::Error>(()).boxed()

@@ -83,9 +83,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
     fn from(redis_conn_info: &redis::ConnectionInfo) -> Self {
         let (protocol, endpoint) = match &redis_conn_info.addr {
             redis::ConnectionAddr::Tcp(host, port)
-            | redis::ConnectionAddr::TcpTls { host, port, .. } => {
-                ("tcp", format!("{}:{}", host, port))
-            }
+            | redis::ConnectionAddr::TcpTls { host, port, .. } => ("tcp", format!("{host}:{port}")),
             redis::ConnectionAddr::Unix(path) => ("uds", path.to_string_lossy().to_string()),
         };
 

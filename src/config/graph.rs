@@ -26,7 +26,7 @@ impl fmt::Display for Node {
             Node::Source { outputs } => {
                 write!(f, "component_kind: source\n  outputs:")?;
                 for output in outputs {
-                    write!(f, "\n    {}", output)?;
+                    write!(f, "\n    {output}")?;
                 }
                 Ok(())
             }
@@ -36,7 +36,7 @@ impl fmt::Display for Node {
                     "component_kind: source\n  input_types: {in_ty}\n  outputs:"
                 )?;
                 for output in outputs {
-                    write!(f, "\n    {}", output)?;
+                    write!(f, "\n    {output}")?;
                 }
                 Ok(())
             }
@@ -187,7 +187,7 @@ impl Graph {
                 "Available components:\n{}",
                 self.nodes
                     .iter()
-                    .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
+                    .map(|(key, node)| format!("\"{key}\":\n  {node}"))
                     .collect::<Vec<_>>()
                     .join("\n")
             );
@@ -353,7 +353,7 @@ impl Graph {
 
         for id in self.valid_inputs() {
             if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
-                errors.insert(format!("Input specifier {} is ambiguous", id));
+                errors.insert(format!("Input specifier {id} is ambiguous"));
             }
         }
 

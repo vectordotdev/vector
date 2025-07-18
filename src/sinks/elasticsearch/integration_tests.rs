@@ -210,7 +210,7 @@ async fn structures_events_correctly() {
     flush(common).await.unwrap();
 
     let response = reqwest::Client::new()
-        .get(format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -680,7 +680,7 @@ async fn run_insert_tests_with_config(
 
     let client = create_http_client();
     let mut response = client
-        .get(format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .basic_auth("elastic", Some("vector"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
@@ -769,7 +769,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let mut total = 0;
     for base_url in base_urls {
         if let Ok(response) = client
-            .get(format!("{}/{}/_search", base_url, index))
+            .get(format!("{base_url}/{index}/_search"))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }

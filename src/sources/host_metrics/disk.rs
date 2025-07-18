@@ -103,12 +103,7 @@ mod tests {
             "disk_written_bytes_total",
             "disk_writes_completed_total",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 4,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
         }
 
         // They should all have a "device" tag

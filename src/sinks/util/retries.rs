@@ -469,9 +469,7 @@ mod tests {
             let backoff = policy.backoff();
             assert!(
                 !backoff.is_zero() && backoff <= max_duration,
-                "Expected backoff to not exceed {:?}, got {:?}",
-                max_duration,
-                backoff
+                "Expected backoff to not exceed {max_duration:?}, got {backoff:?}"
             );
 
             policy.advance();

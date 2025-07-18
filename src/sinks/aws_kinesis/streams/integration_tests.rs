@@ -200,7 +200,7 @@ async fn ensure_stream(stream_name: String) {
         .await
     {
         Ok(_) => (),
-        Err(error) => panic!("Unable to check the stream {:?}", error),
+        Err(error) => panic!("Unable to check the stream {error:?}"),
     };
 
     // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors

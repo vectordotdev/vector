@@ -101,6 +101,7 @@ pub(crate) fn add_index(
     Ok(index)
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn is_case_sensitive(
     arguments: &ArgumentList,
     state: &TypeState,

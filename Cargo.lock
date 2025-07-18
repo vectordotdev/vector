@@ -12352,6 +12352,7 @@ dependencies = [
  "vector-vrl-functions",
  "vrl",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

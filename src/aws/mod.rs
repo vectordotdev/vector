@@ -130,7 +130,7 @@ pub trait ClientBuilder {
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
-) -> crate::Result<impl ProvideRegion> {
+) -> crate::Result<impl ProvideRegion + use<>> {
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 

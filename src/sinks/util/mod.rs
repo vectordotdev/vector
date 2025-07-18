@@ -122,7 +122,7 @@ pub fn encode_namespace<'a>(
 ) -> String {
     let name = name.into();
     namespace
-        .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
+        .map(|namespace| format!("{namespace}{delimiter}{name}"))
         .unwrap_or_else(|| name.into_owned())
 }
 
