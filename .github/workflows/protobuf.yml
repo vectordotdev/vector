@@ -22,6 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       # Install the `buf` CLI
       - uses: bufbuild/buf-setup-action@v1.50.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       # Perform breaking change detection against the `master` branch
       - uses: bufbuild/buf-breaking-action@v1.1.4
         with:
