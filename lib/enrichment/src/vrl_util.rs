@@ -55,6 +55,22 @@ pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Co
                     .ok_or("to in condition must be a timestamp")?,
             }
         }
+        Value::Object(map) if map.contains_key("from") => Condition::FromDate {
+            field: key,
+            from: *map
+                .get("from")
+                .expect("should contain from")
+                .as_timestamp()
+                .ok_or("from in condition must be a timestamp")?,
+        },
+        Value::Object(map) if map.contains_key("to") => Condition::ToDate {
+            field: key,
+            to: *map
+                .get("to")
+                .expect("should contain to")
+                .as_timestamp()
+                .ok_or("to in condition must be a timestamp")?,
+        },
         _ => Condition::Equals { field: key, value },
     })
 }
@@ -64,14 +80,19 @@ pub(crate) fn add_index(
     registry: &mut TableRegistry,
     tablename: &str,
     case: Case,
-    condition: &BTreeMap<String, expression::Expr>,
+    condition: &BTreeMap<KeyString, expression::Expr>,
 ) -> std::result::Result<IndexHandle, ExpressionError> {
     let fields = condition
         .iter()
         .filter_map(|(field, value)| match value {
             expression::Expr::Container(expression::Container {
                 variant: expression::Variant::Object(map),
-            }) if map.contains_key("from") && map.contains_key("to") => None,
+            }) if (map.contains_key("from") && map.contains_key("to"))
+                || map.contains_key("from")
+                || map.contains_key("to") =>
+            {
+                None
+            }
             _ => Some(field.as_ref()),
         })
         .collect::<Vec<_>>();
@@ -80,6 +101,7 @@ pub(crate) fn add_index(
     Ok(index)
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn is_case_sensitive(
     arguments: &ArgumentList,
     state: &TypeState,
@@ -112,10 +134,8 @@ mod tests {
     #[test]
     fn add_indexes() {
         let mut registry = test_util::get_table_registry();
-        let conditions = BTreeMap::from([(
-            "field".to_owned(),
-            expression::Literal::from("value").into(),
-        )]);
+        let conditions =
+            BTreeMap::from([("field".into(), expression::Literal::from("value").into())]);
         let index = add_index(&mut registry, "dummy1", Case::Insensitive, &conditions).unwrap();
 
         assert_eq!(IndexHandle(0), index);

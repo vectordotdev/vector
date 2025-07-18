@@ -58,42 +58,50 @@ components: sources: aws_kinesis_firehose: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_kinesis_firehose.configuration
+	configuration: generated.components.sources.aws_kinesis_firehose.configuration
 
-	output: logs: {
-		line: {
-			description: "One event will be published per incoming AWS Kinesis Firehose record."
-			fields: {
-				timestamp: fields._current_timestamp
-				message: {
-					description: "The raw record from the incoming payload."
-					required:    true
-					type: string: {
-						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+	output: {
+		logs: {
+			line: {
+				description: "One event will be published per incoming AWS Kinesis Firehose record."
+				fields: {
+					timestamp: fields._current_timestamp
+					message: {
+						description: "The raw record from the incoming payload."
+						required:    true
+						type: string: {
+							examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+						}
 					}
-				}
-				request_id: {
-					description: "The AWS Kinesis Firehose request ID, value of the `X-Amz-Firehose-Request-Id` header."
-					required:    true
-					type: string: {
-						examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+					request_id: {
+						description: "The AWS Kinesis Firehose request ID, value of the `X-Amz-Firehose-Request-Id` header."
+						required:    true
+						type: string: {
+							examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+						}
 					}
-				}
-				source_arn: {
-					description: "The AWS Kinesis Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
-					required:    true
-					type: string: {
-						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+					source_arn: {
+						description: "The AWS Kinesis Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
+						required:    true
+						type: string: {
+							examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+						}
 					}
-				}
-				source_type: {
-					description: "The name of the source type."
-					required:    true
-					type: string: {
-						examples: ["aws_kinesis_firehose"]
+					source_type: {
+						description: "The name of the source type."
+						required:    true
+						type: string: {
+							examples: ["aws_kinesis_firehose"]
+						}
 					}
 				}
 			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 
@@ -187,8 +195,9 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		request_read_errors_total:             components.sources.internal_metrics.output.metrics.request_read_errors_total
-		requests_received_total:               components.sources.internal_metrics.output.metrics.requests_received_total
-		request_automatic_decode_errors_total: components.sources.internal_metrics.output.metrics.request_automatic_decode_errors_total
+
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

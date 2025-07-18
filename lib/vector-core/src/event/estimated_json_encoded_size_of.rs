@@ -5,7 +5,7 @@ use chrono::{DateTime, Timelike, Utc};
 use ordered_float::NotNan;
 use smallvec::SmallVec;
 use vector_common::json_size::JsonSize;
-use vrl::value::Value;
+use vrl::value::{KeyString, Value};
 
 const NULL_SIZE: JsonSize = JsonSize::new(4);
 const TRUE_SIZE: JsonSize = JsonSize::new(4);
@@ -87,7 +87,7 @@ impl EstimatedJsonEncodedSizeOf for Value {
 /// need for UTF-8 replacement characters.
 ///
 /// This is the main reason why `EstimatedJsonEncodedSizeOf` is named as is, as most other types can
-/// be calculated exactly without a noticable performance penalty.
+/// be calculated exactly without a noticeable performance penalty.
 impl EstimatedJsonEncodedSizeOf for str {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         JsonSize::new(QUOTES_SIZE + self.len())
@@ -95,6 +95,12 @@ impl EstimatedJsonEncodedSizeOf for str {
 }
 
 impl EstimatedJsonEncodedSizeOf for String {
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        self.as_str().estimated_json_encoded_size_of()
+    }
+}
+
+impl EstimatedJsonEncodedSizeOf for KeyString {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         self.as_str().estimated_json_encoded_size_of()
     }

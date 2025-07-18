@@ -1,20 +1,25 @@
 use std::cell::RefCell;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_buffers::{BufferConfig, BufferType};
-use vector_config::{
+use serde_with::serde_as;
+use std::path::PathBuf;
+use vector_lib::buffers::{BufferConfig, BufferType};
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::configurable::{
     configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
 };
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
-use vector_core::{
+use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
+    id::Inputs,
     sink::VectorSink,
 };
 
-use super::{id::Inputs, schema, ComponentKey, ProxyConfig, Resource};
+use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
+use crate::extra_context::ExtraContext;
 use crate::sinks::{util::UriSerde, Healthcheck};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
@@ -33,7 +38,7 @@ impl Configurable for BoxedSink {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_config::component::SinkDescription::generate_schemas(gen)
+        vector_lib::configurable::component::SinkDescription::generate_schemas(gen)
     }
 }
 
@@ -52,6 +57,10 @@ where
     T: Configurable + Serialize + 'static,
 {
     #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub graph: GraphConfig,
+
+    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -59,25 +68,19 @@ where
     /// This must be a valid URI, which requires at least the scheme and host. All other
     /// components -- port, path, etc -- are allowed as well.
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
-    healthcheck_uri: Option<UriSerde>,
+    pub healthcheck_uri: Option<UriSerde>,
 
     #[configurable(derived, metadata(docs::advanced))]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
-    healthcheck: SinkHealthcheckOptions,
+    pub healthcheck: SinkHealthcheckOptions,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
-    proxy: ProxyConfig,
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub proxy: ProxyConfig,
 
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
@@ -100,6 +103,7 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: Default::default(),
+            graph: Default::default(),
         }
     }
 
@@ -156,17 +160,27 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            graph: self.graph,
         }
     }
 }
 
 /// Healthcheck configuration.
+#[serde_as]
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct SinkHealthcheckOptions {
     /// Whether or not to check the health of the sink when Vector starts up.
     pub enabled: bool,
+
+    /// Timeout duration for healthcheck in seconds.
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    #[serde(
+        default = "default_healthcheck_timeout",
+        skip_serializing_if = "is_default_healthcheck_timeout"
+    )]
+    pub timeout: Duration,
 
     /// The full URI to make HTTP healthcheck requests to.
     ///
@@ -176,26 +190,38 @@ pub struct SinkHealthcheckOptions {
     pub uri: Option<UriSerde>,
 }
 
+const fn default_healthcheck_timeout() -> Duration {
+    Duration::from_secs(10)
+}
+
+fn is_default_healthcheck_timeout(timeout: &Duration) -> bool {
+    timeout == &default_healthcheck_timeout()
+}
+
 impl Default for SinkHealthcheckOptions {
     fn default() -> Self {
         Self {
             enabled: true,
             uri: None,
+            timeout: default_healthcheck_timeout(),
         }
     }
 }
 
 impl From<bool> for SinkHealthcheckOptions {
     fn from(enabled: bool) -> Self {
-        Self { enabled, uri: None }
+        Self {
+            enabled,
+            ..Default::default()
+        }
     }
 }
 
 impl From<UriSerde> for SinkHealthcheckOptions {
     fn from(uri: UriSerde) -> Self {
         Self {
-            enabled: true,
             uri: Some(uri),
+            ..Default::default()
         }
     }
 }
@@ -218,6 +244,11 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
 
+    /// Gets the files to watch to trigger reload
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        Vec::new()
+    }
+
     /// Gets the list of resources, if any, used by this sink.
     ///
     /// Resources represent dependencies -- network ports, file descriptors, and so on -- that
@@ -235,12 +266,34 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
 dyn_clone::clone_trait_object!(SinkConfig);
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone)]
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
+    pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
+    pub app_name: String,
+    pub app_name_slug: String,
+
+    /// Extra context data provided by the running app and shared across all components. This can be
+    /// used to pass shared settings or other data from outside the components.
+    pub extra_context: ExtraContext,
+}
+
+impl Default for SinkContext {
+    fn default() -> Self {
+        Self {
+            healthcheck: Default::default(),
+            globals: Default::default(),
+            enrichment_tables: Default::default(),
+            proxy: Default::default(),
+            schema: Default::default(),
+            app_name: crate::get_app_name().to_string(),
+            app_name_slug: crate::get_slugified_app_name(),
+            extra_context: Default::default(),
+        }
+    }
 }
 
 impl SinkContext {

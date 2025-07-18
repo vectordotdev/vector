@@ -56,38 +56,46 @@ components: sources: socket: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.socket.configuration
+	configuration: generated.components.sources.socket.configuration
 
-	output: logs: line: {
-		description: "A single socket event."
-		fields: {
-			host: {
-				description: "The peer host IP address."
-				required:    true
-				type: string: {
-					examples: ["129.21.31.122"]
+	output: {
+		logs: line: {
+			description: "A single socket event."
+			fields: {
+				host: {
+					description: "The peer host IP address."
+					required:    true
+					type: string: {
+						examples: ["129.21.31.122"]
+					}
 				}
-			}
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["socket"]
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["socket"]
+					}
 				}
-			}
-			port: {
-				description: "The peer source port."
-				required:    false
-				common:      true
-				type: uint: {
-					default: null
-					unit:    null
-					examples: [2838]
+				port: {
+					description: "The peer source port."
+					required:    false
+					common:      true
+					type: uint: {
+						default: null
+						unit:    null
+						examples: [2838]
+					}
 				}
+				client_metadata: fields._client_metadata
 			}
-			client_metadata: fields._client_metadata
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 
@@ -111,12 +119,9 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total:     components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_send_errors_total: components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_received_bytes:     components.sources.internal_metrics.output.metrics.component_received_bytes
 	}
 }

@@ -1,17 +1,17 @@
 #![allow(missing_docs)]
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::event::Event;
 
-pub(self) mod datadog_search;
+mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
 pub(crate) mod is_trace;
 mod vrl;
 
+pub use self::datadog_search::{DatadogSearchConfig, DatadogSearchRunner};
 pub use self::vrl::VrlConfig;
 use self::{
-    datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
     is_trace::{check_is_trace, check_is_trace_with_context},
@@ -116,7 +116,10 @@ pub enum ConditionConfig {
 }
 
 impl ConditionConfig {
-    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    pub fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
@@ -148,7 +151,10 @@ pub trait Conditional: std::fmt::Debug {
 }
 
 pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition>;
+    fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition>;
 }
 
 dyn_clone::clone_trait_object!(ConditionalConfig);
@@ -184,7 +190,10 @@ pub enum AnyCondition {
 }
 
 impl AnyCondition {
-    pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
+    pub fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+    ) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => {
                 let vrl_config = VrlConfig {

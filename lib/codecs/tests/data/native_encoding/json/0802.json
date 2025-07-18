@@ -1,1 +1,1 @@
-{"log":{"!\u001f":-8909374146578806210}}
+{"metric":{"name":"m","namespace":"a","tags":{"d":"r","s":"y"},"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[-2149],"n":[1]},"count":1,"min":-289856.0,"max":-289856.0,"sum":-204672.0,"avg":-665600.0}}}}}

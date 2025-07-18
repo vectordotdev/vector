@@ -1,1 +1,1 @@
-{"metric":{"name":"f","namespace":"n","timestamp":"1970-01-01T08:42:05.000012897Z","kind":"incremental","aggregated_histogram":{"buckets":[{"upper_limit":239232.0,"count":3697607650411877705}],"count":1413932012078540208,"sum":-888128.0}}}
+{"log":{"⁦":null}}

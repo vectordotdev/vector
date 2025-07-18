@@ -8,6 +8,8 @@ remap: functions: del: {
 		For dynamic path deletion, see the `remove` function.
 		"""
 
+	pure: false
+
 	arguments: [
 		{
 			name:        "path"
@@ -18,8 +20,8 @@ remap: functions: del: {
 		{
 			name: "compact"
 			description: """
-				If compact is true, after deletion, if an empty object or array is left
-				behind, it should be removed as well, cascading up to the root. This only
+				After deletion, if `compact` is `true` and there is an empty object or array left,
+				the empty object or array is also removed, cascading up to the root. This only
 				applies to the path being deleted, and any parent paths.
 				"""
 			required: false

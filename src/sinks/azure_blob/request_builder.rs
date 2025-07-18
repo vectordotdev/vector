@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::encoding::Framer;
 use uuid::Uuid;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::codecs::encoding::Framer;
+use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -66,12 +66,11 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let blob_name = {
-            let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
-
-            self.blob_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
-                .unwrap_or_else(|| formatted_ts.to_string())
+        let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
+        let blob_name = if self.blob_append_uuid {
+            format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+        } else {
+            formatted_ts.to_string()
         };
 
         let extension = self.compression.extension();
@@ -93,20 +92,9 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         AzureBlobRequest {
             blob_data,
             content_encoding: self.compression.content_encoding(),
-            content_type: self.compression.content_type(),
+            content_type: self.encoder.1.content_type(),
             metadata: azure_metadata,
             request_metadata,
-        }
-    }
-}
-
-impl Compression {
-    pub const fn content_type(self) -> &'static str {
-        match self {
-            Self::None => "text/plain",
-            Self::Gzip(_) => "application/gzip",
-            Self::Zlib(_) => "application/zlib",
-            Self::Zstd(_) => "application/zstd",
         }
     }
 }

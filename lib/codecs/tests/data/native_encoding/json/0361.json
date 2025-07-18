@@ -1,1 +1,1 @@
-{"log":{"=㰙⁐":[{},-738752.0,false],"‣*:":false}}
+{"metric":{"name":"a","interval_ms":2516192506,"kind":"absolute","distribution":{"samples":[{"value":604480.0,"rate":3972213681}],"statistic":"histogram"}}}

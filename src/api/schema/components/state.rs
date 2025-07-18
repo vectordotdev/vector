@@ -1,17 +1,15 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock, RwLock},
 };
-
-use once_cell::sync::Lazy;
 
 use super::{sink, source, transform, Component};
 use crate::config::{ComponentKey, OutputId};
 
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
-pub static COMPONENTS: Lazy<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+pub static COMPONENTS: LazyLock<Arc<RwLock<HashMap<ComponentKey, Component>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Filter components with the provided `map_func`
 pub fn filter_components<T>(map_func: impl Fn((&ComponentKey, &Component)) -> Option<T>) -> Vec<T> {

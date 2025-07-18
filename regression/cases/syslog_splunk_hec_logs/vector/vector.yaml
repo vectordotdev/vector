@@ -1,0 +1,35 @@
+data_dir: "/var/lib/vector"
+
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type:       "syslog"
+    address:    "0.0.0.0:8282"
+    max_length: 1500000
+    mode:       "tcp"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  splunk_hec_logs:
+    type:     "splunk_hec_logs"
+    inputs: [ "syslog" ]
+    endpoint: "http://0.0.0.0:8080"
+    encoding:
+      codec: "json"
+    token:    "abcd1234"
+    healthcheck:
+      enabled: false

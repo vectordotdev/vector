@@ -21,9 +21,9 @@ remap: functions: mod: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't an integer or float",
-		"`modulus` isn't an integer or float",
-		"`modulus` is equal to 0",
+		"`value` is not an integer or float.",
+		"`modulus` is not an integer or float.",
+		"`modulus` is equal to 0.",
 	]
 	return: types: ["string"]
 
@@ -31,7 +31,7 @@ remap: functions: mod: {
 		{
 			title: "Calculate the remainder of two integers"
 			source: #"""
-				remainder = mod(5, 2)
+				mod(5, 2)
 				"""#
 			return: 1
 		},

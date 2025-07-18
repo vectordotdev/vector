@@ -5,26 +5,45 @@ fn generate_config() {
     crate::test_util::test_generate_config::<DockerLogsConfig>();
 }
 
-#[test]
-fn exclude_self() {
-    let (tx, _rx) = SourceSender::new_test();
-    let mut source = DockerLogsSource::new(
-        DockerLogsConfig::default(),
-        tx,
-        ShutdownSignal::noop(),
-        LogNamespace::Legacy,
-    )
-    .unwrap();
-    source.hostname = Some("451062c59603".to_owned());
-    assert!(source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3"));
-
-    // hostname too short
-    source.hostname = Some("a".to_owned());
-    assert!(!source.exclude_self("a29d569bd46c"));
-}
-
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
+    #[test]
+    /// Should only run when docker daemon is up. DockerLogsSource::new will fail if docker socket
+    /// is not present even though it is not used.
+    fn exclude_self() {
+        let (tx, _rx) = SourceSender::new_test();
+        let mut source = DockerLogsSource::new(
+            DockerLogsConfig::default(),
+            tx,
+            ShutdownSignal::noop(),
+            LogNamespace::Legacy,
+        )
+        .unwrap();
+        source.hostname = Some("451062c59603".to_owned());
+        assert!(
+            source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
+        );
+
+        // hostname too short
+        source.hostname = Some("a".to_owned());
+        assert!(!source.exclude_self("a29d569bd46c"));
+    }
+
+    use bollard::{
+        query_parameters::{
+            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
+        },
+        query_parameters::{
+            KillContainerOptions, RemoveContainerOptions, StartContainerOptions,
+            WaitContainerOptions,
+        },
+        secret::ContainerCreateBody,
+    };
+    use futures::{stream::TryStreamExt, FutureExt};
+    use itertools::Itertools as _;
+    use similar_asserts::assert_eq;
+    use vrl::value;
+
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
@@ -36,16 +55,6 @@ mod integration_tests {
         },
         SourceSender,
     };
-    use bollard::{
-        container::{
-            Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
-            RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-        },
-        image::{CreateImageOptions, ListImagesOptions},
-    };
-    use futures::{stream::TryStreamExt, FutureExt};
-    use similar_asserts::assert_eq;
-    use vrl::value;
 
     /// None if docker is not present on the system
     async fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -99,7 +108,7 @@ mod integration_tests {
             vec![
                 "sh",
                 "-c",
-                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {log}; i=$((i+1)); done").as_str(),
             ],
             docker,
             false
@@ -138,14 +147,16 @@ mod integration_tests {
 
         trace!("Creating container.");
 
-        let options = Some(CreateContainerOptions {
-            name,
-            platform: None,
-        });
-        let config = ContainerConfig {
-            image: Some("busybox"),
-            cmd: Some(cmd),
-            labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+        let options = Some(CreateContainerOptionsBuilder::new().name(name).build());
+
+        let config = ContainerCreateBody {
+            image: Some("busybox".to_string()),
+            cmd: Some(cmd.iter().map(|i| i.to_string()).collect::<Vec<_>>()),
+            labels: label.map(|label| {
+                vec![(label.to_string(), String::new())]
+                    .into_iter()
+                    .collect()
+            }),
             tty: Some(tty),
             ..Default::default()
         };
@@ -158,26 +169,24 @@ mod integration_tests {
         let mut filters = HashMap::new();
         filters.insert("reference", vec!["busybox:latest"]);
 
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
+        let options = Some(ListImagesOptionsBuilder::new().filters(&filters).build());
 
         let images = docker.list_images(options).await.unwrap();
         if images.is_empty() {
             // If `busybox:latest` not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: "busybox",
-                tag: "latest",
-                ..Default::default()
-            });
+            let options = Some(
+                CreateImageOptionsBuilder::new()
+                    .from_image("busybox")
+                    .tag("latest")
+                    .build(),
+            );
 
             docker
                 .create_image(options, None, None)
                 .for_each(|item| async move {
                     let info = item.unwrap();
                     if let Some(error) = info.error {
-                        panic!("{:?}", error);
+                        panic!("{error:?}");
                     }
                 })
                 .await
@@ -188,7 +197,7 @@ mod integration_tests {
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
         trace!("Starting container.");
 
-        let options = None::<StartContainerOptions<&str>>;
+        let options = None::<StartContainerOptions>;
         docker.start_container(id, options).await
     }
 
@@ -197,7 +206,7 @@ mod integration_tests {
         trace!("Waiting for container.");
 
         docker
-            .wait_container(id, None::<WaitContainerOptions<&str>>)
+            .wait_container(id, None::<WaitContainerOptions>)
             .try_for_each(|exit| async move {
                 info!(message = "Container exited with status code.", status_code = ?exit.status_code);
                 Ok(())
@@ -210,7 +219,7 @@ mod integration_tests {
         trace!("Waiting for container to be killed.");
 
         docker
-            .kill_container(id, None::<KillContainerOptions<&str>>)
+            .kill_container(id, None::<KillContainerOptions>)
             .await
     }
 
@@ -253,7 +262,7 @@ mod integration_tests {
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
         }
         id
@@ -273,7 +282,7 @@ mod integration_tests {
         let id = eternal_container(name, label, log, &docker).await;
         if let Err(error) = container_start(&id, &docker).await {
             container_remove(&id, &docker).await;
-            panic!("Container start failed with error: {:?}", error);
+            panic!("Container start failed with error: {error:?}");
         }
 
         // Wait for before message
@@ -444,7 +453,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -641,7 +650,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -868,14 +877,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
-                .collect::<Box<_>>()
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;
@@ -939,14 +947,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
-                .collect::<Box<_>>()
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;

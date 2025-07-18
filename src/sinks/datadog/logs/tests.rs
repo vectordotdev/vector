@@ -9,19 +9,21 @@ use futures::{
     StreamExt,
 };
 use http::request::Parts;
-use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::{
+use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
+use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
 use crate::{
-    config::SinkConfig,
+    common::datadog,
+    config::{SinkConfig, SinkContext},
+    extra_context::ExtraContext,
     http::HttpError,
     sinks::{
         util::retries::RetryLogic,
-        util::test::{build_test_server_status, load_sink},
+        util::test::{load_sink, load_sink_with_context},
     },
     test_util::{
         components::{
@@ -34,37 +36,6 @@ use crate::{
 };
 
 use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
-
-// The sink must support v1 and v2 API endpoints which have different codes for
-// signaling status. This enum allows us to signal which API endpoint and what
-// kind of response we want our test to model without getting into the details
-// of exactly what that code is.
-enum ApiStatus {
-    OKv1,
-    OKv2,
-    BadRequestv1,
-    BadRequestv2,
-}
-
-fn test_server(
-    addr: std::net::SocketAddr,
-    api_status: ApiStatus,
-) -> (
-    futures::channel::mpsc::Receiver<(http::request::Parts, Bytes)>,
-    stream_cancel::Trigger,
-    impl std::future::Future<Output = Result<(), ()>>,
-) {
-    let status = match api_status {
-        ApiStatus::OKv1 => StatusCode::OK,
-        ApiStatus::OKv2 => StatusCode::ACCEPTED,
-        ApiStatus::BadRequestv1 | ApiStatus::BadRequestv2 => StatusCode::BAD_REQUEST,
-    };
-
-    // NOTE: we pass `Trigger` out to the caller even though this suite never
-    // uses it as it's being dropped cancels the stream machinery here,
-    // indicating failures that might not be valid.
-    build_test_server_status(addr, status)
-}
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));
@@ -116,8 +87,8 @@ async fn start_test_detail(
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -271,8 +242,8 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -283,7 +254,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -351,8 +322,8 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -378,43 +349,34 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
 }
 
 #[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is set when
-/// 'enterprise' is flagged on, v2 API
+/// Assert that events are sent and the DD-EVP-ORIGIN header is not set, v2 API
 ///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// active we should set the origin header discussed above correctly, as well as
+/// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
-async fn enterprise_headers_v2() {
-    enterprise_headers_inner(ApiStatus::OKv2).await
+async fn headers_v2() {
+    headers_inner(ApiStatus::OKv2).await
 }
 
 #[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is set when
-/// 'enterprise' is flagged on, v1 API
+/// Assert that events are sent and the DD-EVP-ORIGIN header is not set, v1 API
 ///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// active we should set the origin header discussed above correctly, as well as
+/// When this flag is not active we should not set the origin header discussed above, as well as
 /// still sending events through the sink.
-async fn enterprise_headers_v1() {
-    enterprise_headers_inner(ApiStatus::OKv1).await
+async fn headers_v1() {
+    headers_inner(ApiStatus::OKv1).await
 }
 
-async fn enterprise_headers_inner(api_status: ApiStatus) {
+async fn headers_inner(api_status: ApiStatus) {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
-
-            [request]
-            headers.DD-EVP-ORIGIN = "vector-enterprise"
         "#})
     .unwrap();
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -425,70 +387,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
-        e.iter_logs_mut().for_each(|log| {
-            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
-        });
-        e
-    });
-
-    sink.run(events).await.unwrap();
-    let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
-    let parts = output.0;
-
-    assert_eq!(
-        parts.headers.get("DD-EVP-ORIGIN").unwrap(),
-        "vector-enterprise"
-    );
-    assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
-}
-
-#[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is not set when
-/// 'enterprise' is flagged off, v2 API
-///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// not active we should not set the origin header discussed above, as well as
-/// still sending events through the sink.
-async fn no_enterprise_headers_v2() {
-    no_enterprise_headers_inner(ApiStatus::OKv2).await
-}
-
-#[tokio::test]
-/// Assert that events are sent and the DD-EVP-ORIGIN header is not set when
-/// 'enterprise' is flagged off, v1 API
-///
-/// Vector allows for flagging a global 'enterprise' context that indicates
-/// whether we're running in Datadog enterprise mode or not. When this flag is
-/// not active we should not set the origin header discussed above, as well as
-/// still sending events through the sink.
-async fn no_enterprise_headers_v1() {
-    no_enterprise_headers_inner(ApiStatus::OKv1).await
-}
-
-async fn no_enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-        "#})
-    .unwrap();
-
-    let addr = next_addr();
-    // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
-    config.dd_common.endpoint = Some(endpoint.clone());
-
-    let (sink, _) = config.build(cx).await.unwrap();
-
-    let (rx, _trigger, server) = test_server(addr, api_status);
-    tokio::spawn(server);
-
-    let (_expected_messages, events) = random_lines_with_stream(100, 10, None);
-
-    let api_key = "0xDECAFBAD";
-    let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -533,4 +432,141 @@ async fn error_is_retriable() {
     // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
     //       but are not straightforward to instantiate due to the design of
     //       the crates they originate from.
+}
+
+#[tokio::test]
+async fn does_not_send_too_big_payloads() {
+    crate::test_util::trace_init();
+
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+            default_api_key = "atoken"
+            compression = "none"
+        "#})
+    .unwrap();
+
+    let addr = next_addr();
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (mut rx, _trigger, server) = test_server(addr, ApiStatus::OKv2);
+    tokio::spawn(server);
+
+    // Generate input that will require escaping when serialized to json, and therefore grow in size
+    // between batching and encoding. This is a very specific example that will fit in a batch of
+    // <4,250,000 but serialize to >5,000,000, defeating the current 750k safety buffer.
+    let events = (0..1000).map(|_n| {
+        let data = serde_json::json!({"a": "b"});
+        let nested = serde_json::to_string(&data).unwrap();
+        event_with_api_key(&nested.repeat(401), "foo")
+    });
+
+    sink.run_events(events).await.unwrap();
+
+    let mut sizes = Vec::new();
+    loop {
+        tokio::select! {
+            Some((_parts, body)) = rx.next() => {
+                sizes.push(body.len());
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
+                break;
+            }
+        }
+    }
+
+    assert!(!sizes.is_empty());
+    for size in sizes {
+        assert!(size < 5_000_000, "{size} not less than max");
+    }
+}
+
+#[tokio::test]
+async fn global_options() {
+    let config = indoc! {r#"
+            compression = "none"
+        "#};
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = test_server(addr, ApiStatus::OKv1);
+    tokio::spawn(server);
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let (_expected, events) = random_lines_with_stream(100, 10, Some(batch));
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "global-key"));
+}
+
+#[tokio::test]
+async fn override_global_options() {
+    let config = indoc! {r#"
+            default_api_key = "local-key"
+            compression = "none"
+        "#};
+
+    // Set a global key option, which should be overridden by the option in the component configuration.
+    let cx = SinkContext {
+        extra_context: ExtraContext::single_value(datadog::Options {
+            api_key: Some("global-key".to_string().into()),
+            ..Default::default()
+        }),
+        ..SinkContext::default()
+    };
+    let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it
+    // to our local server
+    let endpoint = format!("http://{addr}");
+    config.local_dd_common.endpoint = Some(endpoint.clone());
+
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = test_server(addr, ApiStatus::OKv1);
+    tokio::spawn(server);
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let (_expected, events) = random_lines_with_stream(100, 10, Some(batch));
+
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = rx
+        .take(1)
+        .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
+        .collect::<Vec<_>>()
+        .await;
+
+    assert!(keys
+        .iter()
+        .all(|value| value.to_str().unwrap() == "local-key"));
 }

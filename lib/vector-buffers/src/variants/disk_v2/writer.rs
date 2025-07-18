@@ -39,7 +39,7 @@ use crate::{
     Bufferable,
 };
 
-/// Error that occurred during calls to [`Writer`].
+/// Error that occurred during calls to [`BufferWriter`].
 #[derive(Debug, Snafu)]
 pub enum WriterError<T>
 where
@@ -109,7 +109,7 @@ where
 
     /// The writer failed to validate the last written record.
     ///
-    /// Specifically, for `Writer`, this can only ever be returned when creating the buffer, during
+    /// Specifically, for `BufferWriter`, this can only ever be returned when creating the buffer, during
     /// validation of the last written record.  While it's technically possible that it may be
     /// something else, this error is most likely to occur when the records in a buffer were written
     /// in a different version of Vector that cannot be decoded in this version of Vector.
@@ -228,7 +228,7 @@ pub(super) struct FlushResult {
 
 /// Wraps an [`AsyncWrite`] value and buffers individual writes, while signalling implicit flushes.
 ///
-/// As the [`Writer`] must track when writes have theoretically made it to disk, we care about
+/// As the [`BufferWriter`] must track when writes have theoretically made it to disk, we care about
 /// situations where the internal write buffer for a data file has been flushed to make room.  In
 /// order to provide this information, we track the number of events represented by a record when
 /// writing its serialized form.
@@ -322,7 +322,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         self.unflushed_events = 0;
         self.buf.clear();
 
-        result.map(|_| {
+        result.map(|()| {
             Some(FlushResult {
                 events_flushed,
                 bytes_flushed,
@@ -472,7 +472,7 @@ where
             record.encode(&mut encode_buf)
         };
         let encoded_len = encode_result
-            .map(|_| self.encode_buf.len())
+            .map(|()| self.encode_buf.len())
             .context(FailedToEncodeSnafu)?;
         if encoded_len > self.max_record_size {
             return Err(WriterError::RecordTooLarge {
@@ -648,7 +648,7 @@ where
     /// `InconsistentState`, as being unable to immediately deserialize and decode a record we just serialized and
     /// encoded implies a fatal, and unrecoverable, error with the buffer implementation as a whole.
     #[instrument(skip(self), level = "trace")]
-    pub fn recover_archived_record(&mut self, token: WriteToken) -> Result<T, WriterError<T>> {
+    pub fn recover_archived_record(&mut self, token: &WriteToken) -> Result<T, WriterError<T>> {
         // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
         let serialized_len = token.serialized_len();
         debug_assert_eq!(
@@ -709,7 +709,7 @@ where
 
 /// Writes records to the buffer.
 #[derive(Debug)]
-pub struct Writer<T, FS>
+pub struct BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,
@@ -727,17 +727,17 @@ where
     _t: PhantomData<T>,
 }
 
-impl<T, FS> Writer<T, FS>
+impl<T, FS> BufferWriter<T, FS>
 where
     T: Bufferable,
     FS: Filesystem + fmt::Debug + Clone,
     FS::File: Unpin,
 {
-    /// Creates a new [`Writer`] attached to the given [`Ledger`].
+    /// Creates a new [`BufferWriter`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
         let config = ledger.config().clone();
         let next_record_id = ledger.state().get_next_writer_record_id();
-        Writer {
+        BufferWriter {
             ledger,
             config,
             writer: None,
@@ -1161,12 +1161,7 @@ where
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
     pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
-        self.try_write_record_inner(record)
-            .await
-            .map(|result| match result {
-                Ok(_) => None,
-                Err(record) => Some(record),
-            })
+        self.try_write_record_inner(record).await.map(Result::err)
     }
 
     #[instrument(skip_all, level = "debug")]
@@ -1219,8 +1214,6 @@ where
                             last_attempted_write_size = serialized_len,
                             "Current data file reached maximum size. Rolling to the next data file."
                         );
-
-                        continue;
                     }
                     e => return Err(e),
                 },
@@ -1247,7 +1240,7 @@ where
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
             // errors if we encounter them, but if we recover the record successfully, we're returning
             // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
-            return Ok(Err(writer.recover_archived_record(token)?));
+            return Ok(Err(writer.recover_archived_record(&token)?));
         };
 
         // Track our write since things appear to have succeeded. This only updates our internal
@@ -1294,7 +1287,6 @@ where
                 Err(old_record) => {
                     record = old_record;
                     self.ledger.wait_for_reader().await;
-                    continue;
                 }
             }
         }
@@ -1345,7 +1337,7 @@ where
     }
 }
 
-impl<T, FS> Writer<T, FS>
+impl<T, FS> BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,
@@ -1368,7 +1360,7 @@ where
     }
 }
 
-impl<T, FS> Drop for Writer<T, FS>
+impl<T, FS> Drop for BufferWriter<T, FS>
 where
     FS: Filesystem,
     FS::File: Unpin,

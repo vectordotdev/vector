@@ -8,9 +8,8 @@ use vector::{
     conditions::Condition,
     transforms::{filter::Filter, FunctionTransform, OutputBuffer},
 };
-use vector_core::event::{Event, LogEvent};
+use vector_lib::event::{Event, LogEvent};
 
-#[derive(Debug)]
 struct Payload {
     filter: Filter,
     output: OutputBuffer,

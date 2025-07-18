@@ -28,12 +28,14 @@ sinks:
 - influxdb_logs
 - influxdb_metrics
 - kafka
+- keep
 - mezmo
 - loki
 - nats
 - new_relic_logs
 - new_relic
 - papertrail
+- postgres
 - prometheus_exporter
 - prometheus_remote_write
 - pulsar
@@ -61,6 +63,7 @@ sources:
 - postgresql_metrics
 - prometheus_remote_write
 - prometheus_scrape
+- pulsar
 - socket
 - splunk_hec
 - statsd

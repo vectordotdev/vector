@@ -76,7 +76,7 @@ impl EventFinalizers {
 
     /// Merges the event finalizers from `other` into the collection.
     pub fn merge(&mut self, other: Self) {
-        self.0.extend(other.0.into_iter());
+        self.0.extend(other.0);
     }
 
     /// Updates the status of all event finalizers in the collection.
@@ -462,7 +462,7 @@ mod tests {
         assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    #[ignore] // The current implementation does not deduplicate finalizers
+    #[ignore = "The current implementation does not deduplicate finalizers"]
     #[test]
     fn clone_and_merge_events() {
         let (mut fin1, mut receiver) = make_finalizer();

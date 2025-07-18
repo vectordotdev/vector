@@ -4,7 +4,7 @@ use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 
 use crate::{
-    file_watcher::{tests::*, FileWatcher},
+    file_watcher::{tests::*, FileWatcher, RawLineResult},
     ReadFrom,
 };
 
@@ -49,7 +49,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
             }
             FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
-                new_path.set_extension(format!("log.{}", rotation_count));
+                new_path.set_extension(format!("log.{rotation_count}"));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
@@ -63,17 +63,23 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.bytes.is_empty() => {
+                        Ok(RawLineResult {
+                            raw_line: Some(line),
+                            ..
+                        }) if line.bytes.is_empty() => {
                             attempts -= 1;
                             assert!(fwfiles[read_index].read_line().is_none());
                             continue;
                         }
-                        Ok(None) => {
+                        Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
                             assert!(fwfiles[read_index].read_line().is_none());
                             continue;
                         }
-                        Ok(Some(line)) => {
+                        Ok(RawLineResult {
+                            raw_line: Some(line),
+                            ..
+                        }) => {
                             let exp = fwfiles[read_index].read_line().expect("could not readline");
                             assert_eq!(exp.into_bytes(), line.bytes);
                             // assert_eq!(sz, buf.len() + 1);

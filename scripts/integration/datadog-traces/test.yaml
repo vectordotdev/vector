@@ -19,6 +19,6 @@ matrix:
 paths:
 - "src/common/datadog.rs"
 - "src/internal_events/datadog_*"
-- "src/sinks/datadog/**"
+- "src/sinks/datadog/traces/**"
 - "src/sinks/util/**"
 - "scripts/integration/datadog-traces/**"

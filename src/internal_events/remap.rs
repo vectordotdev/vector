@@ -1,8 +1,6 @@
-use crate::emit;
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{
     error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
 };
 
@@ -21,13 +19,14 @@ impl InternalEvent for RemapMappingError {
             error = ?self.error,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
         if self.event_dropped {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,

@@ -22,7 +22,7 @@ crate::script_wrapper! {
 }
 
 crate::script_wrapper! {
-    events = "Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md"
+    events = "Check that events satisfy patterns set in <https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md>"
         => "check-events"
 }
 

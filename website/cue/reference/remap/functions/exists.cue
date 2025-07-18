@@ -5,10 +5,10 @@ remap: functions: exists: {
 	description: """
 		Checks whether the `path` exists for the target.
 
-		This function allows you to distinguish between a missing path,
-		or a path with a `null` value, something a regular path lookup
-		such as `.foo` would not allow, since that always returns `null`
-		if the path doesn't exist.
+		This function distinguishes between a missing path
+		and a path with a `null` value. A regular path lookup,
+		such as `.foo`, cannot distinguish between the two cases
+		since it always returns `null` if the path doesn't exist.
 		"""
 
 	arguments: [

@@ -5,13 +5,13 @@ use std::sync::{
 
 use async_trait::async_trait;
 use futures_util::FutureExt;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     config::LogNamespace,
     event::{Event, LogEvent},
     schema::Definition,
 };
-use vector_core::{
+use vector_lib::{
     config::{DataType, SourceOutput},
     source::Source,
 };
@@ -45,7 +45,7 @@ impl SourceConfig for BackpressureSourceConfig {
             for i in 0.. {
                 let _result = cx
                     .out
-                    .send_event(Event::Log(LogEvent::from(format!("event-{}", i))))
+                    .send_event(Event::Log(LogEvent::from(format!("event-{i}"))))
                     .await;
                 counter.fetch_add(1, Ordering::AcqRel);
 
@@ -64,8 +64,8 @@ impl SourceConfig for BackpressureSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
-            DataType::all(),
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
             Definition::default_legacy_namespace(),
         )]
     }

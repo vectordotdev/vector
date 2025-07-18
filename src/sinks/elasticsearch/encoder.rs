@@ -1,29 +1,58 @@
 use std::{io, io::Write};
 
 use serde::Serialize;
-use vector_buffers::EventCount;
-use vector_common::{
+use serde_json::json;
+use vector_lib::buffers::EventCount;
+use vector_lib::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
     internal_event::TaggedEventsSent,
     json_size::JsonSize,
     request_metadata::{GetEventCountTags, GroupedCountByteSize},
 };
-use vector_core::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::{
-        elasticsearch::BulkAction,
+        elasticsearch::{BulkAction, VersionType},
         util::encoding::{as_tracked_write, Encoder},
     },
 };
+
+#[derive(Serialize)]
+pub enum DocumentVersionType {
+    External,
+    ExternalGte,
+}
+
+impl DocumentVersionType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            DocumentVersionType::External => VersionType::External.as_str(),
+            DocumentVersionType::ExternalGte => VersionType::ExternalGte.as_str(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct DocumentVersion {
+    pub kind: DocumentVersionType,
+    pub value: u64,
+}
+
+#[derive(Serialize)]
+pub enum DocumentMetadata {
+    WithoutId,
+    Id(String),
+    IdAndVersion(String, DocumentVersion),
+}
 
 #[derive(Serialize)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
     pub log: LogEvent,
-    pub id: Option<String>,
+    pub document_metadata: DocumentMetadata,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -34,7 +63,14 @@ impl Finalizable for ProcessedEvent {
 
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
-        self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+        match &self.document_metadata {
+            DocumentMetadata::WithoutId => {
+                self.index.allocated_bytes() + self.log.allocated_bytes()
+            }
+            DocumentMetadata::Id(id) | DocumentMetadata::IdAndVersion(id, _) => {
+                self.index.allocated_bytes() + self.log.allocated_bytes() + id.allocated_bytes()
+            }
+        }
     }
 }
 
@@ -86,13 +122,16 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticsearchEncoder {
                 &event.index,
                 &self.doc_type,
                 self.suppress_type_name,
-                &event.id,
+                &event.document_metadata,
             )?;
             written_bytes +=
                 as_tracked_write::<_, _, io::Error>(writer, &log, |mut writer, log| {
-                    writer.write_all(&[b'\n'])?;
+                    writer.write_all(b"\n")?;
+                    // False positive clippy hit on the following line. Clippy wants us to skip the
+                    // borrow, but then the value is moved for the following line.
+                    #[allow(clippy::needless_borrows_for_generic_args)]
                     serde_json::to_writer(&mut writer, log)?;
-                    writer.write_all(&[b'\n'])?;
+                    writer.write_all(b"\n")?;
                     Ok(())
                 })?;
         }
@@ -107,34 +146,90 @@ fn write_bulk_action(
     index: &str,
     doc_type: &str,
     suppress_type: bool,
-    id: &Option<String>,
+    document: &DocumentMetadata,
 ) -> std::io::Result<usize> {
     as_tracked_write(
         writer,
-        (bulk_action, index, doc_type, id, suppress_type),
-        |writer, (bulk_action, index, doc_type, id, suppress_type)| match (id, suppress_type) {
-            (Some(id), true) => {
+        (bulk_action, index, doc_type, suppress_type, document),
+        |writer, (bulk_action, index, doc_type, suppress_type, document)| match (
+            suppress_type,
+            document,
+        ) {
+            (true, DocumentMetadata::Id(id)) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
-                    bulk_action, index, id
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_index": index,
+                            "_id": id,
+                        }
+                    }),
                 )
             }
-            (Some(id), false) => {
+            (false, DocumentMetadata::Id(id)) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
-                    bulk_action, index, doc_type, id
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_type": doc_type,
+                            "_index": index,
+                            "_id": id,
+                        }
+                    }),
                 )
             }
-            (None, true) => {
-                write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
-            }
-            (None, false) => {
+            (true, DocumentMetadata::WithoutId) => {
                 write!(
                     writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
-                    bulk_action, index, doc_type
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_index": index,
+                        }
+                    }),
+                )
+            }
+            (false, DocumentMetadata::WithoutId) => {
+                write!(
+                    writer,
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_type": doc_type,
+                            "_index": index,
+                        }
+                    }),
+                )
+            }
+            (true, DocumentMetadata::IdAndVersion(id, version)) => {
+                write!(
+                    writer,
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_id": id,
+                            "_index": index,
+                            "version_type": version.kind.as_str(),
+                            "version": version.value,
+                        }
+                    }),
+                )
+            }
+            (false, DocumentMetadata::IdAndVersion(id, version)) => {
+                write!(
+                    writer,
+                    "{}",
+                    json!({
+                        bulk_action: {
+                            "_id": id,
+                            "_type": doc_type,
+                            "_index": index,
+                            "version_type": version.kind.as_str(),
+                            "version": version.value,
+                        }
+                    }),
                 )
             }
         },
@@ -149,14 +244,15 @@ mod tests {
     fn suppress_type_with_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             true,
-            &Some("ID".to_string()),
-        );
+            &DocumentMetadata::Id("ID".to_string()),
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -177,7 +273,15 @@ mod tests {
     fn suppress_type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+        write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            true,
+            &DocumentMetadata::WithoutId,
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -197,14 +301,15 @@ mod tests {
     fn type_with_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(
+        write_bulk_action(
             &mut writer,
             "ACTION",
             "INDEX",
             "TYPE",
             false,
-            &Some("ID".to_string()),
-        );
+            &DocumentMetadata::Id("ID".to_string()),
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -226,7 +331,15 @@ mod tests {
     fn type_without_id() {
         let mut writer = Vec::new();
 
-        _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+        write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            false,
+            &DocumentMetadata::WithoutId,
+        )
+        .unwrap();
 
         let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
         let value = value.as_object().unwrap();
@@ -241,5 +354,35 @@ mod tests {
         assert!(!nested.contains_key("_id"));
         assert!(nested.contains_key("_type"));
         assert_eq!(nested.get("_type").unwrap().as_str(), Some("TYPE"));
+    }
+
+    #[test]
+    fn encodes_fields_with_newlines() {
+        let mut writer = Vec::new();
+
+        write_bulk_action(
+            &mut writer,
+            "ACTION\n",
+            "INDEX\n",
+            "TYPE\n",
+            false,
+            &DocumentMetadata::Id("ID\n".to_string()),
+        )
+        .unwrap();
+
+        let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
+        let value = value.as_object().unwrap();
+
+        assert!(value.contains_key("ACTION\n"));
+
+        let nested = value.get("ACTION\n").unwrap();
+        let nested = nested.as_object().unwrap();
+
+        assert!(nested.contains_key("_index"));
+        assert_eq!(nested.get("_index").unwrap().as_str(), Some("INDEX\n"));
+        assert!(nested.contains_key("_id"));
+        assert_eq!(nested.get("_id").unwrap().as_str(), Some("ID\n"));
+        assert!(nested.contains_key("_type"));
+        assert_eq!(nested.get("_type").unwrap().as_str(), Some("TYPE\n"));
     }
 }

@@ -1,6 +1,6 @@
 {{ $examples := .examples }}
 {{ $levels := slice "common" "advanced" }}
-{{ $formats := slice "toml" "yaml" "json" }}
+{{ $formats := slice "yaml"  "toml" "json" }}
 <div x-data="{ level: 'common', format: $store.global.format }" class="no-prose mb-4 border dark:border-gray-700 rounded-md shadow py-4 px-6">
   <span>
     {{ partial "heading.html" (dict "text" "Example configurations" "level" 3) }}

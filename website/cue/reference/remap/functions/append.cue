@@ -9,13 +9,13 @@ remap: functions: append: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The initial array"
+			description: "The initial array."
 			required:    true
 			type: ["array"]
 		},
 		{
 			name:        "items"
-			description: "The items to append"
+			description: "The items to append."
 			required:    true
 			type: ["array"]
 		},

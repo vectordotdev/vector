@@ -1,31 +1,29 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::{
-    error::Error as _, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll,
-    time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{error::Error as _, future::Future, pin::Pin, task::Context, task::Poll, time::Duration};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
-use codecs::decoding::{DeserializerConfig, FramingConfig};
+use chrono::DateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use lookup::owned_value_path;
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
-    metadata::{errors::InvalidMetadataValue, MetadataValue},
+    metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::internal_event::{
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
+use vrl::path;
 use vrl::value::{kind::Collection, Kind};
 
 use crate::{
@@ -67,7 +65,7 @@ type Finalizer = UnorderedFinalizer<Vec<String>>;
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/google.pubsub.v1.rs"));
 
-    use vector_core::ByteSizeOf;
+    use vector_lib::ByteSizeOf;
 
     impl ByteSizeOf for StreamingPullResponse {
         fn allocated_bytes(&self) -> usize {
@@ -93,31 +91,21 @@ mod proto {
 
 #[derive(Debug, Snafu)]
 pub(crate) enum PubsubError {
-    #[snafu(display("Could not parse credentials metadata: {}", source))]
-    Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
     #[snafu(display("Could not create endpoint: {}", source))]
     Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect: {}", source))]
-    Connect { source: tonic::transport::Error },
-    #[snafu(display("Could not pull data from remote: {}", source))]
-    Pull { source: Status },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
-    #[snafu(display("Cannot set both `ack_deadline_secs` and `ack_deadline_seconds`"))]
-    BothAckDeadlineSecsAndSeconds,
-    #[snafu(display("Cannot set both `retry_delay_secs` and `retry_delay_seconds`"))]
-    BothRetryDelaySecsAndSeconds,
 }
 
-static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
+static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
@@ -130,9 +118,11 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
+    #[configurable(metadata(docs::examples = "my-log-source-project"))]
     pub project: String,
 
     /// The subscription within the project which is configured to receive logs.
+    #[configurable(metadata(docs::examples = "my-vector-source-subscription"))]
     pub subscription: String,
 
     /// The endpoint from which to pull data.
@@ -279,7 +269,7 @@ impl SourceConfig for PubsubConfig {
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
         let mut tls_config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = tls.identity_pem() {
@@ -360,7 +350,10 @@ impl SourceConfig for PubsubConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -486,7 +479,9 @@ impl PubsubSource {
                 }
                 Ok(req)
             },
-        );
+        )
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
@@ -663,7 +658,7 @@ impl PubsubSource {
             message
                 .attributes
                 .into_iter()
-                .map(|(key, value)| (key, Value::Bytes(value.into())))
+                .map(|(key, value)| (key.into(), Value::Bytes(value.into())))
                 .collect(),
         );
         let log_namespace = self.log_namespace;
@@ -672,11 +667,7 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                DateTime::from_utc(
-                    NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                        .expect("invalid timestamp"),
-                    Utc,
-                )
+                DateTime::from_timestamp(dt.seconds, dt.nanos as u32).expect("invalid timestamp")
             }),
             batch,
             log_namespace,
@@ -687,15 +678,15 @@ impl PubsubSource {
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("message_id")),
-                    "message_id",
+                    Some(LegacyKey::Overwrite(path!("message_id"))),
+                    path!("message_id"),
                     message.message_id.clone(),
                 );
                 log_namespace.insert_source_metadata(
                     PubsubConfig::NAME,
                     log,
-                    Some(LegacyKey::Overwrite("attributes")),
-                    "attributes",
+                    Some(LegacyKey::Overwrite(path!("attributes"))),
+                    path!("attributes"),
                     attributes.clone(),
                 )
             }
@@ -726,7 +717,7 @@ fn is_reset(error: &Status) -> bool {
         .and_then(|source| source.downcast_ref::<hyper::Error>())
         .and_then(|error| error.source())
         .and_then(|source| source.downcast_ref::<h2::Error>())
-        .map_or(false, |error| error.is_remote() && error.is_reset())
+        .is_some_and(|error| error.is_remote() && error.is_reset())
 }
 
 #[pin_project::pin_project]
@@ -745,8 +736,8 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use lookup::OwnedTargetPath;
-    use vector_core::schema::Definition;
+    use vector_lib::lookup::OwnedTargetPath;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -837,12 +828,13 @@ mod tests {
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
+    use std::sync::LazyLock;
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
-    use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
     use vrl::btreemap;
@@ -854,13 +846,13 @@ mod integration_tests {
     use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
-    static PROJECT_URI: Lazy<String> =
-        Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
+    static PROJECT_URI: LazyLock<String> =
+        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+    static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
@@ -883,7 +875,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -906,7 +898,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
@@ -919,7 +911,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
@@ -935,7 +927,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn acks_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -990,7 +982,7 @@ mod integration_tests {
     ) {
         components::init_test();
 
-        let tls_settings = TlsSettings::from_options(&None).unwrap();
+        let tls_settings = TlsSettings::from_options(None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
@@ -1002,10 +994,7 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp_opt(start, 0).expect("invalid timestamp"),
-            Utc,
-        )
+        DateTime::from_timestamp(start, 0).expect("invalid timestamp")
     }
 
     struct Tester {
@@ -1119,7 +1108,7 @@ mod integration_tests {
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
             let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
+            serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 
         async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {
@@ -1170,7 +1159,7 @@ mod integration_tests {
                 .clone();
             assert_eq!(logattr.len(), attributes.len());
             for (a, b) in logattr.into_iter().zip(&attributes) {
-                assert_eq!(&a.0, b.0);
+                assert_eq!(&a.0, b.0.as_str());
                 assert_eq!(a.1, b.1.clone().into());
             }
         }

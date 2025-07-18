@@ -13,8 +13,8 @@ use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_common::request_metadata::MetaDescriptive;
-use vector_core::event::EventStatus;
+use vector_lib::event::EventStatus;
+use vector_lib::request_metadata::MetaDescriptive;
 
 use super::{
     acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
@@ -282,8 +282,8 @@ mod tests {
     use bytes::Bytes;
     use futures_util::{poll, stream::FuturesUnordered, StreamExt};
     use tower::{util::BoxService, Service, ServiceExt};
-    use vector_common::internal_event::CountByteSize;
-    use vector_core::{
+    use vector_lib::internal_event::CountByteSize;
+    use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
     };
@@ -370,10 +370,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 let ack_id =
@@ -385,10 +382,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/ack"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(ack_response)
             .mount(&mock_server)
@@ -528,10 +522,7 @@ mod tests {
         // Override the usual event endpoint
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 ResponseTemplate::new(200).set_body_json(r#"{ "new": "a new response body" }"#)

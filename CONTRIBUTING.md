@@ -42,10 +42,9 @@ Vector team member will find this document useful.
 
 ## Your First Contribution
 
-1. Ensure your change has an issue! Find an
+1. For large PRs or for breaking changes, ensure your change has an issue! Find an
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
    - This is where you can get a feel if the change will be accepted or not.
-     Changes that are questionable will have a `needs: approval` label.
 2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
    GitHub account (only applicable to outside contributors).
 3. [Create a new Git branch][urls.create_branch].
@@ -102,7 +101,11 @@ outputs to reference the filter, and finally update the outputs of `workflow_cal
 ### Git Branches
 
 _All_ changes must be made in a branch and submitted as [pull requests](#github-pull-requests).
-Vector does not adopt any type of branch naming style, but please use something
+
+If you want your branch to have a website preview build created, include the word `website` in the
+branch.
+
+Otherwise, Vector does not adopt any type of branch naming style, but please use something
 descriptive of your changes.
 
 ### Git Commits
@@ -112,6 +115,45 @@ descriptive of your changes.
 Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
+
+#### Pre-push
+
+To reduce iterations you can create do the following:
+
+```shell
+touch .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+You can use the following as a starting point:
+
+```shell
+#!/bin/sh
+set -e
+echo "Running pre-push checks..."
+
+# We recommend always running all the following checks.
+make check-licenses
+make check-fmt
+make check-clippy
+make check-component-docs
+
+# Some other checks that in our experience rarely fail on PRs.
+make check-deny
+make check-docs
+make check-version
+make check-examples
+make check-scripts
+
+./scripts/check_changelog_fragments.sh
+
+# The following check is very slow.
+# make check-component-features
+```
+
+Please note that `make check-all` covers all checks, but it is slow and may runs checks not
+relevant to your PR. This command is defined
+[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
 
 ### GitHub Pull Requests
 
@@ -128,7 +170,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -161,6 +203,15 @@ with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
 process.
+
+#### Changelog
+
+By default, all pull requests are assumed to include user-facing changes that
+need to be communicated in the project's changelog. If your pull request does
+not contain user-facing changes that warrant describing in the changelog, add
+the label 'no-changelog' to your PR. When in doubt, consult the vector team
+for guidance. The details on how to add a changelog entry for your PR are
+outlined in detail in [changelog.d/README.md](changelog.d/README.md).
 
 ### CI
 
@@ -221,6 +272,36 @@ Integration tests are not run by default when running
 `cargo vdev test`. Instead, they are accessible via the integration subcommand (example:
 `cargo vdev int test aws` runs aws-related integration tests). You can find the list of available integration tests using `cargo vdev int show`. Integration tests require docker or podman to run.
 
+### Running other checks
+
+There are other checks that are run by CI before the PR can be merged. These should be run locally
+first to ensure they pass.
+
+```sh
+# Run the Clippy linter to catch common mistakes.
+cargo vdev check rust --clippy
+# Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
+cargo vdev check fmt
+# Ensure the internal metrics that Vector emits conform to standards.
+cargo vdev check events
+# Ensure the `LICENSE-3rdparty.csv` file is up to date with the licenses each of Vector's dependencies are published under.
+cargo vdev check licenses
+# Vector's documentation for each component is generated from the comments attached to the Component structs and members.
+# Running this ensures that the generated docs are up to date.
+make check-component-docs
+# Generate the code documentation for the Vector project.
+# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
+cd rust-doc && make docs
+```
+
+### Updating licences
+
+```sh
+cargo install dd-rust-license-tool --locked
+dd-rust-license-tool write
+git commit -am "dd-rust-license-tool write"
+git push
+```
 
 ### Deprecations
 

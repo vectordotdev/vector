@@ -1,1 +1,1 @@
-{"log":{"S|6":[]}}
+{"metric":{"name":"e","tags":{"a":"h","x":"x"},"timestamp":"1970-01-01T00:00:00.000020875Z","interval_ms":3949664363,"kind":"absolute","aggregated_histogram":{"buckets":[],"count":5622889468742944741,"sum":-466176.0}}}

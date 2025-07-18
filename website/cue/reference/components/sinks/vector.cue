@@ -30,6 +30,7 @@ components: sinks: vector: {
 			}
 			compression: enabled: false
 			encoding: enabled:    false
+			proxy: enabled:       true
 			request: {
 				enabled: true
 				headers: false
@@ -75,9 +76,9 @@ components: sinks: vector: {
 		traces: true
 	}
 
-	configuration: base.components.sinks.vector.configuration
+	configuration: generated.components.sinks.vector.configuration
 
-	how_it_works: components.sources.vector.how_it_works
+	how_it_works: components.sinks.vector.how_it_works
 
 	telemetry: metrics: {
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total

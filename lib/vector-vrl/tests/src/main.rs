@@ -4,6 +4,8 @@
 mod docs;
 mod test_enrichment;
 
+use std::env;
+use std::path::PathBuf;
 use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
 
 use chrono_tz::Tz;
@@ -54,7 +56,7 @@ pub struct Cmd {
 impl Cmd {
     fn timezone(&self) -> TimeZone {
         if let Some(ref tz) = self.timezone {
-            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {tz}"))
         } else {
             TimeZone::Named(Tz::UTC)
         }
@@ -95,6 +97,7 @@ fn main() {
 
     let mut functions = vrl::stdlib::all();
     functions.extend(vector_vrl_functions::all());
+    functions.extend(dnstap_parser::vrl_functions());
     functions.extend(enrichment::vrl_functions());
 
     run_tests(
@@ -111,18 +114,26 @@ fn main() {
     );
 }
 
+pub fn test_dir() -> PathBuf {
+    PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
+}
+
+fn test_glob_pattern() -> String {
+    test_dir().join("**/*.vrl").to_str().unwrap().to_string()
+}
 fn get_tests(cmd: &Cmd) -> Vec<Test> {
-    glob("tests/**/*.vrl")
+    glob(test_glob_pattern().as_str())
         .expect("valid pattern")
         .filter_map(|entry| {
             let path = entry.ok()?;
             Some(Test::from_path(&path))
         })
-        .chain(docs::tests(cmd.ignore_cue).into_iter())
+        .chain(docs::tests(cmd.ignore_cue))
         .chain(get_tests_from_functions(
             vector_vrl_functions::all()
                 .into_iter()
                 .chain(enrichment::vrl_functions())
+                .chain(dnstap_parser::vrl_functions())
                 .collect(),
         ))
         .filter(|test| {

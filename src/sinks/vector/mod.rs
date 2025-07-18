@@ -1,6 +1,6 @@
 use snafu::Snafu;
 
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 mod config;
 mod service;
@@ -45,7 +45,7 @@ mod tests {
     use http::request::Parts;
     use hyper::Method;
     use prost::Message;
-    use vector_core::{
+    use vector_lib::{
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };
@@ -84,7 +84,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -156,7 +156,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -222,7 +222,6 @@ mod tests {
         .await
         .into_iter()
         .flatten()
-        .map(Into::into)
         .collect()
     }
 

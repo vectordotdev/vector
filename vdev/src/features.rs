@@ -1,7 +1,8 @@
-use std::{collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path};
+use std::{
+    collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path, sync::LazyLock,
+};
 
 use anyhow::{bail, Context, Result};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -20,16 +21,18 @@ macro_rules! mapping {
 
 // Mapping of component names to feature name exceptions.
 
-static SOURCE_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static SOURCE_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     mapping!(
+        prometheus_pushgateway => prometheus,
         prometheus_scrape => prometheus,
         prometheus_remote_write => prometheus,
     )
 });
 
-static TRANSFORM_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| mapping!());
+static TRANSFORM_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> =
+    LazyLock::new(|| mapping!());
 
-static SINK_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+static SINK_FEATURE_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     mapping!(
         gcp_pubsub => gcp,
         gcp_cloud_storage => gcp,
@@ -46,7 +49,6 @@ static SINK_FEATURE_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
 #[derive(Deserialize)]
 pub struct VectorConfig {
     api: Option<Value>,
-    enterprise: Option<Value>,
 
     #[serde(default)]
     sources: ComponentMap,
@@ -62,8 +64,8 @@ struct Component {
 }
 
 pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
-    let config =
-        fs::read_to_string(filename).with_context(|| format!("failed to read {filename:?}"))?;
+    let config = fs::read_to_string(filename)
+        .with_context(|| format!("failed to read {}", filename.display()))?;
 
     let config: VectorConfig = match filename
         .extension()
@@ -83,8 +85,7 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
 
 pub fn from_config(config: VectorConfig) -> Vec<String> {
     let mut features = FeatureSet::default();
-    add_option(&mut features, "api", &config.api);
-    add_option(&mut features, "enterprise", &config.enterprise);
+    add_option(&mut features, "api", config.api.as_ref());
 
     get_features(
         &mut features,
@@ -107,7 +108,7 @@ pub fn from_config(config: VectorConfig) -> Vec<String> {
     features.into_iter().collect()
 }
 
-fn add_option<T>(features: &mut FeatureSet, name: &str, field: &Option<T>) {
+fn add_option<T>(features: &mut FeatureSet, name: &str, field: Option<&T>) {
     if field.is_some() {
         features.insert(name.into());
     }

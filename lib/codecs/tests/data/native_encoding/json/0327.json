@@ -1,1 +1,1 @@
-{"log":{"":0.0,"¦":{"-":"򱹌"}}}
+{"metric":{"name":"a","tags":{"l":"c","o":"y","u":"o"},"timestamp":"1969-12-31T19:29:06.000030594Z","kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[-2182],"n":[1]},"count":1,"min":-478720.0,"max":-478720.0,"sum":571200.0,"avg":-858368.0}}}}}

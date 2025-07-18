@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aws_smithy_client::SdkError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_types::region::Region;
 
 use super::{
@@ -58,7 +58,7 @@ where
     <C as SendRecord>::T: Send,
 {
     type Response = KinesisResponse;
-    type Error = SdkError<<C as SendRecord>::E>;
+    type Error = SdkError<<C as SendRecord>::E, HttpResponse>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     // Emission of an internal event in case of errors is handled upstream by the caller.

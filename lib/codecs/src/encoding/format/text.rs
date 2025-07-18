@@ -1,22 +1,20 @@
 use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 use crate::MetricTagValues;
 
 /// Config used to build a `TextSerializer`.
-#[crate::configurable_component]
+#[configurable_component]
 #[derive(Debug, Clone, Default)]
 pub struct TextSerializerConfig {
     /// Controls how metric tag values are encoded.
     ///
     /// When set to `single`, only the last non-bare value of tags are displayed with the
     /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub metric_tag_values: MetricTagValues,
 }
 

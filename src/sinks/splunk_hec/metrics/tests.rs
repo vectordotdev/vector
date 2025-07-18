@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use chrono::{DateTime, Utc};
 use futures_util::StreamExt;
 use serde_json::{json, Value as JsonValue};
-use vector_core::{
+use vector_lib::{
     event::{Event, Metric, MetricKind, MetricValue},
     metric_tags, ByteSizeOf,
 };
@@ -320,7 +320,7 @@ async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
-        endpoint: format!("http://{}", addr),
+        endpoint: format!("http://{addr}"),
         host_key: config_host_key(),
         index: None,
         sourcetype: None,

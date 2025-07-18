@@ -1,1 +1,1 @@
-{"log":{"":true,",":[null]}}
+{"metric":{"name":"f","timestamp":"1970-01-01T01:39:01.000002277Z","kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2145],"n":[1]},"count":1,"min":273408.0,"max":273408.0,"sum":203968.0,"avg":-153728.0}}}}}

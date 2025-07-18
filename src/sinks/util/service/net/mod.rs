@@ -12,7 +12,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use std::path::PathBuf;
+use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
 
 use crate::{
     common::backoff::ExponentialBackoff,
@@ -34,7 +34,7 @@ pub use self::unix::{UnixConnectorConfig, UnixMode};
 use self::tcp::TcpConnector;
 use self::udp::UdpConnector;
 #[cfg(unix)]
-use self::unix::{UnixConnector, UnixEither};
+use self::unix::UnixConnector;
 
 use futures_util::{future::BoxFuture, FutureExt};
 use snafu::{ResultExt, Snafu};
@@ -45,8 +45,8 @@ use tokio::{
     time::sleep,
 };
 use tower::Service;
-use vector_config::configurable_component;
-use vector_core::tls::{MaybeTlsStream, TlsError};
+use vector_lib::configurable::configurable_component;
+use vector_lib::tls::{MaybeTlsStream, TlsError};
 
 /// Hostname and port tuple.
 ///

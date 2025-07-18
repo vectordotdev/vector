@@ -1,6 +1,6 @@
 use chrono::{offset::TimeZone, Timelike, Utc};
 use rand::seq::SliceRandom;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::{
@@ -18,7 +18,7 @@ fn cloudwatch_address() -> String {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         ..Default::default()
     }
 }
@@ -61,7 +61,7 @@ async fn cloudwatch_metrics_put_data() {
     let gauge_name = random_string(10);
     for i in 0..10 {
         let event = Event::Metric(Metric::new(
-            format!("gauge-{}", gauge_name),
+            format!("gauge-{gauge_name}"),
             MetricKind::Absolute,
             MetricValue::Gauge { value: i as f64 },
         ));
@@ -72,10 +72,10 @@ async fn cloudwatch_metrics_put_data() {
     for i in 0..10 {
         let event = Event::Metric(
             Metric::new(
-                format!("distribution-{}", distribution_name),
+                format!("distribution-{distribution_name}"),
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![i as f64 => 100],
+                    samples: vector_lib::samples![i as f64 => 100],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -115,7 +115,7 @@ async fn cloudwatch_metrics_namespace_partitioning() {
         }
     }
 
-    events.shuffle(&mut rand::thread_rng());
+    events.shuffle(&mut rand::rng());
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 }

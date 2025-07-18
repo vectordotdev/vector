@@ -2,11 +2,10 @@
     feature = "sources-apache_metrics",
     feature = "sources-aws_ecs_metrics",
     feature = "sources-aws_kinesis_firehose",
-    feature = "sources-http-client",
     feature = "sources-utils-http",
 ))]
 pub(crate) fn http_error_code(code: u16) -> String {
-    format!("http_response_{}", code)
+    format!("http_response_{code}")
 }
 
 pub(crate) fn io_error_code(error: &std::io::Error) -> &'static str {
@@ -35,32 +34,5 @@ pub(crate) fn io_error_code(error: &std::io::Error) -> &'static str {
         WouldBlock => "operation_would_block",
         WriteZero => "write_zero",
         _ => "unknown",
-    }
-}
-
-#[cfg(feature = "sources-aws_ecs_metrics")]
-pub(crate) fn hyper_error_code(error: &hyper::Error) -> &'static str {
-    if error.is_body_write_aborted() {
-        "body_write_aborted"
-    } else if error.is_canceled() {
-        "cancelled"
-    } else if error.is_closed() {
-        "sender_closed"
-    } else if error.is_connect() {
-        "connect_error"
-    } else if error.is_incomplete_message() {
-        "incomplete_message"
-    } else if error.is_parse() {
-        "parse_error"
-    } else if error.is_parse_status() {
-        "parse_status_error"
-    } else if error.is_parse_too_large() {
-        "parse_too_large"
-    } else if error.is_timeout() {
-        "timeout"
-    } else if error.is_user() {
-        "user"
-    } else {
-        "unknown"
     }
 }

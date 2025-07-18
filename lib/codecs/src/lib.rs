@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 #![deny(warnings)]
 
+mod common;
 pub mod decoding;
 pub mod encoding;
 pub mod gelf;
@@ -28,7 +29,7 @@ pub use encoding::{
     RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use gelf::{gelf_fields, VALID_FIELD_REGEX};
-use vector_config::configurable_component;
+use vector_config_macros::configurable_component;
 
 /// The user configuration to choose the metric tag strategy.
 #[configurable_component]

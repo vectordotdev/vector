@@ -6,7 +6,7 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
-use vector_config::{component::GenerateConfig, configurable_component};
+use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
 use crate::{config::SecretBackend, signal};
 
@@ -58,7 +58,7 @@ struct ExecResponse {
 }
 
 impl SecretBackend for ExecBackend {
-    fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
@@ -76,18 +76,18 @@ impl SecretBackend for ExecBackend {
         for k in secret_keys.into_iter() {
             if let Some(secret) = output.get_mut(&k) {
                 if let Some(e) = &secret.error {
-                    return Err(format!("secret for key '{}' was not retrieved: {}", k, e).into());
+                    return Err(format!("secret for key '{k}' was not retrieved: {e}").into());
                 }
                 if let Some(v) = secret.value.take() {
                     if v.is_empty() {
-                        return Err(format!("secret for key '{}' was empty", k).into());
+                        return Err(format!("secret for key '{k}' was empty").into());
                     }
                     secrets.insert(k.to_string(), v);
                 } else {
-                    return Err(format!("secret for key '{}' was empty", k).into());
+                    return Err(format!("secret for key '{k}' was empty").into());
                 }
             } else {
-                return Err(format!("secret for key '{}' was not retrieved", k).into());
+                return Err(format!("secret for key '{k}' was not retrieved").into());
             }
         }
         Ok(secrets)
@@ -117,12 +117,10 @@ async fn query_backend(
     let mut stderr_stream = child
         .stderr
         .map(|s| codec::FramedRead::new(s, codec::LinesCodec::new()))
-        .take()
         .ok_or("unable to acquire stderr")?;
     let mut stdout_stream = child
         .stdout
         .map(|s| codec::FramedRead::new(s, codec::BytesCodec::new()))
-        .take()
         .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;
@@ -134,7 +132,7 @@ async fn query_backend(
     loop {
         tokio::select! {
             biased;
-            Ok(signal::SignalTo::Shutdown | signal::SignalTo::Quit) = signal_rx.recv() => {
+            Ok(signal::SignalTo::Shutdown(_) | signal::SignalTo::Quit) = signal_rx.recv() => {
                 drop(command);
                 return Err("Secret retrieval was interrupted.".into());
             }
@@ -148,7 +146,7 @@ async fn query_backend(
                 match stdout {
                     None => break,
                     Some(Ok(b)) => output.extend(b),
-                    Some(Err(e)) => return Err(format!("Error while reading from an exec backend stdout: {}.", e).into()),
+                    Some(Err(e)) => return Err(format!("Error while reading from an exec backend stdout: {e}.").into()),
                 }
             }
             _ = &mut timeout => {

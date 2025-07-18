@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
 use crate::event::Event;

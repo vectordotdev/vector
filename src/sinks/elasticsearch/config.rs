@@ -4,14 +4,13 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
-    aws::RegionOrEndpoint,
     codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
-    http::HttpClient,
+    http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
     sinks::{
         elasticsearch::{
@@ -19,12 +18,12 @@ use crate::{
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
-            ElasticsearchApiVersion, ElasticsearchAuth, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode,
+            ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
+            ElasticsearchCommonMode, ElasticsearchMode, VersionType,
         },
         util::{
             http::RequestConfig, service::HealthConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings,
         },
         Healthcheck, VectorSink,
     },
@@ -32,12 +31,41 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use lookup::event_path;
-use vector_core::schema::Requirement;
+use vector_lib::lookup::event_path;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::schema::Requirement;
 use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
+
+/// The Amazon OpenSearch service type, either managed or serverless; primarily, selects the
+/// correct AWS service to use when calculating the AWS v4 signature + disables features
+/// unsupported by serverless: Elasticsearch API version autodetection, health checks
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum OpenSearchServiceType {
+    /// Elasticsearch or OpenSearch Managed domain
+    Managed,
+    /// OpenSearch Serverless collection
+    Serverless,
+}
+
+impl OpenSearchServiceType {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            OpenSearchServiceType::Managed => "es",
+            OpenSearchServiceType::Serverless => "aoss",
+        }
+    }
+}
+
+impl Default for OpenSearchServiceType {
+    fn default() -> Self {
+        Self::Managed
+    }
+}
 
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]
@@ -58,6 +86,12 @@ pub struct ElasticsearchConfig {
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a
     /// hostname or IP address and port.
+    /// The endpoint may include basic authentication credentials,
+    /// e.g., `https://user:password@example.com`. If credentials are provided in the endpoint,
+    /// they will be used to authenticate against Elasticsearch.
+    ///
+    /// If `auth` is specified and the endpoint contains credentials,
+    /// a configuration error will be raised.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
@@ -75,6 +109,8 @@ pub struct ElasticsearchConfig {
     pub doc_type: String,
 
     /// The API version of Elasticsearch.
+    ///
+    /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
     #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
@@ -108,7 +144,7 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "id"))]
     #[configurable(metadata(docs::examples = "_id"))]
-    pub id_key: Option<String>,
+    pub id_key: Option<ConfigValuePath>,
 
     /// The name of the pipeline to apply.
     #[serde(default)]
@@ -124,10 +160,7 @@ pub struct ElasticsearchConfig {
     #[configurable(derived)]
     pub compression: Compression,
 
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     pub encoding: Transformer,
@@ -141,18 +174,23 @@ pub struct ElasticsearchConfig {
     pub request: RequestConfig,
 
     #[configurable(derived)]
-    pub auth: Option<ElasticsearchAuth>,
+    pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
     #[serde(default)]
     #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
-    pub query: Option<HashMap<String, String>>,
+    pub query: Option<QueryParameters>,
 
     #[serde(default)]
     #[configurable(derived)]
-    pub aws: Option<RegionOrEndpoint>,
+    #[cfg(feature = "aws-core")]
+    pub aws: Option<crate::aws::RegionOrEndpoint>,
+
+    /// Amazon OpenSearch service type
+    #[serde(default)]
+    pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
     #[configurable(derived)]
@@ -182,7 +220,7 @@ pub struct ElasticsearchConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
@@ -193,7 +231,7 @@ fn default_doc_type() -> String {
 }
 
 fn query_examples() -> HashMap<String, String> {
-    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())].into_iter())
+    HashMap::<_, _>::from_iter([("X-Powered-By".to_owned(), "Vector".to_owned())])
 }
 
 impl Default for ElasticsearchConfig {
@@ -214,7 +252,9 @@ impl Default for ElasticsearchConfig {
             request: Default::default(),
             auth: None,
             query: None,
+            #[cfg(feature = "aws-core")]
             aws: None,
+            opensearch_service_type: Default::default(),
             tls: None,
             endpoint_health: None,
             bulk: BulkConfig::default(), // the default mode is Bulk
@@ -230,7 +270,10 @@ impl ElasticsearchConfig {
         match self.mode {
             ElasticsearchMode::Bulk => Ok(ElasticsearchCommonMode::Bulk {
                 index: self.bulk.index.clone(),
+                template_fallback_index: self.bulk.template_fallback_index.clone(),
                 action: self.bulk.action.clone(),
+                version: self.bulk.version.clone(),
+                version_type: self.bulk.version_type,
             }),
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
@@ -246,7 +289,7 @@ impl ElasticsearchConfig {
 pub struct BulkConfig {
     /// Action to use when making requests to the [Elasticsearch Bulk API][es_bulk].
     ///
-    /// Only `index` and `create` actions are supported.
+    /// Only `index`, `create` and `update` actions are supported.
     ///
     /// [es_bulk]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     #[serde(default = "default_bulk_action")]
@@ -259,6 +302,25 @@ pub struct BulkConfig {
     #[configurable(metadata(docs::examples = "application-{{ application_id }}-%Y-%m-%d"))]
     #[configurable(metadata(docs::examples = "{{ index }}"))]
     pub index: Template,
+
+    /// The default index to write events to if the template in `bulk.index` cannot be resolved
+    #[configurable(metadata(docs::examples = "test-index"))]
+    pub template_fallback_index: Option<String>,
+
+    /// Version field value.
+    #[configurable(metadata(docs::examples = "{{ obj_version }}-%Y-%m-%d"))]
+    #[configurable(metadata(docs::examples = "123"))]
+    pub version: Option<Template>,
+
+    /// Version type.
+    ///
+    /// Possible values are `internal`, `external` or `external_gt` and `external_gte`.
+    ///
+    /// [es_index_versioning]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-index_.html#index-versioning
+    #[serde(default = "default_version_type")]
+    #[configurable(metadata(docs::examples = "internal"))]
+    #[configurable(metadata(docs::examples = "external"))]
+    pub version_type: VersionType,
 }
 
 fn default_bulk_action() -> Template {
@@ -269,11 +331,18 @@ fn default_index() -> Template {
     Template::try_from("vector-%Y.%m.%d").expect("unable to parse template")
 }
 
+const fn default_version_type() -> VersionType {
+    VersionType::Internal
+}
+
 impl Default for BulkConfig {
     fn default() -> Self {
         Self {
             action: default_bulk_action(),
             index: default_index(),
+            template_fallback_index: Default::default(),
+            version: Default::default(),
+            version_type: default_version_type(),
         }
     }
 }
@@ -443,7 +512,9 @@ impl DataStreamConfig {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
-            let data_stream = log.get("data_stream").and_then(|ds| ds.as_object());
+            let data_stream = log
+                .get(event_path!("data_stream"))
+                .and_then(|ds| ds.as_object());
             let dtype = data_stream
                 .and_then(|ds| ds.get("type"))
                 .map(|value| value.to_string_lossy().into_owned())
@@ -458,7 +529,14 @@ impl DataStreamConfig {
                 .or_else(|| self.namespace(log))?;
             (dtype, dataset, namespace)
         };
-        Some(format!("{}-{}-{}", dtype, dataset, namespace))
+
+        let name = [dtype, dataset, namespace]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+
+        Some(name)
     }
 }
 
@@ -471,10 +549,7 @@ impl SinkConfig for ElasticsearchConfig {
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
-        let request_limits = self
-            .request
-            .tower
-            .unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.tower.into_settings();
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
 
@@ -498,6 +573,7 @@ impl SinkConfig for ElasticsearchConfig {
             services,
             health_config,
             ElasticsearchHealthLogic,
+            1,
         );
 
         let sink = ElasticsearchSink::new(&common, self, service)?;

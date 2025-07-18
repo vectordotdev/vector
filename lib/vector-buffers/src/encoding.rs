@@ -177,7 +177,7 @@ impl<T: FixedEncodable> Encodable for T {
 
     fn get_metadata() -> Self::Metadata {}
 
-    fn can_decode(_: Self::Metadata) -> bool {
+    fn can_decode((): Self::Metadata) -> bool {
         true
     }
 
@@ -189,7 +189,7 @@ impl<T: FixedEncodable> Encodable for T {
         FixedEncodable::encoded_size(self)
     }
 
-    fn decode<B: Buf + Clone>(_: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
+    fn decode<B: Buf + Clone>((): Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
         <Self as FixedEncodable>::decode(buffer)
     }
 }

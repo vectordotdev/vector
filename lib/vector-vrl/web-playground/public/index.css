@@ -1,317 +1,422 @@
+:root {
+  --datadog-purple-lightest: #f8f6ff;
+  --datadog-purple-light: #e1d8ff;
+  --datadog-purple: #632ca6;
+  --datadog-purple-vibrant: #7b40f1;
+  --datadog-purple-dark: #451b78;
+  --datadog-gray: #252525;
+  --datadog-gray-light: #b6b6b6;
+  --datadog-gray-lighter: #eaeaea;
+  --datadog-background: #fafbfc;
+  --light-grey: #f5f5f5;
+}
+
 body {
-    margin-right: 2vw;
-    margin-left: 2vw;
+  margin: 0;
+  padding: 0;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif;
+  background-color: var(--datadog-background);
+  color: var(--datadog-gray);
+}
+
+.top-bar-wrapper {
+  border-bottom: 1px solid var(--datadog-purple-light);
+  padding: 10px 0;
+}
+
+.headers-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 20px;
+  padding: 0 15px;
+  max-width: 1600px;
+  margin: 0 auto;
+  align-items: stretch;
+}
+
+.headers-grid-item {
+  background-color: var(--datadog-purple-lightest);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--datadog-purple-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title-section {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+#logo {
+  width: 20px;
+  height: 20px;
+}
+
+.headers-grid-item h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--datadog-purple);
+  margin: 0;
+}
+
+#description-cell {
+  grid-column: 2;
+}
+
+#description-cell p {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  color: var(--datadog-gray);
+}
+
+#description-cell p,
+.version-info td {
+  color: var(--datadog-gray);
+}
+
+.version-info {
+  justify-content: center;
+}
+
+.version-info table {
+  width: 100%;
+  border-spacing: 0;
+}
+
+.version-info tr {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.version-info td {
+  padding: 2px 0;
+  font-weight: normal;
+  font-size: 12px;
+  color: var(--datadog-gray);
+}
+
+.version-info td:first-child {
+  font-weight: 600;
+}
+
+#description-cell a:hover,
+.version-info a:hover {
+  text-decoration: underline;
 }
 
 div#App {
-    display: grid;
+  display: grid;
+  width: calc(100% - 40px);
+  max-width: 1600px;
+  height: calc(100vh - 240px);
+  grid-template-columns: minmax(45%, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-gap: 1rem;
+  padding: 20px 20px;
+  margin: 0 auto;
+}
+
+div#toolbar-section {
+  padding: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  gap: 1rem;
+  align-items: center;
+}
+
+#toolbar-section #run-code-btn,
+#toolbar-section #share-code-btn {
+  height: 36px;
+  flex: 0 1 auto;
+  min-width: 120px;
+}
+
+div#input-section,
+div#output-section {
+  border: 1px solid var(--datadog-gray-lighter);
+  border-radius: 4px;
+}
+
+div#input-section {
+  display: grid;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+div#output-section {
+  display: grid;
+  grid-column: 2;
+  grid-row: 2;
+  grid-template-rows: 1fr 1fr;
+  gap: 1rem;
+}
+
+#input-section #cell,
+#output-section #event-cell,
+#output-section #output-cell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.cell-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--datadog-gray);
+  margin: 0;
+  padding: 8px 12px;
+  background-color: var(--datadog-gray-lighter);
+  border-bottom: 1px solid var(--datadog-gray-light);
+}
+
+/* BUTTONS */
+.btn {
+  display: inline-block;
+  outline: 0;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  height: 36px;
+  padding: 0 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background-color: var(--datadog-purple);
+  color: var(--datadog-background);
+}
+
+.btn-primary:hover {
+  background-color: var(--datadog-purple-dark);
+}
+
+.btn-secondary {
+  background-color: var(--datadog-gray-lighter);
+  color: var(--datadog-gray);
+  border: 1px solid var(--datadog-gray-light);
+}
+
+.btn-secondary:hover {
+  background-color: var(--datadog-gray-light);
+}
+
+/* Media Queries for Responsiveness */
+@media only screen and (min-width: 1601px) {
+  .headers-grid,
+  div#App {
+    max-width: 1800px;
+  }
+
+  .headers-grid {
+    padding: 20px 30px;
+  }
+
+  div#App {
+    padding: 30px 30px;
+  }
+
+  .headers-grid-item h2 {
+    font-size: 24px;
+  }
+
+  #description-cell p {
+    font-size: 16px;
+  }
+}
+
+@media only screen and (min-width: 1201px) and (max-width: 1600px) {
+  .headers-grid,
+  div#App {
+    max-width: 1400px;
+  }
+
+  .headers-grid {
+    padding: 18px 25px;
+  }
+
+  div#App {
+    padding: 25px 25px;
+  }
+
+  .headers-grid-item h2 {
+    font-size: 22px;
+  }
+
+  #description-cell p {
+    font-size: 15px;
+  }
+}
+
+@media only screen and (max-width: 1200px) {
+  .headers-grid,
+  div#App {
+    max-width: 1000px;
+  }
+}
+
+@media only screen and (max-width: 1024px) {
+  .headers-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .headers-grid-item {
     width: 100%;
-    height: 100%;
-    /* the app will have two columns, one for input
-  one for output, left and right */
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: 15vh 1vh 75vh;
-    grid-gap: 1rem;
+    box-sizing: border-box;
   }
 
-  div#summary-section {
-    display: grid;
-    grid-row: 1;
-    grid-template-rows: 35% 65%;
-    width: 100%;
-    font-size: 1vw;
-    grid-gap: 1vw;
-  }
-
-  div#summary-section p{
-    font-size: .9vw;
-  }
-
-  div#toolbar-section {
-    display: grid;
-    grid-row: 2;
-    grid-column: 1 / span 2;
-    grid-template-columns: repeat(8, 1fr);
-  }
-
-  #toolbar-section #run-code-btn {
+  #description-cell {
     grid-column: 1;
   }
 
-  #toolbar-section #share-code-btn {
-    grid-column: 3;
+  div#App {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - 180px);
   }
 
-  /* input pane */
   div#input-section {
-    display: grid;
     grid-column: 1;
-    grid-row: 3;
-    overflow: hidden;
-  }
-
-  #input-section #cell {
-    display: grid;
-    grid-template-rows: 6% 94%;
-    overflow: hidden;
-  }
-
-  #input-section #cell #input-cell-title {
-    height: 100%;
-    grid-row: 1;
-  }
-
-  #input-section #cell #container-program {
-    display: grid;
-    height: 100%;
+    grid-row: 2;
+    height: 40vh;
   }
 
   div#output-section {
-    display: grid;
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 3;
-    grid-template-rows: 50% 50%;
-    overflow: hidden;
+    grid-template-rows: auto auto;
+    grid-template-columns: 1fr;
+    height: auto;
   }
 
-  /* event pane */
-  #output-section #event-cell {
-    display: grid;
-    /* this is double of input-cell-title row
-  because we are working with half the space */
-    grid-template-rows: 12% 88%;
-    grid-row: 1;
-    height: 100%;
-  }
-
-  #output-section #event-cell #event-cell-title {
-    display: grid;
-    grid-row: 1;
-  }
-
-  #output-section #event-cell #container-event {
-    display: grid;
-    grid-row: 2;
-    height: 100%;
-  }
-
-  /* output pane */
+  #output-section #event-cell,
   #output-section #output-cell {
-    display: grid;
-    grid-template-rows: 12% 88%;
-    grid-row: 2;
-    height: 100%;
+    height: 30vh;
+  }
+}
+
+@media only screen and (max-width: 768px) {
+  .headers-grid,
+  div#App {
+    width: calc(100% - 20px);
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
-  #output-section #output-cell #output-cell-title {
-    display: grid;
-    grid-row: 1;
+  .headers-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  #output-section #output-cell #container-output {
-    display: grid;
-    grid-row: 2;
-    height: 100%;
+  .headers-grid-item h2 {
+    font-size: 18px;
   }
 
-  body {
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-      Helvetica Neue, Arial, Noto Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-      Segoe UI Symbol, Noto Color Emoji;
+  #toolbar-section #run-code-btn,
+  #toolbar-section #share-code-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media only screen and (max-width: 480px) {
+  .headers-grid,
+  div#App {
+    width: calc(100% - 16px);
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
-  .btn-primary {
-    display: inline-block;
-    outline: 0;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 13px;
-    height: 30px;
-    background-color: #9147ff;
-    color: white;
-    padding: 0 20px;
+  .headers-grid-item h2 {
+    font-size: 16px;
   }
 
-  .btn-primary:hover {
-    background-color: #772ce8;
+  #description-cell p {
+    font-size: 12px;
   }
 
-  .btn-secondary {
-    display: inline-block;
-    outline: 0;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 13px;
-    height: 30px;
-    background-color: #0000001a;
-    color: #000000;
-    padding: 0 20px;
+  div#toolbar-section {
+    padding: 10px 0;
   }
 
-  .btn-secondary:hover {
-    background-color: #dcdcdc;
+  #toolbar-section #run-code-btn,
+  #toolbar-section #share-code-btn {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
+
+@media only screen and (max-width: 320px) {
+  .headers-grid,
+  div#App {
+    width: calc(100% - 10px);
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
-/* Portrait and Landscape */
-@media only screen
-  and (min-width: 200px)
-  and (max-width: 1000px) {
-    div#App {
-        display: grid;
-        width: 100%;
-        height: 100%;
-        /* the app will have multiple rows
-        stacking each section on top of each other */
-        grid-template-rows: 20vh 25vh 10vh 50vh;
-        grid-template-columns: 100%;
-      }
+  .headers-grid-item h2 {
+    font-size: 14px;
+  }
 
-      div#summary-section {
-        display: grid;
-        grid-row: 1;
-        grid-template-rows: 20% 80%;
-        width: 100%;
-        font-size: 1.5vh;
-        grid-gap: 2vw;
-      }
+  #description-cell p {
+    font-size: 11px;
+  }
+}
 
-      div#summary-section p {
-        grid-row: 2;
-        font-size: 2vh;
-      }
+#toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-      div#toolbar-section {
-        display: grid;
-        grid-row: 3;
-        grid-column: 1;
-        grid-template-columns: 100%;
-        grid-template-rows: repeat(2, 1fr);
-      }
+.timezone-container {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
 
-      #toolbar-section #run-code-btn {
-        display: grid;
-        grid-row: 1;
-        grid-column: 1;
-      }
+#timezone-label {
+  margin-right: 8px;
+  font-weight: bold;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+  Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+}
 
-      #toolbar-section #share-code-btn {
-        display: grid;
-        grid-row: 2;
-        grid-column: 1;
-      }
+#timezone-input {
+  padding: 0px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border-width: 1px;
+  border-style: solid;
+  font-size: 14px;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+  Cantarell, "Helvetica Neue", sans-serif;
+  line-height: 1.5;
+  color: #212529;
+  height: 36px;
+  box-sizing: border-box;
+}
 
-      /* input pane */
-      div#input-section {
-        display: grid;
-        grid-column: 1;
-        grid-row: 2;
-        overflow: hidden;
-      }
+#output-cell-title .cell-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-      #input-section #cell {
-        display: grid;
-        grid-column: 1;
-        grid-template-rows: 23% 77%;
-        overflow: hidden;
-      }
-
-      #input-section #cell #input-cell-title {
-        height: 100%;
-        grid-column: 1;
-        grid-row: 1;
-      }
-
-      #input-section #cell #container-program {
-        display: grid;
-        height: 100%;
-      }
-
-      div#output-section {
-        display: grid;
-        grid-row: 4 / 5;
-        grid-column: 1;
-        grid-template-rows: 50% 50%;
-        overflow: hidden;
-      }
-
-      /* event pane */
-      #output-section #event-cell {
-        display: grid;
-        grid-template-rows: 20% 80%;
-        grid-row: 1;
-        height: 100%;
-      }
-
-      #output-section #event-cell #event-cell-title {
-        display: grid;
-        grid-row: 1;
-      }
-
-      #output-section #event-cell #container-event {
-        display: grid;
-        height: 100%;
-      }
-
-      /* output pane */
-      #output-section #output-cell {
-        display: grid;
-        grid-template-rows: 20% 80%;
-        grid-row: 2;
-        height: 100%;
-      }
-
-      #output-section #output-cell #output-cell-title {
-        display: grid;
-        grid-row: 1;
-      }
-
-      #output-section #output-cell #container-output {
-        display: grid;
-        grid-row: 2;
-        height: 100%;
-      }
-
-      body {
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-          Helvetica Neue, Arial, Noto Sans, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-          Segoe UI Symbol, Noto Color Emoji;
-      }
-
-      .btn-primary {
-        display: inline-block;
-        outline: 0;
-        border: none;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 13px;
-        height: 30px;
-        background-color: #9147ff;
-        color: white;
-        padding: 0 20px;
-        align-items: center;
-      }
-
-      .btn-primary:hover {
-        background-color: #772ce8;
-      }
-
-      .btn-secondary {
-        display: inline-block;
-        outline: 0;
-        border: none;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 13px;
-        height: 30px;
-        background-color: #0000001a;
-        color: #000000;
-        padding: 0 20px;
-        align-items: center;
-      }
-
-      .btn-secondary:hover {
-        background-color: #dcdcdc;
-      }
+#elapsed-time {
+  font-weight: normal;
+  font-size: 12px;
 }

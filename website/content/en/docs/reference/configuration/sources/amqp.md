@@ -1,7 +1,7 @@
 ---
 title: AMQP
 description: Collect events from [AMQP 0.9.1](https://www.amqp.org/specification/0-9-1/amqp-org-download) compatible brokers like RabbitMQ
-kind: source
+component_kind: source
 layout: component
 tags: ["amqp", "rabbitmq", "component", "source"]
 ---

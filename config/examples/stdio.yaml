@@ -1,0 +1,17 @@
+# STDIO Example
+# ------------------------------------------------------------------------------
+# A simple STDIN / STDOUT example. This script is used in the getting started
+# guide:
+#
+# https://vector.dev/guides/getting-started
+
+sources:
+  in:
+    type: "stdin"
+
+sinks:
+  out:
+    inputs: [ "in" ]
+    type: "console"
+    encoding:
+      codec: "text"

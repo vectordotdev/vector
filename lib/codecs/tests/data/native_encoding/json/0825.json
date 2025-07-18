@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"q","namespace":"h","timestamp":"1970-01-01T00:27:58.000029839Z","interval_ms":4276374311,"kind":"absolute","counter":{"value":-408128.0}}}

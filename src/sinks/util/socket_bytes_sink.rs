@@ -1,5 +1,5 @@
 use std::{
-    io::{Error as IoError, ErrorKind},
+    io::Error as IoError,
     marker::Unpin,
     pin::Pin,
     task::{ready, Context, Poll},
@@ -10,7 +10,7 @@ use futures::Sink;
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_common::{
+use vector_lib::{
     finalization::{EventFinalizers, EventStatus},
     json_size::JsonSize,
 };
@@ -151,7 +151,7 @@ where
                     return Poll::Ready(Err(error));
                 }
 
-                return Poll::Ready(Err(IoError::new(ErrorKind::Other, reason)));
+                return Poll::Ready(Err(IoError::other(reason)));
             }
             ShutdownCheck::Alive => {}
         }

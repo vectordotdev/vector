@@ -2,10 +2,9 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::Serialize;
 use tower::Service;
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
@@ -14,7 +13,7 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         metric::{Metric, MetricValue, Sample, StatisticKind},
-        Event,
+        Event, KeyString,
     },
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
@@ -100,7 +99,7 @@ pub struct InfluxDbConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -113,19 +112,13 @@ pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
 
-// https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct InfluxDbRequest {
-    series: Vec<String>,
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
@@ -159,10 +152,7 @@ impl InfluxDbSvc {
         let protocol_version = settings.protocol_version();
 
         let batch = config.batch.into_batch_settings()?;
-        let request = config.request.unwrap_with(&TowerRequestConfig {
-            retry_attempts: Some(5),
-            ..Default::default()
-        });
+        let request = config.request.into_settings();
 
         let uri = settings.write_uri(endpoint)?;
 
@@ -229,7 +219,7 @@ fn create_build_request(
     token: &str,
 ) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
 {
-    let auth = format!("Token {}", token);
+    let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(
             hyper::Request::post(uri.clone())
@@ -319,7 +309,7 @@ fn encode_events(
 fn get_type_and_fields(
     value: &MetricValue,
     quantiles: &[f64],
-) -> (&'static str, Option<HashMap<String, Field>>) {
+) -> (&'static str, Option<HashMap<KeyString, Field>>) {
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
@@ -329,17 +319,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = buckets
+            let mut fields: HashMap<KeyString, Field> = buckets
                 .iter()
                 .map(|sample| {
                     (
-                        format!("bucket_{}", sample.upper_limit),
+                        format!("bucket_{}", sample.upper_limit).into(),
                         Field::UnsignedInt(sample.count),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -348,17 +338,17 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = quantiles
+            let mut fields: HashMap<KeyString, Field> = quantiles
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.quantile),
+                        format!("quantile_{}", quantile.quantile).into(),
                         Field::Float(quantile.value),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
-            fields.insert("sum".to_owned(), Field::Float(*sum));
+            fields.insert("count".into(), Field::UnsignedInt(*count));
+            fields.insert("sum".into(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -382,31 +372,25 @@ fn get_type_and_fields(
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
                         (
-                            quantile.to_percentile_string(),
+                            quantile.to_percentile_string().into(),
                             Field::Float(quantile.value),
                         )
                     })
-                    .collect::<HashMap<_, _>>();
+                    .collect::<HashMap<KeyString, _>>();
                 fields.insert(
-                    "count".to_owned(),
+                    "count".into(),
                     Field::UnsignedInt(u64::from(ddsketch.count())),
                 );
                 fields.insert(
-                    "min".to_owned(),
+                    "min".into(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
                 );
                 fields.insert(
-                    "max".to_owned(),
+                    "max".into(),
                     Field::Float(ddsketch.max().unwrap_or(f64::MIN)),
                 );
-                fields.insert(
-                    "sum".to_owned(),
-                    Field::Float(ddsketch.sum().unwrap_or(0.0)),
-                );
-                fields.insert(
-                    "avg".to_owned(),
-                    Field::Float(ddsketch.avg().unwrap_or(0.0)),
-                );
+                fields.insert("sum".into(), Field::Float(ddsketch.sum().unwrap_or(0.0)));
+                fields.insert("avg".into(), Field::Float(ddsketch.avg().unwrap_or(0.0)));
 
                 ("sketch", Some(fields))
             }
@@ -414,34 +398,33 @@ fn get_type_and_fields(
     }
 }
 
-fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<String, Field>> {
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<KeyString, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
-    let fields: HashMap<String, Field> = vec![
-        ("min".to_owned(), Field::Float(statistic.min)),
-        ("max".to_owned(), Field::Float(statistic.max)),
-        ("median".to_owned(), Field::Float(statistic.median)),
-        ("avg".to_owned(), Field::Float(statistic.avg)),
-        ("sum".to_owned(), Field::Float(statistic.sum)),
-        ("count".to_owned(), Field::Float(statistic.count as f64)),
-    ]
-    .into_iter()
-    .chain(
-        statistic
-            .quantiles
-            .iter()
-            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+    Some(
+        [
+            ("min".into(), Field::Float(statistic.min)),
+            ("max".into(), Field::Float(statistic.max)),
+            ("median".into(), Field::Float(statistic.median)),
+            ("avg".into(), Field::Float(statistic.avg)),
+            ("sum".into(), Field::Float(statistic.sum)),
+            ("count".into(), Field::Float(statistic.count as f64)),
+        ]
+        .into_iter()
+        .chain(
+            statistic
+                .quantiles
+                .iter()
+                .map(|&(p, val)| (format!("quantile_{p:.2}").into(), Field::Float(val))),
+        )
+        .collect(),
     )
-    .collect();
-
-    Some(fields)
 }
 
-fn to_fields(value: f64) -> HashMap<String, Field> {
-    let fields: HashMap<String, Field> = vec![("value".to_owned(), Field::Float(value))]
+fn to_fields(value: f64) -> HashMap<KeyString, Field> {
+    [("value".into(), Field::Float(value))]
         .into_iter()
-        .collect();
-    fields
+        .collect()
 }
 
 #[cfg(test)]
@@ -543,7 +526,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -584,7 +567,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_lib::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -625,7 +608,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -666,7 +649,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_lib::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -708,7 +691,7 @@ mod tests {
                 "requests",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                    samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -835,7 +818,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
+                samples: vector_lib::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -853,7 +836,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_lib::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )
@@ -953,7 +936,7 @@ mod integration_tests {
     use chrono::{SecondsFormat, Utc};
     use futures::stream;
     use similar_asserts::assert_eq;
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -1020,7 +1003,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.expect("error when building config");
         run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
-        let res = query_v1_json(url, &format!("show series on {}", database)).await;
+        let res = query_v1_json(url, &format!("show series on {database}")).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -1054,8 +1037,7 @@ mod integration_tests {
                 _ => unreachable!(),
             };
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
-            let res =
-                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+            let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
             assert_eq!(
                 res,
@@ -1109,7 +1091,12 @@ mod integration_tests {
             acknowledgements: Default::default(),
         };
 
-        let metric = format!("counter-{}", Utc::now().timestamp_nanos());
+        let metric = format!(
+            "counter-{}",
+            Utc::now()
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range")
+        );
         let mut events = Vec::new();
         for i in 0..10 {
             let event = Event::Metric(
@@ -1132,7 +1119,7 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{metric}\")"));
         body.insert("type", "flux".to_owned());
 
         let client = reqwest::Client::builder()
@@ -1195,7 +1182,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("counter-{}", i),
+                format!("counter-{i}"),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )

@@ -1,1 +1,1 @@
-{"log":{"":[true,false]}}
+{"metric":{"name":"m","namespace":"x","tags":{"n":"t"},"kind":"absolute","gauge":{"value":535104.0}}}

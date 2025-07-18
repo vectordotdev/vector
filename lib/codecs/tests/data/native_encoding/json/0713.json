@@ -1,1 +1,1 @@
-{"metric":{"name":"m","tags":{"c":"y","f":"c","i":"b"},"timestamp":"1970-01-01T00:59:27.000013217Z","interval_ms":3010939700,"kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":307648.0,"value":-496064.0},{"quantile":701760.0,"value":-200960.0},{"quantile":462848.0,"value":307072.0},{"quantile":453056.0,"value":117440.0},{"quantile":499968.0,"value":-961088.0},{"quantile":848960.0,"value":-580389.0468}],"count":13044008843756814092,"sum":165568.0}}}
+{"log":{"":-41344.0,"J峾":true}}

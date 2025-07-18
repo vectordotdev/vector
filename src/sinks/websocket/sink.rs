@@ -9,7 +9,8 @@ use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, protocol::Message};
 use tokio_util::codec::Encoder as _;
-use vector_core::{
+use vector_lib::{
+    emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -20,6 +21,7 @@ use crate::{
     codecs::{Encoder, Transformer},
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     emit,
+    dns,
     event::{Event, EventStatus, Finalizable},
     internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},
     sinks::util::StreamSink,
@@ -76,13 +78,13 @@ impl WebSocketSink {
     }
 
     const fn should_encode_as_binary(&self) -> bool {
-        use codecs::encoding::Serializer::{
-            Avro, Csv, Gelf, Json, Logfmt, Native, NativeJson, RawMessage, Text,
+        use vector_lib::codecs::encoding::Serializer::{
+            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
         };
 
         match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) => true,
-            Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
+            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
 
@@ -221,7 +223,6 @@ impl StreamSink<Event> for WebSocketSink {
 mod tests {
     use std::net::SocketAddr;
 
-    use codecs::JsonSerializerConfig;
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
     use tokio::{time, time::timeout};
@@ -232,6 +233,7 @@ mod tests {
             handshake::server::{Request, Response},
         },
     };
+    use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
     use crate::{
@@ -250,7 +252,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -273,7 +275,7 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -292,10 +294,10 @@ mod tests {
 
         let addr = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
-        let tls = MaybeTlsSettings::from_config(&tls_config, true).unwrap();
+        let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{}", addr),
+            uri: format!("wss://{addr}"),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
@@ -321,7 +323,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
+            uri: format!("ws://{addr}"),
             tls: None,
             encoding: JsonSerializerConfig::default().into(),
             ping_interval: None,
@@ -421,6 +423,8 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            #[cfg(feature = "aws-core")]
+                                            _ => {}
                                         }
                                     }
                                     Ok(res)

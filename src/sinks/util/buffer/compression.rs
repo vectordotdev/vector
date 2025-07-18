@@ -3,7 +3,8 @@ use std::{cell::RefCell, collections::BTreeSet, fmt};
 use indexmap::IndexMap;
 use serde::{de, ser};
 use serde_json::Value;
-use vector_config::{
+use vector_lib::configurable::attributes::CustomAttribute;
+use vector_lib::configurable::{
     schema::{
         apply_base_metadata, generate_const_string_schema, generate_enum_schema,
         generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
@@ -11,7 +12,6 @@ use vector_config::{
     },
     Configurable, GenerateError, Metadata, ToValue,
 };
-use vector_config_common::attributes::CustomAttribute;
 
 use crate::sinks::util::zstd::ZstdCompressionLevel;
 
@@ -37,6 +37,11 @@ pub enum Compression {
     ///
     /// [zstd]: https://facebook.github.io/zstd/
     Zstd(CompressionLevel),
+
+    /// [Snappy][snappy] compression.
+    ///
+    /// [snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+    Snappy,
 }
 
 impl Compression {
@@ -70,6 +75,7 @@ impl Compression {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
             Self::Zstd(_) => Some("zstd"),
+            Self::Snappy => Some("snappy"),
         }
     }
 
@@ -78,6 +84,7 @@ impl Compression {
             Self::Gzip(_) => Some("gzip"),
             Self::Zlib(_) => Some("deflate"),
             Self::Zstd(_) => Some("zstd"),
+            Self::Snappy => Some("snappy"),
             _ => None,
         }
     }
@@ -88,6 +95,7 @@ impl Compression {
             Self::Gzip(_) => "log.gz",
             Self::Zlib(_) => "log.zz",
             Self::Zstd(_) => "log.zst",
+            Self::Snappy => "log.snappy",
         }
     }
 
@@ -97,12 +105,13 @@ impl Compression {
             Compression::Gzip(_) => 9,
             Compression::Zlib(_) => 9,
             Compression::Zstd(_) => 21,
+            Compression::Snappy => 0,
         }
     }
 
     pub const fn compression_level(self) -> CompressionLevel {
         match self {
-            Self::None => CompressionLevel::None,
+            Self::None | Self::Snappy => CompressionLevel::None,
             Self::Gzip(level) | Self::Zlib(level) | Self::Zstd(level) => level,
         }
     }
@@ -117,6 +126,7 @@ impl fmt::Display for Compression {
             Compression::Zstd(ref level) => {
                 write!(f, "zstd({})", ZstdCompressionLevel::from(*level))
             }
+            Compression::Snappy => write!(f, "snappy"),
         }
     }
 }
@@ -144,6 +154,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "gzip" => Ok(Compression::gzip_default()),
                     "zlib" => Ok(Compression::zlib_default()),
                     "zstd" => Ok(Compression::zstd_default()),
+                    "snappy" => Ok(Compression::Snappy),
                     _ => Err(de::Error::invalid_value(
                         de::Unexpected::Str(s),
                         &r#""none" or "gzip" or "zlib" or "zstd""#,
@@ -187,9 +198,13 @@ impl<'de> de::Deserialize<'de> for Compression {
                     "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     "zlib" => Ok(Compression::Zlib(level.unwrap_or_default())),
                     "zstd" => Ok(Compression::Zstd(level.unwrap_or_default())),
+                    "snappy" => match level {
+                        Some(_) => Err(de::Error::unknown_field("level", &[])),
+                        None => Ok(Compression::Snappy),
+                    },
                     algorithm => Err(de::Error::unknown_variant(
                         algorithm,
-                        &["none", "gzip", "zlib", "zstd"],
+                        &["none", "gzip", "zlib", "zstd", "snappy"],
                     )),
                 }?;
 
@@ -197,9 +212,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     let max_level = compression.max_compression_level_val();
                     if level > max_level {
                         let msg = std::format!(
-                            "invalid value `{}`, expected value in range [0, {}]",
-                            level,
-                            max_level
+                            "invalid value `{level}`, expected value in range [0, {max_level}]"
                         );
                         return Err(de::Error::custom(msg));
                     }
@@ -252,8 +265,29 @@ impl ser::Serialize for Compression {
                     serializer.serialize_str("zstd")
                 }
             }
+            Compression::Snappy => serializer.serialize_str("snappy"),
         }
     }
+}
+
+pub const ALGORITHM_NAME: &str = "algorithm";
+pub const LEVEL_NAME: &str = "level";
+pub const LOGICAL_NAME: &str = "logical_name";
+pub const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
+
+pub fn generate_string_schema(
+    logical_name: &str,
+    title: Option<&'static str>,
+    description: &'static str,
+) -> SchemaObject {
+    let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
+    let mut const_metadata = Metadata::with_description(description);
+    if let Some(title) = title {
+        const_metadata.set_title(title);
+    }
+    const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
+    apply_base_metadata(&mut const_schema, const_metadata);
+    const_schema
 }
 
 // TODO: Consider an approach for generating schema of "string or object" structure used by this type.
@@ -272,25 +306,6 @@ impl Configurable for Compression {
     }
 
     fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        const ALGORITHM_NAME: &str = "algorithm";
-        const LEVEL_NAME: &str = "level";
-        const LOGICAL_NAME: &str = "logical_name";
-        const ENUM_TAGGING_MODE: &str = "docs::enum_tagging";
-
-        let generate_string_schema = |logical_name: &str,
-                                      title: Option<&'static str>,
-                                      description: &'static str|
-         -> SchemaObject {
-            let mut const_schema = generate_const_string_schema(logical_name.to_lowercase());
-            let mut const_metadata = Metadata::with_description(description);
-            if let Some(title) = title {
-                const_metadata.set_title(title);
-            }
-            const_metadata.add_custom_attribute(CustomAttribute::kv(LOGICAL_NAME, logical_name));
-            apply_base_metadata(&mut const_schema, const_metadata);
-            const_schema
-        };
-
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
@@ -314,11 +329,18 @@ impl Configurable for Compression {
             "[zstd]: https://facebook.github.io/zstd/",
         );
 
+        let snappy_string_subschema = generate_string_schema(
+            "Snappy",
+            Some("[Snappy][snappy] compression."),
+            "[snappy]: https://github.com/google/snappy/blob/main/docs/README.md",
+        );
+
         let mut all_string_oneof_subschema = generate_one_of_schema(&[
             none_string_subschema,
             gzip_string_subschema,
             zlib_string_subschema,
             zstd_string_subschema,
+            snappy_string_subschema,
         ]);
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
@@ -402,7 +424,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
     {
         struct NumberOrString;
 
-        impl<'de> de::Visitor<'de> for NumberOrString {
+        impl de::Visitor<'_> for NumberOrString {
             type Value = CompressionLevel;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -418,12 +440,10 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                     "fast" => Ok(CompressionLevel::Fast),
                     "default" => Ok(CompressionLevel::Default),
                     "best" => Ok(CompressionLevel::Best),
-                    level => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Str(level),
-                            &r#""none", "fast", "best" or "default""#,
-                        ))
-                    }
+                    level => Err(de::Error::invalid_value(
+                        de::Unexpected::Str(level),
+                        &r#""none", "fast", "best" or "default""#,
+                    )),
                 }
             }
 
@@ -433,8 +453,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
                     de::Error::custom(format!(
-                        "unsigned integer could not be converted to u32: {}",
-                        err
+                        "unsigned integer could not be converted to u32: {err}"
                     ))
                 })
             }
@@ -444,7 +463,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                 E: de::Error,
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
-                    de::Error::custom(format!("integer could not be converted to u32: {}", err))
+                    de::Error::custom(format!("integer could not be converted to u32: {err}"))
                 })
             }
         }
@@ -509,6 +528,7 @@ mod test {
             (r#""none""#, Compression::None),
             (r#""gzip""#, Compression::Gzip(CompressionLevel::default())),
             (r#""zlib""#, Compression::Zlib(CompressionLevel::default())),
+            (r#""snappy""#, Compression::Snappy),
             (r#"{"algorithm": "none"}"#, Compression::None),
             (
                 r#"{"algorithm": "gzip"}"#,
@@ -542,8 +562,8 @@ mod test {
 
         let fixtures_invalid = [
             (
-                r#"42"#,
-                r#"invalid type: integer `42`, expected string or map at line 1 column 2"#,
+                r"42",
+                r"invalid type: integer `42`, expected string or map at line 1 column 2",
             ),
             (
                 r#""b42""#,
@@ -551,15 +571,15 @@ mod test {
             ),
             (
                 r#"{"algorithm": "b42"}"#,
-                r#"unknown variant `b42`, expected one of `none`, `gzip`, `zlib`, `zstd` at line 1 column 20"#,
+                r"unknown variant `b42`, expected one of `none`, `gzip`, `zlib`, `zstd`, `snappy` at line 1 column 20",
             ),
             (
                 r#"{"algorithm": "none", "level": "default"}"#,
-                r#"unknown field `level`, there are no fields at line 1 column 41"#,
+                r"unknown field `level`, there are no fields at line 1 column 41",
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33"#,
+                r"integer could not be converted to u32: out of range integral type conversion attempted at line 1 column 33",
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
@@ -567,19 +587,23 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": {}}"#,
-                r#"invalid type: map, expected unsigned number or string at line 1 column 33"#,
+                r"invalid type: map, expected unsigned number or string at line 1 column 33",
             ),
             (
                 r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,
-                r#"unknown field `key`, expected `algorithm` or `level` at line 1 column 47"#,
+                r"unknown field `key`, expected `algorithm` or `level` at line 1 column 47",
             ),
             (
                 r#"{"algorithm": "gzip", "level": 10}"#,
-                r#"invalid value `10`, expected value in range [0, 9] at line 1 column 34"#,
+                r"invalid value `10`, expected value in range [0, 9] at line 1 column 34",
             ),
             (
                 r#"{"algorithm": "zstd", "level": 22}"#,
-                r#"invalid value `22`, expected value in range [0, 21] at line 1 column 34"#,
+                r"invalid value `22`, expected value in range [0, 21] at line 1 column 34",
+            ),
+            (
+                r#"{"algorithm": "snappy", "level": 3}"#,
+                r"unknown field `level`, there are no fields at line 1 column 35",
             ),
         ];
         for (source, result) in fixtures_invalid.iter() {

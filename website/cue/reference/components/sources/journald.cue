@@ -49,7 +49,7 @@ components: sources: journald: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.journald.configuration
+	configuration: generated.components.sources.journald.configuration
 
 	output: logs: {
 		event: {
@@ -148,10 +148,5 @@ components: sources: journald: {
 				are replaced with the Unicode replacement character, `�`.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }

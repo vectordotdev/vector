@@ -18,6 +18,16 @@ fn pre_v24_fixtures_match() {
 }
 
 #[test]
+fn pre_v34_fixtures_match() {
+    fixtures_match("pre-v34");
+}
+
+#[test]
+fn pre_v41_fixtures_match() {
+    fixtures_match("pre-v41");
+}
+
+#[test]
 fn current_fixtures_match() {
     fixtures_match("");
 }
@@ -82,6 +92,74 @@ fn reserialize_pre_v26_native_proto_fixtures() {
     );
 }
 
+/// The event proto file was changed in v0.34. This test ensures we can still load the old version
+/// binary and that when serialized and deserialized in the new format we still get the same event.
+#[test]
+fn reserialize_pre_v34_native_json_fixtures() {
+    roundtrip_fixtures(
+        "json",
+        "pre-v34",
+        &NativeJsonDeserializerConfig::default().build(),
+        &mut NativeJsonSerializerConfig.build(),
+        true,
+    );
+}
+
+#[test]
+fn reserialize_pre_v34_native_proto_fixtures() {
+    roundtrip_fixtures(
+        "proto",
+        "pre-v34",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+        true,
+    );
+}
+
+/// The event proto file was changed in v0.41. This test ensures we can still load the old version
+/// binary and that when serialized and deserialized in the new format we still get the same event.
+#[test]
+fn reserialize_pre_v41_native_json_fixtures() {
+    roundtrip_fixtures(
+        "json",
+        "pre-v41",
+        &NativeJsonDeserializerConfig::default().build(),
+        &mut NativeJsonSerializerConfig.build(),
+        true,
+    );
+}
+
+#[test]
+fn reserialize_pre_v41_native_proto_fixtures() {
+    roundtrip_fixtures(
+        "proto",
+        "pre-v41",
+        &NativeDeserializerConfig.build(),
+        &mut NativeSerializerConfig.build(),
+        true,
+    );
+}
+
+// TODO: the json &  protobuf consistency has been broken for a while due to the lack of implementing
+// serde deser and ser of EventMetadata. Thus the `native_json` codec is not passing through the
+// `EventMetadata.value` field, whereas the `native` codec does.
+//
+// both of these tests are affected as a result
+//
+// https://github.com/vectordotdev/vector/issues/18570
+#[ignore]
+#[test]
+fn pre_v34_native_decoding_matches() {
+    decoding_matches("pre-v34");
+}
+
+#[ignore]
+#[test]
+fn pre_v41_native_decoding_matches() {
+    decoding_matches("pre-v41");
+}
+
+#[ignore]
 #[test]
 fn current_native_decoding_matches() {
     decoding_matches("");
@@ -236,7 +314,7 @@ fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &m
         .into_iter()
         .collect();
         let mut out = File::create(&new_path).unwrap_or_else(|error| {
-            panic!("Could not create rebuilt file {:?}: {:?}", new_path, error)
+            panic!("Could not create rebuilt file {new_path:?}: {error:?}")
         });
         out.write_all(&buf).expect("Could not write rebuilt data");
         out.flush().expect("Could not write rebuilt data");

@@ -1,1 +1,1 @@
-{"log":{"O":{"":{"Y襩󾁿":null,"]ª":9223372036854775807,"؅躬":[]}}}}
+{"metric":{"name":"l","tags":{"b":"y","o":"g"},"interval_ms":1284430961,"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":569020.7521,"value":-510592.0},{"quantile":36224.0,"value":275328.0},{"quantile":-517312.0,"value":592448.0},{"quantile":789440.0,"value":27200.0},{"quantile":-190656.0,"value":849920.0},{"quantile":900992.0,"value":175488.0}],"count":15795755051401723810,"sum":922688.0}}}

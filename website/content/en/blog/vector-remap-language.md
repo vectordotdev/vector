@@ -110,29 +110,34 @@ Parsing this log, without VRL, looks like this:
 {{< tabs default="Vector" >}}
 {{< tab title="Vector" >}}
 
-```toml title="vector.toml"
+```yaml title="vector.yaml"
 # ... sources ...
 
-# Parse the internal Syslog log
-[transforms.parse_syslog]
-type = "regex_parser"
-inputs = ["parse_docker"]
-patterns = ['^(?P<host>\S+) (?P<client>\S+) (?P<user>\S+) \[(?<timestamp>[\w:/]+\s[+\-]\d{4})\] "(?<method>\S+) (?<resource>.+?) (?<protocol>\S+)" (?<status>\d{3}) (?<bytes_out>\S+)$']
-field = "log"
+transforms:
+  parse_syslog:
+    type: regex_parser
+    inputs:
+      - parse_docker
+    patterns:
+      - '^(?P<host>\S+) (?P<client>\S+) (?P<user>\S+) \[(?<timestamp>[\w:/]+\s[+\-]\d{4})\] "(?<method>\S+) (?<resource>.+?) (?<protocol>\S+)" (?<status>\d{3}) (?<bytes_out>\S+)$'
+    field: log
 
-# Remove Docker time and log fields since they are duplicative
-[transform.remove_log]
-type = "remove_fields"
-inputs = ["parse_syslog"]
-fields = ["time", "log"]
+  remove_log:
+    type: remove_fields
+    inputs:
+      - parse_syslog
+    fields:
+      - time
+      - log
 
-# Coerce parsed fields
-[transforms.coerce_fields]
-type = "coercer"
-inputs = ["remove_log"]
-types.timestamp = "timestamp"
-types.status = "int"
-types.bytes_out = "int"
+  coerce_fields:
+    type: coercer
+    inputs:
+      - remove_log
+    types:
+      timestamp: timestamp
+      status: int
+      bytes_out: int
 
 # ... sinks ...
 ```
@@ -224,7 +229,7 @@ transformation.
 
 Instead of conflating these concerns, like Logstash, Fluentd, and others, Vector
 separates them, allowing you to choose your preferred configuration language
-(TOML, YAML, or JSON) while offering a purpose-built language for data
+(YAML, TOML or JSON) while offering a purpose-built language for data
 transformation (VRL). But is VRL really necessary? Couldn't you leverage Lua,
 JavaScript, or any other existing language?
 

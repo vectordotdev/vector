@@ -17,7 +17,7 @@ remap: functions: parse_url: {
 			name: "default_known_ports"
 			description: """
 				If true and the port number is not specified in the input URL
-				string (or matches the default port for the scheme), it will be
+				string (or matches the default port for the scheme), it is
 				populated from well-known ports for the following schemes:
 				`http`, `https`, `ws`, `wss`, and `ftp`.
 				"""
@@ -27,7 +27,7 @@ remap: functions: parse_url: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` isn't a properly formatted URL",
+		"`value` is not a properly formatted URL.",
 	]
 	return: types: ["object"]
 
@@ -35,13 +35,13 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL"
 			source: #"""
-				parse_url!("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
+				parse_url!("ftp://foo:bar@example.com:4343/foobar?hello=world#123")
 				"""#
 			return: {
 				scheme:   "ftp"
 				username: "foo"
 				password: "bar"
-				host:     "vector.dev"
+				host:     "example.com"
 				port:     4343
 				path:     "/foobar"
 				query: hello: "world"
@@ -51,14 +51,46 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL with default port"
 			source: #"""
-				parse_url!("https://vector.dev", default_known_ports: true)
+				parse_url!("https://example.com", default_known_ports: true)
 				"""#
 			return: {
 				scheme:   "https"
 				username: ""
 				password: ""
-				host:     "vector.dev"
+				host:     "example.com"
 				port:     443
+				path:     "/"
+				query: {}
+				fragment: null
+			}
+		},
+		{
+			title: "Parse URL with internationalized domain name"
+			source: #"""
+				parse_url!("https://www.café.com")
+				"""#
+			return: {
+				scheme:   "https"
+				username: ""
+				password: ""
+				host:     "www.xn--caf-dma.com"
+				port:     null
+				path:     "/"
+				query: {}
+				fragment: null
+			}
+		},
+		{
+			title: "Parse URL with mixed case internationalized domain name"
+			source: #"""
+				parse_url!("https://www.CAFé.com")
+				"""#
+			return: {
+				scheme:   "https"
+				username: ""
+				password: ""
+				host:     "www.xn--caf-dma.com"
+				port:     null
 				path:     "/"
 				query: {}
 				fragment: null

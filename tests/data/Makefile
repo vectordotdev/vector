@@ -133,6 +133,24 @@ ca/intermediate_server/certs/postgres.cert.pem: ca/intermediate_server/csr/postg
 ca/intermediate_server/certs/postgres-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/postgres.cert.pem
 	cat ca/intermediate_server/certs/postgres.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/postgres-chain.cert.pem
 
+ca/intermediate_server/private/rabbitmq.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/rabbitmq.key.pem 2048
+
+ca/intermediate_server/csr/rabbitmq.csr.pem: ca/intermediate_server/private/rabbitmq.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/rabbitmq.key.pem \
+		-subj '/CN=rabbitmq/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/rabbitmq.csr.pem
+
+ca/intermediate_server/certs/rabbitmq.cert.pem: ca/intermediate_server/csr/rabbitmq.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/rabbitmq.csr.pem \
+		-out ca/intermediate_server/certs/rabbitmq.cert.pem
+
+ca/intermediate_server/certs/rabbitmq-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/rabbitmq.cert.pem
+	cat ca/intermediate_server/certs/rabbitmq.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/rabbitmq-chain.cert.pem
+
 ca/intermediate_server/private/kafka.key.pem:
 	openssl genrsa -out ca/intermediate_server/private/kafka.key.pem 2048
 
@@ -156,6 +174,24 @@ ca/intermediate_server/private/kafka.p12: ca/intermediate_server/private/kafka.k
 		-out ca/intermediate_server/private/kafka.p12 \
 		-in ca/intermediate_server/certs/kafka.cert.pem \
 		-inkey ca/intermediate_server/private/kafka.key.pem
+
+ca/intermediate_server/private/pulsar.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/pulsar.key.pem 2048
+
+ca/intermediate_server/csr/pulsar.csr.pem: ca/intermediate_server/private/pulsar.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/pulsar.key.pem \
+		-subj '/CN=pulsar/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/pulsar.csr.pem
+
+ca/intermediate_server/certs/pulsar.cert.pem: ca/intermediate_server/csr/pulsar.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/pulsar.csr.pem \
+		-out ca/intermediate_server/certs/pulsar.cert.pem
+
+ca/intermediate_server/certs/pulsar-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/pulsar.cert.pem
+	cat ca/intermediate_server/certs/pulsar.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/pulsar-chain.cert.pem
 
 ca/intermediate_client/private/localhost.p12: ca/intermediate_client/private/localhost.key.pem ca/intermediate_client/certs/localhost.cert.pem ca/intermediate_client/certs/ca-chain.cert.pem
 	openssl pkcs12 -chain -export -password pass:NOPASS -CAfile ca/intermediate_client/certs/ca-chain.cert.pem\

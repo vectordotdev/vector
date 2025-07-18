@@ -1,1 +1,1 @@
-{"metric":{"name":"x","namespace":"y","interval_ms":146127485,"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[13274,-4443,5059],"n":[48477,6232,33123]},"count":3149892218,"min":897856.0,"max":-862400.0,"sum":273024.0,"avg":-953408.0}}}}}
+{"log":{}}

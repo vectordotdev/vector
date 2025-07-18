@@ -41,7 +41,7 @@ impl Visitor for InlineSingleUseReferencesVisitor {
         // entire schema, by visiting the root schema in a recursive fashion, using a helper visitor.
         let mut occurrence_visitor = OccurrenceVisitor::default();
         occurrence_visitor.visit_root_schema(root);
-        let occurrence_map = occurrence_visitor.into_occurrences();
+        let occurrence_map = occurrence_visitor.occurrence_map;
 
         self.eligible_to_inline = occurrence_map
             .into_iter()
@@ -141,16 +141,7 @@ fn is_inlineable_schema(definition_name: &str, schema: &SchemaObject) -> bool {
 #[derive(Debug, Default)]
 struct OccurrenceVisitor {
     scope_stack: SchemaScopeStack,
-    occurrence_map: HashMap<SchemaReference, HashSet<SchemaReference>>,
-}
-
-impl OccurrenceVisitor {
-    fn into_occurrences(self) -> HashMap<SchemaReference, usize> {
-        self.occurrence_map
-            .into_iter()
-            .map(|(k, v)| (k, v.len()))
-            .collect()
-    }
+    occurrence_map: HashMap<SchemaReference, usize>,
 }
 
 impl Visitor for OccurrenceVisitor {
@@ -162,23 +153,11 @@ impl Visitor for OccurrenceVisitor {
         visit_schema_object_scoped(self, definitions, schema);
 
         if let Some(current_schema_ref) = schema.reference.as_ref() {
-            // Track the named "parent" schema for the schema we're currently visiting so that if we
-            // visit this schema again, we don't double count any schema references that it has. The
-            // "parent" schema is simply the closest ancestor schema that was itself a schema
-            // reference, or "Root", which represents the oldest schema ancestor in the document.
-            //
-            // This lets us couple with scenarios where schema A references schema B, and is the
-            // only actual direct schema reference to schema B, but due to multiple schemas
-            // referencing schema A, would otherwise lead to both A and B being visited multiple
-            // times.
-            let current_parent_schema_ref = self.get_current_schema_scope().clone();
             let current_schema_ref = get_cleaned_schema_reference(current_schema_ref);
-
-            let occurrences = self
+            *self
                 .occurrence_map
                 .entry(current_schema_ref.into())
-                .or_insert_with(HashSet::new);
-            occurrences.insert(current_parent_schema_ref);
+                .or_default() += 1;
         }
     }
 }
@@ -257,17 +236,7 @@ mod tests {
         assert_schemas_eq(expected_schema, actual_schema);
     }
 
-    // TODO(tobz): These two tests are ignored because the inliner currently works off of schema
-    // reference scopes, so two object properties within the same schema don't count as two
-    // instances of a schema being referenced.
-    //
-    // We need to refactor schema scopes to be piecemeal extensible more in the way of how
-    // `jsonschema` does it rather than an actual stack.... the current approach is good enough for
-    // now, but not optimal in the way that it could be.
-    //
-    // These are here for when I improve the situation after getting this merged.
     #[test]
-    #[ignore]
     fn single_ref_multiple_usages() {
         let mut actual_schema = as_schema(json!({
             "definitions": {
@@ -294,7 +263,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn multiple_refs_mixed_usages() {
         let mut actual_schema = as_schema(json!({
             "definitions": {
@@ -343,6 +311,133 @@ mod tests {
                 }
             }
         }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn reference_in_multiple_arrays() {
+        let mut actual_schema = as_schema(json!({
+            "definitions": {
+                "item": {
+                    "type": "object",
+                    "properties": {
+                        "x": { "type": "string" }
+                    }
+                }
+            },
+            "type": "object",
+            "properties": {
+                "arr1": { "type": "array", "items": { "$ref": "#/definitions/item" } },
+                "arr2": { "type": "array", "items": { "$ref": "#/definitions/item" } }
+            }
+        }));
+
+        let expected_schema = actual_schema.clone();
+
+        let mut visitor = InlineSingleUseReferencesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn reference_in_oneof_anyof_allof() {
+        let mut actual_schema = as_schema(json!({
+            "definitions": {
+                "shared": {
+                    "type": "object",
+                    "properties": {
+                        "y": { "type": "string" }
+                    }
+                }
+            },
+            "type": "object",
+            "properties": {
+                "choice": {
+                    "oneOf": [
+                        { "$ref": "#/definitions/shared" },
+                        { "$ref": "#/definitions/shared" }
+                    ],
+                    "anyOf": [
+                        { "$ref": "#/definitions/shared" },
+                        { "type": "null" }
+                    ],
+                    "allOf": [
+                        { "$ref": "#/definitions/shared" },
+                        { "type": "object" }
+                    ]
+                }
+            }
+        }));
+
+        let expected_schema = actual_schema.clone();
+
+        let mut visitor = InlineSingleUseReferencesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn reference_in_additional_properties() {
+        let mut actual_schema = as_schema(json!({
+            "definitions": {
+                "val": {
+                    "type": "object",
+                    "properties": {
+                        "z": { "type": "string" }
+                    }
+                }
+            },
+            "type": "object",
+            "properties": {
+                "obj1": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#/definitions/val" }
+                },
+                "obj2": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#/definitions/val" }
+                }
+            }
+        }));
+
+        let expected_schema = actual_schema.clone();
+
+        let mut visitor = InlineSingleUseReferencesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn reference_in_pattern_properties() {
+        let mut actual_schema = as_schema(json!({
+            "definitions": {
+                "pat": {
+                    "type": "object",
+                    "properties": {
+                        "w": { "type": "string" }
+                    }
+                }
+            },
+            "type": "object",
+            "properties": {
+                "obj": {
+                    "type": "object",
+                    "patternProperties": {
+                        "^foo$": { "$ref": "#/definitions/pat" },
+                        "^bar$": { "$ref": "#/definitions/pat" }
+                    }
+                }
+            }
+        }));
+
+        let expected_schema = actual_schema.clone();
+
+        let mut visitor = InlineSingleUseReferencesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
     }

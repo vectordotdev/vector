@@ -2,8 +2,8 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_config::configurable_component;
-use vector_core::metric_tags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
@@ -173,12 +173,7 @@ mod tests {
             "filesystem_used_bytes",
             "filesystem_used_ratio",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 4,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags

@@ -1,10 +1,10 @@
 use std::{io, sync::Arc};
 
 use bytes::Bytes;
-use codecs::JsonSerializerConfig;
-use lookup::lookup_v2::OwnedSegment;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::ByteSizeOf;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, TimestampFormat, Transformer},
@@ -133,7 +133,7 @@ fn encoder() -> (Transformer, Encoder<()>) {
             "title",
         ]
         .iter()
-        .map(|field| vec![OwnedSegment::Field((*field).into())].into())
+        .map(|field| ConfigValuePath::try_from((*field).to_string()).unwrap())
         .collect(),
     );
     // DataDog Event API requires unix timestamp.

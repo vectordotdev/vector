@@ -1,1 +1,1 @@
-{"metric":{"name":"t","interval_ms":3851829577,"kind":"incremental","gauge":{"value":540224.0}}}
+{"metric":{"name":"l","tags":{"j":"g","r":"v"},"kind":"incremental","counter":{"value":-475072.0}}}

@@ -7,14 +7,14 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde_json::{value::RawValue, Value as JsonValue};
 use smallvec::SmallVec;
-use vrl::value::Value;
+use vrl::value::{KeyString, Value};
 
 pub trait ByteSizeOf {
     /// Returns the in-memory size of this type
     ///
     /// This function returns the total number of bytes that
     /// [`std::mem::size_of`] does in addition to any interior allocated
-    /// bytes. It default implementation is `std::mem::size_of` +
+    /// bytes. Its default implementation is `std::mem::size_of` +
     /// `ByteSizeOf::allocated_bytes`.
     fn size_of(&self) -> usize {
         mem::size_of_val(self) + self.allocated_bytes()
@@ -31,7 +31,7 @@ pub trait ByteSizeOf {
     fn allocated_bytes(&self) -> usize;
 }
 
-impl<'a, T> ByteSizeOf for &'a T
+impl<T> ByteSizeOf for &T
 where
     T: ByteSizeOf,
 {
@@ -58,7 +58,13 @@ impl ByteSizeOf for String {
     }
 }
 
-impl<'a> ByteSizeOf for &'a str {
+impl ByteSizeOf for KeyString {
+    fn allocated_bytes(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ByteSizeOf for &str {
     fn allocated_bytes(&self) -> usize {
         0
     }

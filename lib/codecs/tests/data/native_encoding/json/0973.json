@@ -1,1 +1,1 @@
-{"log":{"":"c","￵":8016281870939424702}}
+{"metric":{"name":"p","tags":{"f":"u","j":"f","z":"x"},"timestamp":"1970-01-01T06:36:47.000017224Z","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":320576.0,"value":-695296.0},{"quantile":-974592.0,"value":280704.0},{"quantile":-980802.0,"value":-33792.0},{"quantile":658048.0,"value":534272.0},{"quantile":-875200.0,"value":390528.0},{"quantile":718400.0,"value":578816.0},{"quantile":976064.0,"value":424704.0},{"quantile":-978432.0,"value":-326784.0}],"count":0,"sum":-692352.0}}}

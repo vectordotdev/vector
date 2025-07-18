@@ -1,7 +1,6 @@
 use metrics::counter;
-use vector_core::internal_event::InternalEvent;
-
-use vector_common::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::InternalEvent;
+use vector_lib::internal_event::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct WindowsServiceStart<'a> {
@@ -9,16 +8,18 @@ pub struct WindowsServiceStart<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceStart<'a> {
+impl InternalEvent for WindowsServiceStart<'_> {
     fn emit(self) {
         info!(
             already_started = %self.already_started,
             name = self.name,
             "Started Windows Service.",
         );
-        counter!("windows_service_start_total", 1,
+        counter!(
+            "windows_service_start_total",
             "already_started" => self.already_started.to_string(),
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -28,16 +29,18 @@ pub struct WindowsServiceStop<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceStop<'a> {
+impl InternalEvent for WindowsServiceStop<'_> {
     fn emit(self) {
         info!(
             already_stopped = %self.already_stopped,
             name = ?self.name,
             "Stopped Windows Service.",
         );
-        counter!("windows_service_stop_total", 1,
+        counter!(
+            "windows_service_stop_total",
             "already_stopped" => self.already_stopped.to_string(),
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -46,13 +49,13 @@ pub struct WindowsServiceRestart<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceRestart<'a> {
+impl InternalEvent for WindowsServiceRestart<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
             "Restarted Windows Service."
         );
-        counter!("windows_service_restart_total", 1)
+        counter!("windows_service_restart_total").increment(1)
     }
 }
 
@@ -61,13 +64,13 @@ pub struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceInstall<'a> {
+impl InternalEvent for WindowsServiceInstall<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
             "Installed Windows Service.",
         );
-        counter!("windows_service_install_total", 1,);
+        counter!("windows_service_install_total").increment(1);
     }
 }
 
@@ -76,13 +79,13 @@ pub struct WindowsServiceUninstall<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
+impl InternalEvent for WindowsServiceUninstall<'_> {
     fn emit(self) {
         info!(
             name = ?self.name,
             "Uninstalled Windows Service.",
         );
-        counter!("windows_service_uninstall_total", 1,);
+        counter!("windows_service_uninstall_total").increment(1);
     }
 }
 
@@ -91,7 +94,7 @@ pub struct WindowsServiceDoesNotExistError<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
+impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
     fn emit(self) {
         error!(
             message = "Windows service does not exist. Maybe it needs to be installed.",
@@ -99,15 +102,13 @@ impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
             error_code = "service_missing",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "service_missing",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("windows_service_does_not_exist_total", 1,);
+        )
+        .increment(1);
     }
 }

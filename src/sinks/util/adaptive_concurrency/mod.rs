@@ -9,13 +9,11 @@ mod service;
 #[cfg(test)]
 pub mod tests;
 
-pub(super) const MAX_CONCURRENCY: usize = 200;
-
 pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
 pub(crate) use service::AdaptiveConcurrencyLimit;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
-pub(self) fn instant_now() -> std::time::Instant {
+fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()
 }
 
@@ -29,12 +27,21 @@ pub(self) fn instant_now() -> std::time::Instant {
 #[derive(Clone, Copy, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
+    /// The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
+    ///
+    /// Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
+    /// long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
+    /// `adaptive_concurrency_limit` metric.
+    #[configurable(validation(range(min = 1)))]
+    #[serde(default = "default_initial_concurrency")]
+    pub(super) initial_concurrency: usize,
+
     /// The fraction of the current value to set the new concurrency limit when decreasing the limit.
     ///
     /// Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
     /// when latency increases.
     ///
-    /// Note that the new limit is rounded down after applying this ratio.
+    /// **Note**: The new limit is rounded down after applying this ratio.
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     #[serde(default = "default_decrease_ratio")]
     pub(super) decrease_ratio: f64,
@@ -61,6 +68,17 @@ pub struct AdaptiveConcurrencySettings {
     #[configurable(validation(range(min = 0.0)))]
     #[serde(default = "default_rtt_deviation_scale")]
     pub(super) rtt_deviation_scale: f64,
+
+    /// The maximum concurrency limit.
+    ///
+    /// The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
+    #[configurable(validation(range(min = 1)))]
+    #[serde(default = "default_max_concurrency_limit")]
+    pub(super) max_concurrency_limit: usize,
+}
+
+const fn default_initial_concurrency() -> usize {
+    1
 }
 
 const fn default_decrease_ratio() -> f64 {
@@ -75,18 +93,18 @@ const fn default_rtt_deviation_scale() -> f64 {
     2.5
 }
 
-impl AdaptiveConcurrencySettings {
-    pub const fn max_concurrency() -> usize {
-        MAX_CONCURRENCY
-    }
+const fn default_max_concurrency_limit() -> usize {
+    200
 }
 
 impl Default for AdaptiveConcurrencySettings {
     fn default() -> Self {
         Self {
+            initial_concurrency: default_initial_concurrency(),
             decrease_ratio: default_decrease_ratio(),
             ewma_alpha: default_ewma_alpha(),
             rtt_deviation_scale: default_rtt_deviation_scale(),
+            max_concurrency_limit: default_max_concurrency_limit(),
         }
     }
 }

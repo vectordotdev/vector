@@ -1,7 +1,7 @@
 ---
 title: JournalD
 description: Collect logs from [JournalD](https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html)
-kind: source
+component_kind: source
 layout: component
 tags: ["journald", "component", "source", "logs"]
 ---

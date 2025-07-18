@@ -1,1 +1,1 @@
-{"log":{"\u0000":"0","t":{"":[],"3)1":" ","":200960.0},"熪\u0017":true}}
+{"metric":{"name":"m","namespace":"z","tags":{"i":"y","y":"h"},"timestamp":"1969-12-31T15:50:01.000003225Z","interval_ms":2821601488,"kind":"incremental","counter":{"value":738944.0}}}

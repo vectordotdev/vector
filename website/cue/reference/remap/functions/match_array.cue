@@ -3,7 +3,7 @@ package metadata
 remap: functions: match_array: {
 	category: "Enumerate"
 	description: """
-		Determines whether the elements in the `value` array matches the `pattern` - by default it checks at least one element matches, but can be set to determine if all the elements match.
+		Determines whether the elements in the `value` array matches the `pattern`. By default, it checks that at least one element matches, but can be set to determine if all the elements match.
 		"""
 
 	arguments: [
@@ -34,28 +34,28 @@ remap: functions: match_array: {
 		{
 			title: "Match at least one element"
 			source: #"""
-					match_array(["foobar", "bazqux"], r'foo')
+				match_array(["foobar", "bazqux"], r'foo')
 				"""#
 			return: true
 		},
 		{
 			title: "Match all elements"
 			source: #"""
-					match_array(["foo", "foobar", "barfoo"], r'foo', all: true)
+				match_array(["foo", "foobar", "barfoo"], r'foo', all: true)
 				"""#
 			return: true
 		},
 		{
 			title: "No matches"
 			source: #"""
-					match_array(["bazqux", "xyz"], r'foo')
+				match_array(["bazqux", "xyz"], r'foo')
 				"""#
 			return: false
 		},
 		{
 			title: "Not all elements match"
 			source: #"""
-					match_array(["foo", "foobar", "baz"], r'foo', all: true)
+				match_array(["foo", "foobar", "baz"], r'foo', all: true)
 				"""#
 			return: false
 		},

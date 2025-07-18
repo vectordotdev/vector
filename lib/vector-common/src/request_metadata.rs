@@ -61,7 +61,7 @@ impl GroupedCountByteSize {
     /// Returns a `HashMap` of tags => event counts for when we are tracking by tags.
     /// Returns `None` if we are not tracking by tags.
     #[must_use]
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test"))]
     pub fn sizes(&self) -> Option<&HashMap<TaggedEventsSent, CountByteSize>> {
         match self {
             Self::Tagged { sizes } => Some(sizes),
@@ -71,8 +71,8 @@ impl GroupedCountByteSize {
 
     /// Returns a single count for when we are not tracking by tags.
     #[must_use]
-    #[cfg(test)]
-    fn size(&self) -> Option<CountByteSize> {
+    #[cfg(any(test, feature = "test"))]
+    pub fn size(&self) -> Option<CountByteSize> {
         match self {
             Self::Tagged { .. } => None,
             Self::Untagged { size } => Some(*size),
@@ -196,7 +196,7 @@ impl AddAssign for GroupedCountByteSize {
                 }
             }
             (Self::Untagged { .. }, Self::Tagged { .. }) => unreachable!(),
-        };
+        }
     }
 }
 

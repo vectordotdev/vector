@@ -59,15 +59,18 @@ components: sinks: socket: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.socket.configuration
+	configuration: generated.components.sinks.socket.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
-	}
-
-	telemetry: metrics: {
-		connection_errors_total: components.sources.internal_metrics.output.metrics.connection_errors_total
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
 	}
 }

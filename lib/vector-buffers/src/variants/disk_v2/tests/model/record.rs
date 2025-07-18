@@ -80,7 +80,7 @@ impl fmt::Debug for Record {
             .field("event_count", &self.event_count)
             .field("encoded_len", &self.encoded_len())
             .field("archived_len", &self.archived_len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

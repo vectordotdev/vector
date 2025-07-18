@@ -50,7 +50,7 @@ impl Mergeable for Value {
         // We _may_ need to relax this in practice/in the future, but it's a solid invariant to
         // enforce for the time being.
         if discriminant(self) != discriminant(other) {
-            panic!("Tried to merge two `Value` types together with differing types!\n\nSelf: {:?}\n\nOther: {:?}", self, other);
+            panic!("Tried to merge two `Value` types together with differing types!\n\nSelf: {self:?}\n\nOther: {other:?}");
         }
 
         match (self, other) {
@@ -128,11 +128,7 @@ fn merge_schema_instance_type(
     source: Option<&SingleOrVec<InstanceType>>,
 ) {
     merge_optional_with(destination, source, |existing, new| {
-        let mut deduped = existing
-            .into_iter()
-            .chain(new.into_iter())
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut deduped = existing.into_iter().chain(new).cloned().collect::<Vec<_>>();
         deduped.dedup();
 
         *existing = deduped.into();

@@ -1,7 +1,7 @@
 ---
 title: File Descriptor
 description: Collect logs from a [file descriptor](https://en.wikipedia.org/wiki/File_descriptor)
-kind: source
+component_kind: source
 layout: component
 tags: ["file_descriptor", "component", "source", "logs"]
 ---

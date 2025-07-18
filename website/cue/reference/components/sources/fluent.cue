@@ -51,7 +51,7 @@ components: sources: fluent: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.fluent.configuration
+	configuration: generated.components.sources.fluent.configuration
 
 	output: logs: line: {
 		description: "A Fluent message"
@@ -174,9 +174,5 @@ components: sources: fluent: {
 				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7532).
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		decode_errors_total: components.sources.internal_metrics.output.metrics.decode_errors_total
 	}
 }

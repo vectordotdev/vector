@@ -16,13 +16,13 @@ remap: functions: encode_logfmt: {
 		},
 		{
 			name:        "fields_ordering"
-			description: "The ordering of fields to preserve. Any fields not in this list will appear unordered, after any ordered fields."
+			description: "The ordering of fields to preserve. Any fields not in this list are listed unordered, after all ordered fields."
 			required:    false
 			type: ["array"]
 		},
 	]
 	internal_failure_reasons: [
-		"`fields_ordering` contains a non-string element",
+		"`fields_ordering` contains a non-string element.",
 	]
 	return: types: ["string"]
 
@@ -44,16 +44,16 @@ remap: functions: encode_logfmt: {
 		{
 			title: "Encode to logfmt (nested fields)"
 			source: """
-				encode_logfmt({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
+				encode_logfmt({"agent": {"name": "foo"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
 				"""
-			return: #"agent.name=vector event=log log.file.path=my.log"#
+			return: #"agent.name=foo event=log log.file.path=my.log"#
 		},
 		{
 			title: "Encode to logfmt (nested fields ordering)"
 			source: """
-				encode_logfmt!({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"}, ["event", "log.file.path", "agent.name"])
+				encode_logfmt!({"agent": {"name": "foo"}, "log": {"file": {"path": "my.log"}}, "event": "log"}, ["event", "log.file.path", "agent.name"])
 				"""
-			return: #"event=log log.file.path=my.log agent.name=vector"#
+			return: #"event=log log.file.path=my.log agent.name=foo"#
 		},
 	]
 }

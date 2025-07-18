@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::Arc};
 
 use http::Uri;
 use tower::ServiceBuilder;
-use vector_common::sensitive_string::SensitiveString;
+use vector_lib::sensitive_string::SensitiveString;
 
 use super::{
     healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
@@ -90,10 +90,7 @@ pub struct NewRelicConfig {
     pub compression: Compression,
 
     #[configurable(derived)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
     #[configurable(derived)]
@@ -108,7 +105,7 @@ pub struct NewRelicConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 
@@ -141,8 +138,8 @@ impl SinkConfig for NewRelicConfig {
             .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
 
-        let request_limits = self.request.unwrap_with(&Default::default());
-        let tls_settings = TlsSettings::from_options(&None)?;
+        let request_limits = self.request.into_settings();
+        let tls_settings = TlsSettings::from_options(None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
         let credentials = Arc::from(NewRelicCredentials::from(self));
 

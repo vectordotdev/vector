@@ -10,14 +10,14 @@ remap: functions: random_bytes: {
 	arguments: [
 		{
 			name:        "length"
-			description: "The number of bytes to generate. Must not be larger than 64k"
+			description: "The number of bytes to generate. Must not be larger than 64k."
 			required:    true
 			type: ["integer"]
 		},
 	]
 	internal_failure_reasons: [
-		"`length` is negative",
-		"`length` is larger than the maximum value (64k)",
+		"`length` is negative.",
+		"`length` is larger than the maximum value (64k).",
 	]
 	return: types: ["string"]
 

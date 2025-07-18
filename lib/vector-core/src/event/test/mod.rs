@@ -14,17 +14,20 @@ fn event_iteration() {
     log.insert("Pitbull", "The bigger they are, the harder they fall");
 
     let all = log
-        .all_fields()
+        .all_event_fields()
         .unwrap()
         .map(|(k, v)| (k, v.to_string_lossy()))
         .collect::<HashSet<_>>();
     assert_eq!(
         all,
         vec![
-            ("Ke$ha".into(), "It's going down, I'm yelling timber".into()),
             (
                 "Pitbull".into(),
                 "The bigger they are, the harder they fall".into()
+            ),
+            (
+                "\"Ke$ha\"".into(),
+                "It's going down, I'm yelling timber".into()
             ),
         ]
         .into_iter()
@@ -39,13 +42,13 @@ fn event_iteration_order() {
     log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
     log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));
 
-    let collected: Vec<_> = log.all_fields().unwrap().collect();
+    let collected: Vec<_> = log.all_event_fields().unwrap().collect();
     assert_eq!(
         collected,
         vec![
-            (String::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-            (String::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-            (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+            ("YRjhxXcg".into(), &Value::from("nw8iM5Jr")),
+            ("lZDfzKIL".into(), &Value::from("tOVrjveM")),
+            ("o9amkaRY".into(), &Value::from("pGsfG7Nr")),
         ]
     );
 }

@@ -5,27 +5,23 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::BytesMut;
 use futures::{stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, InternalEventHandle, Protocol, Registered,
-};
-use vector_config::configurable_component;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{BytesSent, Protocol, Registered};
 
-use super::SinkBuildError;
+use super::{
+    datagram::{send_datagrams, DatagramSocket},
+    SinkBuildError,
+};
 use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
     dns,
-    event::{Event, EventStatus, Finalizable},
-    internal_events::{
-        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
-        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
-    },
+    event::Event,
+    internal_events::{UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError},
     net,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
 };
@@ -81,7 +77,11 @@ impl UdpSinkConfig {
     pub fn build(
         &self,
         transformer: Transformer,
-        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+        encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
         let sink = UdpSink::new(connector.clone(), transformer, encoder);
@@ -162,7 +162,7 @@ impl UdpConnector {
 
 struct UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UdpConnector,
     transformer: Transformer,
@@ -172,7 +172,7 @@ where
 
 impl<E> UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
@@ -187,66 +187,29 @@ where
 #[async_trait]
 impl<E> StreamSink<Event> for UdpSink<E>
 where
-    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();
         while Pin::new(&mut input).peek().await.is_some() {
-            let mut socket = self.connector.connect_backoff().await;
-            while let Some(mut event) = input.next().await {
-                let byte_size = event.estimated_json_encoded_size_of();
-
-                self.transformer.transform(&mut event);
-
-                let finalizers = event.take_finalizers();
-                let mut bytes = BytesMut::new();
-
-                // Errors are handled by `Encoder`.
-                if encoder.encode(event, &mut bytes).is_err() {
-                    continue;
-                }
-
-                match udp_send(&mut socket, &bytes).await {
-                    Ok(()) => {
-                        emit!(SocketEventsSent {
-                            mode: SocketMode::Udp,
-                            count: 1,
-                            byte_size,
-                        });
-
-                        self.bytes_sent.emit(ByteSize(bytes.len()));
-                        finalizers.update_status(EventStatus::Delivered);
-                    }
-                    Err(error) => {
-                        emit!(SocketSendError {
-                            mode: SocketMode::Udp,
-                            error
-                        });
-                        finalizers.update_status(EventStatus::Errored);
-                        break;
-                    }
-                }
-            }
+            let socket = self.connector.connect_backoff().await;
+            send_datagrams(
+                &mut input,
+                DatagramSocket::Udp(socket),
+                &self.transformer,
+                &mut encoder,
+                &self.bytes_sent,
+            )
+            .await;
         }
 
         Ok(())
     }
 }
 
-async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
-    let sent = socket.send(buf).await?;
-    if sent != buf.len() {
-        emit!(UdpSendIncompleteError {
-            data_size: buf.len(),
-            sent,
-        });
-    }
-    Ok(())
-}
-
-fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
+pub(super) const fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
     match remote_addr {
         SocketAddr::V4(_) => SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
         SocketAddr::V6(_) => SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),

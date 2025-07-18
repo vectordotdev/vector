@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use vector_common::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_core::{
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };

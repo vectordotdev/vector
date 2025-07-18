@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use criterion::{criterion_group, BatchSize, Criterion};
 use vector::event::LogEvent;
+use vrl::event_path;
 
 fn benchmark_event_iterate(c: &mut Criterion) {
     let mut group = c.benchmark_group("event/iterate");
@@ -9,12 +10,12 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut log = LogEvent::default();
-                log.insert("key1", Bytes::from("value1"));
-                log.insert("key2", Bytes::from("value2"));
-                log.insert("key3", Bytes::from("value3"));
+                log.insert(event_path!("key1"), Bytes::from("value1"));
+                log.insert(event_path!("key2"), Bytes::from("value2"));
+                log.insert(event_path!("key3"), Bytes::from("value3"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
@@ -23,12 +24,18 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut log = LogEvent::default();
-                log.insert("key1.nested1.nested2", Bytes::from("value1"));
-                log.insert("key1.nested1.nested3", Bytes::from("value4"));
-                log.insert("key3", Bytes::from("value3"));
+                log.insert(
+                    event_path!("key1", "nested1", "nested2"),
+                    Bytes::from("value1"),
+                );
+                log.insert(
+                    event_path!("key1", "nested1", "nested3"),
+                    Bytes::from("value4"),
+                );
+                log.insert(event_path!("key3"), Bytes::from("value3"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
@@ -37,11 +44,11 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut log = LogEvent::default();
-                log.insert("key1.nested1[0]", Bytes::from("value1"));
-                log.insert("key1.nested1[1]", Bytes::from("value2"));
+                log.insert(event_path!("key1", "nested1", 0), Bytes::from("value1"));
+                log.insert(event_path!("key1", "nested1", 1), Bytes::from("value2"));
                 log
             },
-            |e| e.all_fields().unwrap().count(),
+            |e| e.all_event_fields().unwrap().count(),
             BatchSize::SmallInput,
         )
     });
@@ -53,25 +60,31 @@ fn benchmark_event_create(c: &mut Criterion) {
     group.bench_function("single-level", |b| {
         b.iter(|| {
             let mut log = LogEvent::default();
-            log.insert("key1", Bytes::from("value1"));
-            log.insert("key2", Bytes::from("value2"));
-            log.insert("key3", Bytes::from("value3"));
+            log.insert(event_path!("key1"), Bytes::from("value1"));
+            log.insert(event_path!("key2"), Bytes::from("value2"));
+            log.insert(event_path!("key3"), Bytes::from("value3"));
         })
     });
 
     group.bench_function("nested-keys", |b| {
         b.iter(|| {
             let mut log = LogEvent::default();
-            log.insert("key1.nested1.nested2", Bytes::from("value1"));
-            log.insert("key1.nested1.nested3", Bytes::from("value4"));
-            log.insert("key3", Bytes::from("value3"));
+            log.insert(
+                event_path!("key1", "nested1", "nested2"),
+                Bytes::from("value1"),
+            );
+            log.insert(
+                event_path!("key1", "nested1", "nested3"),
+                Bytes::from("value4"),
+            );
+            log.insert(event_path!("key3"), Bytes::from("value3"));
         })
     });
     group.bench_function("array", |b| {
         b.iter(|| {
             let mut log = LogEvent::default();
-            log.insert("key1.nested1[0]", Bytes::from("value1"));
-            log.insert("key1.nested1[1]", Bytes::from("value2"));
+            log.insert(event_path!("key1", "nested1", 0), Bytes::from("value1"));
+            log.insert(event_path!("key1", "nested1", 1), Bytes::from("value2"));
         })
     });
 }

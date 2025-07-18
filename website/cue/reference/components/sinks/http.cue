@@ -77,7 +77,7 @@ components: sinks: http: {
 		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
-	configuration: base.components.sinks.http.configuration
+	configuration: generated.components.sinks.http.configuration
 
 	input: {
 		logs: true
@@ -90,9 +90,5 @@ components: sinks: http: {
 			set:          true
 		}
 		traces: true
-	}
-
-	telemetry: metrics: {
-		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
 	}
 }

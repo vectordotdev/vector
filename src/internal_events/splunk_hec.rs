@@ -7,22 +7,21 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
-    use metrics::{counter, decrement_gauge, increment_gauge};
+    use metrics::{counter, gauge};
     use serde_json::Error;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::internal_event::{
+        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+    };
 
     use crate::{
-        emit,
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
-    };
-    use vector_common::internal_event::{
-        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
     };
 
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
-        pub error: vector_common::Error,
+        pub error: vector_lib::Error,
     }
 
     impl InternalEvent for SplunkEventEncodeError {
@@ -34,14 +33,15 @@ mod sink {
                 error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
+
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "serializing_json",
                 "error_type" => error_type::ENCODER_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
             emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
         }
     }
@@ -53,7 +53,7 @@ mod sink {
         pub error: crate::Error,
     }
 
-    impl<'a> InternalEvent for SplunkInvalidMetricReceivedError<'a> {
+    impl InternalEvent for SplunkInvalidMetricReceivedError<'_> {
         fn emit(self) {
             error!(
                 message = "Invalid metric received.",
@@ -62,18 +62,20 @@ mod sink {
                 stage = error_stage::PROCESSING,
                 value = ?self.value,
                 kind = ?self.kind,
-                internal_log_rate_limit = true,
+
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
             counter!(
-                "component_discarded_events_total", 1,
+                "component_discarded_events_total",
                 "error_type" => error_type::INVALID_METRIC,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -90,14 +92,15 @@ mod sink {
                 error_code = "invalid_response",
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
+
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "invalid_response",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::SENDING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -115,14 +118,15 @@ mod sink {
                 error_code = "indexer_ack_failed",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
+
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "indexer_ack_failed",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::SENDING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -139,14 +143,15 @@ mod sink {
                 error_code = "indexer_ack_unavailable",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
+
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "indexer_ack_unavailable",
                 "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
                 "stage" => error_stage::SENDING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -154,7 +159,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
         fn emit(self) {
-            increment_gauge!("splunk_pending_acks", 1.0);
+            gauge!("splunk_pending_acks").increment(1.0);
         }
     }
 
@@ -164,7 +169,7 @@ mod sink {
 
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit(self) {
-            decrement_gauge!("splunk_pending_acks", self.count);
+            gauge!("splunk_pending_acks").decrement(self.count);
         }
     }
 
@@ -172,7 +177,7 @@ mod sink {
         pub r#type: &'a str,
     }
 
-    impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
+    impl InternalEvent for SplunkEventTimestampInvalidType<'_> {
         fn emit(self) {
             warn!(
                 message =
@@ -198,26 +203,10 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
-    use vector_core::internal_event::InternalEvent;
+    use vector_lib::internal_event::InternalEvent;
 
     use crate::sources::splunk_hec::ApiError;
-    use vector_common::internal_event::{error_stage, error_type};
-
-    #[derive(Debug)]
-    pub struct SplunkHecRequestReceived<'a> {
-        pub path: &'a str,
-    }
-
-    impl<'a> InternalEvent for SplunkHecRequestReceived<'a> {
-        fn emit(self) {
-            debug!(
-                message = "Received one request.",
-                path = %self.path,
-                internal_log_rate_limit = true
-            );
-            counter!("requests_received_total", 1);
-        }
-    }
+    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestBodyInvalidError {
@@ -235,11 +224,12 @@ mod source {
                 internal_log_rate_limit = true
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_code" => "invalid_request_body",
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
-            );
+            )
+            .increment(1);
         }
     }
 
@@ -258,12 +248,11 @@ mod source {
                 internal_log_rate_limit = true
             );
             counter!(
-                "component_errors_total", 1,
+                "component_errors_total",
                 "error_type" => error_type::REQUEST_FAILED,
                 "stage" => error_stage::RECEIVING,
-            );
-            // deprecated
-            counter!("http_request_errors_total", 1);
+            )
+            .increment(1);
         }
     }
 }

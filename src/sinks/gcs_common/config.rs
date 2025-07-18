@@ -2,7 +2,7 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     gcp::{GcpAuthenticator, GcpError},
@@ -14,7 +14,9 @@ use crate::{
     },
 };
 
-pub const BASE_URL: &str = "https://storage.googleapis.com/";
+pub fn default_endpoint() -> String {
+    "https://storage.googleapis.com".to_string()
+}
 
 /// GCS Predefined ACLs.
 ///
@@ -152,13 +154,15 @@ impl RetryLogic for GcsRetryLogic {
         let status = response.inner.status();
 
         match status {
+            StatusCode::UNAUTHORIZED => RetryAction::Retry("unauthorized".into()),
+            StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
             _ if status.is_server_error() => RetryAction::Retry(status.to_string().into()),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }

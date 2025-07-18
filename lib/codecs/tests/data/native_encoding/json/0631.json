@@ -1,1 +1,1 @@
-{"log":{"\u0004":[],"<":[]}}
+{"metric":{"name":"g","namespace":"j","timestamp":"1969-12-31T18:31:49.000017867Z","interval_ms":4294967295,"kind":"absolute","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[2220],"n":[1]},"count":1,"min":862208.0,"max":862208.0,"sum":-516800.0,"avg":407360.0}}}}}

@@ -162,7 +162,7 @@ There is no guide accompanying this RFC, it only minimally touches user facing s
 
 ## Doc Level Proposal
 
-> **Placement:** Insert into [Log Event](https://vector.dev/docs/about/data-model/log/#types)'s [Types](https://vector.dev/docs/about/data-model/log/#types) section
+> **Placement:** Insert into [Log Event](https://vector.dev/docs/architecture/data-model/log/#types)'s [Types](https://vector.dev/docs/architecture/data-model/log/#types) section
 
 ### Bytes
 

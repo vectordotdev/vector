@@ -9,9 +9,9 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_common::sensitive_string::SensitiveString;
-use vector_config::configurable_component;
-use vector_core::event::MetricTags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{KeyString, MetricTags};
+use vector_lib::sensitive_string::SensitiveString;
 
 use crate::http::HttpClient;
 
@@ -232,7 +232,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
     tags: Option<MetricTags>,
-    fields: Option<HashMap<String, Field>>,
+    fields: Option<HashMap<KeyString, Field>>,
     timestamp: i64,
     line_protocol: &mut BytesMut,
 ) -> Result<(), &'static str> {
@@ -284,7 +284,7 @@ fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
-    fields: HashMap<String, Field>,
+    fields: HashMap<KeyString, Field>,
     output: &mut BytesMut,
 ) {
     let original_len = output.len();
@@ -342,7 +342,7 @@ fn encode_string(key: &str, output: &mut BytesMut) {
 
 pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
-        ts.timestamp_nanos()
+        ts.timestamp_nanos_opt().unwrap()
     } else {
         encode_timestamp(Some(Utc::now()))
     }
@@ -380,7 +380,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
-    use vector_core::metric_tags;
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::tls;
@@ -390,7 +390,7 @@ pub mod test_util {
     pub(crate) const TOKEN: &str = "my-token";
 
     pub(crate) fn next_database() -> String {
-        format!("testdb{}", Utc::now().timestamp_nanos())
+        format!("testdb{}", Utc::now().timestamp_nanos_opt().unwrap())
     }
 
     pub(crate) fn ts() -> DateTime<Utc> {
@@ -416,9 +416,7 @@ pub mod test_util {
         for field in fields.into_iter() {
             assert!(
                 encoded_fields.contains(&field),
-                "Fields: {} has to have: {}",
-                value,
-                field
+                "Fields: {value} has to have: {field}"
             )
         }
     }
@@ -471,7 +469,7 @@ pub mod test_util {
 
     pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
-            .get(&format!("{}/query", endpoint))
+            .get(format!("{endpoint}/query"))
             .query(&[("q", query)])
             .send()
             .await
@@ -480,10 +478,10 @@ pub mod test_util {
 
     pub(crate) async fn onboarding_v1(endpoint: &str) -> String {
         let database = next_database();
-        let status = query_v1(endpoint, &format!("create database {}", database))
+        let status = query_v1(endpoint, &format!("create database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
         // Some times InfluxDB will return OK before it can actually
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
@@ -494,7 +492,7 @@ pub mod test_util {
                 match client()
                     .post(&write_url)
                     .header("Content-Type", "text/plain")
-                    .header("Authorization", &format!("Token {}", TOKEN))
+                    .header("Authorization", &format!("Token {TOKEN}"))
                     .body("")
                     .send()
                     .await
@@ -503,7 +501,7 @@ pub mod test_util {
                 {
                     http::StatusCode::NO_CONTENT => true,
                     http::StatusCode::NOT_FOUND => false,
-                    status => panic!("Unexpected status: {}", status),
+                    status => panic!("Unexpected status: {status}"),
                 }
             }
         })
@@ -512,10 +510,10 @@ pub mod test_util {
     }
 
     pub(crate) async fn cleanup_v1(endpoint: &str, database: &str) {
-        let status = query_v1(endpoint, &format!("drop database {}", database))
+        let status = query_v1(endpoint, &format!("drop database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
     }
 
     pub(crate) async fn onboarding_v2(endpoint: &str) {
@@ -532,7 +530,7 @@ pub mod test_util {
             .unwrap();
 
         let res = client
-            .post(format!("{}/api/v2/setup", endpoint))
+            .post(format!("{endpoint}/api/v2/setup"))
             .json(&body)
             .header("accept", "application/json")
             .send()
@@ -543,8 +541,7 @@ pub mod test_util {
 
         assert!(
             status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
-            "UnexpectedStatus: {}",
-            status
+            "UnexpectedStatus: {status}"
         );
     }
 
@@ -597,8 +594,8 @@ mod tests {
 
     #[test]
     fn test_influxdb_settings_missing() {
-        let config = r#"
-    "#;
+        let config = r"
+    ";
         let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
@@ -736,20 +733,17 @@ mod tests {
     #[test]
     fn test_encode_fields_v1() {
         let fields = vec![
+            ("field_string".into(), Field::String("string value".into())),
             (
-                "field_string".to_owned(),
-                Field::String("string value".to_owned()),
+                "field_string_escape".into(),
+                Field::String("string\\val\"ue".into()),
             ),
-            (
-                "field_string_escape".to_owned(),
-                Field::String("string\\val\"ue".to_owned()),
-            ),
-            ("field_float".to_owned(), Field::Float(123.45)),
-            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
-            ("field_int".to_owned(), Field::Int(657646)),
-            ("field_bool_true".to_owned(), Field::Bool(true)),
-            ("field_bool_false".to_owned(), Field::Bool(false)),
-            ("escape key".to_owned(), Field::Float(10.0)),
+            ("field_float".into(), Field::Float(123.45)),
+            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
+            ("field_int".into(), Field::Int(657646)),
+            ("field_bool_true".into(), Field::Bool(true)),
+            ("field_bool_false".into(), Field::Bool(false)),
+            ("escape key".into(), Field::Float(10.0)),
         ]
         .into_iter()
         .collect();
@@ -776,20 +770,17 @@ mod tests {
     #[test]
     fn test_encode_fields() {
         let fields = vec![
+            ("field_string".into(), Field::String("string value".into())),
             (
-                "field_string".to_owned(),
-                Field::String("string value".to_owned()),
+                "field_string_escape".into(),
+                Field::String("string\\val\"ue".into()),
             ),
-            (
-                "field_string_escape".to_owned(),
-                Field::String("string\\val\"ue".to_owned()),
-            ),
-            ("field_float".to_owned(), Field::Float(123.45)),
-            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
-            ("field_int".to_owned(), Field::Int(657646)),
-            ("field_bool_true".to_owned(), Field::Bool(true)),
-            ("field_bool_false".to_owned(), Field::Bool(false)),
-            ("escape key".to_owned(), Field::Float(10.0)),
+            ("field_float".into(), Field::Float(123.45)),
+            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
+            ("field_int".into(), Field::Int(657646)),
+            ("field_bool_true".into(), Field::Bool(true)),
+            ("field_bool_false".into(), Field::Bool(false)),
+            ("escape key".into(), Field::Float(10.0)),
         ]
         .into_iter()
         .collect();
@@ -834,7 +825,9 @@ mod tests {
 
     #[test]
     fn test_encode_timestamp() {
-        let start = Utc::now().timestamp_nanos();
+        let start = Utc::now()
+            .timestamp_nanos_opt()
+            .expect("Timestamp out of range");
         assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
         assert!(encode_timestamp(None) >= start)
     }

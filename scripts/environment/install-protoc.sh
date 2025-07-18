@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 set -o errexit -o verbose
 
 # A parameter can be optionally passed to this script to specify an alternative
@@ -60,7 +60,7 @@ install_protoc() {
   curl -fsSL "${url}" -o "${download_path}"
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
-  mv --force --verbose "${TMP_DIR}/bin/protoc" "${install_path}"
+  mv -f -v "${TMP_DIR}/bin/protoc" "${install_path}"
 }
 
-install_protoc "3.19.5" "${INSTALL_PATH}/protoc"
+install_protoc "3.20.2" "${INSTALL_PATH}/protoc"

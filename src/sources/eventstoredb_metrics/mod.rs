@@ -5,12 +5,12 @@ use http::Uri;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
-use vector_common::internal_event::{
+use vector_lib::config::LogNamespace;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
@@ -89,7 +89,7 @@ fn eventstoredb(
     mut cx: SourceContext,
 ) -> crate::Result<super::Source> {
     let mut ticks = IntervalStream::new(tokio::time::interval(interval)).take_until(cx.shutdown);
-    let tls_settings = TlsSettings::from_options(&None)?;
+    let tls_settings = TlsSettings::from_options(None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
     let url: Uri = endpoint.as_str().parse()?;
 

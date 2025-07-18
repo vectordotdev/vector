@@ -1,9 +1,9 @@
 use std::num::NonZeroUsize;
 
-use codecs::decoding::{DeserializerConfig, FramingConfig};
-use lookup::owned_value_path;
-use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vrl::value::Kind;
 
 use crate::aws::create_client;
@@ -147,7 +147,7 @@ impl SourceConfig for AwsSqsConfig {
                 Some("timestamp"),
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -161,12 +161,13 @@ impl SourceConfig for AwsSqsConfig {
 impl AwsSqsConfig {
     async fn build_client(&self, cx: &SourceContext) -> crate::Result<aws_sdk_sqs::Client> {
         create_client::<SqsClientBuilder>(
+            &SqsClientBuilder {},
             &self.auth,
             self.region.region(),
             self.region.endpoint(),
             &cx.proxy,
-            &self.tls,
-            false,
+            self.tls.as_ref(),
+            None,
         )
         .await
     }

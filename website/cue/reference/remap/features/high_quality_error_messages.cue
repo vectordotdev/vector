@@ -7,23 +7,35 @@ remap: features: high_quality_error_messages: {
 		This VRL program, for example...
 
 		```coffee
-		.foo, err = upcase(.foo)
+		parse_json!(1)
 		```
 
 		...would result in this error:
 
 		```rust
-		error: program aborted
-		  ┌─ :2:1
+		error[E110]: invalid argument type
+		  ┌─ :2:13
 		  │
 		2 │ parse_json!(1)
-		  │ ^^^^^^^^^^^^^^
-		  │ │
-		  │ function call error
-		  │ unable to parse json: key must be a string at line 1 column 3
+		  │             ^
+		  │             │
+		  │             this expression resolves to the exact type integer
+		  │             but the parameter "value" expects the exact type string
 		  │
-		  = see function documentation at: https://master.vector.dev/docs/reference/vrl/functions/#parse_json
-		  = see language documentation at: https://vector.dev/docs/reference/vrl/
+		  = try: ensuring an appropriate type at runtime
+		  =
+		  =     1 = string!(1)
+		  =     parse_json!(1)
+		  =
+		  = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
+		  =
+		  =     1 = to_string(1) ?? "default"
+		  =     parse_json!(1)
+		  =
+		  = see documentation about error handling at https://errors.vrl.dev/#handling
+		  = learn more about error code 110 at https://errors.vrl.dev/110
+		  = see language documentation at https://vrl.dev
+		  = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 		```
 		"""
 

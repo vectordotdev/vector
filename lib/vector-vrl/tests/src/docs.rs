@@ -16,6 +16,7 @@ const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "type_def", // Not supported on VM runtime
     "random_bytes",
     "uuid_v4",
+    "uuid_v7",
     "strip_ansi_escape_codes",
     "get_hostname",
     "now",
@@ -182,7 +183,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
 
     Test {
         name: title,
-        category: format!("docs/{}/{}", category, name),
+        category: format!("docs/{category}/{name}"),
         error: None,
         source,
         object,
@@ -190,5 +191,6 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         result_approx: false,
         skip,
         read_only_paths: vec![],
+        check_diagnostics: false,
     }
 }

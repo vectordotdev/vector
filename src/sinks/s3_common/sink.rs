@@ -1,36 +1,22 @@
-use std::{fmt, num::NonZeroUsize};
+use std::{fmt, hash::Hash};
 
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures_util::StreamExt;
-use tower::Service;
-use vector_common::request_metadata::MetaDescriptive;
-use vector_core::{
-    event::Finalizable,
-    sink::StreamSink,
-    stream::{BatcherSettings, DriverResponse},
-};
+use crate::sinks::prelude::*;
 
-use crate::internal_events::SinkRequestBuildError;
-use crate::{
-    event::Event,
-    sinks::util::{RequestBuilder, SinkBuilderExt},
-};
+use super::partitioner::S3PartitionKey;
+use vector_lib::{event::Event, partition::Partitioner};
 
-use super::partitioner::{S3KeyPartitioner, S3PartitionKey};
-
-pub struct S3Sink<Svc, RB> {
+pub struct S3Sink<Svc, RB, P> {
     service: Svc,
     request_builder: RB,
-    partitioner: S3KeyPartitioner,
+    partitioner: P,
     batcher_settings: BatcherSettings,
 }
 
-impl<Svc, RB> S3Sink<Svc, RB> {
+impl<Svc, RB, P> S3Sink<Svc, RB, P> {
     pub const fn new(
         service: Svc,
         request_builder: RB,
-        partitioner: S3KeyPartitioner,
+        partitioner: P,
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
@@ -42,7 +28,7 @@ impl<Svc, RB> S3Sink<Svc, RB> {
     }
 }
 
-impl<Svc, RB> S3Sink<Svc, RB>
+impl<Svc, RB, P> S3Sink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -51,18 +37,19 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<S3PartitionKey>> + Unpin + Send,
+    P::Key: Eq + Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let partitioner = self.partitioner;
         let settings = self.batcher_settings;
-
-        let builder_limit = NonZeroUsize::new(64);
         let request_builder = self.request_builder;
 
         input
-            .batched_partitioned(partitioner, settings)
+            .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
-            .request_builder(builder_limit, request_builder)
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(error) => {
@@ -79,7 +66,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink<Event> for S3Sink<Svc, RB>
+impl<Svc, RB, P> StreamSink<Event> for S3Sink<Svc, RB, P>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -88,6 +75,9 @@ where
     RB: RequestBuilder<(S3PartitionKey, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
+    P: Partitioner<Item = Event, Key = Option<S3PartitionKey>> + Unpin + Send,
+    P::Key: Eq + Hash + Clone,
+    P::Item: ByteSizeOf,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

@@ -53,7 +53,7 @@ components: sources: prometheus_scrape: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.prometheus_scrape.configuration & {
+	configuration: generated.components.sources.prometheus_scrape.configuration & {
 		endpoints: warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
 	}
 
@@ -64,6 +64,22 @@ components: sources: prometheus_scrape: {
 				Multiple tags with the same name are invalid within Prometheus. Prometheus
 				itself will reject a metric with duplicate tags. Vector will accept the metric,
 				but will only take the last value for each tag name specified.
+				"""
+		}
+
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				In query params, key needs to be `match[]` with array of values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							"match[]":
+								- '{job="somejob"}'
+								- '{__name__=~"job:.*"}'
+				```
 				"""
 		}
 	}
@@ -97,10 +113,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		http_error_response_total: components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
-		requests_completed_total:  components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:  components.sources.internal_metrics.output.metrics.request_duration_seconds
+		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
+		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
 	}
 }

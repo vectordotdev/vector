@@ -1,0 +1,34 @@
+[package]
+name = "vector-lib"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+codecs = { path = "../codecs", default-features = false }
+enrichment = { path = "../enrichment" }
+file-source = { path = "../file-source", optional = true }
+opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
+prometheus-parser = { path = "../prometheus-parser", optional = true }
+vector-api-client = { path = "../vector-api-client", optional = true }
+vector-buffers = { path = "../vector-buffers", default-features = false }
+vector-common = { path = "../vector-common" }
+vector-config = { path = "../vector-config" }
+vector-core = { path = "../vector-core", default-features = false }
+vector-lookup = { path = "../vector-lookup", features = ["test"] }
+vector-stream = { path = "../vector-stream" }
+vector-tap = { path = "../vector-tap" }
+vrl = { workspace = true, optional = true }
+
+[features]
+api = ["vector-tap/api"]
+api-client = ["dep:vector-api-client"]
+lua = ["vector-core/lua"]
+file-source = ["dep:file-source"]
+opentelemetry = ["dep:opentelemetry-proto"]
+prometheus = ["dep:prometheus-parser"]
+proptest = ["vector-lookup/proptest", "vrl/proptest"]
+syslog = ["codecs/syslog"]
+test = ["vector-core/test"]
+vrl = ["vector-core/vrl", "dep:vrl"]

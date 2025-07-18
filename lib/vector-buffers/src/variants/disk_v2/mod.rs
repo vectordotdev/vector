@@ -140,7 +140,7 @@
 //! ### Record ID generation, and its relation of events
 //!
 //! While the buffer talks a lot about writing "records", records are ostensibly a single event, or
-//! collection of events. We manage the organization and grouping of events at at a higher level
+//! collection of events. We manage the organization and grouping of events at a higher level
 //! (i.e. `EventArray`), but we're still required to confront this fact at the buffer layer. In
 //! order to maintain as little extra metadata as possible as records, and within the ledger, we
 //! encode the number of events in a buffer into the record ID. We do this by using the value
@@ -199,8 +199,8 @@ pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},
     ledger::LedgerLoadCreateError,
-    reader::{Reader, ReaderError},
-    writer::{Writer, WriterError},
+    reader::{BufferReader, ReaderError},
+    writer::{BufferWriter, WriterError},
 };
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -243,7 +243,7 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -253,7 +253,7 @@ where
             .context(LedgerSnafu)?;
         let ledger = Arc::new(ledger);
 
-        let mut writer = Writer::new(Arc::clone(&ledger));
+        let mut writer = BufferWriter::new(Arc::clone(&ledger));
         writer
             .validate_last_write()
             .await
@@ -261,7 +261,7 @@ where
 
         let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
-        let mut reader = Reader::new(Arc::clone(&ledger), finalizer);
+        let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
         reader
             .seek_to_next_record()
             .await
@@ -286,7 +286,7 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>), BufferError<T>>
+    ) -> Result<(BufferWriter<T, FS>, BufferReader<T, FS>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -345,8 +345,8 @@ async fn build_disk_v2_buffer<T>(
     max_size: NonZeroU64,
 ) -> Result<
     (
-        Writer<T, ProductionFilesystem>,
-        Reader<T, ProductionFilesystem>,
+        BufferWriter<T, ProductionFilesystem>,
+        BufferReader<T, ProductionFilesystem>,
     ),
     Box<dyn Error + Send + Sync>,
 >

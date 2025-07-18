@@ -1,9 +1,12 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
+use mlua::ExternalError;
+use mlua::FromLua;
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
+use vrl::path::parse_target_path;
 
 use crate::config::OutputId;
 use crate::schema::Definition;
@@ -102,7 +105,7 @@ impl Clone for Lua {
 
 // This wrapping structure is added in order to make it possible to have independent implementations
 // of `mlua::UserData` trait for event in version 1 and version 2 of the transform.
-#[derive(Clone)]
+#[derive(Clone, FromLua)]
 struct LuaEvent {
     inner: Event,
 }
@@ -117,19 +120,19 @@ impl Lua {
 
         let additional_paths = search_dirs
             .iter()
-            .map(|d| format!("{}/?.lua", d))
+            .map(|d| format!("{d}/?.lua"))
             .collect::<Vec<_>>()
             .join(";");
 
         if !additional_paths.is_empty() {
             let package = lua
                 .globals()
-                .get::<_, mlua::Table<'_>>("package")
+                .get::<mlua::Table>("package")
                 .context(InvalidLuaSnafu)?;
             let current_paths = package
-                .get::<_, String>("path")
+                .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 
@@ -152,20 +155,18 @@ impl Lua {
 
         globals.raw_set("event", LuaEvent { inner: event })?;
 
-        let func = lua.registry_value::<mlua::Function<'_>>(&self.vector_func)?;
-        func.call(())?;
+        let func = lua.registry_value::<mlua::Function>(&self.vector_func)?;
+        func.call::<()>(())?;
 
-        let result = globals
-            .raw_get::<_, Option<LuaEvent>>("event")
-            .map(|option| {
-                option.map(|lua_event| {
-                    let mut event = lua_event.inner;
-                    if let Some(source_id) = source_id {
-                        event.set_source_id(source_id);
-                    }
-                    event
-                })
-            });
+        let result = globals.raw_get::<Option<LuaEvent>>("event").map(|option| {
+            option.map(|lua_event| {
+                let mut event = lua_event.inner;
+                if let Some(source_id) = source_id {
+                    event.set_source_id(source_id);
+                }
+                event
+            })
+        });
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
@@ -204,7 +205,7 @@ impl TaskTransform<Event> for Lua {
                 let mut output = Vec::with_capacity(1);
                 ready(match inner.process(event) {
                     Ok(event) => {
-                        output.extend(event.into_iter());
+                        output.extend(event);
                         Some(stream::iter(output))
                     }
                     Err(error) => {
@@ -219,43 +220,43 @@ impl TaskTransform<Event> for Lua {
 }
 
 impl mlua::UserData for LuaEvent {
-    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
         methods.add_meta_method_mut(
             mlua::MetaMethod::NewIndex,
-            |_lua, this, (key, value): (String, Option<mlua::Value<'lua>>)| {
+            |_lua, this, (key, value): (String, Option<mlua::Value>)| {
+                let key_path = parse_target_path(key.as_str()).map_err(|e| e.into_lua_err())?;
                 match value {
                     Some(mlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key.as_str(),
+                            &key_path,
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
                     Some(mlua::Value::Integer(integer)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Integer(integer));
+                            .insert(&key_path, Value::Integer(integer));
                     }
                     Some(mlua::Value::Number(number)) if !number.is_nan() => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Float(NotNan::new(number).unwrap()));
+                            .insert(&key_path, Value::Float(NotNan::new(number).unwrap()));
                     }
                     Some(mlua::Value::Boolean(boolean)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.as_str(), Value::Boolean(boolean));
+                            .insert(&key_path, Value::Boolean(boolean));
                     }
                     Some(mlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(key.as_str());
+                        this.inner.as_mut_log().remove(&key_path);
                     }
                     _ => {
                         info!(
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
-                            internal_log_rate_limit = true
                         );
-                        this.inner.as_mut_log().remove(key.as_str());
+                        this.inner.as_mut_log().remove(&key_path);
                     }
                 }
 
@@ -264,8 +265,14 @@ impl mlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(mlua::MetaMethod::Index, |lua, this, key: String| {
-            if let Some(value) = this.inner.as_log().get(key.as_str()) {
-                let string = lua.create_string(&value.coerce_to_bytes())?;
+            if let Some(value) = this
+                .inner
+                .as_log()
+                .parse_path_and_get_value(key.as_str())
+                .ok()
+                .flatten()
+            {
+                let string = lua.create_string(value.coerce_to_bytes())?;
                 Ok(Some(string))
             } else {
                 Ok(None)
@@ -287,13 +294,16 @@ impl mlua::UserData for LuaEvent {
                     let keys: mlua::Table = state.raw_get("keys")?;
                     let next: mlua::Function = lua.globals().raw_get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key
-                        .clone()
-                        .and_then(|k| event.inner.as_log().get(k.as_str()))
-                    {
-                        Some(value) => {
-                            Ok((key, Some(lua.create_string(&value.coerce_to_bytes())?)))
-                        }
+                    let value = key.clone().and_then(|k| {
+                        event
+                            .inner
+                            .as_log()
+                            .parse_path_and_get_value(k.as_str())
+                            .ok()
+                            .flatten()
+                    });
+                    match value {
+                        Some(value) => Ok((key, Some(lua.create_string(value.coerce_to_bytes())?))),
                         None => Ok((None, None)),
                     }
                 })?;
@@ -364,9 +374,9 @@ mod tests {
         let mut log = LogEvent::default();
         log.insert("name", "Bob");
         let event = transform_one(
-            r#"
+            r"
               event = nil
-            "#,
+            ",
             log,
         );
 
@@ -463,9 +473,9 @@ mod tests {
     fn lua_non_string_key_read() {
         crate::test_util::trace_init();
         let mut transform = Lua::new(
-            r#"
+            r"
               print(event[false])
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -501,9 +511,9 @@ mod tests {
     fn lua_syntax_error() {
         crate::test_util::trace_init();
         let err = Lua::new(
-            r#"
+            r"
               1234 = sadf <>&*!#@
-            "#
+            "
             .to_string(),
             vec![],
         )
@@ -556,11 +566,11 @@ mod tests {
         event.insert("friend", "Alice");
 
         let event = transform_one(
-            r#"
+            r"
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#,
+            ",
             event,
         )
         .unwrap();

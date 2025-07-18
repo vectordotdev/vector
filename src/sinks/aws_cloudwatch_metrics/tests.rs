@@ -1,7 +1,7 @@
-use aws_sdk_cloudwatch::types::DateTime;
+use aws_smithy_types::DateTime;
 use chrono::{offset::TimeZone, Timelike, Utc};
 use similar_asserts::assert_eq;
-use vector_core::metric_tags;
+use vector_lib::metric_tags;
 
 use super::*;
 use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
@@ -22,7 +22,7 @@ fn generate_config() {
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
-        region: RegionOrEndpoint::with_region("local".to_owned()),
+        region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
         ..Default::default()
     }
 }
@@ -114,7 +114,7 @@ async fn encode_events_distribution() {
         "latency",
         MetricKind::Incremental,
         MetricValue::Distribution {
-            samples: vector_core::samples![11.0 => 100, 12.0 => 50],
+            samples: vector_lib::samples![11.0 => 100, 12.0 => 50],
             statistic: StatisticKind::Histogram,
         },
     )];

@@ -1,8 +1,12 @@
 pub mod adaptive_concurrency;
+pub mod auth;
+// https://github.com/mcarton/rust-derivative/issues/112
+#[allow(clippy::non_canonical_clone_impl)]
 pub mod batch;
 pub mod buffer;
 pub mod builder;
 pub mod compressor;
+pub mod datagram;
 pub mod encoding;
 pub mod http;
 pub mod metadata;
@@ -13,13 +17,14 @@ pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod snappy;
 pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test;
 pub mod udp;
-#[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
+#[cfg(unix)]
 pub mod unix;
 pub mod uri;
 pub mod zstd;
@@ -48,9 +53,10 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_common::json_size::JsonSize;
+use vector_lib::{json_size::JsonSize, TimeZone};
 
 use crate::event::EventFinalizers;
+use chrono::{FixedOffset, Offset, Utc};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -116,7 +122,7 @@ pub fn encode_namespace<'a>(
 ) -> String {
     let name = name.into();
     namespace
-        .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
+        .map(|namespace| format!("{namespace}{delimiter}{name}"))
         .unwrap_or_else(|| name.into_owned())
 }
 
@@ -128,5 +134,12 @@ pub trait ElementCount {
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()
+    }
+}
+
+pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
+    match tz {
+        TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
+        TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
     }
 }

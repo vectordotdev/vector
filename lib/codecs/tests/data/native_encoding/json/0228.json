@@ -1,1 +1,1 @@
-{"log":{":1":{"u􏿿":-307584.0,"":false},"%":false}}
+{"metric":{"name":"t","interval_ms":3328013227,"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":-510300.4238,"value":858368.0},{"quantile":636552.7466,"value":-638592.0},{"quantile":725952.0,"value":-546112.0},{"quantile":942976.0,"value":273472.0},{"quantile":-833600.0,"value":309440.0},{"quantile":16.9021,"value":959232.0},{"quantile":404224.0,"value":880256.0}],"count":7118592644848300304,"sum":-843392.0}}}

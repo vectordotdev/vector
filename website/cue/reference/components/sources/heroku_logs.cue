@@ -22,6 +22,7 @@ components: sources: heroku_logs: {
 
 	features: {
 		auto_generated:   true
+		has_auth:         true
 		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
@@ -62,7 +63,7 @@ components: sources: heroku_logs: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.heroku_logs.configuration
+	configuration: generated.components.sources.heroku_logs.configuration
 
 	output: logs: line: {
 		description: "An individual event from a batch of events received through an HTTP POST request."
@@ -101,7 +102,8 @@ components: sources: heroku_logs: {
 	}
 
 	telemetry: metrics: {
-		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
-		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
+		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
+		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
+		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total
 	}
 }

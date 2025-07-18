@@ -36,7 +36,7 @@ observability data with Vector.
 As shown above, you can pass a custom
 [Vector configuration file][docs.setup.configuration] via the `-c` flag. You'll want
 to do this since the
-[default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
+[default `/etc/vector/vector.yaml` configuration file][urls.default_configuration]
 doesn't do anything.
 
 ## Deploying
@@ -120,15 +120,15 @@ Vector's Docker source files are located
 [docs.administration]: https://vector.dev/docs/administration/
 [docs.setup.configuration]: https://vector.dev/docs/setup/configuration/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
-[docs.sinks]: https://vector.dev/docs/reference/sinks/
-[docs.sources]: https://vector.dev/docs/reference/sources/
+[docs.sinks]: https://vector.dev/docs/reference/configuration/sinks/
+[docs.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.strategies#daemon]: https://vector.dev/docs/setup/deployment/strategies/#daemon
 [docs.strategies#service]: https://vector.dev/docs/setup/deployment/strategies/#service
 [docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
-[docs.transforms]: https://vector.dev/docs/reference/transforms/
+[docs.transforms]: https://vector.dev/docs/reference/configurationtransforms/
 [pages.index#correctness]: https://vector.dev/#correctness
 [pages.index#performance]: https://vector.dev/#performance
-[urls.default_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.toml
+[urls.default_configuration]: https://github.com/vectordotdev/vector/blob/master/config/vector.yaml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
 [urls.rust]: https://www.rust-lang.org/

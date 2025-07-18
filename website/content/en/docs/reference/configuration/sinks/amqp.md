@@ -1,7 +1,7 @@
 ---
 title: AMQP
 description: Send events to [AMQP 0.9.1](https://www.amqp.org/specification/0-9-1/amqp-org-download) compatible brokers like RabbitMQ
-kind: sink
+component_kind: sink
 layout: component
 tags: ["amqp", "rabbitmq", "component", "sink"]
 ---

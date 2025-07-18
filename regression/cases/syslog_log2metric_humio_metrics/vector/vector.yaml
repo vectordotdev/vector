@@ -1,0 +1,47 @@
+##
+## Sources
+##
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+
+  syslog:
+    type:       "syslog"
+    address:    "0.0.0.0:8282"
+    max_length: 1500000
+    mode:       "tcp"
+
+##
+## Transforms
+##
+
+transforms:
+  log2metric:
+    type: "log_to_metric"
+    inputs: [ "syslog" ]
+    metrics:
+      - type:  "gauge"
+        field: "procid"
+        tags:
+          hostname: "{{ hostname }}"
+          facility: "{{ facility }}"
+          severity: "{{ severity }}"
+
+##
+## Sinks
+##
+
+sinks:
+  prometheus:
+    type:    "prometheus_exporter"
+    inputs: [ "internal_metrics" ]
+    address: "0.0.0.0:9090"
+
+  humio_metrics:
+    type:     "humio_metrics"
+    inputs: [ "log2metric" ]
+    endpoint: "http://0.0.0.0:8080"
+    token:    "humio_token"
+    healthcheck:
+      enabled: false

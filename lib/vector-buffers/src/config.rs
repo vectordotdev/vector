@@ -86,16 +86,32 @@ impl BufferTypeVisitor {
         let when_full = when_full.unwrap_or_default();
         match kind {
             BufferTypeKind::Memory => {
-                if max_size.is_some() {
-                    return Err(de::Error::unknown_field(
-                        "max_size",
-                        &["type", "max_events", "when_full"],
-                    ));
-                }
-                Ok(BufferType::Memory {
-                    max_events: max_events.unwrap_or_else(memory_buffer_default_max_events),
-                    when_full,
-                })
+                let size = match (max_events, max_size) {
+                    (Some(_), Some(_)) => {
+                        return Err(de::Error::unknown_field(
+                            "max_events",
+                            &["type", "max_size", "when_full"],
+                        ));
+                    }
+                    (_, Some(max_size)) => {
+                        if let Ok(bounded_max_bytes) = usize::try_from(max_size.get()) {
+                            MemoryBufferSize::MaxSize(NonZeroUsize::new(bounded_max_bytes).unwrap())
+                        } else {
+                            return Err(de::Error::invalid_value(
+                                de::Unexpected::Unsigned(max_size.into()),
+                                &format!(
+                                    "Value for max_bytes must be a positive integer <= {}",
+                                    usize::MAX
+                                )
+                                .as_str(),
+                            ));
+                        }
+                    }
+                    _ => MemoryBufferSize::MaxEvents(
+                        max_events.unwrap_or_else(memory_buffer_default_max_events),
+                    ),
+                };
+                Ok(BufferType::Memory { size, when_full })
             }
             BufferTypeKind::DiskV2 => {
                 if max_events.is_some() {
@@ -175,6 +191,23 @@ impl DiskUsage {
     }
 }
 
+/// Enumeration to define exactly what terms the bounds of the buffer is expressed in: length, or
+/// `byte_size`.
+#[configurable_component(no_deser)]
+#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MemoryBufferSize {
+    /// The maximum number of events allowed in the buffer.
+    MaxEvents(#[serde(default = "memory_buffer_default_max_events")] NonZeroUsize),
+
+    // Doc string is duplicated here as a workaround due to a name collision with the `max_size`
+    // field with the DiskV2 variant of `BufferType`.
+    /// The maximum allowed amount of allocated memory the buffer can hold.
+    ///
+    /// If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
+    MaxSize(#[configurable(metadata(docs::type_unit = "bytes"))] NonZeroUsize),
+}
+
 /// A specific type of buffer stage.
 #[configurable_component(no_deser)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -186,11 +219,10 @@ pub enum BufferType {
     /// This is more performant, but less durable. Data will be lost if Vector is restarted
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
-    #[serde(rename = "memory")]
     Memory {
-        /// The maximum number of events allowed in the buffer.
-        #[serde(default = "memory_buffer_default_max_events")]
-        max_events: NonZeroUsize,
+        /// The terms around how to express buffering limits, can be in size or bytes_size.
+        #[serde(flatten)]
+        size: MemoryBufferSize,
 
         #[configurable(derived)]
         #[serde(default)]
@@ -277,11 +309,8 @@ impl BufferType {
         T: Bufferable + Clone + Finalizable,
     {
         match *self {
-            BufferType::Memory {
-                when_full,
-                max_events,
-            } => {
-                builder.stage(MemoryBuffer::new(max_events), when_full);
+            BufferType::Memory { size, when_full } => {
+                builder.stage(MemoryBuffer::new(size), when_full);
             }
             BufferType::DiskV2 {
                 when_full,
@@ -290,7 +319,7 @@ impl BufferType {
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
-        };
+        }
 
         Ok(())
     }
@@ -322,7 +351,7 @@ impl BufferType {
     description = r#"More information about the individual buffer types, and buffer behavior, can be found in the
 [Buffering Model][buffering_model] section.
 
-[buffering_model]: /docs/about/under-the-hood/architecture/buffering-model/"#
+[buffering_model]: /docs/architecture/buffering-model/"#
 )]
 pub enum BufferConfig {
     /// A single stage buffer topology.
@@ -335,7 +364,7 @@ pub enum BufferConfig {
 impl Default for BufferConfig {
     fn default() -> Self {
         Self::Single(BufferType::Memory {
-            max_events: memory_buffer_default_max_events(),
+            size: MemoryBufferSize::MaxEvents(memory_buffer_default_max_events()),
             when_full: WhenFull::default(),
         })
     }
@@ -389,7 +418,7 @@ impl BufferConfig {
 mod test {
     use std::num::{NonZeroU64, NonZeroUsize};
 
-    use crate::{BufferConfig, BufferType, WhenFull};
+    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull};
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();
@@ -425,9 +454,9 @@ mod test {
 
     #[test]
     fn parse_partial_invalid_keys() {
-        let source = r#"max_size: 100
+        let source = r"max_size: 100
 max_events: 42
-"#;
+";
         let error = serde_yaml::from_str::<BufferConfig>(source).unwrap_err();
         assert_eq!(error.to_string(), BUFFER_CONFIG_NO_MATCH_ERR);
     }
@@ -435,11 +464,24 @@ max_events: 42
     #[test]
     fn parse_without_type_tag() {
         check_single_stage(
-            r#"
+            r"
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
-                max_events: NonZeroUsize::new(100).unwrap(),
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
+                when_full: WhenFull::Block,
+            },
+        );
+    }
+
+    #[test]
+    fn parse_memory_with_byte_size_option() {
+        check_single_stage(
+            r"
+        max_size: 4096
+        ",
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxSize(NonZeroUsize::new(4096).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
@@ -448,18 +490,18 @@ max_events: 42
     #[test]
     fn parse_multiple_stages() {
         check_multiple_stages(
-            r#"
+            r"
           - max_events: 42
           - max_events: 100
             when_full: drop_newest
-          "#,
+          ",
             &[
                 BufferType::Memory {
-                    max_events: NonZeroUsize::new(42).unwrap(),
+                    size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(42).unwrap()),
                     when_full: WhenFull::Block,
                 },
                 BufferType::Memory {
-                    max_events: NonZeroUsize::new(100).unwrap(),
+                    size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
                     when_full: WhenFull::DropNewest,
                 },
             ],
@@ -469,53 +511,53 @@ max_events: 42
     #[test]
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
-            r#"
+            r"
           type: memory
-          "#,
+          ",
             BufferType::Memory {
-                max_events: NonZeroUsize::new(500).unwrap(),
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           max_events: 100
-          "#,
+          ",
             BufferType::Memory {
-                max_events: NonZeroUsize::new(100).unwrap(),
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(100).unwrap()),
                 when_full: WhenFull::Block,
             },
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: drop_newest
-          "#,
+          ",
             BufferType::Memory {
-                max_events: NonZeroUsize::new(500).unwrap(),
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::DropNewest,
             },
         );
 
         check_single_stage(
-            r#"
+            r"
           type: memory
           when_full: overflow
-          "#,
+          ",
             BufferType::Memory {
-                max_events: NonZeroUsize::new(500).unwrap(),
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(500).unwrap()),
                 when_full: WhenFull::Overflow,
             },
         );
 
         check_single_stage(
-            r#"
+            r"
           type: disk
           max_size: 1024
-          "#,
+          ",
             BufferType::DiskV2 {
                 max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,

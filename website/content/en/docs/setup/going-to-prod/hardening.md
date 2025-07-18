@@ -53,7 +53,7 @@ Vector implements an affine type system via Rust that achieves memory safety and
 
 #### Securing Vector’s Artifacts
 
-- **Download over encrypted channels.** Vector does not allow unencrypted downloads of its artifacts. All download channels require industry-standard TLS for all connections. When downloading Vector be sure to enable SSL verification (the default for most clients).
+- **Download over encrypted channels.** Vector does not allow unencrypted downloads of its artifacts. All download channels require industry-standard TLS for all connections. When downloading Vector, be sure to enable server certificate verification (the default for most clients).
 
 #### Securing Vector’s Configuration
 

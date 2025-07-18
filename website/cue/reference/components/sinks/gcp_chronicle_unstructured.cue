@@ -69,7 +69,7 @@ components: sinks: gcp_chronicle_unstructured: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.gcp_chronicle_unstructured.configuration
+	configuration: generated.components.sinks.gcp_chronicle_unstructured.configuration
 
 	input: {
 		logs:    true
@@ -77,6 +77,5 @@ components: sinks: gcp_chronicle_unstructured: {
 		traces:  false
 	}
 
-	how_it_works: {
-	}
+	how_it_works: {}
 }

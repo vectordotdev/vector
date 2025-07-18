@@ -1,6 +1,5 @@
-use std::{fs::File, io::BufReader, path::Path};
+use std::{fs::File, io::BufReader, path::Path, sync::OnceLock};
 
-use once_cell::sync::OnceCell;
 use serde_json::Value;
 use snafu::Snafu;
 use vector_config_common::{
@@ -118,29 +117,25 @@ impl<'a> SchemaQueryBuilder<'a> {
                             let attr_matched = match self_attribute {
                                 CustomAttribute::Flag(key) => schema_attributes
                                     .get(key)
-                                    .map_or(false, |value| matches!(value, Value::Bool(true))),
+                                    .is_some_and(|value| matches!(value, Value::Bool(true))),
                                 CustomAttribute::KeyValue {
                                     key,
                                     value: attr_value,
                                 } => {
-                                    schema_attributes
-                                        .get(key)
-                                        .map_or(false, |value| match value {
-                                            // Check string values directly.
-                                            Value::String(schema_attr_value) => {
-                                                schema_attr_value == attr_value
-                                            }
-                                            // For arrays, try and convert each item to a string, and
-                                            // for the values that are strings, see if they match.
-                                            Value::Array(schema_attr_values) => {
-                                                schema_attr_values.iter().any(|value| {
-                                                    value
-                                                        .as_str()
-                                                        .map_or(false, |s| s == attr_value)
-                                                })
-                                            }
-                                            _ => false,
-                                        })
+                                    schema_attributes.get(key).is_some_and(|value| match value {
+                                        // Check string values directly.
+                                        Value::String(schema_attr_value) => {
+                                            schema_attr_value == attr_value
+                                        }
+                                        // For arrays, try and convert each item to a string, and
+                                        // for the values that are strings, see if they match.
+                                        Value::Array(schema_attr_values) => {
+                                            schema_attr_values.iter().any(|value| {
+                                                value.as_str().is_some_and(|s| s == attr_value)
+                                            })
+                                        }
+                                        _ => false,
+                                    })
                                 }
                             };
 
@@ -237,7 +232,7 @@ pub trait QueryableSchema {
     fn has_flag_attribute(&self, key: &str) -> Result<bool, QueryError>;
 }
 
-impl<'a, T> QueryableSchema for &'a T
+impl<T> QueryableSchema for &T
 where
     T: QueryableSchema,
 {
@@ -266,7 +261,7 @@ where
     }
 }
 
-impl<'a> QueryableSchema for &'a SchemaObject {
+impl QueryableSchema for &SchemaObject {
     fn schema_type(&self) -> SchemaType {
         // TODO: Technically speaking, it is allowed to use the "X of" schema types in conjunction
         // with other schema types i.e. `allOf` in conjunction with specifying a `type`.
@@ -388,7 +383,7 @@ impl<'a> From<&'a SchemaObject> for SimpleSchema<'a> {
     }
 }
 
-impl<'a> QueryableSchema for SimpleSchema<'a> {
+impl QueryableSchema for SimpleSchema<'_> {
     fn schema_type(&self) -> SchemaType {
         self.schema.schema_type()
     }
@@ -415,8 +410,8 @@ impl<'a> QueryableSchema for SimpleSchema<'a> {
 }
 
 fn schema_to_simple_schema(schema: &Schema) -> SimpleSchema<'_> {
-    static TRUE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
-    static FALSE_SCHEMA_OBJECT: OnceCell<SchemaObject> = OnceCell::new();
+    static TRUE_SCHEMA_OBJECT: OnceLock<SchemaObject> = OnceLock::new();
+    static FALSE_SCHEMA_OBJECT: OnceLock<SchemaObject> = OnceLock::new();
 
     let schema_object = match schema {
         Schema::Bool(bool) => {

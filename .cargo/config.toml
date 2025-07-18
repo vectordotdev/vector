@@ -1,6 +1,11 @@
 [alias]
 vdev = "run --quiet --package vdev --"
 
+[env]
+# Build with large pages so that Vector runs on systems with 64k pages or less (e.g. 4k) to support
+# CentOS 7, 8, and a few other Linux distributions.
+JEMALLOC_SYS_WITH_LG_PAGE = "16"
+
 [target.'cfg(all())']
 rustflags = [
   "-Dclippy::print_stdout",

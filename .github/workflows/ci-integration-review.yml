@@ -1,0 +1,191 @@
+# Integration CI Review Trigger
+#
+# This workflow runs one or more integration tests triggered by a comment in a PR.
+# The comment must include '/ci-run-integration'.
+# More than one can be specified.
+#
+# Examples:
+#
+# 1. Run a single integration test:
+#
+#     /ci-run-integration-amqp
+#
+# 2. Run two integration tests:
+#
+#     /ci-run-integration-datadog-logs
+#     /ci-run-integration-splunk
+#
+# 3. Run all integration tests:
+#
+#     /ci-run-integration-all
+#
+# 4. Run all CI (including all integration tests)
+#
+#     /ci-run-all
+#
+# NOTE: This workflow runs on Pull Request Review Comments rather than normal comments to be able to
+# capture the SHA that the comment is associated with.
+
+name: CI Integration Review Trigger
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  statuses: write
+
+env:
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+  TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
+  TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+  CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+
+jobs:
+  prep-pr:
+    name: (PR review) Signal pending to PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
+    steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+      - name: Get PR review author
+        id: comment
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - name: Validate author membership
+        if: steps.comment.outputs.isTeamMember == 'false'
+        run: exit 1
+
+      - name: (PR review) Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          sha: ${{ github.event.review.commit_id }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending
+
+  integration-tests:
+    needs: prep-pr
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        service: [
+          "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
+          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
+          "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
+          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "redis", "splunk", "webhdfs"
+        ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          ref: ${{ github.event.review.commit_id }}
+
+      - run: sudo npm -g install @datadog/datadog-ci
+
+      - run: docker image prune -af ; docker container prune -f
+
+      - name: Integration Tests - ${{ matrix.service }}
+        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
+          || startsWith(github.event.review.body, '/ci-run-all')
+          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: bash scripts/int-e2e-test.sh int ${{ matrix.service }}
+
+  e2e-tests:
+    needs: prep-pr
+    runs-on: ubuntu-24.04-8core
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          ref: ${{ github.event.review.commit_id }}
+
+      - run: sudo npm -g install @datadog/datadog-ci
+
+      - run: docker image prune -af ; docker container prune -f
+      - name: e2e-datadog-logs
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
+          || startsWith(github.event.review.body, '/ci-run-integration-all')
+          || startsWith(github.event.review.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 35
+          max_attempts: 3
+          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+
+      - name: datadog-e2e-metrics
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
+          || startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all') }}
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 35
+          max_attempts: 3
+          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
+
+  update-pr-status:
+    name: Signal result to PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      - integration-tests
+      - e2e-tests
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    env:
+      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    steps:
+      - name: Generate authentication token
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a
+        with:
+          app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
+
+      - name: Validate issue comment
+        if: github.event_name == 'pull_request_review'
+        uses: tspascoal/get-user-teams-membership@v3
+        with:
+          username: ${{ github.actor }}
+          team: 'Vector'
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
+
+      - name: (PR review) Submit PR result as success
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        with:
+          sha: ${{ github.event.review.commit_id }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: 'success'
+
+      - run: |
+          echo "failed=${{ env.FAILED }}"
+          if [[ "$FAILED" == "true" ]] ; then
+            exit 1
+          else
+            exit 0
+          fi

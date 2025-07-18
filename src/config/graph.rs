@@ -1,10 +1,10 @@
-use indexmap::{set::IndexSet, IndexMap};
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput,
+    TransformOutput, WildcardMatching,
 };
+use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -18,6 +18,33 @@ pub enum Node {
     Sink {
         ty: DataType,
     },
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Node::Source { outputs } => {
+                write!(f, "component_kind: source\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {output}")?;
+                }
+                Ok(())
+            }
+            Node::Transform { in_ty, outputs } => {
+                write!(
+                    f,
+                    "component_kind: source\n  input_types: {in_ty}\n  outputs:"
+                )?;
+                for output in outputs {
+                    write!(f, "\n    {output}")?;
+                }
+                Ok(())
+            }
+            Node::Sink { ty } => {
+                write!(f, "component_kind: sink\n  types: {ty}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -38,8 +65,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
+        wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema)
+        Self::new_inner(sources, transforms, sinks, false, schema, wildcard_matching)
     }
 
     pub fn new_unchecked(
@@ -47,8 +75,10 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         schema: schema::Options,
+        wildcard_matching: WildcardMatching,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, true, schema, wildcard_matching)
+            .expect("errors ignored")
     }
 
     fn new_inner(
@@ -57,6 +87,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         ignore_errors: bool,
         schema: schema::Options,
+        wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -77,7 +108,7 @@ impl Graph {
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
                     outputs: transform.inner.outputs(
-                        enrichment::TableRegistry::default(),
+                        vector_lib::enrichment::TableRegistry::default(),
                         &[(id.into(), schema::Definition::any())],
                         schema.log_namespace(),
                     ),
@@ -85,7 +116,7 @@ impl Graph {
             );
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             graph.nodes.insert(
                 id.clone(),
                 Node::Sink {
@@ -100,15 +131,15 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);
                 }
             }
         }
 
-        for (id, config) in sinks.iter() {
+        for (id, config) in sinks {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);
                 }
             }
@@ -126,6 +157,7 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
+        wildcard_matching: WildcardMatching,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
@@ -139,9 +171,28 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
+            // allow empty result if relaxed wildcard matching is enabled
+            match wildcard_matching {
+                WildcardMatching::Relaxed => {
+                    // using value != glob::Pattern::escape(value) to check if value is a glob
+                    // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
+                    if from != glob::Pattern::escape(from) {
+                        info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
+                        return Ok(());
+                    }
+                }
+                WildcardMatching::Strict => {}
+            }
+            info!(
+                "Available components:\n{}",
+                self.nodes
+                    .iter()
+                    .map(|(key, node)| format!("\"{key}\":\n  {node}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
             Err(format!(
-                "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                from, output_type, to
+                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
             ))
         }
     }
@@ -228,7 +279,7 @@ impl Graph {
                     stack.insert(n.clone());
                 } else {
                     // we came back to the node after exploring all its children - remove it from the stack and traversal
-                    stack.remove(&n);
+                    stack.shift_remove(&n);
                     traversal.pop_back();
                 }
                 let inputs = self
@@ -302,7 +353,7 @@ impl Graph {
 
         for id in self.valid_inputs() {
             if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
-                errors.insert(format!("Input specifier {} is ambiguous", id));
+                errors.insert(format!("Input specifier {id} is ambiguous"));
             }
         }
 
@@ -367,7 +418,7 @@ impl Graph {
 #[cfg(test)]
 mod test {
     use similar_asserts::assert_eq;
-    use vector_core::schema::Definition;
+    use vector_lib::schema::Definition;
 
     use super::*;
 
@@ -379,7 +430,7 @@ mod test {
                     outputs: vec![match ty {
                         DataType::Metric => SourceOutput::new_metrics(),
                         DataType::Trace => SourceOutput::new_traces(),
-                        _ => SourceOutput::new_logs(ty, Definition::any()),
+                        _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
                     }],
                 },
             );
@@ -438,9 +489,14 @@ mod test {
             }
         }
 
-        fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
+        fn test_add_input(
+            &mut self,
+            node: &str,
+            input: &str,
+            wildcard_matching: WildcardMatching,
+        ) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs)
+            self.add_input(input, &node.into(), &available_inputs, wildcard_matching)
         }
     }
 
@@ -510,7 +566,7 @@ mod test {
 
         assert_eq!(
             Err(vec![
-                "Data type mismatch between in (Log) and out (Metric)".into()
+                "Data type mismatch between in ([\"Log\"]) and out ([\"Metric\"])".into()
             ]),
             graph.typecheck()
         );
@@ -523,7 +579,7 @@ mod test {
         graph.add_source("metric_source", DataType::Metric);
         graph.add_sink(
             "any_sink",
-            DataType::all(),
+            DataType::all_bits(),
             vec!["log_source", "metric_source"],
         );
 
@@ -533,16 +589,16 @@ mod test {
     #[test]
     fn allows_any_into_log_or_metric() {
         let mut graph = Graph::default();
-        graph.add_source("any_source", DataType::all());
+        graph.add_source("any_source", DataType::all_bits());
         graph.add_transform(
             "log_to_any",
             DataType::Log,
-            DataType::all(),
+            DataType::all_bits(),
             vec!["any_source"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Log,
             vec!["any_source"],
         );
@@ -579,19 +635,19 @@ mod test {
         );
         graph.add_transform(
             "any_to_any",
-            DataType::all(),
-            DataType::all(),
+            DataType::all_bits(),
+            DataType::all_bits(),
             vec!["log_to_log", "metric_to_metric"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Log,
             vec!["any_to_any"],
         );
         graph.add_transform(
             "any_to_metric",
-            DataType::all(),
+            DataType::all_bits(),
             DataType::Metric,
             vec!["any_to_any"],
         );
@@ -621,14 +677,22 @@ mod test {
         // make sure we're good with dotted paths
         assert_eq!(
             Ok(()),
-            graph.test_add_input("errored_log_sink", "log_to_log.errors")
+            graph.test_add_input(
+                "errored_log_sink",
+                "log_to_log.errors",
+                WildcardMatching::Strict
+            )
         );
 
         // make sure that we're not cool with an unknown dotted path
         let expected = "Input \"log_to_log.not_errors\" for sink \"bad_log_sink\" doesn't match any components.".to_string();
         assert_eq!(
             Err(expected),
-            graph.test_add_input("bad_log_sink", "log_to_log.not_errors")
+            graph.test_add_input(
+                "bad_log_sink",
+                "log_to_log.not_errors",
+                WildcardMatching::Strict
+            )
         );
     }
 
@@ -639,26 +703,32 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
             Node::Transform {
-                in_ty: DataType::all(),
+                in_ty: DataType::all_bits(),
                 outputs: vec![
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     ),
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )
                     .with_port("bar"),
@@ -670,20 +740,23 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(DataType::all(), Definition::any())],
+                outputs: vec![SourceOutput::new_maybe_logs(
+                    DataType::all_bits(),
+                    Definition::any(),
+                )],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
             Node::Transform {
-                in_ty: DataType::all(),
+                in_ty: DataType::all_bits(),
                 outputs: vec![
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     ),
                     TransformOutput::new(
-                        DataType::all(),
+                        DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )
                     .with_port("errors"),
@@ -699,6 +772,40 @@ mod test {
                 String::from("Input specifier baz.errors is ambiguous"),
                 String::from("Input specifier foo.bar is ambiguous"),
             ]
+        );
+    }
+
+    #[test]
+    fn wildcard_matching() {
+        let mut graph = Graph::default();
+        graph.add_source("log_source", DataType::Log);
+
+        // don't add inputs to these yet since they're not validated via these helpers
+        graph.add_sink("sink", DataType::Log, vec![]);
+
+        // make sure we're not good with non existing inputs with relaxed wildcard matching disabled
+        let wildcard_matching = WildcardMatching::Strict;
+        let expected =
+            "Input \"bad_source-*\" for sink \"sink\" doesn't match any components.".to_string();
+        assert_eq!(
+            Err(expected),
+            graph.test_add_input("sink", "bad_source-*", wildcard_matching)
+        );
+
+        // make sure we're good with non existing inputs with relaxed wildcard matching enabled
+        let wildcard_matching = WildcardMatching::Relaxed;
+        assert_eq!(
+            Ok(()),
+            graph.test_add_input("sink", "bad_source-*", wildcard_matching)
+        );
+
+        // make sure we're not good with non existing inputs that are not wildcards even when relaxed wildcard matching is enabled
+        let wildcard_matching = WildcardMatching::Relaxed;
+        let expected =
+            "Input \"bad_source-1\" for sink \"sink\" doesn't match any components.".to_string();
+        assert_eq!(
+            Err(expected),
+            graph.test_add_input("sink", "bad_source-1", wildcard_matching)
         );
     }
 

@@ -14,10 +14,7 @@ use vector_core::config::LogNamespace;
 #[derive(Debug, Clone, Default)]
 pub struct NativeJsonDeserializerConfig {
     /// Vector's native JSON-specific decoding options.
-    #[serde(
-        default,
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub native_json: NativeJsonDeserializerOptions,
 }
 
@@ -38,7 +35,7 @@ impl NativeJsonDeserializerConfig {
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
-        DataType::all()
+        DataType::all_bits()
     }
 
     /// The schema produced by the deserializer.
@@ -67,7 +64,7 @@ pub struct NativeJsonDeserializerOptions {
     /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[serde(
         default = "default_lossy",
-        skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
+        skip_serializing_if = "vector_core::serde::is_default"
     )]
     #[derivative(Default(value = "default_lossy()"))]
     pub lossy: bool,
@@ -100,7 +97,7 @@ impl Deserializer for NativeJsonDeserializer {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
-        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         let events = match json {
             serde_json::Value::Array(values) => values
@@ -132,8 +129,8 @@ mod test {
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
 
-        let event1 = Event::try_from(json1).unwrap();
-        let event2 = Event::try_from(json2).unwrap();
+        let event1 = Event::from_json_value(json1, LogNamespace::Legacy).unwrap();
+        let event2 = Event::from_json_value(json2, LogNamespace::Legacy).unwrap();
         let expected: SmallVec<[Event; 1]> = smallvec![event1, event2];
         assert_eq!(events, expected);
     }

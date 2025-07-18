@@ -18,13 +18,14 @@ use crate::{
 };
 
 /// Adapter for papering over various receiver backends.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum ReceiverAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
     InMemory(LimitedReceiver<T>),
 
     /// The disk v2 buffer.
-    DiskV2(disk_v2::Reader<T, ProductionFilesystem>),
+    DiskV2(disk_v2::BufferReader<T, ProductionFilesystem>),
 }
 
 impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
@@ -33,8 +34,8 @@ impl<T: Bufferable> From<LimitedReceiver<T>> for ReceiverAdapter<T> {
     }
 }
 
-impl<T: Bufferable> From<disk_v2::Reader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
-    fn from(v: disk_v2::Reader<T, ProductionFilesystem>) -> Self {
+impl<T: Bufferable> From<disk_v2::BufferReader<T, ProductionFilesystem>> for ReceiverAdapter<T> {
+    fn from(v: disk_v2::BufferReader<T, ProductionFilesystem>) -> Self {
         Self::DiskV2(v)
     }
 }
@@ -54,7 +55,6 @@ where
                             // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
                             // keep trying to read the next available record.
                             emit(re);
-                            continue;
                         }
                         None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },
@@ -108,7 +108,7 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 
     /// Configures this receiver to instrument the items passing through it.
-    pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
+    pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.instrumentation = Some(handle);
     }
 
@@ -157,10 +157,11 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,
-    Closed(BufferReceiver<T>),
+    Closed,
 }
 
 pub struct BufferReceiverStream<T: Bufferable> {
@@ -183,7 +184,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             match mem::replace(&mut self.state, StreamState::Polling) {
-                s @ StreamState::Closed(_) => {
+                s @ StreamState::Closed => {
                     self.state = s;
                     return Poll::Ready(None);
                 }
@@ -193,7 +194,7 @@ impl<T: Bufferable> Stream for BufferReceiverStream<T> {
                 StreamState::Polling => {
                     let (result, receiver) = ready!(self.recv_fut.poll(cx));
                     self.state = if result.is_none() {
-                        StreamState::Closed(receiver)
+                        StreamState::Closed
                     } else {
                         StreamState::Idle(receiver)
                     };

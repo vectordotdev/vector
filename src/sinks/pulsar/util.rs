@@ -3,10 +3,10 @@ use crate::sinks::pulsar::config::PulsarSinkConfig;
 use crate::sinks::pulsar::sink::PulsarEvent;
 use crate::template::Template;
 use bytes::Bytes;
-use lookup::lookup_v2::OptionalTargetPath;
 use std::collections::HashMap;
-use vector_core::event::Event;
-use vrl::value::Value;
+use vector_lib::event::Event;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vrl::value::{KeyString, Value};
 
 /// Transforms an event into a Pulsar event by rendering the required template fields.
 /// Returns None if there is an error whilst rendering.
@@ -57,7 +57,7 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
 pub(super) fn get_properties(
     event: &Event,
     properties_key: &Option<OptionalTargetPath>,
-) -> Option<HashMap<String, Bytes>> {
+) -> Option<HashMap<KeyString, Bytes>> {
     properties_key.as_ref().and_then(|properties_key| {
         properties_key.path.as_ref().and_then(|path| {
             event.maybe_as_log().and_then(|log| {

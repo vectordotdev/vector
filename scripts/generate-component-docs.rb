@@ -515,88 +515,60 @@ def expand_schema_references(root_schema, unexpanded_schema)
   original_title = unexpanded_schema['title']
   original_description = unexpanded_schema['description']
 
-  loop do
-    expanded = false
+  # If the schema has a top level reference, we expand it.
+  schema_ref = schema['$ref']
+  if !schema_ref.nil?
+    expanded_schema_ref = get_cached_expanded_schema(schema_ref)
+    if expanded_schema_ref.nil?
+      @logger.debug "Expanding top-level schema ref of '#{schema_ref}'..."
 
-    # If the schema has a top level reference, we expand it.
-    schema_ref = schema['$ref']
-    if !schema_ref.nil?
-      expanded_schema_ref = get_cached_expanded_schema(schema_ref)
-      if expanded_schema_ref.nil?
-        @logger.debug "Expanding top-level schema ref of '#{schema_ref}'..."
+      unexpanded_schema_ref = get_schema_by_name(root_schema, schema_ref)
+      expanded_schema_ref = expand_schema_references(root_schema, unexpanded_schema_ref)
 
-        unexpanded_schema_ref = get_schema_by_name(root_schema, schema_ref)
-        expanded_schema_ref = expand_schema_references(root_schema, unexpanded_schema_ref)
-
-        @expanded_schema_cache[schema_ref] = expanded_schema_ref
-      end
-
-      schema.delete('$ref')
-      schema = nested_merge(expanded_schema_ref, schema)
-
-      expanded = true
+      @expanded_schema_cache[schema_ref] = expanded_schema_ref
     end
 
-    # If the schema is an array type and has a reference for its items, we expand that.
-    items_ref = schema.dig('items', '$ref')
-    if !items_ref.nil?
-      expanded_items_schema_ref = expand_schema_references(root_schema, schema['items'])
+    schema.delete('$ref')
+    schema = nested_merge(expanded_schema_ref, schema)
+  end
 
-      schema['items'].delete('$ref')
-      schema['items'] = nested_merge(expanded_items_schema_ref, schema['items'])
+  # If the schema is an array type and has a reference for its items, we expand that.
+  items_ref = schema.dig('items', '$ref')
+  if !items_ref.nil?
+    expanded_items_schema_ref = expand_schema_references(root_schema, schema['items'])
 
-      expanded = true
-    end
+    schema['items'].delete('$ref')
+    schema['items'] = nested_merge(expanded_items_schema_ref, schema['items'])
+  end
 
-    # If the schema has any object properties, we expand those.
-    if !schema['properties'].nil?
-      schema['properties'] = schema['properties'].transform_values { |property_schema|
-        new_property_schema = expand_schema_references(root_schema, property_schema)
-        if new_property_schema != property_schema
-          expanded = true
-        end
+  # If the schema has any object properties, we expand those.
+  if !schema['properties'].nil?
+    schema['properties'] = schema['properties'].transform_values { |property_schema|
+      new_property_schema = expand_schema_references(root_schema, property_schema)
+      new_property_schema
+    }
+  end
 
-        new_property_schema
-      }
-    end
+  # If the schema has any `allOf`/`oneOf` subschemas, we expand those, too.
+  if !schema['allOf'].nil?
+    schema['allOf'] = schema['allOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
+  end
 
-    # If the schema has any `allOf`/`oneOf` subschemas, we expand those, too.
-    if !schema['allOf'].nil?
-      schema['allOf'] = schema['allOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
+  if !schema['oneOf'].nil?
+    schema['oneOf'] = schema['oneOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
+  end
 
-        new_subschema
-      }
-    end
-
-    if !schema['oneOf'].nil?
-      schema['oneOf'] = schema['oneOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
-
-        new_subschema
-      }
-    end
-
-    if !schema['anyOf'].nil?
-      schema['anyOf'] = schema['anyOf'].map { |subschema|
-        new_subschema = expand_schema_references(root_schema, subschema)
-        if new_subschema != subschema
-          expanded = true
-        end
-
-        new_subschema
-      }
-    end
-
-    if !expanded
-      break
-    end
+  if !schema['anyOf'].nil?
+    schema['anyOf'] = schema['anyOf'].map { |subschema|
+      new_subschema = expand_schema_references(root_schema, subschema)
+      new_subschema
+    }
   end
 
   # If the original schema had either a title or description, we forcefully reset both of them back
@@ -744,9 +716,23 @@ def resolve_schema(root_schema, schema)
   #
   # We intentially set no actual definition for these types, relying on the documentation generation
   # process to provide the actual details. We only need to specify the custom type name.
+  #
+  # To handle u8 types as ascii characters and not there uint representation between 0 and 255 we
+  # added a special handling of these exact values. This means
+  # `#[configurable(metadata(docs::type_override = "ascii_char"))]` should only be used consciously
+  # for rust u8 type. See lib/codecs/src/encoding/format/csv.rs for an example and
+  # https://github.com/vectordotdev/vector/pull/20498
   type_override = get_schema_metadata(schema, 'docs::type_override')
   if !type_override.nil?
-    resolved = { 'type' => { type_override.to_s => {} } }
+    if type_override == 'ascii_char'
+      if !schema['default'].nil?
+        resolved = { 'type' => { type_override.to_s => { 'default' => schema['default'].chr } } }
+      else
+        resolved = { 'type' => { type_override.to_s => { } } }
+      end
+    else
+      resolved = { 'type' => { type_override.to_s => {} } }
+    end
     description = get_rendered_description_from_schema(schema)
     resolved['description'] = description unless description.empty?
     return resolved
@@ -782,6 +768,17 @@ def resolve_schema(root_schema, schema)
     if message
       resolved['deprecated_message'] = message
     end
+  end
+
+  # required for global option configuration
+  is_common_field = get_schema_metadata(schema, 'docs::common')
+  if !is_common_field.nil?
+    resolved['common'] = is_common_field
+  end
+
+  is_required_field = get_schema_metadata(schema, 'docs::required')
+  if !is_required_field.nil?
+    resolved['required'] = is_required_field
   end
 
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
@@ -1645,7 +1642,7 @@ def get_rendered_description_from_schema(schema)
   description.strip
 end
 
-def render_and_import_schema(root_schema, schema_name, friendly_name, config_map_path, cue_relative_path)
+def unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   @logger.info "[*] Resolving schema definition for #{friendly_name}..."
 
   # Try and resolve the schema, unwrapping it as an object schema which is a requirement/expectation
@@ -1659,7 +1656,10 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
     exit 1
   end
 
-  unwrapped_resolved_schema = sort_hash_nested(unwrapped_resolved_schema)
+  return sort_hash_nested(unwrapped_resolved_schema)
+end
+
+def render_and_import_schema(unwrapped_resolved_schema, friendly_name, config_map_path, cue_relative_path)
 
   # Set up the appropriate structure for the value based on the configuration map path. It defines
   # the nested levels of the map where our resolved schema should go, as well as a means to generate
@@ -1677,8 +1677,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   config_map_path.prepend('config-schema-base')
   tmp_file_prefix = config_map_path.join('-')
 
-  final = { 'base' => { 'components' => data } }
-  final_json = to_pretty_json(final)
+  final_json = to_pretty_json(data)
 
   # Write the resolved schema as JSON, which we'll then use to import into a Cue file.
   json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", '.json'], final_json)
@@ -1686,7 +1685,7 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
 
   # Try importing it as Cue.
   @logger.info "[*] Importing #{friendly_name} schema as Cue file..."
-  cue_output_file = "website/cue/reference/components/#{cue_relative_path}"
+  cue_output_file = "website/cue/reference/#{cue_relative_path}"
   unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
     @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
     exit 1
@@ -1694,23 +1693,65 @@ def render_and_import_schema(root_schema, schema_name, friendly_name, config_map
   @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
 
-def render_and_import_base_component_schema(root_schema, schema_name, component_type)
+def render_and_import_generated_component_schema(root_schema, schema_name, component_type)
+  friendly_name = "generated #{component_type} configuration"
+  unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   render_and_import_schema(
-    root_schema,
-    schema_name,
-    "base #{component_type} configuration",
-    ["#{component_type}s"],
-    "base/#{component_type}s.cue"
+    unwrapped_resolved_schema,
+    friendly_name,
+    ["generated", "components", "#{component_type}s"],
+    "components/generated/#{component_type}s.cue"
   )
 end
 
 def render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
+  friendly_name = "'#{component_name}' #{component_type} configuration"
+  unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   render_and_import_schema(
-    root_schema,
-    schema_name,
-    "'#{component_name}' #{component_type} configuration",
-    ["#{component_type}s", component_name],
-    "#{component_type}s/base/#{component_name}.cue"
+    unwrapped_resolved_schema,
+    friendly_name,
+    ["generated", "components", "#{component_type}s", component_name],
+    "components/#{component_type}s/generated/#{component_name}.cue"
+  )
+end
+
+def render_and_import_generated_api_schema(root_schema, apis)
+  api_schema = {}
+  apis.each do |component_name, schema_name|
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+    resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+    api_schema[component_name] = resolved_schema
+  end
+
+  render_and_import_schema(
+    api_schema,
+    "configuration",
+    ["generated", "api"],
+    "generated/api.cue"
+  )
+end
+
+def render_and_import_generated_global_option_schema(root_schema, global_options)
+  global_option_schema = {}
+
+  global_options.each do |component_name, schema_name|
+    friendly_name = "'#{component_name}' #{schema_name} configuration"
+
+    if component_name == "global_option"
+      # Flattening global options
+      unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+        .each { |name, schema| global_option_schema[name] = schema }
+    else
+      # Resolving and assigning other global options
+      global_option_schema[component_name] = resolve_schema_by_name(root_schema, schema_name)
+    end
+  end
+
+  render_and_import_schema(
+    global_option_schema,
+    "configuration",
+    ["generated", "configuration"],
+    "generated/configuration.cue"
   )
 end
 
@@ -1733,7 +1774,7 @@ component_types = %w[source transform sink]
 # First off, we generate the component type configuration bases. These are the high-level
 # configuration settings that are universal on a per-component type basis.
 #
-# For example, the "base" configuration for a sink would be the inputs, buffer settings, healthcheck
+# For example, the "generated" configuration for a sink would be the inputs, buffer settings, healthcheck
 # settings, and proxy settings... and then the configuration for a sink would be those, plus
 # whatever the sink itself defines.
 component_bases = root_schema['definitions'].filter_map do |key, definition|
@@ -1743,7 +1784,7 @@ end
 .reduce { |acc, item| nested_merge(acc, item) }
 
 component_bases.each do |component_type, schema_name|
-  render_and_import_base_component_schema(root_schema, schema_name, component_type)
+  render_and_import_generated_component_schema(root_schema, schema_name, component_type)
 end
 
 # Now we'll generate the base configuration for each component.
@@ -1759,3 +1800,23 @@ all_components.each do |component_type, components|
     render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   end
 end
+
+apis = root_schema['definitions'].filter_map do |key, definition|
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
+  { component_name => key } if component_type == "api"
+end
+.reduce { |acc, item| nested_merge(acc, item) }
+
+render_and_import_generated_api_schema(root_schema, apis)
+
+
+# At last, we generate the global options configuration.
+global_options = root_schema['definitions'].filter_map do |key, definition|
+  component_type = get_schema_metadata(definition, 'docs::component_type')
+  component_name = get_schema_metadata(definition, 'docs::component_name')
+  { component_name => key } if component_type == "global_option"
+end
+.reduce { |acc, item| nested_merge(acc, item) }
+
+render_and_import_generated_global_option_schema(root_schema, global_options)

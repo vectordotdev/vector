@@ -1,8 +1,8 @@
 use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_config::configurable_component;
-use vector_core::metric_tags;
+use vector_lib::configurable::configurable_component;
+use vector_lib::metric_tags;
 
 use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
@@ -103,12 +103,7 @@ mod tests {
             "disk_written_bytes_total",
             "disk_writes_completed_total",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 4,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
         }
 
         // They should all have a "device" tag

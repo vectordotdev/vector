@@ -1,13 +1,13 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
-use codecs::StreamDecodingError;
 use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
-use vector_common::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_core::EstimatedJsonEncodedSizeOf;
+use vector_lib::codecs::StreamDecodingError;
+use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Decoder,
@@ -72,7 +72,7 @@ async fn listen(
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::decoding::Error::FramingError(error.into());
+                    let error = vector_lib::codecs::decoding::Error::FramingError(error.into());
                     emit!(SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error
@@ -81,9 +81,8 @@ async fn listen(
 
                 let span = info_span!("datagram");
                 let received_from = if !address.is_unnamed() {
-                    let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                        span.record("peer_path", &field::debug(&path));
-                        path
+                    let path = address.as_pathname().map(|e| e.to_owned()).inspect(|path| {
+                        span.record("peer_path", field::debug(path));
                     });
 
                     path.map(|p| p.to_string_lossy().into_owned().into())
@@ -92,7 +91,7 @@ async fn listen(
                     // socket from an unnamed socket (a socket not
                     // bound to a file). Instead of a filename, we'll
                     // surface a specific host value.
-                    span.record("peer_path", &field::debug(UNNAMED_SOCKET_HOST));
+                    span.record("peer_path", field::debug(UNNAMED_SOCKET_HOST));
                     Some(UNNAMED_SOCKET_HOST.into())
                 };
 

@@ -1,1 +1,1 @@
-{"metric":{"name":"k","timestamp":"1970-01-01T00:00:00.000000213Z","kind":"absolute","gauge":{"value":-957312.0}}}
+{"metric":{"name":"k","timestamp":"1970-01-01T07:39:58.000009725Z","kind":"incremental","counter":{"value":213056.0}}}

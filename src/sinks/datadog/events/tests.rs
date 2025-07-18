@@ -9,7 +9,7 @@ use futures::{
 use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
-use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 use super::*;
 use crate::{
@@ -52,7 +52,7 @@ async fn start_test(
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -117,7 +117,7 @@ async fn api_key_in_metadata() {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();

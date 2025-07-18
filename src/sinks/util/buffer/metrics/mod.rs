@@ -1,8 +1,6 @@
-pub mod sort;
-
 use std::cmp::Ordering;
 
-use vector_core::event::metric::{Metric, MetricValue, Sample};
+use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
     batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
@@ -125,10 +123,10 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 }
 
 #[cfg(test)]
-pub(self) mod tests {
+mod tests {
     use similar_asserts::assert_eq;
-    use vector_core::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
-    use vector_core::metric_tags;
+    use vector_lib::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
+    use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
@@ -140,7 +138,7 @@ pub(self) mod tests {
 
     pub fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
-            format!("counter-{}", num),
+            format!("counter-{num}"),
             kind,
             MetricValue::Counter { value },
         )
@@ -148,12 +146,12 @@ pub(self) mod tests {
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+        Metric::new(format!("gauge-{num}"), kind, MetricValue::Gauge { value })
     }
 
     pub fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
         Metric::new(
-            format!("set-{}", num),
+            format!("set-{num}"),
             kind,
             MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
@@ -163,10 +161,10 @@ pub(self) mod tests {
 
     pub fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
         Metric::new(
-            format!("dist-{}", num),
+            format!("dist-{num}"),
             kind,
             MetricValue::Distribution {
-                samples: vector_core::samples![num as f64 => rate],
+                samples: vector_lib::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -180,10 +178,10 @@ pub(self) mod tests {
         sum: f64,
     ) -> Metric {
         Metric::new(
-            format!("buckets-{}", num),
+            format!("buckets-{num}"),
             kind,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![
+                buckets: vector_lib::buckets![
                     1.0 => cfactor,
                     bpower.exp2() => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
@@ -196,10 +194,10 @@ pub(self) mod tests {
 
     pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
         Metric::new(
-            format!("quantiles-{}", num),
+            format!("quantiles-{num}"),
             kind,
             MetricValue::AggregatedSummary {
-                quantiles: vector_core::quantiles![
+                quantiles: vector_lib::quantiles![
                     0.0 => factor,
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0
@@ -241,7 +239,7 @@ pub(self) mod tests {
         result
             .into_iter()
             .map(|mut batch| {
-                batch.sort_by_key(|k| format!("{:?}", k));
+                batch.sort_by_key(|k| format!("{k:?}"));
                 batch
             })
             .collect()
@@ -567,7 +565,7 @@ pub(self) mod tests {
 
     #[test]
     fn compress_distributions() {
-        let mut samples = vector_core::samples![
+        let mut samples = vector_lib::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -579,7 +577,7 @@ pub(self) mod tests {
 
         assert_eq!(
             compress_distribution(&mut samples),
-            vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+            vector_lib::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 

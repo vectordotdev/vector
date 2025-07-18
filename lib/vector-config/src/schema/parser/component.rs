@@ -43,7 +43,7 @@ pub struct ComponentSchema<'a> {
     component_type: ComponentType,
 }
 
-impl<'a> ComponentSchema<'a> {
+impl ComponentSchema<'_> {
     /// The type of the component represented by this schema.
     pub fn component_type(&self) -> ComponentType {
         self.component_type
@@ -60,7 +60,7 @@ impl<'a> ComponentSchema<'a> {
     }
 }
 
-impl<'a> QueryableSchema for ComponentSchema<'a> {
+impl QueryableSchema for ComponentSchema<'_> {
     fn schema_type(&self) -> SchemaType {
         self.schema.schema_type()
     }
@@ -133,7 +133,7 @@ fn get_component_metadata_kv_str<'a>(
             Value::String(name) => Ok(name),
             _ => Err(SchemaError::invalid_component_schema(
                 key,
-                format!("`{}` must be a string", key),
+                format!("`{key}` must be a string"),
             )),
         })
 }

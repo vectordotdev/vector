@@ -48,7 +48,7 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.sematext_metrics.configuration
+	configuration: generated.components.sinks.sematext_metrics.configuration
 
 	input: {
 		logs: false
@@ -61,9 +61,5 @@ components: sinks: sematext_metrics: {
 			summary:      false
 		}
 		traces: false
-	}
-
-	telemetry: metrics: {
-		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

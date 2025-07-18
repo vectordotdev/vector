@@ -6,7 +6,7 @@ Download | {{ site.Title }}
 {{ $releases := site.Data.docs.releases }}
 {{ $versions := site.Data.docs.versions }}
 {{ $latest := index $versions 0 }}
-<div class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+<div x-data x-init="$store.global.setToLatest()" class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     {{ partial "hero.html" . }}
   </div>

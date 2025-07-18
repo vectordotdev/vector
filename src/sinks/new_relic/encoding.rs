@@ -1,8 +1,8 @@
 use std::{io, sync::Arc};
 
 use serde::Serialize;
-use vector_common::request_metadata::GroupedCountByteSize;
-use vector_core::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
 
 use super::{
     EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
@@ -59,8 +59,7 @@ pub fn to_json<T: Serialize>(model: &T) -> Result<Vec<u8>, NewRelicSinkError> {
             Ok(json)
         }
         Err(error) => Err(NewRelicSinkError::new(&format!(
-            "Failed generating JSON: {}",
-            error
+            "Failed generating JSON: {error}"
         ))),
     }
 }

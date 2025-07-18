@@ -1,6 +1,6 @@
 {{ $title := .Params.short | default .Title }}
 {{ $componentTag := .File.BaseFileName }}
-{{ $kind := .Params.kind }}
+{{ $kind := .Params.component_kind }}
 <div>
   <a href="{{ .RelPermalink }}">
     <div class="no-prose border hover:border-4 rounded dark:border-gray-700 p-4 shadow-sm hover:border-secondary dark:hover:border-primary">

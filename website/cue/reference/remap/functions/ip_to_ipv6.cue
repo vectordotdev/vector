@@ -15,7 +15,7 @@ remap: functions: ip_to_ipv6: {
 		},
 	]
 	internal_failure_reasons: [
-		"`ip` isn't a valid IP address",
+		"`ip` is not a valid IP address.",
 	]
 	return: {
 		types: ["string"]

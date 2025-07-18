@@ -14,6 +14,9 @@
 
 name: K8S E2E Suite
 
+permissions:
+  statuses: write
+
 on:
   workflow_dispatch:
   workflow_call:
@@ -25,7 +28,15 @@ on:
     - cron: '0 0 * * 2-6'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.comment.html_url || github.event.merge_group.head_sha || github.event.schedule || github.sha }}
+  # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
+  # additional PR commits are pushed. The comment.html_url should always be unique.
+  #
+  # Note that technically this workflow can run on PRs which have code changes that affect K8s. Choosing not to add the PR commit to
+  # the concurrency group settings- since that would result in new PR commits canceling out manual runs on any PR that doesn't flag
+  # change detection. This is a "conservative" approach that means we may have some runs that could be canceled, but it's safer than
+  # having user's runs canceled when they shouldn't be. In practice this shouldn't happen very often given this component does not change
+  # often so any increased cost from the conservative approach should be negligible.
+  group: ${{ github.workflow }}-${{ github.event.comment.html_url || github.ref || github.event.schedule }}
   cancel-in-progress: true
 
 env:
@@ -42,70 +53,65 @@ env:
 jobs:
   changes:
     # Only evaluate files changed on pull request trigger
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref }}
     secrets: inherit
 
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs: changes
-    # Run this job even if `changes` job is skipped (non- pull request trigger)
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
+    # Run this job even if `changes` job is skipped
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
-        id: comment-branch
-
-      - name: (PR comment) Set latest commit status as pending
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+          ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        if: ${{ github.event_name != 'pull_request_review' }}
+        uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/ci-free-disk-space.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: ~/.cargo/bin/rustup target add x86_64-unknown-linux-gnu
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
 
-      - name: (PR comment) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
-        if: failure() && github.event_name == 'issue_comment'
+      - name: (PR review) Set latest commit status as 'failure'
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        if: failure() && github.event_name == 'pull_request_review'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
@@ -117,20 +123,21 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/github-script@v6.4.1
+      - uses: actions/github-script@v7.0.1
         id: set-matrix
         with:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.24.0",
+              "v1.33.1",
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
@@ -171,7 +178,8 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -181,22 +189,22 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      - name: (PR comment) Get PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+      - name: (PR review) Get PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
-      - name: (PR comment) Checkout PR branch
-        if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+      - name: (PR review) Checkout PR branch
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
-        if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        if: ${{ github.event_name != 'pull_request_review' }}
+        uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -208,23 +216,30 @@ jobs:
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
-      - run: make test-e2e-kubernetes
+      # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
+      - name: Run tests
+        uses: nick-fields/retry@v3
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
           CARGO_INCREMENTAL: 0
-
-      - name: (PR comment) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@v1.1.7
-        if: failure() && github.event_name == 'issue_comment'
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          timeout_minutes: 45
+          max_attempts: 3
+          command: make test-e2e-kubernetes
+
+      - name: (PR review) Set latest commit status as failure
+        uses: myrotvorets/set-commit-status-action@v2.0.1
+        if: failure() && github.event_name == 'pull_request_review'
+        with:
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'failure'
 
   final-result:
     name: K8s E2E Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     needs:
       - changes
       - build-x86_64-unknown-linux-gnu
@@ -234,16 +249,16 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: (PR comment) Get PR branch
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@v2
+      - name: (PR review) Get PR branch
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
-      - name: (PR comment) Submit PR result as success
-        if: github.event_name == 'issue_comment' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v1.1.7
+      - name: (PR review) Submit PR result as success
+        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
+        uses: myrotvorets/set-commit-status-action@v2.0.1
         with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 

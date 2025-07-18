@@ -12,8 +12,8 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::configurable_component;
-use vector_core::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -28,7 +28,7 @@ use crate::{
 
 pub mod parser;
 use parser::NginxStubStatus;
-use vector_core::config::LogNamespace;
+use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr) => {
@@ -106,7 +106,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 #[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let http_client = HttpClient::new(tls, &cx.proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
@@ -127,13 +127,13 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                let count = metrics.len();
                 emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let metrics = metrics.into_iter().flatten();
+                let metrics: Vec<Metric> = metrics.into_iter().flatten().collect();
+                let count = metrics.len();
 
                 if (cx.out.send_batch(metrics).await).is_err() {
                     emit!(StreamClosedError { count });
@@ -188,7 +188,7 @@ impl NginxMetrics {
         let uri: Uri = endpoint.parse().context(HostInvalidUriSnafu)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
             (host, None) => host.to_owned(),
-            (host, Some(port)) => format!("{}:{}", host, port),
+            (host, Some(port)) => format!("{host}:{port}"),
         })
     }
 

@@ -650,7 +650,7 @@ pub(crate) fn assert_string_schema_for_map(
                 SingleOrVec::Vec(its) => {
                     its.len() == 1
                         && its
-                            .get(0)
+                            .first()
                             .filter(|it| *it == &InstanceType::String)
                             .is_some()
                 }

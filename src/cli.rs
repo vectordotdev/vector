@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 use std::{num::NonZeroU64, path::PathBuf};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
@@ -9,7 +10,7 @@ use crate::service;
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
 use crate::{generate_schema, signal};
 
 #[derive(Parser, Debug)]
@@ -34,6 +35,7 @@ impl Opts {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
+            | Some(SubCommand::ConvertConfig(_))
             | Some(SubCommand::List(_))
             | Some(SubCommand::Test(_)) => {
                 if self.root.verbose == 0 {
@@ -62,8 +64,8 @@ impl Opts {
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// File format is detected from the file name.
-    /// If zero files are specified the default config path
-    /// `/etc/vector/vector.toml` will be targeted.
+    /// If zero files are specified, the deprecated default config path
+    /// `/etc/vector/vector.yaml` is targeted.
     #[arg(
         id = "config",
         short,
@@ -150,7 +152,33 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 
+    /// Method for configuration watching.
+    ///
+    /// By default, `vector` uses recommended watcher for host OS
+    /// - `inotify` for Linux-based systems.
+    /// - `kqueue` for unix/macos
+    /// - `ReadDirectoryChangesWatcher` for windows
+    ///
+    /// The `poll` watcher can be used in cases where `inotify` doesn't work, e.g., when attaching the configuration via NFS.
+    #[arg(
+        long,
+        default_value = "recommended",
+        env = "VECTOR_WATCH_CONFIG_METHOD"
+    )]
+    pub watch_config_method: WatchConfigMethod,
+
+    /// Poll for changes in the configuration file at the given interval.
+    ///
+    /// This setting is only applicable if `Poll` is set in `--watch-config-method`.
+    #[arg(
+        long,
+        env = "VECTOR_WATCH_CONFIG_POLL_INTERVAL_SECONDS",
+        default_value = "30"
+    )]
+    pub watch_config_poll_interval_seconds: NonZeroU64,
+
     /// Set the internal log rate limit
+    /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(
         short,
         long,
@@ -194,6 +222,21 @@ pub struct RootOpts {
         default_value = "5000"
     )]
     pub allocation_tracing_reporting_interval_ms: u64,
+
+    /// Disable probing and configuration of root certificate locations on the system for OpenSSL.
+    ///
+    /// The probe functionality manipulates the `SSL_CERT_FILE` and `SSL_CERT_DIR` environment variables
+    /// in the Vector process. This behavior can be problematic for users of the `exec` source, which by
+    /// default inherits the environment of the Vector process.
+    #[arg(long, env = "VECTOR_OPENSSL_NO_PROBE", default_value = "false")]
+    pub openssl_no_probe: bool,
+
+    /// Allow the configuration to run without any components. This is useful for loading in an
+    /// empty stub config that will later be replaced with actual components. Note that this is
+    /// likely not useful without also watching for config file changes as described in
+    /// `--watch-config`.
+    #[arg(long, env = "VECTOR_ALLOW_EMPTY_CONFIG", default_value = "false")]
+    pub allow_empty_config: bool,
 }
 
 impl RootOpts {
@@ -213,6 +256,16 @@ impl RootOpts {
         )
         .collect()
     }
+
+    pub fn init_global(&self) {
+        if !self.openssl_no_probe {
+            unsafe {
+                openssl_probe::init_openssl_env_vars();
+            }
+        }
+
+        crate::metrics::init_global().expect("metrics initialization failed");
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -221,16 +274,26 @@ pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),
 
+    /// Convert a config file from one format to another.
+    /// This command can also walk directories recursively and convert all config files that are discovered.
+    /// Note that this is a best effort conversion due to the following reasons:
+    /// * The comments from the original config file are not preserved.
+    /// * Explicitly set default values in the original implementation might be omitted.
+    /// * Depending on how each source/sink config struct configures serde, there might be entries with null values.
+    ConvertConfig(convert_config::Opts),
+
     /// Generate a Vector configuration containing a list of components.
     Generate(generate::Opts),
 
     /// Generate the configuration schema for this version of Vector. (experimental)
     ///
-    /// A JSON Schema document will be written to stdout that represents the valid schema for a
+    /// A JSON Schema document will be generated that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
     /// only when concatenated together.
-    GenerateSchema,
+    ///
+    /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
+    GenerateSchema(generate_schema::Opts),
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[command(hide = true)]
@@ -270,8 +333,9 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Config(c) => config::cmd(c),
+            Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
-            Self::GenerateSchema => generate_schema::cmd(),
+            Self::GenerateSchema(opts) => generate_schema::cmd(opts),
             Self::Graph(g) => graph::cmd(g),
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
@@ -302,7 +366,10 @@ impl Color {
     pub fn use_color(&self) -> bool {
         match self {
             #[cfg(unix)]
-            Color::Auto => atty::is(atty::Stream::Stdout),
+            Color::Auto => {
+                use std::io::IsTerminal;
+                std::io::stdout().is_terminal()
+            }
             #[cfg(windows)]
             Color::Auto => false, // ANSI colors are not supported by cmd.exe
             Color::Always => true,
@@ -315,6 +382,15 @@ impl Color {
 pub enum LogFormat {
     Text,
     Json,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchConfigMethod {
+    /// Recommended watcher for the current OS, usually `inotify` for Linux-based systems.
+    Recommended,
+    /// Poll-based watcher, typically used for watching files on EFS/NFS-like network storage systems.
+    /// The interval is determined by  [`RootOpts::watch_config_poll_interval_seconds`].
+    Poll,
 }
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {

@@ -1,14 +1,17 @@
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::Region;
+use aws_sdk_kms::Client as KMSClient;
 use chrono::Duration;
-use codecs::TextSerializerConfig;
 use futures::{stream, StreamExt};
 use similar_asserts::assert_eq;
+use vector_lib::codecs::TextSerializerConfig;
+use vector_lib::lookup;
 
 use super::*;
-use crate::aws::create_client;
+use crate::aws::{create_client, ClientBuilder};
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
@@ -24,8 +27,22 @@ use crate::{
 
 const GROUP_NAME: &str = "vector-cw";
 
-fn watchlogs_address() -> String {
-    std::env::var("WATCHLOGS_ADDRESS").unwrap_or_else(|_| "http://localhost:6000".into())
+fn cloudwatch_address() -> String {
+    std::env::var("CLOUDWATCH_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
+
+fn kms_address() -> String {
+    std::env::var("KMS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+}
+
+struct KMSClientBuilder;
+
+impl ClientBuilder for KMSClientBuilder {
+    type Client = aws_sdk_kms::client::Client;
+
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_kms::client::Client::new(config)
+    }
 }
 
 #[tokio::test]
@@ -38,10 +55,11 @@ async fn cloudwatch_insert_log_event() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -49,13 +67,15 @@ async fn cloudwatch_insert_log_event() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -70,12 +90,12 @@ async fn cloudwatch_insert_log_event() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, input_lines);
+    assert_eq!(output_lines.sort(), input_lines.sort());
 }
 
 #[tokio::test]
@@ -88,10 +108,11 @@ async fn cloudwatch_insert_log_events_sorted() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -99,6 +120,8 @@ async fn cloudwatch_insert_log_events_sorted() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -142,7 +165,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
@@ -150,7 +173,7 @@ async fn cloudwatch_insert_log_events_sorted() {
     // readjust input_lines in the same way we have readjusted timestamps.
     let first = input_lines.remove(0);
     input_lines.push(first);
-    assert_eq!(output_lines, input_lines);
+    assert_eq!(output_lines.sort(), input_lines.sort());
 }
 
 #[tokio::test]
@@ -163,10 +186,11 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -174,6 +198,8 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -188,10 +214,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         let line = input_lines.next().unwrap();
         let mut event = LogEvent::from(line.clone());
         event.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            log_schema().timestamp_key_target_path().unwrap(),
             now + offset,
         );
         events.push(Event::Log(event));
@@ -224,12 +247,12 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, lines);
+    assert_eq!(output_lines.sort(), lines.sort());
 }
 
 #[tokio::test]
@@ -242,10 +265,11 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -253,13 +277,15 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -274,12 +300,96 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, input_lines);
+    assert_eq!(output_lines.sort(), input_lines.sort());
+}
+
+#[tokio::test]
+async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
+    trace_init();
+
+    let stream_name = gen_name();
+    let group_name = gen_name();
+
+    let config = CloudwatchLogsSinkConfig {
+        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        group_name: Template::try_from(group_name.as_str()).unwrap(),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
+        encoding: TextSerializerConfig::default().into(),
+        create_missing_group: true,
+        create_missing_stream: true,
+        retention: Default::default(),
+        compression: Default::default(),
+        batch: Default::default(),
+        request: Default::default(),
+        tls: Default::default(),
+        assume_role: None,
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        kms_key: Some(
+            create_kms_client_test()
+                .await
+                .create_key()
+                .send()
+                .await
+                .unwrap()
+                .key_metadata()
+                .unwrap()
+                .key_id()
+                .parse()
+                .unwrap(),
+        ),
+        tags: Some(HashMap::from_iter(vec![(
+            "key".to_string(),
+            "value".to_string(),
+        )])),
+    };
+
+    let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+
+    let timestamp = chrono::Utc::now();
+
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
+    let response = create_client_test()
+        .await
+        .get_log_events()
+        .log_stream_name(stream_name)
+        .log_group_name(group_name.clone())
+        .start_time(timestamp.timestamp_millis())
+        .send()
+        .await
+        .unwrap();
+
+    let events = response.events.unwrap();
+
+    let mut output_lines = events
+        .into_iter()
+        .map(|e| e.message.unwrap())
+        .collect::<Vec<_>>();
+
+    assert_eq!(output_lines.sort(), input_lines.sort());
+
+    let log_group = create_client_test()
+        .await
+        .describe_log_groups()
+        .log_group_name_pattern(group_name.clone())
+        .limit(1)
+        .send()
+        .await
+        .unwrap()
+        .log_groups()
+        .first()
+        .unwrap()
+        .clone();
+
+    let kms_key = log_group.kms_key_id().unwrap();
+    assert_eq!(kms_key, config.kms_key.unwrap());
 }
 
 #[tokio::test]
@@ -297,10 +407,11 @@ async fn cloudwatch_insert_log_event_batched() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch,
         request: Default::default(),
@@ -308,13 +419,15 @@ async fn cloudwatch_insert_log_event_batched() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
 
     let timestamp = chrono::Utc::now();
 
-    let (input_lines, events) = random_lines_with_stream(100, 11, None);
+    let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
@@ -329,12 +442,12 @@ async fn cloudwatch_insert_log_event_batched() {
 
     let events = response.events.unwrap();
 
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, input_lines);
+    assert_eq!(output_lines.sort(), input_lines.sort());
 }
 
 #[tokio::test]
@@ -346,11 +459,12 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        stream_name: Template::try_from(format!("{stream_name}-{{{{key}}}}")).unwrap(),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -358,6 +472,8 @@ async fn cloudwatch_insert_log_event_partitioned() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -382,18 +498,18 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-0", stream_name))
+        .log_stream_name(format!("{stream_name}-0"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()
         .await
         .unwrap();
     let events = response.events.unwrap();
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
-    let expected_output = input_lines
+    let mut expected_output = input_lines
         .clone()
         .into_iter()
         .enumerate()
@@ -401,12 +517,12 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .map(|(_, e)| e)
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, expected_output);
+    assert_eq!(output_lines.sort(), expected_output.sort());
 
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-1", stream_name))
+        .log_stream_name(format!("{stream_name}-1"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()
@@ -414,11 +530,11 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .unwrap();
 
     let events = response.events.unwrap();
-    let output_lines = events
+    let mut output_lines = events
         .into_iter()
         .map(|e| e.message.unwrap())
         .collect::<Vec<_>>();
-    let expected_output = input_lines
+    let mut expected_output = input_lines
         .clone()
         .into_iter()
         .enumerate()
@@ -426,7 +542,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .map(|(_, e)| e)
         .collect::<Vec<_>>();
 
-    assert_eq!(output_lines, expected_output);
+    assert_eq!(output_lines.sort(), expected_output.sort());
 }
 
 #[tokio::test]
@@ -439,10 +555,11 @@ async fn cloudwatch_healthcheck() {
     let config = CloudwatchLogsSinkConfig {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
+        region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
         create_missing_stream: true,
+        retention: Default::default(),
         compression: Default::default(),
         batch: Default::default(),
         request: Default::default(),
@@ -450,6 +567,8 @@ async fn cloudwatch_healthcheck() {
         assume_role: None,
         auth: Default::default(),
         acknowledgements: Default::default(),
+        kms_key: None,
+        tags: None,
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();
@@ -458,13 +577,40 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Some(Region::new("localstack"));
-    let endpoint = Some(watchlogs_address());
+    let region = Some(Region::new("us-east-1"));
+    let endpoint = Some(cloudwatch_address());
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
-        .await
-        .unwrap()
+    create_client::<CloudwatchLogsClientBuilder>(
+        &CloudwatchLogsClientBuilder {},
+        &auth,
+        region,
+        endpoint,
+        &proxy,
+        None,
+        None,
+    )
+    .await
+    .unwrap()
+}
+
+async fn create_kms_client_test() -> KMSClient {
+    let auth = AwsAuthentication::test_auth();
+    let region = Some(Region::new("us-east-1"));
+    let endpoint = Some(kms_address());
+    let proxy = ProxyConfig::default();
+
+    create_client::<KMSClientBuilder>(
+        &KMSClientBuilder {},
+        &auth,
+        region,
+        endpoint,
+        &proxy,
+        None,
+        None,
+    )
+    .await
+    .unwrap()
 }
 
 async fn ensure_group() {

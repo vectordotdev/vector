@@ -3,7 +3,7 @@ package metadata
 remap: functions: encode_key_value: {
 	category:    "Codec"
 	description: """
-		Encodes the `value` to in key/value format with customizable delimiters. Default delimiters match
+		Encodes the `value` into key-value format with customizable delimiters. Default delimiters match
 		the [logfmt](\(urls.logfmt)) format.
 		"""
 	notices: [
@@ -21,7 +21,7 @@ remap: functions: encode_key_value: {
 		},
 		{
 			name:        "fields_ordering"
-			description: "The ordering of fields to preserve. Any fields not in this list will appear unordered, after any ordered fields."
+			description: "The ordering of fields to preserve. Any fields not in this list are listed unordered, after all ordered fields."
 			required:    false
 			type: ["array"]
 		},
@@ -34,21 +34,21 @@ remap: functions: encode_key_value: {
 		},
 		{
 			name:        "field_delimiter"
-			description: "The string that separates each key/value pair."
+			description: "The string that separates each key-value pair."
 			required:    false
 			default:     " "
 			type: ["string"]
 		},
 		{
 			name:        "flatten_boolean"
-			description: "Whether to encode key/value with a boolean value as a standalone key if `true` and nothing if `false`."
+			description: "Whether to encode key-value with a boolean value as a standalone key if `true` and nothing if `false`."
 			required:    false
 			type: ["boolean"]
 			default: false
 		},
 	]
 	internal_failure_reasons: [
-		"`fields_ordering` contains a non-string element",
+		"`fields_ordering` contains a non-string element.",
 	]
 	return: types: ["string"]
 
@@ -70,16 +70,16 @@ remap: functions: encode_key_value: {
 		{
 			title: "Encode with default delimiters (nested fields)"
 			source: """
-				encode_key_value({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
+				encode_key_value({"agent": {"name": "foo"}, "log": {"file": {"path": "my.log"}}, "event": "log"})
 				"""
-			return: #"agent.name=vector event=log log.file.path=my.log"#
+			return: #"agent.name=foo event=log log.file.path=my.log"#
 		},
 		{
 			title: "Encode with default delimiters (nested fields ordering)"
 			source: """
-				encode_key_value!({"agent": {"name": "vector"}, "log": {"file": {"path": "my.log"}}, "event": "log"}, ["event", "log.file.path", "agent.name"])
+				encode_key_value!({"agent": {"name": "foo"}, "log": {"file": {"path": "my.log"}}, "event": "log"}, ["event", "log.file.path", "agent.name"])
 				"""
-			return: #"event=log log.file.path=my.log agent.name=vector"#
+			return: #"event=log log.file.path=my.log agent.name=foo"#
 		},
 		{
 			title: "Encode with custom delimiters (no ordering)"

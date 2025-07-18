@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"a","tags":{"h":"s","s":"c","u":"a"},"interval_ms":4073752709,"kind":"incremental","counter":{"value":-81024.0}}}

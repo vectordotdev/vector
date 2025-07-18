@@ -5,6 +5,8 @@ use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;
 
+use crate::serde::is_default;
+
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
     // use lowercase first and the uppercase
@@ -23,9 +25,9 @@ impl NoProxyInterceptor {
                 if scheme.is_some() && scheme != Some(expected_scheme) {
                     return false;
                 }
-                let matches = host.map_or(false, |host| {
+                let matches = host.is_some_and(|host| {
                     self.0.matches(host)
-                        || port.map_or(false, |port| {
+                        || port.is_some_and(|port| {
                             let url = format!("{host}:{port}");
                             self.0.matches(&url)
                         })
@@ -42,7 +44,7 @@ impl NoProxyInterceptor {
 /// Configure to proxy traffic through an HTTP(S) proxy when making external requests.
 ///
 /// Similar to common proxy configuration convention, you can set different proxies
-/// to use based on the type of traffic being proxied, as well as set specific hosts that
+/// to use based on the type of traffic being proxied. You can also set specific hosts that
 /// should not be proxied.
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
@@ -52,7 +54,7 @@ pub struct ProxyConfig {
     /// Enables proxying support.
     #[serde(
         default = "ProxyConfig::default_enabled",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "is_enabled"
     )]
     pub enabled: bool,
 
@@ -61,14 +63,14 @@ pub struct ProxyConfig {
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub http: Option<String>,
 
     /// Proxy endpoint to use when proxying HTTPS traffic.
     ///
     /// Must be a valid URI string.
     #[configurable(validation(format = "uri"))]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "http://foo.bar:3128"))]
     pub https: Option<String>,
 
@@ -85,10 +87,7 @@ pub struct ProxyConfig {
     /// | Splat               | `*` matches all hosts                                                   |
     ///
     /// [cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "is_default")]
     #[configurable(metadata(docs::examples = "localhost"))]
     #[configurable(metadata(docs::examples = ".foo.bar"))]
     #[configurable(metadata(docs::examples = "*"))]
@@ -104,6 +103,11 @@ impl Default for ProxyConfig {
             no_proxy: NoProxy::default(),
         }
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Calling convention is required by serde
+fn is_enabled(e: &bool) -> bool {
+    e == &true
 }
 
 impl ProxyConfig {
@@ -150,7 +154,7 @@ impl ProxyConfig {
     fn build_proxy(
         &self,
         proxy_scheme: &'static str,
-        proxy_url: &Option<String>,
+        proxy_url: Option<&String>,
     ) -> Result<Option<Proxy>, InvalidUri> {
         proxy_url
             .as_ref()
@@ -159,9 +163,13 @@ impl ProxyConfig {
                     let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
                     if let Ok(authority) = Url::parse(url) {
                         if let Some(password) = authority.password() {
+                            let decoded_user = urlencoding::decode(authority.username())
+                                .expect("username must be valid UTF-8.");
+                            let decoded_pw = urlencoding::decode(password)
+                                .expect("Password must be valid UTF-8.");
                             proxy.set_authorization(Authorization::basic(
-                                authority.username(),
-                                password,
+                                &decoded_user,
+                                &decoded_pw,
                             ));
                         }
                     }
@@ -172,11 +180,11 @@ impl ProxyConfig {
     }
 
     fn http_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("http", &self.http)
+        self.build_proxy("http", self.http.as_ref())
     }
 
     fn https_proxy(&self) -> Result<Option<Proxy>, InvalidUri> {
-        self.build_proxy("https", &self.https)
+        self.build_proxy("https", self.https.as_ref())
     }
 
     /// Install the [`ProxyConnector<C>`] for this `ProxyConfig`
@@ -205,10 +213,43 @@ mod tests {
         header::{AUTHORIZATION, PROXY_AUTHORIZATION},
         HeaderName, HeaderValue, Uri,
     };
+    use proptest::prelude::*;
 
     const PROXY_HEADERS: [HeaderName; 2] = [AUTHORIZATION, PROXY_AUTHORIZATION];
 
     use super::*;
+
+    impl Arbitrary for ProxyConfig {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+            (
+                any::<bool>(),
+                any::<Option<String>>(),
+                any::<Option<String>>(),
+            )
+                .prop_map(|(enabled, http, https)| Self {
+                    enabled,
+                    http,
+                    https,
+                    // TODO: Neither NoProxy nor IpCidr contained with in it supports proptest. Once
+                    // they support proptest, add another any here.
+                    no_proxy: Default::default(),
+                })
+                .boxed()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn encodes_and_decodes_through_yaml(config:ProxyConfig) {
+            let yaml = serde_yaml::to_string(&config).expect("Could not serialize config");
+            let reloaded: ProxyConfig = serde_yaml::from_str(&yaml)
+                .expect("Could not deserialize config");
+            assert_eq!(config, reloaded);
+        }
+    }
 
     #[test]
     fn merge_simple() {
@@ -360,7 +401,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn build_proxy_with_special_chars_url_encoded() {
         let config = ProxyConfig {

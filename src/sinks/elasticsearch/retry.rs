@@ -17,10 +17,7 @@ struct EsResultResponse {
 impl EsResultResponse {
     fn parse(body: &str) -> Result<Self, String> {
         serde_json::from_str::<EsResultResponse>(body).map_err(|json_error| {
-            format!(
-                "some messages failed, could not parse response, error: {}",
-                json_error
-            )
+            format!("some messages failed, could not parse response, error: {json_error}")
         })
     }
 
@@ -45,7 +42,7 @@ impl EsResultResponse {
             .find_map(|item| item.result().error.as_ref())
         {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
-            None => format!("error response: {}", body),
+            None => format!("error response: {body}"),
         }
     }
 }
@@ -56,6 +53,8 @@ enum EsResultItem {
     Index(EsIndexResult),
     #[serde(rename = "create")]
     Create(EsIndexResult),
+    #[serde(rename = "update")]
+    Update(EsIndexResult),
 }
 
 impl EsResultItem {
@@ -64,6 +63,7 @@ impl EsResultItem {
         match self {
             EsResultItem::Index(r) => r,
             EsResultItem::Create(r) => r,
+            EsResultItem::Update(r) => r,
         }
     }
 }
@@ -112,7 +112,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
             ),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
-                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body).into())
+                RetryAction::DontRetry(format!("client-side error, {status}: {body}").into())
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
@@ -136,7 +136,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             status, error.err_type, error.reason
                                         )
                                     } else {
-                                        format!("partial error, status: {}", status)
+                                        format!("partial error, status: {status}")
                                     };
                                     return RetryAction::Retry(msg.into());
                                 }
@@ -150,7 +150,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                     RetryAction::Successful
                 }
             }
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
@@ -160,7 +160,7 @@ mod tests {
     use bytes::Bytes;
     use http::Response;
     use similar_asserts::assert_eq;
-    use vector_common::{internal_event::CountByteSize, json_size::JsonSize};
+    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
 
     use super::*;
     use crate::event::EventStatus;
@@ -179,7 +179,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Rejected,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::DontRetry(_)
@@ -200,7 +199,6 @@ mod tests {
             logic.should_retry_response(&ElasticsearchResponse {
                 http_response: response,
                 event_status: EventStatus::Errored,
-                batch_size: 1,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
             RetryAction::Retry(_)

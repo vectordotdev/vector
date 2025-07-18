@@ -13,6 +13,12 @@ remap: functions: encode_json: {
 			required:    true
 			type: ["any"]
 		},
+		{
+			name:        "pretty"
+			description: "Whether to pretty print the JSON string or not."
+			required:    false
+			type: ["boolean"]
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]

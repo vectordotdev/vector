@@ -6,6 +6,7 @@
 
 use std::{
     collections::HashMap,
+    fmt,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
     path::PathBuf,
@@ -37,9 +38,9 @@ pub struct Template {
 
 impl ConfigurableString for Template {}
 
-impl ToString for Template {
-    fn to_string(&self) -> String {
-        self.src.clone()
+impl fmt::Display for Template {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.src)
     }
 }
 
@@ -311,7 +312,7 @@ impl From<SocketListenAddr> for String {
                 if fd == 0 {
                     "systemd".to_owned()
                 } else {
-                    format!("systemd#{}", fd)
+                    format!("systemd#{fd}")
                 }
             }
         }
@@ -349,10 +350,7 @@ const fn default_simple_source_timeout() -> Duration {
 }
 
 fn default_simple_source_listen_addr() -> SocketListenAddr {
-    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
-        Ipv4Addr::new(127, 0, 0, 1),
-        9200,
-    )))
+    SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9200)))
 }
 
 /// A sink for sending events to the `simple` service.
@@ -635,8 +633,8 @@ fn generate_semi_real_schema() {
             let json = serde_json::to_string_pretty(&schema)
                 .expect("rendering root schema to JSON should not fail");
 
-            println!("{}", json);
+            println!("{json}");
         }
-        Err(e) => eprintln!("error while generating schema: {:?}", e),
+        Err(e) => eprintln!("error while generating schema: {e:?}"),
     }
 }

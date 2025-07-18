@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use std::{collections::HashMap, error, pin::Pin};
+use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
-use vector_common::json_size::JsonSize;
-use vector_common::EventDataEq;
+use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;
@@ -17,7 +15,7 @@ use crate::{
         into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
     },
     fanout::{self, Fanout},
-    schema, ByteSizeOf,
+    schema,
 };
 
 #[cfg(feature = "lua")]
@@ -116,7 +114,7 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
-/// `TaskTransform` or vice versa.
+///   `TaskTransform` or vice versa.
 pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
         self: Box<Self>,
@@ -270,11 +268,17 @@ impl TransformOutputs {
         buf: &mut TransformOutputsBuf,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
         if let Some(primary) = self.primary_output.as_mut() {
-            let buf = buf.primary_buffer.as_mut().expect("mismatched outputs");
+            let buf = buf
+                .primary_buffer
+                .as_mut()
+                .unwrap_or_else(|| unreachable!("mismatched outputs"));
             Self::send_single_buffer(buf, primary).await?;
         }
         for (key, buf) in &mut buf.named_buffers {
-            let output = self.named_outputs.get_mut(key).expect("unknown output");
+            let output = self
+                .named_outputs
+                .get_mut(key)
+                .unwrap_or_else(|| unreachable!("unknown output"));
             Self::send_single_buffer(buf, output).await?;
         }
         Ok(())
@@ -353,7 +357,11 @@ impl TransformOutputsBuf {
         }
     }
 
-    /// Adds a new event to the transform output buffer
+    /// Adds a new event to the named output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no output with the given name.
     pub fn push(&mut self, name: Option<&str>, event: Event) {
         match name {
             Some(name) => self.named_buffers.get_mut(name),
@@ -363,7 +371,11 @@ impl TransformOutputsBuf {
         .push(event);
     }
 
-    #[cfg(any(feature = "test", test))]
+    /// Drains the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
@@ -371,7 +383,11 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    #[cfg(any(feature = "test", test))]
+    /// Drains the named output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no output with the given name.
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
@@ -379,12 +395,15 @@ impl TransformOutputsBuf {
             .drain()
     }
 
-    #[cfg(any(feature = "test", test))]
+    /// Takes the default output buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is no default output.
     pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
-    #[cfg(any(feature = "test", test))]
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
@@ -459,7 +478,6 @@ impl OutputBuffer {
         })
     }
 
-    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
@@ -468,8 +486,9 @@ impl OutputBuffer {
         &mut self,
         output: &mut Fanout,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        let send_start = Some(Instant::now());
         for array in std::mem::take(&mut self.0) {
-            output.send(array).await?;
+            output.send(array, send_start).await?;
         }
 
         Ok(())
@@ -498,7 +517,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     fn event_data_eq(&self, other: &Vec<Event>) -> bool {
         struct Comparator<'a>(EventRef<'a>);
 
-        impl<'a> PartialEq<&Event> for Comparator<'a> {
+        impl PartialEq<&Event> for Comparator<'_> {
             fn eq(&self, that: &&Event) -> bool {
                 self.0.event_data_eq(that)
             }

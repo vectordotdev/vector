@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
-use vector_config::configurable_component;
+use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
 use crate::{
@@ -45,7 +45,7 @@ pub struct PapertrailConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -83,7 +83,7 @@ impl SinkConfig for PapertrailConfig {
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-        let address = format!("{}:{}", host, port);
+        let address = format!("{host}:{port}");
         let tls = Some(
             self.tls
                 .clone()
@@ -131,7 +131,7 @@ struct PapertrailEncoder {
 }
 
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
-    type Error = codecs::encoding::Error;
+    type Error = vector_lib::codecs::encoding::Error;
 
     fn encode(
         &mut self,
@@ -172,7 +172,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
         formatter
             .format(&mut buffer.writer(), Severity::LOG_INFO, message)
-            .map_err(|error| Self::Error::SerializingError(format!("{}", error).into()))?;
+            .map_err(|error| Self::Error::SerializingError(format!("{error}").into()))?;
 
         buffer.put_u8(b'\n');
 
@@ -186,10 +186,10 @@ mod tests {
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
-    use codecs::JsonSerializerConfig;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
-    use vector_core::event::{Event, LogEvent};
+    use vector_lib::codecs::JsonSerializerConfig;
+    use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},

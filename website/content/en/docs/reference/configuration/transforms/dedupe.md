@@ -2,7 +2,7 @@
 title: Dedupe events
 description: Deduplicate logs passing through a topology
 short: Dedupe
-kind: transform
+component_kind: transform
 layout: component
 tags: ["dedupe", "deduplicate", "component", "transform"]
 ---

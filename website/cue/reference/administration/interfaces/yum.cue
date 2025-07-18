@@ -7,10 +7,7 @@ administration: interfaces: yum: {
 		open-source command-line package-manager for Linux operating system
 		using the RPM Package Manager.
 
-		Our Yum repositories are provided by
-		[Cloudsmith](\(urls.cloudsmith)) and you
-		can find [instructions for manually adding
-		the repositories](\(urls.cloudsmith_yum)).
+		Our Yum repositories are hosted by [Datadog](\(urls.datadog)).
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]

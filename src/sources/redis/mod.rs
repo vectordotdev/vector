@@ -1,18 +1,18 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::StreamExt;
+use snafu::{ResultExt, Snafu};
+use tokio_util::codec::FramedRead;
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::StreamExt;
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
-use vector_common::internal_event::{
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
@@ -83,9 +83,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
     fn from(redis_conn_info: &redis::ConnectionInfo) -> Self {
         let (protocol, endpoint) = match &redis_conn_info.addr {
             redis::ConnectionAddr::Tcp(host, port)
-            | redis::ConnectionAddr::TcpTls { host, port, .. } => {
-                ("tcp", format!("{}:{}", host, port))
-            }
+            | redis::ConnectionAddr::TcpTls { host, port, .. } => ("tcp", format!("{host}:{port}")),
             redis::ConnectionAddr::Unix(path) => ("uds", path.to_string_lossy().to_string()),
         };
 
@@ -217,7 +215,7 @@ impl SourceConfig for RedisSourceConfig {
             )
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -228,7 +226,7 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-pub(self) struct InputHandler {
+struct InputHandler {
     pub client: redis::Client,
     pub bytes_received: Registered<BytesReceived>,
     pub events_received: Registered<EventsReceived>,
@@ -330,7 +328,7 @@ mod integration_test {
     async fn redis_source_list_rpop() {
         // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
-        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
@@ -373,7 +371,7 @@ mod integration_test {
     async fn redis_source_list_rpop_with_log_namespace() {
         // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
-        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
@@ -412,7 +410,7 @@ mod integration_test {
     async fn redis_source_list_lpop() {
         // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
-        let mut conn = client.get_tokio_connection_manager().await.unwrap();
+        let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
@@ -487,7 +485,7 @@ mod integration_test {
         let client = redis::Client::open(REDIS_SERVER).unwrap();
 
         let mut async_conn = client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .expect("Failed to get redis async connection.");
 

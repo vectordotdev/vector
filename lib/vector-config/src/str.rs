@@ -1,3 +1,5 @@
+use vrl::value::KeyString;
+
 use crate::Configurable;
 
 /// A string-like type that can be represented in a Vector configuration.
@@ -10,3 +12,5 @@ use crate::Configurable;
 pub trait ConfigurableString: Configurable + ToString {}
 
 impl ConfigurableString for String {}
+
+impl ConfigurableString for KeyString {}

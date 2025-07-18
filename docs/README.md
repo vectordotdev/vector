@@ -10,7 +10,7 @@ Whether you're a Vector team member, or an outside contributor, this is the best
 place to start. This folder contains internal documentation to help with the
 development of Vector and ensuring your change gets approved in a timely manner.
 
-1. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Start here, contributor basics and workflow
+1. **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Start here, contributor basics and workflow
 2. **[DEVELOPING.md](DEVELOPING.md)** - Everything necessary to develop
 3. **[DOCUMENTING.md](DOCUMENTING.md)** - Preparing your change for Vector users
 

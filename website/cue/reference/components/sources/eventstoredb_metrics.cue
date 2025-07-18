@@ -44,7 +44,7 @@ components: sources: eventstoredb_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.eventstoredb_metrics.configuration
+	configuration: generated.components.sources.eventstoredb_metrics.configuration
 
 	output: metrics: {
 		_eventstoredb_metrics_tags: {
@@ -114,9 +114,5 @@ components: sources: eventstoredb_metrics: {
 			default_namespace: "eventstoredb"
 			tags:              _eventstoredb_metrics_tags
 		}
-	}
-	telemetry: metrics: {
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 }

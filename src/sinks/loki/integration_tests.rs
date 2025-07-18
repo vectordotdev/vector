@@ -4,9 +4,9 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use lookup::owned_value_path;
-use vector_common::encode_logfmt;
-use vector_core::{
+use vector_lib::encode_logfmt;
+use vector_lib::lookup::{owned_value_path, PathPrefix};
+use vector_lib::{
     config::{init_telemetry, LogNamespace, Tags, Telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
@@ -94,7 +94,7 @@ async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::U
 }
 
 fn line_generator(index: usize) -> String {
-    format!("random line {}", index)
+    format!("random line {index}")
 }
 
 fn event_generator(index: usize) -> Event {
@@ -210,7 +210,12 @@ async fn namespaced_timestamp() {
 
         // The timestamp of the event needs to be the timestamp set in the `norknork`
         // field since that was given the meaning of `timestamp`.
-        assert_eq!(timestamp.timestamp_nanos(), timestamps[i]);
+        assert_eq!(
+            timestamp
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            timestamps[i]
+        );
     }
 }
 
@@ -492,19 +497,13 @@ async fn out_of_order_drop() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base,
     );
 
@@ -528,19 +527,13 @@ async fn out_of_order_accept() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base - Duration::seconds(1),
     );
 
@@ -566,19 +559,13 @@ async fn out_of_order_rewrite() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
     // first event of the second batch is out-of-order.
     events[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         base,
     );
 
@@ -586,10 +573,7 @@ async fn out_of_order_rewrite() {
     let time = get_timestamp(&expected[batch_size - 1]);
     // timestamp is rewritten with latest timestamp of the first batch
     expected[batch_size].as_mut_log().insert(
-        (
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ),
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
         time,
     );
 
@@ -617,10 +601,7 @@ async fn out_of_order_per_partition() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
         log.insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             base + Duration::seconds(i as i64),
         );
     }
@@ -675,24 +656,26 @@ async fn test_out_of_order_events(
         )
     }
     for (i, ts) in timestamps.iter().enumerate() {
-        assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
+        assert_eq!(
+            get_timestamp(&expected[i])
+                .timestamp_nanos_opt()
+                .expect("Timestamp out of range"),
+            *ts
+        );
     }
 }
 
 fn get_timestamp(event: &Event) -> DateTime<Utc> {
     *event
         .as_log()
-        .get((
-            lookup::PathPrefix::Event,
-            log_schema().timestamp_key().unwrap(),
-        ))
+        .get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
         .unwrap()
         .as_timestamp()
         .unwrap()
 }
 
 async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
-    let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
+    let query = format!("%7Btest_name%3D\"{stream}\"%7D");
     let query = format!(
         "{}/loki/api/v1/query_range?query={}&direction=forward",
         loki_address(),

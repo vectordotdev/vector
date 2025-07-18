@@ -49,7 +49,7 @@ components: sources: nginx_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.nginx_metrics.configuration
+	configuration: generated.components.sources.nginx_metrics.configuration
 
 	how_it_works: {
 		mod_status: {
@@ -128,9 +128,7 @@ components: sources: nginx_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_completed_total:   components.sources.internal_metrics.output.metrics.collect_completed_total
-		collect_duration_seconds:  components.sources.internal_metrics.output.metrics.collect_duration_seconds
-		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:        components.sources.internal_metrics.output.metrics.parse_errors_total
+		collect_completed_total:  components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_seconds: components.sources.internal_metrics.output.metrics.collect_duration_seconds
 	}
 }

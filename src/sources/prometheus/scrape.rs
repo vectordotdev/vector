@@ -5,11 +5,12 @@ use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
-use snafu::{ResultExt, Snafu};
-use vector_config::configurable_component;
-use vector_core::{config::LogNamespace, event::Event};
+use snafu::ResultExt;
+use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, event::Event};
 
 use super::parser;
+use crate::http::QueryParameters;
 use crate::sources::util::http::HttpMethod;
 use crate::sources::util::http_client::{default_timeout, warn_if_interval_too_low};
 use crate::{
@@ -34,12 +35,6 @@ static PARSE_ERROR_NO_PATH: &str = "No path is set on the endpoint and we got a 
 static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 404,\
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
-
-#[derive(Debug, Snafu)]
-enum ConfigError {
-    #[snafu(display("Cannot set both `endpoints` and `hosts`"))]
-    BothEndpointsAndHosts,
-}
 
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
@@ -100,7 +95,7 @@ pub struct PrometheusScrapeConfig {
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_example()"))]
-    query: HashMap<String, Vec<String>>,
+    query: QueryParameters,
 
     #[configurable(derived)]
     tls: Option<TlsConfig>,
@@ -146,7 +141,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
@@ -259,7 +254,7 @@ impl HttpClientContext for PrometheusScrapeContext {
             {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_instance)) => {
-                        metric.replace_tag(format!("exported_{}", tag), old_instance);
+                        metric.replace_tag(format!("exported_{tag}"), old_instance);
                         metric.replace_tag(tag.clone(), instance.clone());
                     }
                     (true, Some(_)) => {}
@@ -276,7 +271,7 @@ impl HttpClientContext for PrometheusScrapeContext {
             {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_endpoint)) => {
-                        metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                        metric.replace_tag(format!("exported_{tag}"), old_endpoint);
                         metric.replace_tag(tag.clone(), endpoint.clone());
                     }
                     (true, Some(_)) => {}
@@ -336,6 +331,7 @@ mod test {
     use super::*;
     use crate::{
         config,
+        http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
             components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
@@ -534,7 +530,7 @@ mod test {
         .await;
         assert!(!events.is_empty());
 
-        let metrics: Vec<vector_core::event::Metric> = events
+        let metrics: Vec<vector_lib::event::Metric> = events
             .into_iter()
             .map(|event| event.into_metric())
             .collect();
@@ -561,9 +557,8 @@ mod test {
         let dummy_endpoint = warp::path!("metrics").and(warp::query::raw()).map(|query| {
             format!(
                 r#"
-                    promhttp_metric_handler_requests_total{{query="{}"}} 100 1612411516789
-                "#,
-                query
+                    promhttp_metric_handler_requests_total{{query="{query}"}} 100 1612411516789
+                "#
             )
         });
 
@@ -578,10 +573,18 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::from([
-                ("key1".to_string(), vec!["val2".to_string()]),
+                (
+                    "key1".to_string(),
+                    QueryParameterValue::MultiParams(vec![ParameterValue::String(
+                        "val2".to_string(),
+                    )]),
+                ),
                 (
                     "key2".to_string(),
-                    vec!["val1".to_string(), "val2".to_string()],
+                    QueryParameterValue::MultiParams(vec![
+                        ParameterValue::String("val1".to_string()),
+                        ParameterValue::String("val2".to_string()),
+                    ]),
                 ),
             ]),
             auth: None,
@@ -616,9 +619,7 @@ mod test {
             let query = metric.tag_value("query").expect("query must be tagged");
             let mut got: HashMap<String, Vec<String>> = HashMap::new();
             for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
-                got.entry(k.to_string())
-                    .or_insert_with(Vec::new)
-                    .push(v.to_string());
+                got.entry(k.to_string()).or_default().push(v.to_string());
             }
             for v in got.values_mut() {
                 v.sort();
@@ -638,7 +639,7 @@ mod test {
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
-                    r##"
+                    r#"
                     # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
                     # TYPE promhttp_metric_handler_requests_total counter
                     promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
@@ -665,7 +666,7 @@ mod test {
                     rpc_duration_seconds{code="200",quantile="0.99"} 76656 1612411516789
                     rpc_duration_seconds_sum{code="200"} 1.7560473e+07 1612411516789
                     rpc_duration_seconds_count{code="200"} 2693 1612411516789
-                    "##,
+                    "#,
                 )))
             }))
         });
@@ -713,7 +714,7 @@ mod test {
         sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()
-            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .get(format!("http://{out_addr}/metrics").parse().unwrap())
             .await
             .unwrap();
 
@@ -799,7 +800,7 @@ mod integration_tests {
             metrics
                 .iter()
                 .find(|metric| metric.name() == name)
-                .unwrap_or_else(|| panic!("Missing metric {:?}", name))
+                .unwrap_or_else(|| panic!("Missing metric {name:?}"))
         };
 
         // Sample some well-known metrics

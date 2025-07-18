@@ -16,7 +16,7 @@ administration: management: {
 		variables: {
 			variants?: [string, ...string]
 
-			config_formats: ["toml", "yaml", "json"]
+			config_formats: ["yaml", "toml", "json"]
 		}
 
 		manage?: {
@@ -124,7 +124,7 @@ administration: management: {
 						command to access Vector's logs:
 
 						```bash
-						docker-compose logs -f vector
+						docker compose logs -f vector
 						```
 
 						Replace `vector` with the name of Vector's service if you've named it something else.

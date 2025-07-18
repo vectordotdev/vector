@@ -2,10 +2,9 @@ mod cri;
 mod docker;
 mod test_util;
 
-use vector_core::config::LogNamespace;
-use vrl::path::PathPrefix;
+use vector_lib::config::LogNamespace;
 
-use crate::sources::kubernetes_logs::transform_utils::get_message_field;
+use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
     event::{Event, Value},
     internal_events::KubernetesLogsFormatPickerEdgeCase,
@@ -43,11 +42,8 @@ impl FunctionTransform for Parser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
             ParserState::Uninitialized => {
-                let message_field = get_message_field(self.log_namespace);
-                let message = match event
-                    .as_log()
-                    .get((PathPrefix::Event, message_field.as_str()))
-                {
+                let message_field = get_message_path(self.log_namespace);
+                let message = match event.as_log().get(&message_field) {
                     Some(message) => message,
                     None => {
                         emit!(KubernetesLogsFormatPickerEdgeCase {
@@ -83,7 +79,7 @@ impl FunctionTransform for Parser {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use lookup::event_path;
+    use vector_lib::lookup::event_path;
     use vrl::value;
 
     use super::*;
@@ -135,7 +131,7 @@ mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 
@@ -163,7 +159,7 @@ mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 }

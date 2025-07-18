@@ -2,12 +2,12 @@
 use std::net::SocketAddr;
 
 use chrono::Utc;
-use codecs::NativeDeserializerConfig;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_common::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_config::configurable_component;
-use vector_core::{
+use vector_lib::codecs::NativeDeserializerConfig;
+use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
+use vector_lib::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
@@ -137,7 +137,7 @@ pub struct VectorConfig {
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 impl VectorConfig {
@@ -172,7 +172,7 @@ impl GenerateConfig for VectorConfig {
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_settings = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
@@ -181,7 +181,9 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
@@ -198,7 +200,10 @@ impl SourceConfig for VectorConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -212,8 +217,8 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use lookup::owned_value_path;
-    use vector_core::{config::LogNamespace, schema::Definition};
+    use vector_lib::lookup::owned_value_path;
+    use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
@@ -273,19 +278,17 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
-    use vector_common::assert_event_data_eq;
-    use vector_core::config::log_schema;
-    use vrl::path::PathPrefix;
-
     use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
         test_util, SourceSender,
     };
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
@@ -306,11 +309,11 @@ mod tests {
         let (mut events, stream) = test_util::random_events_with_stream(100, 100, None);
         sink.run(stream).await.unwrap();
 
-        let source_type_key = log_schema().source_type_key().unwrap();
         for event in &mut events {
-            event
-                .as_mut_log()
-                .insert((PathPrefix::Event, source_type_key), "vector");
+            event.as_mut_log().insert(
+                log_schema().source_type_key_target_path().unwrap(),
+                "vector",
+            );
         }
 
         let output = test_util::collect_ready(rx).await;
@@ -321,7 +324,7 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         run_test(&config, addr).await;
     }
 
@@ -330,9 +333,8 @@ mod tests {
         let addr = test_util::next_addr();
 
         let config = format!(
-            r#"address = "{}"
-            compression=true"#,
-            addr
+            r#"address = "{addr}"
+            compression=true"#
         );
         run_test(&config, addr).await;
     }

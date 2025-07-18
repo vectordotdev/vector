@@ -29,7 +29,7 @@ remap: functions: ip_ntop: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` must be of length 4 or 16 bytes",
+		"`value` must be of length 4 or 16 bytes.",
 	]
 	return: types: ["string"]
 

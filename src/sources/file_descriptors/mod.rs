@@ -3,18 +3,18 @@ use std::io;
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
+use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_lib::codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_common::internal_event::{
+use vector_lib::configurable::NamedComponent;
+use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_config::NamedComponent;
-use vector_core::{
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
     EstimatedJsonEncodedSizeOf,
@@ -29,7 +29,7 @@ use crate::{
     SourceSender,
 };
 
-#[cfg(all(unix, feature = "sources-file-descriptor"))]
+#[cfg(all(unix, feature = "sources-file_descriptor"))]
 pub mod file_descriptor;
 #[cfg(feature = "sources-stdin")]
 pub mod stdin;
@@ -97,7 +97,7 @@ where
 {
     loop {
         let (buffer, len) = match reader.fill_buf() {
-            Ok(buffer) if buffer.is_empty() => break, // EOF.
+            Ok([]) => break, // EOF.
             Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => (Err(error), 0),
@@ -200,7 +200,7 @@ async fn process_stream(
     }
 }
 
-/// Builds the `vector_core::config::Outputs` for stdin and
+/// Builds the `vector_lib::config::Outputs` for stdin and
 /// file_descriptor sources.
 fn outputs(
     log_namespace: LogNamespace,
@@ -222,7 +222,7 @@ fn outputs(
         )
         .with_standard_vector_source_metadata();
 
-    vec![SourceOutput::new_logs(
+    vec![SourceOutput::new_maybe_logs(
         decoding.output_type(),
         schema_definition,
     )]

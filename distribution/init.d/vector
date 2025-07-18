@@ -4,7 +4,7 @@
 #
 # description: A lightweight and ultra-fast tool for building observability pipelines
 # processname: vector
-# config:      /etc/vector/vector.toml
+# config:      /etc/vector/vector.yaml
 # pidfile:     /var/run/vector.pid
 
 ### BEGIN INIT INFO
@@ -35,8 +35,9 @@ RETVAL=0
 # Start
 start() {
   echo -n $"Starting $prog: "
-  daemon --pidfile=${pidfile} $vector $OPTIONS
+  daemon --pidfile=${pidfile} "nohup $vector </dev/null &> /dev/null &"
   RETVAL=$?
+  [ $RETVAL = 0 ] && pidof ${prog} > ${pidfile}
   echo
   return $RETVAL
 }

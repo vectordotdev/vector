@@ -1,1 +1,1 @@
-{"log":{"%2":[2015530353804735291,888384.0,{"8¤":852416.0}]}}
+{"metric":{"name":"a","namespace":"y","timestamp":"1969-12-31T23:48:58.000030698Z","interval_ms":3766558370,"kind":"incremental","counter":{"value":738048.0}}}

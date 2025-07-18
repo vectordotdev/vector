@@ -7,29 +7,37 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use codecs::{
-    decoding::{Deserializer, DeserializerConfig, Framer},
-    BytesDecoder, BytesDeserializer,
-};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use lookup::{owned_value_path, OwnedTargetPath};
 use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
-use vector_core::{
+use vector_lib::{
+    codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig},
+    lookup::{owned_value_path, OwnedTargetPath},
+};
+use vector_lib::{
+    codecs::{
+        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
+        BytesDecoder, BytesDeserializer,
+    },
+    config::DataType,
+};
+use vector_lib::{
     config::LogNamespace,
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
 use vrl::compiler::value::Collection;
-use vrl::value::Kind;
+use vrl::value;
+use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
         into_event_stream,
@@ -92,8 +100,9 @@ fn test_decode_log_body() {
             true,
             decoder,
             "http",
-            test_logs_schema_definition(),
+            Some(test_logs_schema_definition()),
             LogNamespace::Legacy,
+            false,
         );
 
         let events = decode_log_body(body, api_key, &source).unwrap();
@@ -109,7 +118,7 @@ fn test_decode_log_body() {
             assert_eq!(log["ddtags"], msg.ddtags.into());
 
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -118,6 +127,77 @@ fn test_decode_log_body() {
     }
 
     QuickCheck::new().quickcheck(inner as fn(Vec<LogMsg>) -> TestResult);
+}
+
+#[test]
+fn test_decode_log_body_parse_ddtags() {
+    let log_msgs = [LogMsg {
+        message: Bytes::from(String::from("message")),
+        status: Bytes::from(String::from("status")),
+        timestamp: Utc
+            .timestamp_millis_opt(1234)
+            .single()
+            .expect("invalid timestamp"),
+        hostname: Bytes::from(String::from("host")),
+        service: Bytes::from(String::from("service")),
+        ddsource: Bytes::from(String::from("ddsource")),
+        ddtags: Bytes::from(String::from("wizard:the_grey,env:staging")),
+    }];
+
+    let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        Some(test_logs_schema_definition()),
+        LogNamespace::Legacy,
+        true,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+
+    assert_eq!(events.len(), 1);
+
+    let event = events.first().unwrap();
+    let log = event.as_log();
+    let log_msg = log_msgs[0].clone();
+
+    assert_eq!(log["message"], log_msg.message.into());
+    assert_eq!(log["status"], log_msg.status.into());
+    assert_eq!(log["timestamp"], log_msg.timestamp.into());
+    assert_eq!(log["hostname"], log_msg.hostname.into());
+    assert_eq!(log["service"], log_msg.service.into());
+    assert_eq!(log["ddsource"], log_msg.ddsource.into());
+
+    assert_eq!(log["ddtags"], value!(["wizard:the_grey", "env:staging"]));
+}
+
+#[test]
+fn test_decode_log_body_empty_object() {
+    let body = Bytes::from("{}");
+    let api_key = None;
+    let decoder = crate::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+
+    let source = DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        Some(test_logs_schema_definition()),
+        LogNamespace::Legacy,
+        false,
+    );
+
+    let events = decode_log_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
@@ -176,7 +256,7 @@ async fn source(
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
     reqwest::Client::new()
-        .post(&format!("http://{}{}", address, path))
+        .post(format!("http://{address}{path}"))
         .headers(headers)
         .body(body.to_owned())
         .send()
@@ -240,7 +320,7 @@ async fn full_payload_v1() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -302,7 +382,7 @@ async fn full_payload_v2() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -364,7 +444,7 @@ async fn no_api_key() {
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -429,7 +509,7 @@ async fn api_key_in_url() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -494,7 +574,7 @@ async fn api_key_in_query_params() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -565,7 +645,7 @@ async fn api_key_in_header() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -709,7 +789,7 @@ async fn ignores_api_key() {
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
@@ -742,6 +822,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_rate".to_string(),
@@ -752,6 +833,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "dd_count".to_string(),
@@ -762,6 +844,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk.free".to_string(),
@@ -772,6 +855,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
                 DatadogSeriesMetric {
                     metric: "system.disk".to_string(),
@@ -782,6 +866,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    metadata: None,
                 },
             ],
         };
@@ -960,6 +1045,13 @@ async fn decode_sketches() {
                 k: vec![1517, 1559],
                 n: vec![1, 1],
             }],
+            metadata: Some(ddmetric_proto::Metadata {
+                origin: Some(ddmetric_proto::Origin {
+                    origin_product: 10,
+                    origin_category: 11,
+                    origin_service: 9,
+                }),
+            }),
         };
 
         let sketch_payload = ddmetric_proto::SketchPayload {
@@ -1026,6 +1118,11 @@ async fn decode_sketches() {
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
+
+            let event_origin = &events[0].metadata().datadog_origin_metadata().unwrap();
+            assert_eq!(event_origin.product().unwrap(), 10);
+            assert_eq!(event_origin.category().unwrap(), 11);
+            assert_eq!(event_origin.service().unwrap(), 9);
         }
     })
     .await;
@@ -1212,12 +1309,8 @@ async fn decode_traces() {
 
             assert_eq!(
                 trace_v2.as_map()["tags"],
-                Value::Object(BTreeMap::from_iter(
-                    [
-                        ("a".to_string(), "tag".into()),
-                        ("another".to_string(), "tag".into())
-                    ]
-                    .into_iter()
+                Value::Object(ObjectMap::from_iter(
+                    [("a".into(), "tag".into()), ("another".into(), "tag".into())].into_iter()
                 ))
             );
 
@@ -1335,6 +1428,7 @@ async fn split_outputs() {
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                metadata: None,
             }],
         };
         let mut metric_event = spawn_collect_n(
@@ -1404,12 +1498,102 @@ async fn split_outputs() {
                 "12345678abcdefgh12345678abcdefgh"
             );
             assert_eq!(
-                event.metadata().schema_definition(),
+                event.metadata().schema_definition().as_ref(),
                 &test_logs_schema_definition()
             );
         }
     })
     .await;
+}
+
+#[test]
+fn test_config_outputs_with_disabled_data_types() {
+    struct TestCase {
+        multiple_outputs: bool,
+        disable_logs: bool,
+        disable_metrics: bool,
+        disable_traces: bool,
+    }
+
+    for TestCase {
+        multiple_outputs,
+        disable_logs,
+        disable_metrics,
+        disable_traces,
+    } in [
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: true,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: false,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: true,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: true,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: true,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
+        },
+        TestCase {
+            multiple_outputs: false,
+            disable_logs: true,
+            disable_metrics: true,
+            disable_traces: true,
+        },
+    ] {
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            tls: None,
+            store_api_key: true,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            acknowledgements: Default::default(),
+            multiple_outputs,
+            disable_logs,
+            disable_metrics,
+            disable_traces,
+            parse_ddtags: false,
+            log_namespace: Some(false),
+            keepalive: Default::default(),
+        };
+
+        let outputs: Vec<DataType> = config
+            .outputs(LogNamespace::Legacy)
+            .into_iter()
+            .map(|output| output.ty)
+            .collect();
+        if multiple_outputs {
+            assert_eq!(outputs.contains(&DataType::Log), !disable_logs);
+            assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
+            assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
+        } else {
+            assert!(outputs.contains(&DataType::all_bits()));
+            assert!(outputs.len() == 1);
+        }
+    }
 }
 
 #[test]
@@ -1658,7 +1842,7 @@ fn test_config_outputs() {
                 ]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / single output",
             TestCase {
@@ -1733,7 +1917,7 @@ fn test_config_outputs() {
                 )]),
             },
         ),
-        #[cfg(feature = "sources-syslog")]
+        #[cfg(feature = "codecs-syslog")]
         (
             "syslog / multiple output",
             TestCase {
@@ -1833,7 +2017,9 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            parse_ddtags: false,
             log_namespace: Some(false),
+            keepalive: Default::default(),
         };
 
         let mut outputs = config
@@ -1884,7 +2070,8 @@ async fn decode_series_endpoint_v2() {
                 r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
                 unit: "".to_string(),
                 source_type_name: "a_random_source_type_name".to_string(),
-                interval: 0,
+                interval: 10, // Dogstatsd sets Gauge interval to 10 by default
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1901,6 +2088,7 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "another_random_source_type_name".to_string(),
                 interval: 10,
+                metadata: None,
             },
             ddmetric_proto::metric_payload::MetricSeries {
                 resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -1917,6 +2105,13 @@ async fn decode_series_endpoint_v2() {
                 unit: "".to_string(),
                 source_type_name: "a_very_random_source_type_name".to_string(),
                 interval: 0,
+                metadata: Some(ddmetric_proto::Metadata {
+                    origin: Some(ddmetric_proto::Origin {
+                        origin_product: 10,
+                        origin_category: 10,
+                        origin_service: 42,
+                    }),
+                }),
             },
         ];
 
@@ -1955,6 +2150,13 @@ async fn decode_series_endpoint_v2() {
                 )
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
             assert_tags(
                 metric,
@@ -1979,6 +2181,13 @@ async fn decode_series_endpoint_v2() {
             );
             assert_eq!(metric.kind(), MetricKind::Absolute);
             assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
+            assert_eq!(
+                metric
+                    .interval_ms()
+                    .expect("should have set interval")
+                    .get(),
+                10000
+            );
             assert_tags(
                 metric,
                 metric_tags!(
@@ -2057,6 +2266,34 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
+            );
+
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .product()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .category()
+                    .unwrap(),
+                10
+            );
+            assert_eq!(
+                events[3]
+                    .metadata()
+                    .datadog_origin_metadata()
+                    .unwrap()
+                    .service()
+                    .unwrap(),
+                42
             );
         }
     })
@@ -2265,3 +2502,62 @@ fn test_output_schema_definition_bytes_legacy_namespace() {
 fn assert_tags(metric: &Metric, tags: MetricTags) {
     assert_eq!(metric.tags().expect("Missing tags"), &tags);
 }
+
+impl ValidatableComponent for DatadogAgentConfig {
+    fn validation_configuration() -> ValidationConfiguration {
+        use crate::codecs::DecodingConfig;
+
+        let config = DatadogAgentConfig {
+            address: "0.0.0.0:9007".parse().unwrap(),
+            tls: None,
+            store_api_key: false,
+            framing: CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: b',',
+                    max_length: Some(usize::MAX),
+                },
+            }
+            .into(),
+            decoding: BytesDeserializerConfig::new().into(),
+            acknowledgements: Default::default(),
+            multiple_outputs: false,
+            disable_logs: false,
+            disable_metrics: false,
+            disable_traces: false,
+            parse_ddtags: false,
+            log_namespace: Some(false),
+            keepalive: Default::default(),
+        };
+
+        let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
+
+        // TODO set up separate test cases for metrics and traces endpoints
+
+        let logs_addr = format!("http://{}/api/v2/logs", config.address);
+        let uri = http::Uri::try_from(&logs_addr).expect("should not fail to parse URI");
+
+        let decoder = DecodingConfig::new(
+            config.framing.clone(),
+            DeserializerConfig::Json(Default::default()),
+            false.into(),
+        );
+
+        let external_resource = ExternalResource::new(
+            ResourceDirection::Push,
+            HttpResourceConfig::from_parts(uri, None),
+            decoder,
+        );
+
+        ValidationConfiguration::from_source(
+            Self::NAME,
+            log_namespace,
+            vec![ComponentTestCaseConfig::from_source(
+                config,
+                None,
+                Some(external_resource),
+            )],
+        )
+    }
+}
+
+register_validatable_component!(DatadogAgentConfig);

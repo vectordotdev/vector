@@ -26,7 +26,7 @@ should be used for all pull requests:
 - [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backward compatibility](#backward-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
-- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
+- [ ] Is there a risk of performance regressions? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
 For component changes, especially pull requests introducing new components, the
@@ -36,10 +36,17 @@ following items should also be checked:
 - [ ] Does it comply with [component spec](specs/component.md)?
 - [ ] Does it comply with the [instrumentation spec](specs/instrumentation.md)?
 
+### Checklist - new source
+
+This checklist is specific for Vector's sources.
+
+- [ ] Does the source handle metrics? If it does, the Datadog Origin Metadata function (`sinks::datadog::metrics::encoder::source_type_to_service`),
+      which maps the source to the correct Service value, needs to be updated. If this source is an Agent role and thus is the true origin of it's
+      metrics, this will need to be a follow-up PR by a member of the Vector team.
 
 ### Checklist - new sink
 
-This checklist is specific for Vector's sink code.
+This checklist is specific for Vector's sinks.
 
 #### Logic
 
@@ -59,7 +66,7 @@ This checklist is specific for Vector's sink code.
 
 #### Documentation
 
-- [ ] Look at the doc preview on Netlify. Does it look good?
+- [ ] Generate a local website: `cd website & make serve`. Does it look good?
 - [ ] Is there a `cue` file linking to `base`?
 - [ ] Is there a markdown file under `/website/content/en/docs/reference/configuration/sinks/`?
 - [ ] Are module comments included in `mod.rs` linking to any relevant areas in the external services documentation?

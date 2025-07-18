@@ -1,1 +1,1 @@
-{"log":{"":[null],"0":null}}
+{"metric":{"name":"y","kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":386880.0,"value":698560.0},{"quantile":685568.0,"value":264576.0},{"quantile":511545.114,"value":-534656.0}],"count":18082260340456771739,"sum":-302080.0}}}

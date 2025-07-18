@@ -1,10 +1,9 @@
 use core::fmt;
 
-use crate::event::metric::TagValue;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use super::{write_list, write_word, MetricTags};
+use super::{write_list, write_word, MetricTags, TagValue};
 
 /// Metrics series.
 #[configurable_component]

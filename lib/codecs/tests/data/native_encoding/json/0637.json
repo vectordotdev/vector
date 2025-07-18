@@ -1,1 +1,1 @@
-{"metric":{"name":"r","tags":{"t":"c","u":"u"},"timestamp":"1970-01-01T00:00:00.000000001Z","interval_ms":2856792675,"kind":"incremental","counter":{"value":495.8689}}}
+{"metric":{"name":"t","interval_ms":997387072,"kind":"incremental","counter":{"value":858368.0}}}

@@ -99,7 +99,7 @@ const toToml = (obj) => {
 
 // Convert object to YAML string
 const toYaml = (obj) => {
-  return `---\n${YAML.stringify(obj)}`;
+  return `${YAML.stringify(obj)}`;
 }
 
 // Convert object to JSON string (indented)

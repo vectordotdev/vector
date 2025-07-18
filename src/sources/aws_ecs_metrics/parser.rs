@@ -126,7 +126,7 @@ fn counter(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Counter { value },
     )
@@ -144,7 +144,7 @@ fn gauge(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Gauge { value },
     )
@@ -507,14 +507,28 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
+#[derive(Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+enum StatsPayload {
+    Container(ContainerStats),
+    Empty {},
+    Null,
+}
+
 pub(super) fn parse(
     bytes: &[u8],
     namespace: Option<String>,
 ) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
-    let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
+    let parsed = serde_json::from_slice::<BTreeMap<String, StatsPayload>>(bytes)?;
 
-    for (id, container) in parsed {
+    for (id, payload) in parsed {
+        let container = match payload {
+            StatsPayload::Container(container) => container,
+            _ => continue,
+        };
+
         let mut tags = MetricTags::default();
         tags.replace("container_id".into(), id);
         if let Some(name) = container.name {
@@ -560,8 +574,8 @@ pub(super) fn parse(
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use vector_common::assert_event_data_eq;
-    use vector_core::metric_tags;
+    use vector_lib::assert_event_data_eq;
+    use vector_lib::metric_tags;
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -579,7 +593,7 @@ mod test {
 
     #[test]
     fn parse_block_io_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -608,8 +622,10 @@ mod test {
                     "io_time_recursive": [],
                     "sectors_recursive": []
                 }
-            }
-        }"##;
+            },
+            "123456789": {},
+            "123456789": null
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -646,7 +662,7 @@ mod test {
 
     #[test]
     fn parse_cpu_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -672,8 +688,10 @@ mod test {
                         "throttled_time": 0
                     }
                 }
-            }
-        }"##;
+            },
+            "2344": {},
+            "test": null
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -804,7 +822,7 @@ mod test {
 
     #[test]
     fn parse_precpu_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -831,7 +849,7 @@ mod test {
                     }
                 }
             }
-        }"##;
+        }"#;
 
         assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
@@ -962,7 +980,7 @@ mod test {
 
     #[test]
     fn parse_memory_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -1008,7 +1026,7 @@ mod test {
                     "limit": 9223372036854771712
                 }
             }
-        }"##;
+        }"#;
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
@@ -1087,7 +1105,7 @@ mod test {
 
     #[test]
     fn parse_network_metrics() {
-        let json = r##"
+        let json = r#"
         {
             "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
                 "read": "2018-11-14T08:09:10.000000011Z",
@@ -1106,7 +1124,7 @@ mod test {
                     }
                 }
             }
-        }"##;
+        }"#;
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 

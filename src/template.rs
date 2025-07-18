@@ -1,23 +1,24 @@
 //! Functionality for managing template fields used by Vector's sinks.
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::LazyLock};
 
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
-    Utc,
+    FixedOffset, Utc,
 };
-use lookup::lookup_v2::parse_target_path;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use snafu::Snafu;
-use vector_config::{configurable_component, ConfigurableString};
+use vector_lib::configurable::{
+    configurable_component, ConfigurableNumber, ConfigurableString, NumberClass,
+};
+use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
     config::log_schema,
     event::{EventRef, Metric, Value},
 };
 
-static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
 /// Errors raised whilst parsing a Template field.
 #[allow(missing_docs)]
@@ -27,6 +28,8 @@ pub enum TemplateParseError {
     StrftimeError,
     #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
     InvalidPathSyntax { path: String },
+    #[snafu(display("Invalid numeric template"))]
+    InvalidNumericTemplate { template: String },
 }
 
 /// Errors raised whilst rendering a Template.
@@ -35,6 +38,8 @@ pub enum TemplateParseError {
 pub enum TemplateRenderingError {
     #[snafu(display("Missing fields on event: {:?}", missing_keys))]
     MissingKeys { missing_keys: Vec<String> },
+    #[snafu(display("Not numeric: {:?}", input))]
+    NotNumeric { input: String },
 }
 
 /// A templated field.
@@ -63,6 +68,9 @@ pub struct Template {
 
     #[serde(skip)]
     reserve_size: usize,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
 }
 
 impl TryFrom<&str> for Template {
@@ -116,6 +124,7 @@ impl TryFrom<Cow<'_, str>> for Template {
                 src: src.into_owned(),
                 is_static,
                 reserve_size,
+                tz_offset: None,
             }
         })
     }
@@ -129,7 +138,7 @@ impl From<Template> for String {
 
 impl fmt::Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.src)
+        self.src.fmt(f)
     }
 }
 
@@ -137,6 +146,11 @@ impl fmt::Display for Template {
 impl ConfigurableString for Template {}
 
 impl Template {
+    /// set tz offset
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.tz_offset = tz_offset;
+        self
+    }
     /// Renders the given template with data from the event.
     pub fn render<'a>(
         &self,
@@ -163,17 +177,23 @@ impl Template {
         for part in &self.parts {
             match part {
                 Part::Literal(lit) => out.push_str(lit),
-                Part::Strftime(items) => out.push_str(&render_timestamp(items, event)),
+                Part::Strftime(items) => {
+                    out.push_str(&render_timestamp(items, event, self.tz_offset))
+                }
                 Part::Reference(key) => {
                     out.push_str(
                         &match event {
-                            EventRef::Log(log) => log.get(&**key).map(Value::to_string_lossy),
+                            EventRef::Log(log) => log
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
                             EventRef::Metric(metric) => {
                                 render_metric_field(key, metric).map(Cow::Borrowed)
                             }
-                            EventRef::Trace(trace) => {
-                                trace.get(key.as_str()).map(Value::to_string_lossy)
-                            }
+                            EventRef::Trace(trace) => trace
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
                         }
                         .unwrap_or_else(|| {
                             missing_keys.push(key.to_owned());
@@ -206,6 +226,7 @@ impl Template {
         (!parts.is_empty()).then_some(parts)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
     pub fn get_ref(&self) -> &str {
         &self.src
@@ -219,6 +240,223 @@ impl Template {
     /// A dynamic template string contains sections that depend on the input event or time.
     pub const fn is_dynamic(&self) -> bool {
         !self.is_static
+    }
+}
+
+/// The source of a `uint` template. May be a constant numeric value or a template string.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[configurable_component]
+#[serde(untagged)]
+enum UnsignedIntTemplateSource {
+    /// A static unsigned number.
+    Number(u64),
+    /// A string, which may be a template.
+    String(String),
+}
+
+impl Default for UnsignedIntTemplateSource {
+    fn default() -> Self {
+        Self::Number(Default::default())
+    }
+}
+
+impl fmt::Display for UnsignedIntTemplateSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Number(i) => i.fmt(f),
+            Self::String(s) => s.fmt(f),
+        }
+    }
+}
+
+/// Unsigned integer template.
+#[configurable_component]
+#[configurable(metadata(docs::templateable))]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(
+    try_from = "UnsignedIntTemplateSource",
+    into = "UnsignedIntTemplateSource"
+)]
+pub struct UnsignedIntTemplate {
+    src: UnsignedIntTemplateSource,
+
+    #[serde(skip)]
+    parts: Vec<Part>,
+
+    #[serde(skip)]
+    tz_offset: Option<FixedOffset>,
+}
+
+impl TryFrom<UnsignedIntTemplateSource> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: UnsignedIntTemplateSource) -> Result<Self, Self::Error> {
+        match src {
+            UnsignedIntTemplateSource::Number(num) => Ok(UnsignedIntTemplate {
+                src: UnsignedIntTemplateSource::Number(num),
+                parts: Vec::new(),
+                tz_offset: None,
+            }),
+            UnsignedIntTemplateSource::String(s) => UnsignedIntTemplate::try_from(s),
+        }
+    }
+}
+
+impl From<UnsignedIntTemplate> for UnsignedIntTemplateSource {
+    fn from(template: UnsignedIntTemplate) -> UnsignedIntTemplateSource {
+        template.src
+    }
+}
+
+impl TryFrom<&str> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: &str) -> Result<Self, Self::Error> {
+        UnsignedIntTemplate::try_from(Cow::Borrowed(src))
+    }
+}
+
+impl TryFrom<String> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        UnsignedIntTemplate::try_from(Cow::Owned(src))
+    }
+}
+
+impl From<u64> for UnsignedIntTemplate {
+    fn from(num: u64) -> UnsignedIntTemplate {
+        UnsignedIntTemplate {
+            src: UnsignedIntTemplateSource::Number(num),
+            parts: Vec::new(),
+            tz_offset: None,
+        }
+    }
+}
+
+impl TryFrom<Cow<'_, str>> for UnsignedIntTemplate {
+    type Error = TemplateParseError;
+
+    fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
+        parse_template(&src).and_then(|parts| {
+            let is_static =
+                parts.is_empty() || (parts.len() == 1 && matches!(parts[0], Part::Literal(..)));
+
+            if is_static {
+                match src.parse::<u64>() {
+                    Ok(num) => Ok(UnsignedIntTemplate {
+                        src: UnsignedIntTemplateSource::Number(num),
+                        parts,
+                        tz_offset: None,
+                    }),
+                    Err(_) => Err(TemplateParseError::InvalidNumericTemplate {
+                        template: src.into_owned(),
+                    }),
+                }
+            } else {
+                Ok(UnsignedIntTemplate {
+                    parts,
+                    src: UnsignedIntTemplateSource::String(src.into_owned()),
+                    tz_offset: None,
+                })
+            }
+        })
+    }
+}
+
+impl From<UnsignedIntTemplate> for String {
+    fn from(template: UnsignedIntTemplate) -> String {
+        template.src.to_string()
+    }
+}
+
+impl fmt::Display for UnsignedIntTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.src.fmt(f)
+    }
+}
+
+impl ConfigurableString for UnsignedIntTemplate {}
+impl ConfigurableNumber for UnsignedIntTemplate {
+    type Numeric = u64;
+
+    fn class() -> NumberClass {
+        NumberClass::Unsigned
+    }
+}
+
+impl UnsignedIntTemplate {
+    /// Renders the given template with data from the event.
+    pub fn render<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<u64, TemplateRenderingError> {
+        match self.src {
+            UnsignedIntTemplateSource::Number(num) => Ok(num),
+            UnsignedIntTemplateSource::String(_) => self.render_event(event.into()),
+        }
+    }
+
+    /// set tz offset
+    pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
+        self.tz_offset = tz_offset;
+        self
+    }
+
+    fn render_event(&self, event: EventRef<'_>) -> Result<u64, TemplateRenderingError> {
+        let mut missing_keys = Vec::new();
+        let mut out = String::with_capacity(20);
+        for part in &self.parts {
+            match part {
+                Part::Literal(lit) => out.push_str(lit),
+                Part::Reference(key) => {
+                    out.push_str(
+                        &match event {
+                            EventRef::Log(log) => log
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
+                            EventRef::Metric(metric) => {
+                                render_metric_field(key, metric).map(Cow::Borrowed)
+                            }
+                            EventRef::Trace(trace) => trace
+                                .parse_path_and_get_value(key)
+                                .ok()
+                                .and_then(|v| v.map(Value::to_string_lossy)),
+                        }
+                        .unwrap_or_else(|| {
+                            missing_keys.push(key.to_owned());
+                            Cow::Borrowed("")
+                        }),
+                    );
+                }
+                Part::Strftime(items) => {
+                    out.push_str(&render_timestamp(items, event, self.tz_offset))
+                }
+            }
+        }
+        if missing_keys.is_empty() {
+            out.parse::<u64>()
+                .map_err(|_| TemplateRenderingError::NotNumeric { input: out })
+        } else {
+            Err(TemplateRenderingError::MissingKeys { missing_keys })
+        }
+    }
+
+    /// Returns the names of the fields that are rendered in this template.
+    pub fn get_fields(&self) -> Option<Vec<String>> {
+        let parts: Vec<_> = self
+            .parts
+            .iter()
+            .filter_map(|part| {
+                if let Part::Reference(r) = part {
+                    Some(r.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        (!parts.is_empty()).then_some(parts)
     }
 }
 
@@ -334,21 +572,19 @@ fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
 fn render_metric_field<'a>(key: &str, metric: &'a Metric) -> Option<&'a str> {
     match key {
         "name" => Some(metric.name()),
-        "namespace" => metric.namespace().map(Into::into),
+        "namespace" => metric.namespace(),
         _ if key.starts_with("tags.") => metric.tags().and_then(|tags| tags.get(&key[5..])),
         _ => None,
     }
 }
 
-fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
-    match event {
-        EventRef::Log(log) => log_schema()
-            .timestamp_key_target_path()
-            .and_then(|timestamp_key| {
-                log.get(timestamp_key)
-                    .and_then(Value::as_timestamp)
-                    .copied()
-            }),
+fn render_timestamp(
+    items: &ParsedStrftime,
+    event: EventRef<'_>,
+    tz_offset: Option<FixedOffset>,
+) -> String {
+    let timestamp = match event {
+        EventRef::Log(log) => log.get_timestamp().and_then(Value::as_timestamp).copied(),
         EventRef::Metric(metric) => metric.timestamp(),
         EventRef::Trace(trace) => {
             log_schema()
@@ -361,16 +597,28 @@ fn render_timestamp(items: &ParsedStrftime, event: EventRef<'_>) -> String {
                 })
         }
     }
-    .unwrap_or_else(Utc::now)
-    .format_with_items(items.as_items())
-    .to_string()
+    .unwrap_or_else(Utc::now);
+
+    match tz_offset {
+        Some(offset) => timestamp
+            .with_timezone(&offset)
+            .format_with_items(items.as_items())
+            .to_string(),
+        None => timestamp
+            .with_timezone(&chrono::Utc)
+            .format_with_items(items.as_items())
+            .to_string(),
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
-    use lookup::metadata_path;
-    use vector_core::metric_tags;
+    use chrono::{Offset, TimeZone, Utc};
+    use chrono_tz::Tz;
+    use vector_lib::config::LogNamespace;
+    use vector_lib::lookup::{metadata_path, PathPrefix};
+    use vector_lib::metric_tags;
+    use vrl::event_path;
 
     use super::*;
     use crate::event::{Event, LogEvent, MetricKind, MetricValue};
@@ -387,11 +635,20 @@ mod tests {
             .unwrap();
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
+        let f5 = UnsignedIntTemplate::try_from("{{ foo }}-{{ bar }}")
+            .unwrap()
+            .get_fields()
+            .unwrap();
+        let f6 = UnsignedIntTemplate::from(123u64).get_fields();
+        let f7 = UnsignedIntTemplate::try_from("%s").unwrap().get_fields();
 
         assert_eq!(f1, vec!["foo"]);
         assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
+        assert_eq!(f5, vec!["foo", "bar"]);
+        assert_eq!(f6, None);
+        assert_eq!(f7, None);
     }
 
     #[test]
@@ -412,6 +669,23 @@ mod tests {
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number() {
+        let event = Event::Log(LogEvent::from("hello world"));
+        let template = UnsignedIntTemplate::from(123);
+
+        assert_eq!(Ok(123), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_unsigned_number_dynamic() {
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("foo", 123);
+
+        let template = UnsignedIntTemplate::try_from("{{ foo }}").unwrap();
+        assert_eq!(Ok(123), template.render(&event))
     }
 
     #[test]
@@ -499,13 +773,37 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            ts,
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+        let template = Template::try_from("abcd-%F").unwrap();
+
+        assert_eq!(Ok(Bytes::from("abcd-2001-02-03")), template.render(&event))
+    }
+
+    #[test]
+    fn render_log_timestamp_strftime_style_namespace() {
+        let ts = Utc
+            .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+            .single()
+            .expect("invalid timestamp");
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert("@timestamp", ts);
+        // use Vector namespace instead of legacy
+        LogNamespace::Vector.insert_vector_metadata(event.as_mut_log(), Some("foo"), "foo", "bar");
+        let new_schema = event
+            .as_mut_log()
+            .metadata()
+            .schema_definition()
+            .as_ref()
+            .clone()
+            .with_meaning(parse_target_path("@timestamp").unwrap(), "timestamp");
+        event
+            .as_mut_log()
+            .metadata_mut()
+            .set_schema_definition(&std::sync::Arc::new(new_schema));
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -520,13 +818,9 @@ mod tests {
             .expect("invalid timestamp");
 
         let mut event = Event::Log(LogEvent::from("hello world"));
-        event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
-            ts,
-        );
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -546,10 +840,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -571,10 +862,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -596,10 +884,7 @@ mod tests {
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(
-            (
-                lookup::PathPrefix::Event,
-                log_schema().timestamp_key().unwrap(),
-            ),
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             ts,
         );
 
@@ -667,6 +952,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn render_log_with_timezone() {
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let template = Template::try_from("vector-%Y-%m-%d-%H.log").unwrap();
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(
+            (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+            ts,
+        );
+
+        let tz: Tz = "Asia/Singapore".parse().unwrap();
+        let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
+        assert_eq!(
+            Ok(Bytes::from("vector-2001-02-03-12.log")),
+            template.with_tz_offset(offset).render(&event)
+        );
+    }
+
+    #[test]
+    fn render_log_unsigned_int_with_timezone() {
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let template = UnsignedIntTemplate::try_from("%Y%m%d%H").unwrap();
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
+
+        let tz: Tz = "Asia/Singapore".parse().unwrap();
+        let offset = Some(Utc::now().with_timezone(&tz).offset().fix());
+
+        assert_eq!(
+            Ok(2001020312),
+            template.with_tz_offset(offset).render(&event)
+        );
+    }
+
     fn sample_metric() -> Metric {
         Metric::new(
             "a-counter",
@@ -685,6 +1006,22 @@ mod tests {
         assert_eq!(
             Template::try_from("%E").unwrap_err(),
             TemplateParseError::StrftimeError
+        );
+    }
+
+    #[test]
+    fn strftime_non_int_result() {
+        let template = UnsignedIntTemplate::try_from("a-%s").unwrap();
+        let ts = Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap();
+
+        let mut event = Event::Log(LogEvent::from("hello world"));
+        event.as_mut_log().insert(event_path!("timestamp"), ts);
+
+        assert_eq!(
+            Err(TemplateRenderingError::NotNumeric {
+                input: "a-981173106".to_owned()
+            }),
+            template.render(&event)
         );
     }
 }

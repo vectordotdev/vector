@@ -1,8 +1,8 @@
 use std::num::NonZeroU64;
 
-use codecs::JsonSerializerConfig;
 use snafu::ResultExt;
-use vector_config::configurable_component;
+use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     codecs::EncodingConfig,
@@ -55,7 +55,7 @@ pub struct WebSocketSinkConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
@@ -92,7 +92,7 @@ impl SinkConfig for WebSocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -102,7 +102,7 @@ impl SinkConfig for WebSocketSinkConfig {
 
 impl WebSocketSinkConfig {
     fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false).context(ConnectSnafu)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false).context(ConnectSnafu)?;
         WebSocketConnector::new(self.uri.clone(), tls, self.auth.clone())
     }
 }

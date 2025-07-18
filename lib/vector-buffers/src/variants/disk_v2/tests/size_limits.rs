@@ -66,7 +66,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "Needs investigation"]
 async fn writer_waits_when_buffer_is_full() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {
@@ -262,7 +262,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             writer.flush().await.expect("flush should not fail");
             writer.close();
 
-            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_buffer_size!(ledger, 2, first_bytes_written + second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             // Now read both records, make sure they are what we expect, etc.
@@ -270,7 +270,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             assert_eq!(first_record_read, first_record);
             acknowledge(first_record_read).await;
 
-            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_buffer_size!(ledger, 2, first_bytes_written + second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             let second_record_read = read_next_some(&mut reader).await;
@@ -358,7 +358,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             writer.flush().await.expect("flush should not fail");
             writer.close();
 
-            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_buffer_size!(ledger, 2, first_bytes_written + second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             // Now read both records, make sure they are what we expect, etc.
@@ -366,7 +366,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             assert_eq!(first_record_read, first_record);
             acknowledge(first_record_read).await;
 
-            assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
+            assert_buffer_size!(ledger, 2, first_bytes_written + second_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             let second_record_read = read_next_some(&mut reader).await;
