@@ -5,6 +5,8 @@ short: Docs home
 weight: 1
 ---
 
+wr321rg
+
 Welcome to the documentation for **Vector**! Vector is a lightweight and ultra-fast tool for building observability pipelines.
 
 If you'd like to familiarize yourself with Vector's core concepts, we recommend reading up on Vector's core concepts:
