@@ -105,7 +105,9 @@ impl<L> Controller<L> {
         }
     }
 
-    pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
+    pub(super) fn acquire(
+        &self,
+    ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
         Arc::clone(&self.semaphore).acquire()
     }
 

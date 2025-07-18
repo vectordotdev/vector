@@ -163,11 +163,10 @@ pub(super) mod process {
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table)>, Vec<String>> {
-            match (component_name(path), open_file(path)) { (Ok(name), Some(file)) => {
-                self.load(file, format).map(|value| Some((name, value)))
-            } _ => {
-                Ok(None)
-            }}
+            match (component_name(path), open_file(path)) {
+                (Ok(name), Some(file)) => self.load(file, format).map(|value| Some((name, value))),
+                _ => Ok(None),
+            }
         }
 
         /// Loads a file, and if the path provided contains a sub-folder by the same name as the

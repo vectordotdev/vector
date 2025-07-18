@@ -563,32 +563,35 @@ impl StreamSink<Event> for PrometheusExporter {
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
 
-            match self.normalize(metric) { Some(normalized) => {
-                let normalized = if self.config.suppress_timestamp {
-                    normalized.with_timestamp(None)
-                } else {
-                    normalized
-                };
+            match self.normalize(metric) {
+                Some(normalized) => {
+                    let normalized = if self.config.suppress_timestamp {
+                        normalized.with_timestamp(None)
+                    } else {
+                        normalized
+                    };
 
-                // We have a normalized metric, in absolute form.  If we're already aware of this
-                // metric, update its expiration deadline, otherwise, start tracking it.
-                let mut metrics = self.metrics.write().expect(LOCK_FAILED);
+                    // We have a normalized metric, in absolute form.  If we're already aware of this
+                    // metric, update its expiration deadline, otherwise, start tracking it.
+                    let mut metrics = self.metrics.write().expect(LOCK_FAILED);
 
-                match metrics.entry(MetricRef::from_metric(&normalized)) {
-                    Entry::Occupied(mut entry) => {
-                        let (data, metadata) = entry.get_mut();
-                        *data = normalized;
-                        metadata.refresh();
+                    match metrics.entry(MetricRef::from_metric(&normalized)) {
+                        Entry::Occupied(mut entry) => {
+                            let (data, metadata) = entry.get_mut();
+                            *data = normalized;
+                            metadata.refresh();
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert((normalized, MetricMetadata::new(flush_period)));
+                        }
                     }
-                    Entry::Vacant(entry) => {
-                        entry.insert((normalized, MetricMetadata::new(flush_period)));
-                    }
+                    finalizers.update_status(EventStatus::Delivered);
                 }
-                finalizers.update_status(EventStatus::Delivered);
-            } _ => {
-                emit!(PrometheusNormalizationError {});
-                finalizers.update_status(EventStatus::Errored);
-            }}
+                _ => {
+                    emit!(PrometheusNormalizationError {});
+                    finalizers.update_status(EventStatus::Errored);
+                }
+            }
         }
 
         Ok(())

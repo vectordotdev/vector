@@ -154,10 +154,7 @@ impl OutputFormat {
         emit!(DemoLogsEventProcessed);
 
         match self {
-            Self::Shuffle {
-                sequence,
-                lines,
-            } => Self::shuffle_generate(*sequence, lines, n),
+            Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),

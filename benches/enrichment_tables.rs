@@ -53,10 +53,10 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
             FileData {
                 data,
                 headers: (0..10)
-                .map(|header| format!("field-{}", header))
-                .collect::<Vec<_>>(),
+                    .map(|header| format!("field-{header}"))
+                    .collect::<Vec<_>>(),
                 modified: SystemTime::now(),
-            }
+            },
         );
 
         let (condition, index, result_offset) = if date_range {

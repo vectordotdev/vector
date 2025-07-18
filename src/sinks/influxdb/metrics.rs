@@ -217,8 +217,11 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 fn create_build_request(
     uri: http::Uri,
     token: &str,
-) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static + use<>
-{
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>
+       + Sync
+       + Send
+       + 'static
+       + use<> {
     let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(

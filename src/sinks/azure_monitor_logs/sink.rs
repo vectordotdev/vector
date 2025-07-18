@@ -112,11 +112,10 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
 
             // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or
             // Metadata, the following `insert()` ensures it's encoded in the request.
-            let timestamp = match log.remove_timestamp() { Some(Value::Timestamp(ts)) => {
-                ts
-            } _ => {
-                chrono::Utc::now()
-            }};
+            let timestamp = match log.remove_timestamp() {
+                Some(Value::Timestamp(ts)) => ts,
+                _ => chrono::Utc::now(),
+            };
 
             if let Some(timestamp_key) = &self.time_generated_key {
                 log.insert(

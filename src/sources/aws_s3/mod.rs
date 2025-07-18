@@ -304,11 +304,12 @@ async fn s3_object_decoder(
     content_type: Option<&str>,
     mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    let first = match body.next().await { Some(first) => {
-        first
-    } _ => {
-        return Box::new(tokio::io::empty());
-    }};
+    let first = match body.next().await {
+        Some(first) => first,
+        _ => {
+            return Box::new(tokio::io::empty());
+        }
+    };
 
     let r = tokio::io::BufReader::new(StreamReader::new(
         stream::iter(Some(first))

@@ -890,22 +890,25 @@ mod test {
         );
 
         let v = merge(34_i64.into(), 43_i64.into(), &MergeStrategy::FlatUnique).unwrap();
-        match v.clone() { Value::Array(v) => {
-            let v: Vec<_> = v
-                .into_iter()
-                .map(|i| {
-                    if let Value::Integer(i) = i {
-                        i
-                    } else {
-                        panic!("Bad value");
-                    }
-                })
-                .collect();
-            assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
-            assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
-        } _ => {
-            panic!("Not array");
-        }}
+        match v.clone() {
+            Value::Array(v) => {
+                let v: Vec<_> = v
+                    .into_iter()
+                    .map(|i| {
+                        if let Value::Integer(i) = i {
+                            i
+                        } else {
+                            panic!("Bad value");
+                        }
+                    })
+                    .collect();
+                assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
+                assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
+            }
+            _ => {
+                panic!("Not array");
+            }
+        }
         let v = merge(v, 34_i32.into(), &MergeStrategy::FlatUnique).unwrap();
         if let Value::Array(v) = v {
             let v: Vec<_> = v
