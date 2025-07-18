@@ -305,7 +305,7 @@ impl Configurable for Compression {
         metadata
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(r#gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
@@ -358,7 +358,7 @@ impl Configurable for Compression {
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
         let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), r#gen, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());

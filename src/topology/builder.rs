@@ -572,9 +572,9 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
+            let (tx, rx) = match self.buffers.remove(key) { Some(buffer) => {
                 buffer
-            } else {
+            } _ => {
                 let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
                     BufferType::Memory { .. } => "memory",
                     BufferType::DiskV2 { .. } => "disk",
@@ -595,7 +595,7 @@ impl<'a> Builder<'a> {
                     }
                     Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                 }
-            };
+            }};
 
             let cx = SinkContext {
                 healthcheck,

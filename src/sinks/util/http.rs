@@ -940,7 +940,7 @@ mod test {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
-        let (body, _rest) = rx.into_future().await;
+        let (body, _rest) = StreamExt::into_future(rx).await;
         assert_eq!(body.unwrap(), "hello");
     }
 }

@@ -890,7 +890,7 @@ mod test {
         );
 
         let v = merge(34_i64.into(), 43_i64.into(), &MergeStrategy::FlatUnique).unwrap();
-        if let Value::Array(v) = v.clone() {
+        match v.clone() { Value::Array(v) => {
             let v: Vec<_> = v
                 .into_iter()
                 .map(|i| {
@@ -903,9 +903,9 @@ mod test {
                 .collect();
             assert_eq!(v.iter().filter(|i| **i == 34i64).count(), 1);
             assert_eq!(v.iter().filter(|i| **i == 43i64).count(), 1);
-        } else {
+        } _ => {
             panic!("Not array");
-        }
+        }}
         let v = merge(v, 34_i32.into(), &MergeStrategy::FlatUnique).unwrap();
         if let Value::Array(v) = v {
             let v: Vec<_> = v

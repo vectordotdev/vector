@@ -113,17 +113,17 @@ fn spawn_input_http_server(
 
             async move {
                 let mut sendable_events = sendable_events.lock().await;
-                if let Some(event) = sendable_events.pop_front() {
+                match sendable_events.pop_front() { Some(event) => {
                     let mut buffer = BytesMut::new();
                     encode_test_event(&mut encoder, &mut buffer, event);
 
                     buffer.into_response()
-                } else {
+                } _ => {
                     // We'll send an empty 200 in the response since some
                     // sources throw errors for anything other than a valid
                     // response.
                     StatusCode::OK.into_response()
-                }
+                }}
             }
         },
     );

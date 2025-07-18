@@ -75,7 +75,7 @@ pub mod integration;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
-    ($e:expr, $t:ty, $v:pat) => {{
+    ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
@@ -85,7 +85,7 @@ macro_rules! assert_downcast_matches {
 
 #[macro_export]
 macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
+    ($($key:expr_2021 => $value:expr_2021),*  $(,)?) => {
         #[allow(unused_variables)]
         {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());

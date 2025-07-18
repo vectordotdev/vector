@@ -233,7 +233,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
     fn add_replay_message_id_to_event(&self, event: &mut Event) -> Uuid {
         let message_id = Uuid::now_v7();
         if let Some(MessageBufferingConfig {
-            message_id_path: Some(ref message_id_path),
+            message_id_path: Some(message_id_path),
             ..
         }) = self
         {

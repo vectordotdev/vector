@@ -186,11 +186,11 @@ window_secs = 5
 
         let mut count = 0_u8;
         while count < 2 {
-            if let Some(_event) = out_stream.next().await {
+            match out_stream.next().await { Some(_event) => {
                 count += 1;
-            } else {
+            } _ => {
                 panic!("Unexpectedly received None in output stream");
-            }
+            }}
         }
         assert_eq!(2, count);
 
@@ -206,10 +206,10 @@ window_secs = 5
         tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
-        if let Some(_event) = out_stream.next().await {
-        } else {
+        match out_stream.next().await { Some(_event) => {
+        } _ => {
             panic!("Unexpectedly received None in output stream");
-        }
+        }}
 
         // We should be back to pending, having nothing waiting for us
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
@@ -252,11 +252,11 @@ exists(.special)
 
         let mut count = 0_u8;
         while count < 2 {
-            if let Some(_event) = out_stream.next().await {
+            match out_stream.next().await { Some(_event) => {
                 count += 1;
-            } else {
+            } _ => {
                 panic!("Unexpectedly received None in output stream");
-            }
+            }}
         }
         assert_eq!(2, count);
 
@@ -271,20 +271,20 @@ exists(.special)
         special_log.insert("special", "true");
         tx.send(special_log.into()).await.unwrap();
         // The rate limiter should allow this log through regardless of current limit
-        if let Some(_event) = out_stream.next().await {
-        } else {
+        match out_stream.next().await { Some(_event) => {
+        } _ => {
             panic!("Unexpectedly received None in output stream");
-        }
+        }}
 
         clock.advance(Duration::from_secs(3));
 
         tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
-        if let Some(_event) = out_stream.next().await {
-        } else {
+        match out_stream.next().await { Some(_event) => {
+        } _ => {
             panic!("Unexpectedly received None in output stream");
-        }
+        }}
 
         // We should be back to pending, having nothing waiting for us
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
@@ -329,11 +329,11 @@ key_field = "{{ bucket }}"
 
         let mut count = 0_u8;
         while count < 2 {
-            if let Some(_event) = out_stream.next().await {
+            match out_stream.next().await { Some(_event) => {
                 count += 1;
-            } else {
+            } _ => {
                 panic!("Unexpectedly received None in output stream");
-            }
+            }}
         }
         assert_eq!(2, count);
 

@@ -33,8 +33,8 @@ impl Configurable for BoxedSource {
         metadata
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_lib::configurable::component::SourceDescription::generate_schemas(gen)
+    fn generate_schema(r#gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_lib::configurable::component::SourceDescription::generate_schemas(r#gen)
     }
 }
 

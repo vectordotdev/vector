@@ -171,7 +171,7 @@ where
         })
 }
 
-fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
+fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> + use<> {
     glob::glob_with(
         pattern,
         glob::MatchOptions {
