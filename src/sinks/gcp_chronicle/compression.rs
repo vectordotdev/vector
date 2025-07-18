@@ -61,7 +61,7 @@ impl Configurable for ChronicleCompression {
         Compression::metadata()
     }
 
-    fn generate_schema(r#gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
@@ -79,7 +79,7 @@ impl Configurable for ChronicleCompression {
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), r#gen, None)?;
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), generator, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());

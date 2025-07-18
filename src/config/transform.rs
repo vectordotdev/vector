@@ -39,8 +39,8 @@ impl Configurable for BoxedTransform {
         metadata
     }
 
-    fn generate_schema(r#gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_lib::configurable::component::TransformDescription::generate_schemas(r#gen)
+    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+        vector_lib::configurable::component::TransformDescription::generate_schemas(generator)
     }
 }
 

@@ -1007,8 +1007,8 @@ impl ContainerLogInfo {
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
                 match self.last_log.as_ref() {
-                    Some(&(last, r#gen)) => {
-                        if last < timestamp || (last == timestamp && r#gen == self.generation) {
+                    Some(&(last, generation)) => {
+                        if last < timestamp || (last == timestamp && generation == self.generation) {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.
