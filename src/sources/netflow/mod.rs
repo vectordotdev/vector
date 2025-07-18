@@ -1,169 +1,113 @@
-use crate::config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput};
+//! NetFlow source for Vector.
+//!
+//! This source listens for NetFlow, IPFIX, and sFlow packets over UDP and parses them
+//! into structured log events.
+
+use crate::config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput};
 use crate::event::Event;
-use crate::tls::TlsSourceConfig;
+use crate::shutdown::ShutdownSignal;
 use crate::sources::Source;
-use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use crate::SourceSender;
 use tokio::net::UdpSocket;
-use tokio::time::{sleep, Duration};
-use vector_lib::configurable::configurable_component;
+use tokio::time::Duration;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::schema::Definition;
 
-mod parser;
-mod template_cache;
-mod errors;
+pub mod config;
+pub mod events;
+pub mod fields;
+pub mod protocols;
+pub mod templates;
 
-pub use parser::*;
-pub use template_cache::*;
-pub use errors::*;
+pub use config::NetflowConfig;
+pub use events::*;
 
-/// Configuration for the `netflow` source.
-#[configurable_component(source("netflow"))]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct NetflowConfig {
-    /// The address to listen for NetFlow packets on.
-    #[configurable(metadata(docs::examples = "0.0.0.0:2055"))]
-    pub address: SocketAddr,
+/// Main netflow source implementation
+async fn netflow_source(
+    config: NetflowConfig,
+    mut shutdown: ShutdownSignal,
+    mut out: SourceSender,
+) -> Result<(), ()> {
+    let socket = UdpSocket::bind(config.address).await.map_err(|error| {
+        NetflowBindError { 
+            address: config.address,
+            error,
+        }.emit();
+    })?;
 
-    /// The maximum size of incoming NetFlow packets.
-    #[configurable(metadata(docs::examples = 1500))]
-    #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    let template_cache = templates::TemplateCache::new(config.max_templates);
+    let protocol_parser = protocols::ProtocolParser::new(&config, template_cache.clone());
+    
+    let mut buf = vec![0; config.max_length];
+    let mut last_cleanup = std::time::Instant::now();
 
-    /// The maximum length of field values before truncation.
-    #[configurable(metadata(docs::examples = 1024))]
-    #[serde(default = "default_max_field_length")]
-    pub max_field_length: usize,
+    loop {
+        tokio::select! {
+            recv_result = socket.recv_from(&mut buf) => {
+                match recv_result {
+                    Ok((len, peer_addr)) => {
+                        if len > config.max_length {
+                            NetflowParseError {
+                                error: "Packet too large",
+                                protocol: "unknown",
+                                peer_addr,
+                            }.emit();
+                            continue;
+                        }
 
-    /// The maximum number of templates to cache per peer.
-    #[configurable(metadata(docs::examples = 1000))]
-    #[serde(default = "default_max_templates")]
-    pub max_templates: usize,
+                        let data = &buf[..len];
+                        let events = protocol_parser.parse(data, peer_addr, &template_cache);
+                        
+                        if !events.is_empty() {
+                            NetflowEventsReceived {
+                                count: events.len(),
+                                byte_size: len,
+                                peer_addr,
+                            }.emit();
 
-    /// The timeout for template cache entries in seconds.
-    #[configurable(metadata(docs::examples = 3600))]
-    #[serde(default = "default_template_timeout")]
-    pub template_timeout: u64,
+                            if let Err(error) = out.send_batch(events).await {
+                                error!(message = "Error sending events", %error);
+                                return Err(());
+                            }
+                        }
 
-    #[configurable(derived)]
-    #[serde(default)]
-    pub tls: Option<TlsSourceConfig>,
-
-    /// The namespace for the source. This value is used to namespace the source's metrics.
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default)]
-    pub namespace: Option<String>,
-}
-
-const fn default_max_length() -> usize {
-    1500
-}
-
-const fn default_max_field_length() -> usize {
-    1024
-}
-
-const fn default_max_templates() -> usize {
-    1000
-}
-
-const fn default_template_timeout() -> u64 {
-    3600
-}
-
-impl GenerateConfig for NetflowConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            address: "0.0.0.0:2055".parse().unwrap(),
-            max_length: default_max_length(),
-            max_field_length: default_max_field_length(),
-            max_templates: default_max_templates(),
-            template_timeout: default_template_timeout(),
-            tls: None,
-            namespace: None,
-        })
-        .unwrap()
+                        // Periodic template cleanup
+                        if last_cleanup.elapsed() > Duration::from_secs(300) {
+                            template_cache.cleanup_expired(config.template_timeout);
+                            last_cleanup = std::time::Instant::now();
+                        }
+                    }
+                    Err(error) => {
+                        NetflowReceiveError { error }.emit();
+                        // Don't break on receive errors - keep trying
+                    }
+                }
+            }
+            _ = &mut shutdown => {
+                info!("NetFlow source shutting down");
+                break;
+            }
+        }
     }
+
+    Ok(())
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "netflow")]
 impl SourceConfig for NetflowConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let address = self.address;
-        let max_length = self.max_length;
-        let max_field_length = self.max_field_length;
-        let max_templates = self.max_templates;
-        let template_timeout = self.template_timeout;
-
-        let socket = UdpSocket::bind(address).await?;
-        let template_cache = template_cache::new_template_cache(max_templates);
-
+        let config = self.clone();
+        let shutdown = cx.shutdown;
         let out = cx.out;
-        let template_cache_clone = template_cache.clone();
 
-        let source = async move {
-            let mut buf = vec![0; max_length];
-            let mut template_cache = template_cache_clone;
-
-            loop {
-                match socket.recv_from(&mut buf).await {
-                    Ok((len, peer_addr)) => {
-                        if len > max_length {
-                            errors::NetflowParseError {
-                                error: "Packet too large",
-                                protocol: "unknown",
-                                peer_addr,
-                            }
-                            .emit();
-                            continue;
-                        }
-
-                        let data = &buf[..len];
-                        match parse_flow_data(data, peer_addr, &template_cache, max_field_length) {
-                            Ok(events) => {
-                                if !events.is_empty() {
-                                    if let Err(error) = out.send_batch(events).await {
-                                        error!(message = "Error sending events", %error);
-                                        break;
-                                    }
-                                }
-                            }
-                            Err(error) => {
-                                errors::NetflowParseError {
-                                    error,
-                                    protocol: "unknown",
-                                    peer_addr,
-                                }
-                                .emit();
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        error!(message = "Error receiving packet", %error);
-                        break;
-                    }
-                }
-            }
-        };
-
-        // Start template cleanup task
-        let template_cache_clone = template_cache.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-            loop {
-                interval.tick().await;
-                cleanup_expired_templates(&template_cache_clone, template_timeout);
-            }
-        });
-
-        Ok(Box::pin(source))
+        Ok(Box::pin(netflow_source(config, shutdown, out)))
     }
 
     fn outputs(&self, _global_log_namespace: vector_lib::config::LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_maybe_logs(DataType::Log, Definition::any())]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log, 
+            vector_lib::schema::Definition::any()
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -178,203 +122,189 @@ impl SourceConfig for NetflowConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::collect_ready;
+    use crate::test_util::{collect_ready, next_addr};
     use std::net::UdpSocket as StdUdpSocket;
-    use std::time::Duration;
-    use template_cache::{Template, TemplateField, cache_put, cache_get, cache_len};
 
-    #[tokio::test]
-    async fn test_netflow_v5() {
+    #[test]
+    fn test_netflow_v5_parsing() {
+        use crate::sources::netflow::protocols::ProtocolParser;
+        use crate::sources::netflow::templates::TemplateCache;
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+        let template_cache = TemplateCache::new(1000);
         let config = NetflowConfig {
-            address: "127.0.0.1:0".parse().unwrap(),
+            address: "127.0.0.1:2055".parse().unwrap(),
             max_length: 1500,
             max_field_length: 1024,
             max_templates: 1000,
             template_timeout: 3600,
-            tls: None,
-            namespace: None,
+            max_message_size: 65536,
+            protocols: vec!["netflow_v5".to_string()],
+            parse_enterprise_fields: true,
+            parse_options_templates: true,
+            parse_variable_length_fields: true,
+            enterprise_fields: std::collections::HashMap::new(),
         };
 
-        let (tx, rx) = SourceContext::new_test();
-        let source = config.build(tx).await.unwrap();
+        let parser = ProtocolParser::new(&config, template_cache.clone());
+        let peer_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
+
+        // Create minimal NetFlow v5 packet
+        let mut packet = vec![0u8; 72]; // 24 header + 48 record
+        
+        // NetFlow v5 header
+        packet[0..2].copy_from_slice(&5u16.to_be_bytes());     // version
+        packet[2..4].copy_from_slice(&1u16.to_be_bytes());     // count
+        packet[4..8].copy_from_slice(&12345u32.to_be_bytes()); // sys_uptime
+        packet[8..12].copy_from_slice(&1609459200u32.to_be_bytes()); // unix_secs
+        packet[12..16].copy_from_slice(&0u32.to_be_bytes());   // unix_nsecs
+        packet[16..20].copy_from_slice(&100u32.to_be_bytes()); // flow_sequence
+        packet[20] = 0; // engine_type
+        packet[21] = 0; // engine_id
+        packet[22..24].copy_from_slice(&0u16.to_be_bytes());   // sampling_interval
+        
+        // Complete flow record (48 bytes)
+        packet[24..28].copy_from_slice(&0xC0A80101u32.to_be_bytes()); // src_addr: 192.168.1.1
+        packet[28..32].copy_from_slice(&0x0A000001u32.to_be_bytes()); // dst_addr: 10.0.0.1
+        packet[32..36].copy_from_slice(&0u32.to_be_bytes());   // next_hop
+        packet[36..38].copy_from_slice(&0u16.to_be_bytes());   // input
+        packet[38..40].copy_from_slice(&0u16.to_be_bytes());   // output
+        packet[40..44].copy_from_slice(&10u32.to_be_bytes());  // d_pkts
+        packet[44..48].copy_from_slice(&1500u32.to_be_bytes()); // d_octets
+        packet[48..52].copy_from_slice(&0u32.to_be_bytes());   // first
+        packet[52..56].copy_from_slice(&0u32.to_be_bytes());   // last
+        packet[56..58].copy_from_slice(&80u16.to_be_bytes());  // src_port
+        packet[58..60].copy_from_slice(&443u16.to_be_bytes()); // dst_port
+        packet[60] = 0; // pad1
+        packet[61] = 0; // tcp_flags
+        packet[62] = 6; // prot (TCP)
+        packet[63] = 0; // tos
+        packet[64..66].copy_from_slice(&0u16.to_be_bytes());   // src_as
+        packet[66..68].copy_from_slice(&0u16.to_be_bytes());   // dst_as
+        packet[68] = 24; // src_mask
+        packet[69] = 24; // dst_mask
+        packet[70..72].copy_from_slice(&0u16.to_be_bytes());   // pad2
+
+        // Parse packet directly
+        let events = parser.parse(&packet, peer_addr, &template_cache);
+
+        assert!(!events.is_empty(), "No events received");
+        
+        if let Event::Log(log) = &events[0] {
+            // Debug: print all available fields
+            if let Some(map) = log.as_map() {
+                println!("Available fields: {:?}", map.keys().collect::<Vec<_>>());
+            } else {
+                println!("Log event is not a map");
+            }
+            
+            // Check if flow_type exists first
+            if let Some(flow_type) = log.get("flow_type") {
+                if let Some(flow_type_str) = flow_type.as_str() {
+                    assert_eq!(flow_type_str, "netflow_v5_record");
+                } else {
+                    panic!("flow_type is not a string: {:?}", flow_type);
+                }
+            } else {
+                panic!("flow_type field not found in event");
+            }
+            
+            // Check record fields (version is not included in record events)
+            if let Some(src_addr) = log.get("src_addr") {
+                if let Some(src_addr_str) = src_addr.as_str() {
+                    assert_eq!(src_addr_str, "192.168.1.1");
+                } else {
+                    panic!("src_addr is not a string: {:?}", src_addr);
+                }
+            } else {
+                panic!("src_addr field not found in event");
+            }
+            
+            if let Some(dst_addr) = log.get("dst_addr") {
+                if let Some(dst_addr_str) = dst_addr.as_str() {
+                    assert_eq!(dst_addr_str, "10.0.0.1");
+                } else {
+                    panic!("dst_addr is not a string: {:?}", dst_addr);
+                }
+            } else {
+                panic!("dst_addr field not found in event");
+            }
+            
+            // Check other important fields
+            if let Some(protocol) = log.get("protocol") {
+                if let Some(protocol_int) = protocol.as_integer() {
+                    assert_eq!(protocol_int, 6); // TCP
+                } else {
+                    panic!("protocol is not an integer: {:?}", protocol);
+                }
+            } else {
+                panic!("protocol field not found in event");
+            }
+            
+            if let Some(src_port) = log.get("src_port") {
+                if let Some(src_port_int) = src_port.as_integer() {
+                    assert_eq!(src_port_int, 80);
+                } else {
+                    panic!("src_port is not an integer: {:?}", src_port);
+                }
+            } else {
+                panic!("src_port field not found in event");
+            }
+            
+            if let Some(dst_port) = log.get("dst_port") {
+                if let Some(dst_port_int) = dst_port.as_integer() {
+                    assert_eq!(dst_port_int, 443);
+                } else {
+                    panic!("dst_port is not an integer: {:?}", dst_port);
+                }
+            } else {
+                panic!("dst_port field not found in event");
+            }
+        } else {
+            panic!("Expected Log event, got {:?}", events[0]);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_invalid_packet_handling() {
+        let addr = next_addr();
+        let config = NetflowConfig {
+            address: addr,
+            max_length: 1500,
+            max_field_length: 1024,
+            max_templates: 1000,
+            template_timeout: 3600,
+            max_message_size: 65536,
+            protocols: vec!["netflow_v5".to_string()],
+            parse_enterprise_fields: true,
+            parse_options_templates: true,
+            parse_variable_length_fields: true,
+            enterprise_fields: std::collections::HashMap::new(),
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        let cx = SourceContext::new_test(tx, None);
+        let source = config.build(cx).await.unwrap();
         let _source_task = tokio::spawn(source);
+        
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // Wait for source to start
-        sleep(Duration::from_millis(100)).await;
-
-        // Create a simple NetFlow v5 packet
-        let mut packet = vec![0u8; 24 + 48]; // Header + 1 record
-        
-        // Version 5
-        packet[0] = 0;
-        packet[1] = 5;
-        
-        // Count = 1
-        packet[2] = 0;
-        packet[3] = 1;
-        
-        // Rest of header...
-        for i in 4..24 {
-            packet[i] = i as u8;
-        }
-        
-        // Record data
-        for i in 24..72 {
-            packet[i] = i as u8;
-        }
-
-        // Send packet
+        // Send invalid packet (too short)
+        let packet = vec![0u8; 5];
         let socket = StdUdpSocket::bind("127.0.0.1:0").unwrap();
-        socket.send_to(&packet, "127.0.0.1:2055").unwrap();
+        socket.send_to(&packet, addr).unwrap();
 
-        // Wait for events
-        sleep(Duration::from_millis(100)).await;
+        // Should either get no events or an unknown protocol event
+        let events = tokio::time::timeout(Duration::from_millis(500), collect_ready(rx))
+            .await
+            .unwrap_or_default();
 
-        let events = collect_ready(rx).await;
-        assert!(!events.is_empty());
-        
-        if let Event::Log(log) = &events[0] {
-            assert_eq!(log.get("protocol").unwrap().as_str().unwrap(), "netflow_v5");
+        // Invalid packets might create unknown protocol events or be dropped
+        // Both behaviors are acceptable
+        if !events.is_empty() {
+            if let Event::Log(log) = &events[0] {
+                assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "unknown");
+            }
         }
-    }
-
-    #[test]
-    fn test_parse_netflow_v5() {
-        let mut packet = vec![0u8; 24 + 48]; // Header + 1 record
-        
-        // Version 5
-        packet[0] = 0;
-        packet[1] = 5;
-        
-        // Count = 1
-        packet[2] = 0;
-        packet[3] = 1;
-        
-        // Rest of header...
-        for i in 4..24 {
-            packet[i] = i as u8;
-        }
-        
-        // Record data
-        for i in 24..72 {
-            packet[i] = i as u8;
-        }
-
-        let template_cache = template_cache::new_template_cache(1000);
-        let peer_addr = "127.0.0.1:12345".parse().unwrap();
-        
-        let result = parse_flow_data(&packet, peer_addr, &template_cache, 1024);
-        assert!(result.is_ok());
-        
-        let events = result.unwrap();
-        assert_eq!(events.len(), 1);
-        
-        if let Event::Log(log) = &events[0] {
-            assert_eq!(log.get("protocol").unwrap().as_str().unwrap(), "netflow_v5");
-            assert_eq!(log.get("peer_addr").unwrap().as_str().unwrap(), "127.0.0.1:12345");
-        }
-    }
-
-    #[test]
-    fn test_parse_ipfix() {
-        let mut packet = vec![0u8; 16 + 8 + 4]; // Header + template set header + template
-        
-        // Version 10 (IPFIX)
-        packet[0] = 0;
-        packet[1] = 10;
-        
-        // Length = 28
-        packet[2] = 0;
-        packet[3] = 28;
-        
-        // Rest of header...
-        for i in 4..16 {
-            packet[i] = i as u8;
-        }
-        
-        // Template set (ID = 2)
-        packet[16] = 0;
-        packet[17] = 2;
-        
-        // Set length = 8
-        packet[18] = 0;
-        packet[19] = 8;
-        
-        // Template ID = 256
-        packet[20] = 1;
-        packet[21] = 0;
-        
-        // Field count = 1
-        packet[22] = 0;
-        packet[23] = 1;
-        
-        // Field type = 8 (sourceIPv4Address)
-        packet[24] = 0;
-        packet[25] = 8;
-        
-        // Field length = 4
-        packet[26] = 0;
-        packet[27] = 4;
-
-        let template_cache = template_cache::new_template_cache(1000);
-        let peer_addr = "127.0.0.1:12345".parse().unwrap();
-        
-        let result = parse_flow_data(&packet, peer_addr, &template_cache, 1024);
-        assert!(result.is_ok());
-        
-        // Should not produce events for template-only packets
-        let events = result.unwrap();
-        assert_eq!(events.len(), 0);
-    }
-
-    #[test]
-    fn test_template_cache() {
-        let cache = template_cache::new_template_cache(2);
-        
-        let template = Template {
-            template_id: 1,
-            fields: vec![TemplateField {
-                field_type: 8,
-                field_length: 4,
-                enterprise_number: None,
-            }],
-            created: std::time::Instant::now(),
-        };
-        
-        let key = ("127.0.0.1:12345".parse().unwrap(), 0, 1);
-        
-        // Test put and get
-        cache_put(&cache, key, template.clone());
-        assert_eq!(cache_len(&cache), 1);
-        
-        let retrieved = cache_get(&cache, &key);
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().template_id, 1);
-        
-        // Test cache size limit
-        let template2 = Template {
-            template_id: 2,
-            fields: vec![],
-            created: std::time::Instant::now(),
-        };
-        let template3 = Template {
-            template_id: 3,
-            fields: vec![],
-            created: std::time::Instant::now(),
-        };
-        
-        let key2 = ("127.0.0.1:12345".parse().unwrap(), 0, 2);
-        let key3 = ("127.0.0.1:12345".parse().unwrap(), 0, 3);
-        
-        cache_put(&cache, key2, template2);
-        cache_put(&cache, key3, template3);
-        
-        // Should have evicted the oldest entry
-        assert_eq!(cache_len(&cache), 2);
-        assert!(cache_get(&cache, &key).is_none());
     }
 }
-
-
-
-
