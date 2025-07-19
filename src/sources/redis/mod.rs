@@ -322,7 +322,7 @@ mod integration_test {
     };
     use vrl::value;
 
-    const REDIS_SERVER: &str = "redis://redis:6379/0";
+    const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
