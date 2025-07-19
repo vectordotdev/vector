@@ -583,17 +583,17 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(147, FieldInfo { name: "wlanSSID", data_type: DataType::String, description: "The Service Set IDentifier (SSID) identifying" });
     map.insert(148, FieldInfo { name: "flowId", data_type: DataType::UInt64, description: "An identifier of a Flow that" });
     map.insert(149, FieldInfo { name: "observationDomainId", data_type: DataType::UInt32, description: "An identifier of an Observation Domain" });
-    map.insert(150, FieldInfo { name: "flowStartSeconds", data_type: DataType::String, description: "The absolute timestamp of the first" });
-    map.insert(151, FieldInfo { name: "flowEndSeconds", data_type: DataType::String, description: "The absolute timestamp of the last" });
-    map.insert(152, FieldInfo { name: "flowStartMilliseconds", data_type: DataType::String, description: "The absolute timestamp of the first" });
-    map.insert(153, FieldInfo { name: "flowEndMilliseconds", data_type: DataType::String, description: "The absolute timestamp of the last" });
-    map.insert(154, FieldInfo { name: "flowStartMicroseconds", data_type: DataType::String, description: "The absolute timestamp of the first" });
-    map.insert(155, FieldInfo { name: "flowEndMicroseconds", data_type: DataType::String, description: "The absolute timestamp of the last" });
-    map.insert(156, FieldInfo { name: "flowStartNanoseconds", data_type: DataType::String, description: "The absolute timestamp of the first" });
-    map.insert(157, FieldInfo { name: "flowEndNanoseconds", data_type: DataType::String, description: "The absolute timestamp of the last" });
+    map.insert(150, FieldInfo { name: "flowStartSeconds", data_type: DataType::DateTimeSeconds, description: "The absolute timestamp of the first" });
+    map.insert(151, FieldInfo { name: "flowEndSeconds", data_type: DataType::DateTimeSeconds, description: "The absolute timestamp of the last" });
+    map.insert(152, FieldInfo { name: "flowStartMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp of the first" });
+    map.insert(153, FieldInfo { name: "flowEndMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp of the last" });
+    map.insert(154, FieldInfo { name: "flowStartMicroseconds", data_type: DataType::DateTimeMicroseconds, description: "The absolute timestamp of the first" });
+    map.insert(155, FieldInfo { name: "flowEndMicroseconds", data_type: DataType::DateTimeMicroseconds, description: "The absolute timestamp of the last" });
+    map.insert(156, FieldInfo { name: "flowStartNanoseconds", data_type: DataType::DateTimeNanoseconds, description: "The absolute timestamp of the first" });
+    map.insert(157, FieldInfo { name: "flowEndNanoseconds", data_type: DataType::DateTimeNanoseconds, description: "The absolute timestamp of the last" });
     map.insert(158, FieldInfo { name: "flowStartDeltaMicroseconds", data_type: DataType::UInt32, description: "This is a relative timestamp only" });
     map.insert(159, FieldInfo { name: "flowEndDeltaMicroseconds", data_type: DataType::UInt32, description: "This is a relative timestamp only" });
-    map.insert(160, FieldInfo { name: "systemInitTimeMilliseconds", data_type: DataType::String, description: "The absolute timestamp of the last" });
+    map.insert(160, FieldInfo { name: "systemInitTimeMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp of the last" });
     map.insert(161, FieldInfo { name: "flowDurationMilliseconds", data_type: DataType::UInt32, description: "The difference in time between the" });
     map.insert(162, FieldInfo { name: "flowDurationMicroseconds", data_type: DataType::UInt32, description: "The difference in time between the" });
     map.insert(163, FieldInfo { name: "observedFlowTotalCount", data_type: DataType::UInt64, description: "The total number of Flows observed" });
@@ -691,22 +691,22 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(255, FieldInfo { name: "postDot1qCustomerVlanId", data_type: DataType::UInt16, description: "The definition of this Information Element" });
     map.insert(256, FieldInfo { name: "ethernetType", data_type: DataType::UInt16, description: "The Ethernet type field of an" });
     map.insert(257, FieldInfo { name: "postIpPrecedence", data_type: DataType::UInt8, description: "The definition of this Information Element" });
-    map.insert(258, FieldInfo { name: "collectionTimeMilliseconds", data_type: DataType::String, description: "The absolute timestamp at which the" });
+    map.insert(258, FieldInfo { name: "collectionTimeMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp at which the" });
     map.insert(259, FieldInfo { name: "exportSctpStreamId", data_type: DataType::UInt16, description: "The value of the SCTP Stream" });
-    map.insert(260, FieldInfo { name: "maxExportSeconds", data_type: DataType::String, description: "The absolute Export Time of the" });
-    map.insert(261, FieldInfo { name: "maxFlowEndSeconds", data_type: DataType::String, description: "The latest absolute timestamp of the" });
+    map.insert(260, FieldInfo { name: "maxExportSeconds", data_type: DataType::DateTimeSeconds, description: "The absolute Export Time of the" });
+    map.insert(261, FieldInfo { name: "maxFlowEndSeconds", data_type: DataType::DateTimeSeconds, description: "The latest absolute timestamp of the" });
     map.insert(262, FieldInfo { name: "messageMD5Checksum", data_type: DataType::Binary, description: "The MD5 checksum of the IPFIX" });
     map.insert(263, FieldInfo { name: "messageScope", data_type: DataType::UInt8, description: "The presence of this Information Element" });
-    map.insert(264, FieldInfo { name: "minExportSeconds", data_type: DataType::String, description: "The absolute Export Time of the" });
-    map.insert(265, FieldInfo { name: "minFlowStartSeconds", data_type: DataType::String, description: "The earliest absolute timestamp of the" });
+    map.insert(264, FieldInfo { name: "minExportSeconds", data_type: DataType::DateTimeSeconds, description: "The absolute Export Time of the" });
+    map.insert(265, FieldInfo { name: "minFlowStartSeconds", data_type: DataType::DateTimeSeconds, description: "The earliest absolute timestamp of the" });
     map.insert(266, FieldInfo { name: "opaqueOctets", data_type: DataType::Binary, description: "This Information Element is used to" });
     map.insert(267, FieldInfo { name: "sessionScope", data_type: DataType::UInt8, description: "The presence of this Information Element" });
-    map.insert(268, FieldInfo { name: "maxFlowEndMicroseconds", data_type: DataType::String, description: "The latest absolute timestamp of the" });
-    map.insert(269, FieldInfo { name: "maxFlowEndMilliseconds", data_type: DataType::String, description: "The latest absolute timestamp of the" });
-    map.insert(270, FieldInfo { name: "maxFlowEndNanoseconds", data_type: DataType::String, description: "The latest absolute timestamp of the" });
-    map.insert(271, FieldInfo { name: "minFlowStartMicroseconds", data_type: DataType::String, description: "The earliest absolute timestamp of the" });
-    map.insert(272, FieldInfo { name: "minFlowStartMilliseconds", data_type: DataType::String, description: "The earliest absolute timestamp of the" });
-    map.insert(273, FieldInfo { name: "minFlowStartNanoseconds", data_type: DataType::String, description: "The earliest absolute timestamp of the" });
+    map.insert(268, FieldInfo { name: "maxFlowEndMicroseconds", data_type: DataType::DateTimeMicroseconds, description: "The latest absolute timestamp of the" });
+    map.insert(269, FieldInfo { name: "maxFlowEndMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The latest absolute timestamp of the" });
+    map.insert(270, FieldInfo { name: "maxFlowEndNanoseconds", data_type: DataType::DateTimeNanoseconds, description: "The latest absolute timestamp of the" });
+    map.insert(271, FieldInfo { name: "minFlowStartMicroseconds", data_type: DataType::DateTimeMicroseconds, description: "The earliest absolute timestamp of the" });
+    map.insert(272, FieldInfo { name: "minFlowStartMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "The earliest absolute timestamp of the" });
+    map.insert(273, FieldInfo { name: "minFlowStartNanoseconds", data_type: DataType::DateTimeNanoseconds, description: "The earliest absolute timestamp of the" });
     map.insert(274, FieldInfo { name: "collectorCertificate", data_type: DataType::Binary, description: "The full X.509 certificate, encoded in" });
     map.insert(275, FieldInfo { name: "exporterCertificate", data_type: DataType::Binary, description: "The full X.509 certificate, encoded in" });
     map.insert(276, FieldInfo { name: "dataRecordsReliability", data_type: DataType::Boolean, description: "The export reliability of Data Records," });
@@ -755,10 +755,10 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(319, FieldInfo { name: "selectorIdTotalPktsSelected", data_type: DataType::UInt64, description: "This Information Element specifies the total" });
     map.insert(320, FieldInfo { name: "absoluteError", data_type: DataType::Float64, description: "This Information Element specifies the maximum" });
     map.insert(321, FieldInfo { name: "relativeError", data_type: DataType::Float64, description: "This Information Element specifies the maximum" });
-    map.insert(322, FieldInfo { name: "observationTimeSeconds", data_type: DataType::String, description: "This Information Element specifies the absolute" });
-    map.insert(323, FieldInfo { name: "observationTimeMilliseconds", data_type: DataType::String, description: "This Information Element specifies the absolute" });
-    map.insert(324, FieldInfo { name: "observationTimeMicroseconds", data_type: DataType::String, description: "This Information Element specifies the absolute" });
-    map.insert(325, FieldInfo { name: "observationTimeNanoseconds", data_type: DataType::String, description: "This Information Element specifies the absolute" });
+    map.insert(322, FieldInfo { name: "observationTimeSeconds", data_type: DataType::DateTimeSeconds, description: "This Information Element specifies the absolute" });
+    map.insert(323, FieldInfo { name: "observationTimeMilliseconds", data_type: DataType::DateTimeMilliseconds, description: "This Information Element specifies the absolute" });
+    map.insert(324, FieldInfo { name: "observationTimeMicroseconds", data_type: DataType::DateTimeMicroseconds, description: "This Information Element specifies the absolute" });
+    map.insert(325, FieldInfo { name: "observationTimeNanoseconds", data_type: DataType::DateTimeNanoseconds, description: "This Information Element specifies the absolute" });
     map.insert(326, FieldInfo { name: "digestHashValue", data_type: DataType::UInt64, description: "This Information Element specifies the value" });
     map.insert(327, FieldInfo { name: "hashIPPayloadOffset", data_type: DataType::UInt64, description: "This Information Element specifies the IP" });
     map.insert(328, FieldInfo { name: "hashIPPayloadSize", data_type: DataType::UInt64, description: "This Information Element specifies the IP" });
@@ -792,8 +792,8 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(356, FieldInfo { name: "ingressBroadcastPacketTotalCount", data_type: DataType::UInt64, description: "The total number of incoming broadcast" });
     map.insert(357, FieldInfo { name: "egressUnicastPacketTotalCount", data_type: DataType::UInt64, description: "The total number of incoming unicast" });
     map.insert(358, FieldInfo { name: "egressBroadcastPacketTotalCount", data_type: DataType::UInt64, description: "The total number of incoming broadcast" });
-    map.insert(359, FieldInfo { name: "monitoringIntervalStartMilliSeconds", data_type: DataType::String, description: "The absolute timestamp at which the" });
-    map.insert(360, FieldInfo { name: "monitoringIntervalEndMilliSeconds", data_type: DataType::String, description: "The absolute timestamp at which the" });
+    map.insert(359, FieldInfo { name: "monitoringIntervalStartMilliSeconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp at which the" });
+    map.insert(360, FieldInfo { name: "monitoringIntervalEndMilliSeconds", data_type: DataType::DateTimeMilliseconds, description: "The absolute timestamp at which the" });
     map.insert(361, FieldInfo { name: "portRangeStart", data_type: DataType::UInt16, description: "The port number identifying the start" });
     map.insert(362, FieldInfo { name: "portRangeEnd", data_type: DataType::UInt16, description: "The port number identifying the end" });
     map.insert(363, FieldInfo { name: "portRangeStepSize", data_type: DataType::UInt16, description: "The step size in a port" });
@@ -961,6 +961,7 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(527, FieldInfo { name: "udpExID", data_type: DataType::UInt16, description: "Observed ExID in an Experimental option" });
     map.insert(528, FieldInfo { name: "udpSafeExIDList", data_type: DataType::String, description: "Observed ExIDs in the Experimental option" });
     map.insert(529, FieldInfo { name: "udpUnsafeExIDList", data_type: DataType::String, description: "Observed ExIDs in the UNSAFE Experimental" });
+
 
     map
 }

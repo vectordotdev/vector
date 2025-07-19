@@ -123,7 +123,7 @@ mod tests {
     use super::*;
     use crate::test_util::{collect_ready, next_addr};
     use std::net::UdpSocket as StdUdpSocket;
-
+    use vector_lib::event::Event;
     #[test]
     fn test_netflow_v5_parsing() {
         use crate::sources::netflow::protocols::ProtocolParser;

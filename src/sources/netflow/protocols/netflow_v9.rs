@@ -176,7 +176,7 @@ impl NetflowV9Parser {
 
         // Parse header
         let header = NetflowV9Header::from_bytes(data)?;
-        
+       
         debug!(
             "Parsing NetFlow v9 packet: version={}, count={}, source_id={}",
             header.version, header.count, header.source_id
@@ -216,8 +216,14 @@ impl NetflowV9Parser {
 
             let set_data = &data[offset..set_end];
 
+            println!("Processing set with ID: {}", set_header.set_id);
+            println!("TEMPLATE_SET_ID: {}, OPTIONS_TEMPLATE_SET_ID: {}", TEMPLATE_SET_ID, OPTIONS_TEMPLATE_SET_ID);
+            println!("set_header.set_id == TEMPLATE_SET_ID: {}", set_header.set_id == TEMPLATE_SET_ID);
+            println!("set_header.set_id == OPTIONS_TEMPLATE_SET_ID: {}", set_header.set_id == OPTIONS_TEMPLATE_SET_ID);
+            println!("About to match on set_id: {}", set_header.set_id);
             match set_header.set_id {
                 TEMPLATE_SET_ID => {
+                    println!("MATCH ARM 0: Processing template set");
                     let parsed_templates = self.parse_template_set(
                         set_data,
                         header.source_id,
@@ -227,6 +233,7 @@ impl NetflowV9Parser {
                     template_count += parsed_templates;
                 }
                 OPTIONS_TEMPLATE_SET_ID => {
+                    println!("MATCH ARM 1: Processing options template set");
                     let parsed_templates = self.parse_options_template_set(
                         set_data,
                         header.source_id,
@@ -379,14 +386,12 @@ impl NetflowV9Parser {
             let scope_field_count = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
             let option_field_count = u16::from_be_bytes([data[offset + 4], data[offset + 5]]);
 
-            debug!(
-                "Parsing NetFlow v9 options template: id={}, scope_fields={}, option_fields={}",
-                template_id, scope_field_count, option_field_count
-            );
+            println!("Parsing NetFlow v9 options template: id={}, scope_fields={}, option_fields={}",
+                    template_id, scope_field_count, option_field_count);
 
             let total_fields = scope_field_count + option_field_count;
             let template_end = offset + 6 + (total_fields as usize * 4);
-            
+           
             if template_end > data.len() {
                 warn!("Options template {} extends beyond set boundary", template_id);
                 break;
@@ -417,8 +422,10 @@ impl NetflowV9Parser {
             if fields.len() == total_fields as usize {
                 let template = Template::new(template_id, fields);
                 let key = (peer_addr, source_id, template_id);
+                println!("About to insert options template with key: {:?}", key);
                 template_cache.insert(key, template);
                 template_count += 1;
+                println!("Inserted options template, count: {}", template_count);
 
                 emit!(TemplateReceived {
                     template_id,
@@ -427,6 +434,8 @@ impl NetflowV9Parser {
                     observation_domain_id: source_id,
                     protocol: "netflow_v9_options",
                 });
+            } else {
+                println!("Fields mismatch: expected {}, got {}", total_fields, fields.len());
             }
 
             offset = template_end;
@@ -698,7 +707,7 @@ mod tests {
 
         // Should have base event with template info
         assert!(!events.is_empty());
-        
+       
         // Template should be cached
         let key = (test_peer_addr(), 1, 256);
         assert!(template_cache.get(&key).is_some());
@@ -779,7 +788,7 @@ mod tests {
 
         // Options template set header
         data.extend_from_slice(&1u16.to_be_bytes()); // set_id (options template)
-        data.extend_from_slice(&14u16.to_be_bytes()); // set_length
+        data.extend_from_slice(&18u16.to_be_bytes()); // set_length (4 header + 14 template data)
 
         // Options template definition
         data.extend_from_slice(&257u16.to_be_bytes()); // template_id
@@ -789,16 +798,20 @@ mod tests {
         data.extend_from_slice(&4u16.to_be_bytes()); // scope field length
         data.extend_from_slice(&2u16.to_be_bytes()); // option field type
         data.extend_from_slice(&4u16.to_be_bytes()); // option field length
+        println!("Data length: {}", data.len());
+        println!("Expected length: {}", 20 + 18); // NetFlow header (20) + set (18)
+        println!("Data: {:?}", data);
+       
         let events = parser.parse(&data, test_peer_addr(), &template_cache, false, false).unwrap();
 
         // Should parse options template
         assert!(!events.is_empty());
-        
+       
         // Debug: print all cached templates
         let debug_templates = template_cache.debug_templates(10);
         println!("Cached templates: {:?}", debug_templates);
         println!("Template cache stats: {:?}", template_cache.stats());
-        
+       
         // Template should be cached - check with correct key
         let key = (test_peer_addr(), 1, 257);
         let template = template_cache.get(&key);
