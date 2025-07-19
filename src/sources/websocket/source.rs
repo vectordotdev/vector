@@ -84,7 +84,6 @@ pub(crate) async fn recv_from_websocket(
     params: WebSocketSourceParams,
 ) -> Result<(), ()> {
     const PING: &[u8] = b"PING";
-    const PONG: &[u8] = b"PONG";
     let ping_interval = config.common.ping_interval;
     let ping_timeout = config.common.ping_timeout;
 
@@ -134,11 +133,7 @@ pub(crate) async fn recv_from_websocket(
                             kind: WsKind::Ping,
                         });
 
-                        if let Err(error) = ws_sink.send(Message::Pong(PONG.to_vec())).await {
-                            Err(error)
-                        } else {
-                            Ok(())
-                        }
+                        Ok(())
                     },
 
                     Ok(Message::Pong(_)) => {
