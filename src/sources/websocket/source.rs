@@ -118,7 +118,7 @@ pub(crate) async fn recv_from_websocket(
     loop {
         let result = tokio::select! {
             _ = cx.shutdown.clone() => {
-                info!("Received shutdown signal");
+                info!("Received shutdown signal.");
                 break;
             },
 
@@ -181,12 +181,12 @@ pub(crate) async fn recv_from_websocket(
                     },
 
                     Ok(Message::Close(_)) => {
-                        info!("Received message: connection closed from server");
+                        info!("Received message: connection closed from server.");
                         Err(WsError::ConnectionClosed)
                     },
 
                     Ok(Message::Frame(_)) => {
-                        warn!("Unsupported message type received: frame");
+                        warn!("Unsupported message type received: frame.");
                         Ok(())
                     },
 
@@ -227,7 +227,7 @@ fn check_received_pong_time(
         if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
             return Err(WsError::Io(io::Error::new(
                 io::ErrorKind::TimedOut,
-                "Pong not received in time",
+                "Pong not received in time.",
             )));
         }
     }
@@ -248,7 +248,7 @@ async fn handle_message<'a>(out: &mut SourceSender, msg: WebSocketEvent<'a>, end
     });
 
     if let Err(error) = out.send_event(events).await {
-        error!("Could not send events: {}", error);
+        error!("Could not send events: {}.", error);
     }
 }
 
@@ -273,7 +273,7 @@ async fn handle_binary_payload(
                             log_namespace: &params.log_namespace,
                         })
                     } else {
-                        warn!("Decoded unsupported event: {:?}", e);
+                        warn!("Decoded unsupported event: {:?}.", e);
                         None
                     }
                 })
@@ -283,11 +283,11 @@ async fn handle_binary_payload(
             Ok::<(), ()>(())
         })
         .map_err(|err| {
-            error!("Failed to process binary message: {}", err);
+            error!("Failed to process binary message: {}.", err);
         }) {
         Ok(_) => Ok(()),
         Err(e) => {
-            error!("Failed to send binary message: {:?}", e);
+            error!("Failed to send binary message: {:?}.", e);
             Ok(())
         }
     }
