@@ -16,7 +16,7 @@ use crate::common::websocket::WebSocketCommonConfig;
 
 /// Configuration for the `websocket` source.
 #[serde_as]
-#[configurable_component(source("websocket", "Pull logs from a websocket endpoint.",))]
+#[configurable_component(source("websocket", "Collect events from a websocket endpoint.",))]
 #[derive(Clone, Debug)]
 pub struct WebSocketConfig {
     #[serde(flatten)]
