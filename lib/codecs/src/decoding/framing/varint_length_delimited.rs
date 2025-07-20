@@ -14,12 +14,19 @@ pub enum VarintFramingError {
 
     #[snafu(display("Frame too large: {length} bytes (max: {max})"))]
     FrameTooLarge { length: usize, max: usize },
+
+    #[snafu(display("Trailing data at EOF"))]
+    TrailingData,
 }
 
 impl StreamDecodingError for VarintFramingError {
     fn can_continue(&self) -> bool {
-        // Varint overflow and frame too large are not recoverable
-        false
+        match self {
+            // Varint overflow and frame too large are not recoverable
+            Self::VarintOverflow | Self::FrameTooLarge { .. } => false,
+            // Trailing data at EOF is not recoverable
+            Self::TrailingData => false,
+        }
     }
 }
 
@@ -135,7 +142,17 @@ impl Decoder for VarintLengthDelimitedDecoder {
             Ok(None)
         } else {
             // Try to decode what we have, even if incomplete
-            self.decode(src)
+            match self.decode(src)? {
+                Some(frame) => Ok(Some(frame)),
+                None => {
+                    // If we have data but couldn't decode it, it's trailing data
+                    if !src.is_empty() {
+                        Err(VarintFramingError::TrailingData.into())
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
         }
     }
 }
@@ -188,5 +205,17 @@ mod tests {
         let mut decoder = VarintLengthDelimitedDecoder::new(1000);
 
         assert!(decoder.decode(&mut input).is_err());
+    }
+
+    #[test]
+    fn decode_trailing_data_at_eof() {
+        let mut input = BytesMut::from(&[0x03, b'f', b'o', b'o', b'e', b'x', b't', b'r', b'a'][..]);
+        let mut decoder = VarintLengthDelimitedDecoder::default();
+
+        // First decode should succeed
+        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), Bytes::from("foo"));
+        
+        // Second decode should fail with trailing data
+        assert!(decoder.decode_eof(&mut input).is_err());
     }
 } 
