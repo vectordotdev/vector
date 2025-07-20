@@ -26,6 +26,10 @@ use crate::{
     },
     SourceSender,
 };
+use vector_lib::{
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
+
 
 #[derive(Debug, PartialEq)]
 struct WebSocketEvent<'a> {
@@ -244,8 +248,15 @@ fn check_received_pong_time(
 }
 
 async fn handle_message<'a>(out: &mut SourceSender, msg: WebSocketEvent<'a>, endpoint: &str) {
+    let events_received = register!(EventsReceived);
+
     let json_size = msg.estimated_json_encoded_size_of();
     let events = EventArray::Logs(vec![msg.into()]);
+
+    events_received.emit(CountByteSize(
+        events.len(),
+        json_size,
+    ));
 
     emit!(WsMessageReceived {
         count: events.len(),
@@ -300,5 +311,68 @@ async fn handle_binary_payload(
             error!("Failed to send binary message: {:?}.", e);
             Ok(())
         }
+    }
+}
+#[cfg(feature = "websocket-integration-tests")]
+#[cfg(test)]
+mod integration_test {
+    use crate::{
+        test_util::{
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            next_addr,
+        },
+    };
+    use crate::sources::websocket::config::WebSocketConfig;
+    use crate::common::websocket::WebSocketCommonConfig;
+    use futures::sink::SinkExt;
+    use tokio::{net::TcpListener, time::Duration};
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+    use url::Url;
+
+    fn make_config(uri: &str) -> WebSocketConfig {
+        WebSocketConfig {
+            common: WebSocketCommonConfig {
+                uri: Url::parse(uri).unwrap().to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Starts a WebSocket server that pushes a message to the first client that connects.
+    async fn start_push_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            // Accept one connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+
+            // Immediately send a message to the connected client (which will be our source)
+            websocket
+                .send(Message::Text("message from server".to_string()))
+                .await
+                .unwrap();
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_consume_event() {
+        let server_addr = start_push_server().await;
+        let config = make_config(&server_addr);
+
+        // Run the source, which will connect to the server and receive the pushed message.
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+        
+        // Now assert that the event was received and is correct.
+        assert!(!events.is_empty(), "No events received from source");
+        let log = events[0].as_log();
+        assert_eq!(log["payload"], "message from server".into());
+        assert_eq!(*log.get_source_type().unwrap(), "websocket".into());
     }
 }
