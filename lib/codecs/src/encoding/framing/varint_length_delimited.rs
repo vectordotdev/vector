@@ -1,9 +1,19 @@
 use bytes::{BufMut, BytesMut};
 use derivative::Derivative;
+use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 
-use super::BoxedFramingError;
+use super::{BoxedFramingError, FramingError};
+
+/// Errors that can occur during varint length delimited framing.
+#[derive(Debug, Snafu)]
+pub enum VarintFramingError {
+    #[snafu(display("Frame too large: {length} bytes (max: {max})"))]
+    FrameTooLarge { length: usize, max: usize },
+}
+
+impl FramingError for VarintFramingError {}
 
 /// Config used to build a `VarintLengthDelimitedEncoder`.
 #[configurable_component]
@@ -42,10 +52,10 @@ impl VarintLengthDelimitedEncoder {
     /// Encode a varint into the buffer
     fn encode_varint(&self, value: usize, buf: &mut BytesMut) -> Result<(), BoxedFramingError> {
         if value > self.max_frame_length {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Frame too large: {} bytes (max: {})", value, self.max_frame_length),
-            ).into());
+            return Err(VarintFramingError::FrameTooLarge {
+                length: value,
+                max: self.max_frame_length,
+            }.into());
         }
 
         let mut val = value;

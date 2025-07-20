@@ -1,9 +1,33 @@
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
+use snafu::Snafu;
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
-use super::BoxedFramingError;
+use super::{BoxedFramingError, FramingError, StreamDecodingError};
+
+/// Errors that can occur during varint length delimited framing.
+#[derive(Debug, Snafu)]
+pub enum VarintFramingError {
+    #[snafu(display("Varint too large"))]
+    VarintOverflow,
+
+    #[snafu(display("Frame too large: {length} bytes (max: {max})"))]
+    FrameTooLarge { length: usize, max: usize },
+}
+
+impl StreamDecodingError for VarintFramingError {
+    fn can_continue(&self) -> bool {
+        // Varint overflow and frame too large are not recoverable
+        false
+    }
+}
+
+impl FramingError for VarintFramingError {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self as &dyn std::any::Any
+    }
+}
 
 /// Config used to build a `VarintLengthDelimitedDecoder`.
 #[configurable_component]
@@ -40,18 +64,18 @@ impl VarintLengthDelimitedDecoder {
     }
 
     /// Decode a varint from the buffer
-    fn decode_varint(&self, buf: &mut BytesMut) -> Result<Option<usize>, BoxedFramingError> {
+    fn decode_varint(&self, buf: &mut BytesMut) -> Result<Option<u64>, BoxedFramingError> {
         if buf.is_empty() {
             return Ok(None);
         }
 
-        let mut value: usize = 0;
-        let mut shift: u32 = 0;
+        let mut value: u64 = 0;
+        let mut shift: u8 = 0;
         let mut bytes_read = 0;
 
         for byte in buf.iter() {
             bytes_read += 1;
-            let byte_value = (*byte & 0x7F) as usize;
+            let byte_value = (*byte & 0x7F) as u64;
             value |= byte_value << shift;
 
             if *byte & 0x80 == 0 {
@@ -62,10 +86,7 @@ impl VarintLengthDelimitedDecoder {
 
             shift += 7;
             if shift >= 64 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Varint too large",
-                ).into());
+                return Err(VarintFramingError::VarintOverflow.into());
             }
         }
 
@@ -87,16 +108,16 @@ impl Decoder for VarintLengthDelimitedDecoder {
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // First, try to decode the varint length
         let length = match self.decode_varint(src)? {
-            Some(len) => len,
+            Some(len) => len as usize,
             None => return Ok(None), // Incomplete varint
         };
 
         // Check if the length is reasonable
         if length > self.max_frame_length {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Frame too large: {} bytes (max: {})", length, self.max_frame_length),
-            ).into());
+            return Err(VarintFramingError::FrameTooLarge {
+                length,
+                max: self.max_frame_length,
+            }.into());
         }
 
         // Check if we have enough data for the complete frame
@@ -128,17 +149,20 @@ mod tests {
         let mut input = BytesMut::from(&[0x03, b'f', b'o', b'o'][..]);
         let mut decoder = VarintLengthDelimitedDecoder::default();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
+        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), Bytes::from("foo"));
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
     #[test]
     fn decode_multi_byte_varint() {
         // 300 in varint encoding: 0xAC 0x02
-        let mut input = BytesMut::from(&[0xAC, 0x02, b'f', b'o', b'o'][..]);
+        let mut input = BytesMut::from(&[0xAC, 0x02][..]);
+        // Add 300 bytes of data
+        input.extend_from_slice(&vec![b'x'; 300]);
         let mut decoder = VarintLengthDelimitedDecoder::default();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
+        let result = decoder.decode(&mut input).unwrap().unwrap();
+        assert_eq!(result.len(), 300);
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 

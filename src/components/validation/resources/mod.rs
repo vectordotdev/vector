@@ -200,7 +200,11 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
         decoding::FramingConfig::OctetCounting(_) => todo!(),
         // TODO: chunked gelf is not supported yet in encoding
         decoding::FramingConfig::ChunkedGelf(_) => todo!(),
-        decoding::FramingConfig::VarintLengthDelimited(_) => todo!(),
+        decoding::FramingConfig::VarintLengthDelimited(config) => {
+            encoding::FramingConfig::VarintLengthDelimited(encoding::VarintLengthDelimitedEncoderConfig {
+                max_frame_length: config.max_frame_length,
+            })
+        }
     };
 
     framing_config.build()
@@ -251,7 +255,11 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
         encoding::FramingConfig::NewlineDelimited => {
             decoding::FramingConfig::NewlineDelimited(Default::default())
         }
-        vector_lib::codecs::encoding::FramingConfig::VarintLengthDelimited(_) => todo!(),
+        vector_lib::codecs::encoding::FramingConfig::VarintLengthDelimited(config) => {
+            decoding::FramingConfig::VarintLengthDelimited(decoding::VarintLengthDelimitedDecoderConfig {
+                max_frame_length: config.max_frame_length,
+            })
+        }
     };
 
     framing_config.build()

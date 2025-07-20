@@ -39,6 +39,12 @@ impl From<std::io::Error> for BoxedFramingError {
     }
 }
 
+impl From<varint_length_delimited::VarintFramingError> for BoxedFramingError {
+    fn from(error: varint_length_delimited::VarintFramingError) -> Self {
+        Box::new(error)
+    }
+}
+
 /// A `Box` containing a `FramingError`.
 pub type BoxedFramingError = Box<dyn FramingError>;
 
