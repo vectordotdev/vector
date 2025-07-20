@@ -1,7 +1,8 @@
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde_with::serde_as;
 use snafu::ResultExt;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 
+use crate::common::websocket::WebSocketCommonConfig;
 use crate::{
     codecs::DecodingConfig,
     common::websocket::{ConnectSnafu, WebSocketConnector},
@@ -12,7 +13,6 @@ use crate::{
 };
 use vector_config::configurable_component;
 use vector_lib::config::{LogNamespace, SourceOutput};
-use crate::common::websocket::WebSocketCommonConfig;
 
 /// Configuration for the `websocket` source.
 #[serde_as]
@@ -99,5 +99,72 @@ impl SourceConfig for super::config::WebSocketConfig {
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use vector_lib::schema::Definition;
+    use vector_lib::{config::LogNamespace, lookup::OwnedTargetPath, schema};
+    use vrl::owned_value_path;
+    use vrl::value::kind::{Collection, Kind};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<WebSocketConfig>();
+    }
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = WebSocketConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+                .with_meaning(OwnedTargetPath::event_root(), "message")
+                .with_metadata_field(
+                    &owned_value_path!("vector", "source_type"),
+                    Kind::bytes(),
+                    None,
+                )
+                .with_metadata_field(
+                    &owned_value_path!("vector", "ingest_timestamp"),
+                    Kind::timestamp(),
+                    None,
+                );
+
+        assert_eq!(definition, Some(expected_definition));
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = WebSocketConfig::default();
+
+        let definition = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        let expected_definition = schema::Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        )
+        .with_event_field(
+            &owned_value_path!("message"),
+            Kind::bytes(),
+            Some("message"),
+        )
+        .with_event_field(&owned_value_path!("timestamp"), Kind::timestamp(), None)
+        .with_event_field(&owned_value_path!("source_type"), Kind::bytes(), None);
+
+        assert_eq!(definition, Some(expected_definition));
     }
 }
