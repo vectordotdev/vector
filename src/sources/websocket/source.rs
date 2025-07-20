@@ -20,8 +20,9 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionShutdown,
-        WsKind, WsMessageReceived, PROTOCOL,
+        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionShutdown,
+        WsKind, WsMessageReceived, PROTOCOL, WsReceiveError, WsSendError, WsBinaryDecodeError,
+        PongTimeoutError
     },
     SourceSender,
 };
@@ -107,7 +108,7 @@ pub(crate) async fn recv_from_websocket(
 
     if ping_interval.is_some() {
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
-            emit!(WsConnectionError { error });
+            emit!(WsSendError { error });
             return Err(());
         }
     }
@@ -124,7 +125,10 @@ pub(crate) async fn recv_from_websocket(
 
             _ = ping.tick() => {
                 match check_received_pong_time(ping_timeout, last_pong) {
-                    Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                    Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map_err(|error| {
+                        emit!(WsSendError { error });
+                        WsError::Io(io::Error::new(io::ErrorKind::BrokenPipe, "Websocket connection is closed."))
+                    }),
                     Err(e) => Err(e)
                 }
             },
@@ -200,7 +204,7 @@ pub(crate) async fn recv_from_websocket(
                 emit!(WsConnectionShutdown);
                 return Err(());
             } else {
-                emit!(WsConnectionError { error });
+                emit!(WsReceiveError { error });
                 (*ws_sink, *ws_source) = create_sink_and_stream(params.connector.clone()).await;
             }
         }
@@ -225,10 +229,14 @@ fn check_received_pong_time(
 ) -> Result<(), WsError> {
     if let Some(ping_timeout) = ping_timeout {
         if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-            return Err(WsError::Io(io::Error::new(
+            let error = io::Error::new(
                 io::ErrorKind::TimedOut,
                 "Pong not received in time.",
-            )));
+            );
+            emit!(PongTimeoutError{
+                timeout_secs: ping_timeout,
+            });
+            return Err(WsError::Io(error));
         }
     }
 
@@ -282,11 +290,13 @@ async fn handle_binary_payload(
                 .await;
             Ok::<(), ()>(())
         })
-        .map_err(|err| {
-            error!("Failed to process binary message: {}.", err);
+        .map_err(|error| {
+            emit!(WsBinaryDecodeError { error });
         }) {
         Ok(_) => Ok(()),
         Err(e) => {
+            // This case should ideally not be reached since map_err should handle it.
+            // However, to be safe, we emit a generic error here.
             error!("Failed to send binary message: {:?}.", e);
             Ok(())
         }

@@ -1,7 +1,9 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result};
+use std::num::NonZeroU64;
 
 use metrics::{counter, histogram};
+use tokio_tungstenite::tungstenite::error::Error as WsError;
 use vector_lib::internal_event::InternalEvent;
 
 use vector_common::{
@@ -181,5 +183,113 @@ impl InternalEvent for WsMessageReceived<'_> {
 
     fn name(&self) -> Option<&'static str> {
         Some("WsMessageReceived")
+    }
+}
+
+#[derive(Debug)]
+pub struct WsReceiveError {
+    pub error: WsError,
+}
+
+impl InternalEvent for WsReceiveError {
+    fn emit(self) {
+        error!(
+            message = "Error receiving message from websocket.",
+            error = %self.error,
+            error_code = "ws_receive_error",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "ws_receive_error",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        ).increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("WsReceiveError")
+    }
+}
+
+#[derive(Debug)]
+pub struct WsSendError {
+    pub error: WsError,
+}
+
+impl InternalEvent for WsSendError {
+    fn emit(self) {
+        error!(
+            message = "Error sending message to websocket.",
+            error = %self.error,
+            error_code = "ws_send_error",
+            error_type = error_type::CONNECTION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "ws_send_error",
+            "error_type" => error_type::CONNECTION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        ).increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("WsSendError")
+    }
+}
+
+#[derive(Debug)]
+pub struct WsBinaryDecodeError {
+    pub error: vector_lib::codecs::decoding::Error,
+}
+
+impl InternalEvent for WsBinaryDecodeError {
+    fn emit(self) {
+        error!(
+            message = "Failed to decode binary message from websocket.",
+            error = %self.error,
+            error_code = "ws_binary_decode_error",
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "ws_binary_decode_error",
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+        ).increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("WsBinaryDecodeError")
+    }
+}
+
+#[derive(Debug)]
+pub struct PongTimeoutError {
+    pub timeout_secs: NonZeroU64,
+}
+
+impl InternalEvent for PongTimeoutError {
+    fn emit(self) {
+        error!(
+            message = "Pong not received in time.",
+            timeout_secs = %self.timeout_secs,
+            error_code = "pong_timeout_error",
+            stage = error_stage::PROCESSING,
+            error_type = error_type::CONNECTION_FAILED,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "pong_timeout_error",
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::CONNECTION_FAILED,
+        ).increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("PongTimeoutError")
     }
 }
