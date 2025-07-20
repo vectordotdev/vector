@@ -135,7 +135,6 @@ members = [
 
 [workspace.dependencies]
 anyhow = "1.0.98"
-async-trait = "0.1"
 cfg-if = { version = "1.0.1", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
