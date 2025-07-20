@@ -1,7 +1,8 @@
+use bytes::Bytes;
 use std::{io, num::NonZeroU64};
 use vector_common::json_size::JsonSize;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
+    config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, EventArray, EventContainer, LogEvent},
     lookup::{metadata_path, path},
     EstimatedJsonEncodedSizeOf,
@@ -43,6 +44,13 @@ impl From<WebSocketEvent<'_>> for LogEvent {
         } = frame;
 
         let mut log = LogEvent::default();
+
+        log_namespace.insert_vector_metadata(
+            &mut log,
+            log_schema().source_type_key(),
+            path!("source_type"),
+            Bytes::from_static(WebSocketEvent::NAME.as_bytes()),
+        );
 
         if let LogNamespace::Vector = log_namespace {
             log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
