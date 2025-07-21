@@ -71,4 +71,4 @@ jobs:
 
           # Add files and then compare with HEAD instead of origin/master
           git add changelog.d/
-          CHANGELOG_MERGE_BASE=HEAD ./scripts/check_changelog_fragments.sh
+          MERGE_BASE=HEAD ./scripts/check_changelog_fragments.sh
