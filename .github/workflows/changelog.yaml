@@ -69,4 +69,6 @@ jobs:
       - name: Run changelog fragment checker
         if: ${{ env.NO_CHANGELOG == 'false' && github.event_name != 'merge_group' }}
         run: |
+          git status
+          git diff --staged
           CHANGELOG_MERGE_BASE=HEAD ./scripts/check_changelog_fragments.sh
