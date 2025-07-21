@@ -36,6 +36,11 @@ pub struct WebSocketConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    /// An optional message to send to the server upon connection.
+    #[configurable]
+    #[serde(default)]
+    pub initial_message: Option<String>,
 }
 
 impl Default for WebSocketConfig {
@@ -44,6 +49,7 @@ impl Default for WebSocketConfig {
             common: WebSocketCommonConfig::default(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
+            initial_message: None,
             log_namespace: None,
         }
     }

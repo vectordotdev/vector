@@ -20,16 +20,12 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionShutdown,
-        WsKind, WsMessageReceived, PROTOCOL, WsReceiveError, WsSendError, WsBinaryDecodeError,
-        PongTimeoutError
+        ConnectionOpen, OpenGauge, PongTimeoutError, WsBinaryDecodeError, WsBytesReceived,
+        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
     SourceSender,
 };
-use vector_lib::{
-    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-};
-
+use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
 
 #[derive(Debug, PartialEq)]
 struct WebSocketEvent<'a> {
@@ -100,7 +96,19 @@ pub(crate) async fn recv_from_websocket(
     let ping_interval = config.common.ping_interval;
     let ping_timeout = config.common.ping_timeout;
 
-    let (ws_sink, ws_source) = create_sink_and_stream(params.connector.clone()).await;
+    let (mut ws_sink, ws_source) = create_sink_and_stream(params.connector.clone()).await;
+
+    // Send the initial message upon first connection.
+    if let Some(initial_message) = &config.initial_message {
+        if let Err(error) = ws_sink.send(Message::Text(initial_message.clone())).await {
+            emit!(WsSendError { error });
+            // The connection is likely unusable. The main loop will fail on the next read and
+            // trigger reconnection logic.
+        } else {
+            info!(message = %initial_message, "Sent initial message.");
+        }
+    }
+
     pin_mut!(ws_sink);
     pin_mut!(ws_source);
 
@@ -209,7 +217,23 @@ pub(crate) async fn recv_from_websocket(
                 return Err(());
             } else {
                 emit!(WsReceiveError { error });
-                (*ws_sink, *ws_source) = create_sink_and_stream(params.connector.clone()).await;
+                let (mut new_sink, new_source) =
+                    create_sink_and_stream(params.connector.clone()).await;
+
+                // Resend initial message on reconnect
+                if let Some(initial_message) = &config.initial_message {
+                    if let Err(error) = new_sink.send(Message::Text(initial_message.clone())).await {
+                        emit!(WsSendError { error });
+                        // Avoid tight loop on repeated send failures.
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        continue;
+                    } else {
+                        info!(message = %initial_message, "Sent initial message on reconnect.");
+                    }
+                }
+
+                ws_sink.set(new_sink);
+                ws_source.set(new_source);
             }
         }
     }
@@ -317,14 +341,14 @@ async fn handle_binary_payload(
 #[cfg(test)]
 mod integration_test {
     use crate::{
+        common::websocket::WebSocketCommonConfig,
+        sources::websocket::config::WebSocketConfig,
         test_util::{
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
             next_addr,
         },
     };
-    use crate::sources::websocket::config::WebSocketConfig;
-    use crate::common::websocket::WebSocketCommonConfig;
-    use futures::sink::SinkExt;
+    use futures::{sink::SinkExt, StreamExt};
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::{accept_async, tungstenite::Message};
     use url::Url;
@@ -360,6 +384,32 @@ mod integration_test {
         server_addr
     }
 
+    /// Starts a WebSocket server that waits for an initial message from the client,
+    /// and upon receiving it, sends a confirmation message back.
+    async fn start_subscribe_server(initial_message: String, response_message: String) -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+
+            // Wait for the initial message from the client
+            if let Some(Ok(Message::Text(msg))) = websocket.next().await {
+                if msg == initial_message {
+                    // Received correct initial message, send response
+                    websocket
+                        .send(Message::Text(response_message))
+                        .await
+                        .unwrap();
+                }
+            }
+        });
+
+        server_addr
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn websocket_source_consume_event() {
         let server_addr = start_push_server().await;
@@ -368,11 +418,30 @@ mod integration_test {
         // Run the source, which will connect to the server and receive the pushed message.
         let events =
             run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
-        
+
         // Now assert that the event was received and is correct.
         assert!(!events.is_empty(), "No events received from source");
         let log = events[0].as_log();
         assert_eq!(log["payload"], "message from server".into());
+        assert_eq!(*log.get_source_type().unwrap(), "websocket".into());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_sends_initial_message() {
+        let initial_msg = "{\"action\":\"subscribe\",\"topic\":\"test\"}".to_string();
+        let response_msg = "{\"status\":\"subscribed\",\"topic\":\"test\"}".to_string();
+        let server_addr =
+            start_subscribe_server(initial_msg.clone(), response_msg.clone()).await;
+
+        let mut config = make_config(&server_addr);
+        config.initial_message = Some(initial_msg);
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty(), "No events received from source");
+        let log = events[0].as_log();
+        assert_eq!(log["payload"], response_msg.into());
         assert_eq!(*log.get_source_type().unwrap(), "websocket".into());
     }
 }
