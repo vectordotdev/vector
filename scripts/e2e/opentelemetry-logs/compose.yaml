@@ -28,8 +28,6 @@ services:
     environment:
       - VECTOR_LOG=debug
     command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
-    ports:
-      - "${VECTOR_API_PORT:-8686}:8686"
 
   otel-collector-sink:
     image: otel/opentelemetry-collector-contrib:latest
