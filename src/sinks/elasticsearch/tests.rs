@@ -702,7 +702,8 @@ async fn test_parse_config_with_uri_auth() {
 
     let got_auth_inner = match common.auth.as_ref().unwrap() {
         Auth::Basic(auth) => auth,
-        _ => panic!("Expected auth to be Basic"),
+        #[cfg(feature = "aws-core")]
+        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
     };
 
     assert_eq!(
@@ -737,7 +738,8 @@ async fn test_parse_config_with_config_auth() {
 
     let got_auth_inner = match common.auth.as_ref().unwrap() {
         Auth::Basic(auth) => auth,
-        _ => panic!("Expected auth to be Basic"),
+        #[cfg(feature = "aws-core")]
+        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
     };
 
     assert_eq!(
