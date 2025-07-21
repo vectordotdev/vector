@@ -29,7 +29,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     let (mut config, cx) = load_sink::<AppsignalConfig>(config.as_str()).unwrap();
     let addr = next_addr();
     // Set the endpoint to a local server so we can fetch the sent events later
-    config.endpoint = format!("http://{}", addr);
+    config.endpoint = format!("http://{addr}");
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -57,7 +57,7 @@ async fn logs_real_endpoint() {
 
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let generator = |index| format!("this is a log with index {}", index);
+    let generator = |index| format!("this is a log with index {index}");
     let (_, events) = generate_lines_with_stream(generator, 10, Some(batch));
 
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
@@ -101,14 +101,14 @@ async fn metrics_shape() {
         .flat_map(|index| {
             vec![
                 Event::Metric(Metric::new(
-                    format!("counter_{}", index),
+                    format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: index as f64,
                     },
                 )),
                 Event::Metric(Metric::new(
-                    format!("counter_{}", index),
+                    format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: (index + index) as f64,

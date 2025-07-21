@@ -319,7 +319,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                                 } else {
                                     let formatted = success
                                         .iter()
-                                        .map(|s| format!("    - {}\n", s))
+                                        .map(|s| format!("    - {s}\n"))
                                         .collect::<Vec<_>>();
 
                                     details.push(format!(
@@ -340,7 +340,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                                 } else {
                                     let formatted = failure
                                         .iter()
-                                        .map(|s| format!("    - {}\n", s))
+                                        .map(|s| format!("    - {s}\n"))
                                         .collect::<Vec<_>>();
 
                                     details.push(format!(
@@ -368,10 +368,9 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                     );
                 }
             }
-            Err(e) => panic!(
-                "Failed to complete validation run for component '{}': {}",
-                component_name, e
-            ),
+            Err(e) => {
+                panic!("Failed to complete validation run for component '{component_name}': {e}")
+            }
         }
     });
 }

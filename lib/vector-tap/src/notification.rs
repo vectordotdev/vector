@@ -14,7 +14,7 @@ pub struct Matched {
 impl Matched {
     pub fn new(pattern: String) -> Self {
         Self {
-            message: format!("[tap] Pattern '{}' successfully matched.", pattern),
+            message: format!("[tap] Pattern '{pattern}' successfully matched."),
             pattern,
         }
     }
@@ -34,8 +34,7 @@ impl NotMatched {
     pub fn new(pattern: String) -> Self {
         Self {
             message: format!(
-                "[tap] Pattern '{}' failed to match: will retry on configuration reload.",
-                pattern
+                "[tap] Pattern '{pattern}' failed to match: will retry on configuration reload."
             ),
             pattern,
         }

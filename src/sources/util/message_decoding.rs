@@ -20,7 +20,7 @@ pub fn decode_message<'a>(
     batch: &'a Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: &'a Registered<EventsReceived>,
-) -> impl Iterator<Item = Event> + 'a {
+) -> impl Iterator<Item = Event> + 'a + use<'a> {
     let schema = log_schema();
 
     let mut buffer = BytesMut::with_capacity(message.len());

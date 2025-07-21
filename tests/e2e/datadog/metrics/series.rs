@@ -287,14 +287,14 @@ pub(super) async fn validate() {
             if metric_type == 2 {
                 let agent_sum: f64 = agent_ts
                     .1
-                    .iter()
-                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .values()
+                    .map(|points| points.iter().sum::<f64>())
                     .sum();
 
                 let vector_sum: f64 = vector_ts
                     .1
-                    .iter()
-                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .values()
+                    .map(|points| points.iter().sum::<f64>())
                     .sum();
 
                 assert_eq!(agent_sum, vector_sum, "Mismatch of rate data");

@@ -181,6 +181,7 @@ impl HttpServerAuthConfig {
 
 /// Built auth matcher with validated configuration
 /// Can be used directly in a component to validate authentication in HTTP requests
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum HttpServerAuthMatcher {
     /// Matcher for comparing exact value of Authorization header

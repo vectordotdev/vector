@@ -83,7 +83,7 @@ pub mod util {
         let mut labels: Vec<String> = labels
             .iter()
             .filter(|(k, _)| !RESERVED_LABELS.contains(&k.as_str()))
-            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+            .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect();
         labels.sort();
         format!("{{{}}}", labels.join(", "))

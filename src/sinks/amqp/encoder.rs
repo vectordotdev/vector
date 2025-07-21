@@ -26,7 +26,7 @@ impl encoding::Encoder<Event> for AmqpEncoder {
         let mut encoder = self.encoder.clone();
         encoder
             .encode(input, &mut body)
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
+            .map_err(|_| io::Error::other("unable to encode"))?;
 
         let body = body.freeze();
         write_all(writer, 1, body.as_ref())?;

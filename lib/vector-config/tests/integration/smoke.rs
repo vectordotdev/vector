@@ -312,7 +312,7 @@ impl From<SocketListenAddr> for String {
                 if fd == 0 {
                     "systemd".to_owned()
                 } else {
-                    format!("systemd#{}", fd)
+                    format!("systemd#{fd}")
                 }
             }
         }
@@ -633,8 +633,8 @@ fn generate_semi_real_schema() {
             let json = serde_json::to_string_pretty(&schema)
                 .expect("rendering root schema to JSON should not fail");
 
-            println!("{}", json);
+            println!("{json}");
         }
-        Err(e) => eprintln!("error while generating schema: {:?}", e),
+        Err(e) => eprintln!("error while generating schema: {e:?}"),
     }
 }
