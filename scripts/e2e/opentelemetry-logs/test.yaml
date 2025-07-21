@@ -3,31 +3,23 @@ features:
 
 test: "e2e"
 
-test_filter: "datadog::logs::"
+test_filter: "opentelemetry::logs::"
 
 runner:
   env:
-    EXPECTED_LOG_EVENTS: '1000'
-    VECTOR_RECEIVE_PORT: '8081'
-    FAKE_INTAKE_AGENT_ENDPOINT: 'http://fakeintake-agent:80'
-    FAKE_INTAKE_VECTOR_ENDPOINT: 'http://fakeintake-vector:80'
+    OTEL_COLLECTOR_SINK_PORT: '5318'
+    OTEL_COLLECTOR_SOURCE_PORT: '4318'
+    VECTOR_API_PORT: '8686'
 
-matrix:
-  # validate against the latest Agent nightly and also stable v6 and v7
-  agent_version: ['latest', '6', '7']
-
-
-# changes to these files/paths will invoke the integration test in CI
-# expressions are evaluated using https://github.com/micromatch/picomatch
+# Only trigger this integration test if relevant OTEL source/sink files change
 paths:
-- "src/common/datadog.rs"
-- "src/sources/datadog_agent/**"
-- "src/internal_events/datadog_*"
-- "src/sinks/datadog/logs/**"
-- "src/sinks/util/**"
-# NOTE: currently we need the prefix 'e2e' even though it looks redundant,
-# because the vdev code does not otherwise have a way to distinguish between
-# the other `datadog-logs` int test.
-# but once GH issue 18829 is completed, this will become unecessary.
-- "scripts/e2e/e2e-datadog-logs/**"
-- "tests/data/e2e/datadog/logs/**"
+  - "src/sources/opentelemetry/**"
+  - "src/sinks/opentelemetry/**"
+  - "src/internal_events/opentelemetry_*"
+  - "src/common/opentelemetry.rs"
+  - "pront/otel/vector/otel-to-otel-logs.yaml"
+  - "pront/otel/otel/collector-sink.yaml"
+  - "pront/otel/otel/collector-source.yaml"
+  - "pront/otel/docker-compose.yaml"
+  - "tests/e2e/opentelemetry/logs/**"
+  - "scripts/e2e/opentelemetry-logs/**"

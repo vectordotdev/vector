@@ -10,8 +10,8 @@ services:
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
     ports:
-      - "4317:4317"  # OTLP gRPC
-      - "4318:4318"  # OTLP HTTP
+      - "${OTEL_COLLECTOR_SOURCE_PORT:-4317}:4317"  # OTLP gRPC
+      - "${OTEL_COLLECTOR_SOURCE_PORT:-4318}:4318"  # OTLP HTTP
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   vector:
@@ -29,7 +29,7 @@ services:
       - VECTOR_LOG=debug
     command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
     ports:
-      - "8686:8686"
+      - "${VECTOR_API_PORT:-8686}:8686"
 
   otel-collector-sink:
     image: otel/opentelemetry-collector-contrib:latest
@@ -46,7 +46,7 @@ services:
         source: ./otel/output
         target: /tmp
     ports:
-      - "5318:5318"
+      - "${OTEL_COLLECTOR_SINK_PORT:-5318}:5318"
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   logs-generator:
