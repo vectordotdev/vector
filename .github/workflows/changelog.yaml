@@ -30,16 +30,6 @@ jobs:
       NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
 
     steps:
-      # Checkout changelog script and changelog.d/ from master
-      - uses: actions/checkout@v4
-        if: ${{ github.event_name != 'merge_group' }}
-        with:
-          ref: master
-          sparse-checkout: |
-            scripts/check_changelog_fragments.sh
-            changelog.d/
-          sparse-checkout-cone-mode: false
-
       - name: Bypass when no‑changelog label is present
         if: env.NO_CHANGELOG == 'true'
         run: |
@@ -51,6 +41,16 @@ jobs:
         run: |
           echo "merge_group event – passing without running changelog validation."
           exit 0
+
+      # Checkout changelog script and changelog.d/ from master
+      - uses: actions/checkout@v4
+        if: ${{ env.NO_CHANGELOG == 'false' && github.event_name != 'merge_group' }}
+        with:
+          ref: master
+          sparse-checkout: |
+            scripts/check_changelog_fragments.sh
+            changelog.d/
+          sparse-checkout-cone-mode: false
 
       # Checkout PR's changelog.d/ into tmp/
       - uses: actions/checkout@v4
