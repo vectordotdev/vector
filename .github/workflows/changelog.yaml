@@ -30,16 +30,17 @@ jobs:
       NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
 
     steps:
-      # Checkout master
+      # Checkout changelog script and changelog.d/ from master
       - uses: actions/checkout@v4
         if: ${{ github.event_name != 'merge_group' }}
         with:
           ref: master
           sparse-checkout: |
-            scripts/
+            scripts/check_changelog_fragments.sh
             changelog.d/
+          sparse-checkout-cone-mode: false
 
-      # Checkout PR's changelog.d into tmp/
+      # Checkout PR's changelog.d/ into tmp/
       - uses: actions/checkout@v4
         if: ${{ github.event_name != 'merge_group' }}
         with:
@@ -48,7 +49,7 @@ jobs:
           path: tmp
           sparse-checkout: changelog.d/
 
-      - name: Overwrite changelog.d/
+      - name: Overwrite changelog.d/*.md
         if: ${{ github.event_name != 'merge_group' }}
         run: |
           rm -rf changelog.d/*.md
