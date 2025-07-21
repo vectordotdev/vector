@@ -28,9 +28,18 @@ jobs:
 
     env:
       NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
-      SHOULD_CHECK: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') == 'false' && github.event_name != 'merge_group' }}
 
     steps:
+      # Checkout changelog script and changelog.d/ from master
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'merge_group' }}
+        with:
+          ref: master
+          sparse-checkout: |
+            scripts/check_changelog_fragments.sh
+            changelog.d/
+          sparse-checkout-cone-mode: false
+
       - name: Bypass when no‑changelog label is present
         if: env.NO_CHANGELOG == 'true'
         run: |
@@ -43,20 +52,9 @@ jobs:
           echo "merge_group event – passing without running changelog validation."
           exit 0
 
-      # Checkout changelog script and changelog.d/ from master
-      - uses: actions/checkout@v4
-        if: ${{ env.SHOULD_CHECK == 'true' }}
-        with:
-          ref: master
-          sparse-checkout: |
-            scripts/check_changelog_fragments.sh
-            changelog.d/
-          sparse-checkout-cone-mode: false
-
-
       # Checkout PR's changelog.d/ into tmp/
       - uses: actions/checkout@v4
-        if: ${{ env.SHOULD_CHECK == 'true' }}
+        if: ${{ env.NO_CHANGELOG == 'false' && github.event_name != 'merge_group' }}
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
@@ -64,7 +62,7 @@ jobs:
           sparse-checkout: changelog.d/
 
       - name: Run changelog fragment checker
-        if: ${{ env.SHOULD_CHECK == 'true' }}
+        if: ${{ env.NO_CHANGELOG == 'false' && github.event_name != 'merge_group' }}
         run: |
           # Overwrite changelog.d/*.md
           rm -rf changelog.d/*.md && mv tmp/changelog.d/*.md changelog.d/
