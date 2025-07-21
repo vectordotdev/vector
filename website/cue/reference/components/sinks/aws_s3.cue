@@ -109,7 +109,7 @@ components: sinks: aws_s3: components._aws & {
 				If you're using Vector to write objects to an s3-compatible storage, you can
 				set `VECTOR_LOG` to `vector::sinks::s3_common::service::put_object=trace` to
 				enable a trace log containing the bucket and key the object was put to. This
-				is best used when writing an object to s3-compatible storage to kick off
+				is best used when writing an object to an s3-compatible storage to kick off
 				post-put operations through another sink.
 				"""
 		}
