@@ -25,31 +25,31 @@ jobs:
     runs-on: ubuntu-24.04
 
     env:
-      PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+      NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
 
     steps:
-      # Checkout full depth because in the check_changelog_fragments script, we need to specify a
-      # merge base. If we only shallow clone the repo, git may not have enough history to determine
-      # the base.
+      # Checkout master
+      - uses: actions/checkout@v4
+        if: ${{ github.event_name != 'merge_group' }}
+
+      # Checkout PR's changelog.d into tmp/
       - uses: actions/checkout@v4
         if: ${{ github.event_name != 'merge_group' }}
         with:
-          fetch-depth: 0
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
+          path: tmp
+          sparse-checkout: changelog.d/
 
-      - name: Checkout trusted changelog script
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository }}
-          ref: master
-          path: base
-          sparse-checkout: scripts/check_changelog_fragments.sh
-          sparse-checkout-cone-mode: false
-          clean: false
+      - name: Overwrite changelog.d/
+        if: ${{ github.event_name != 'merge_group' }}
+        run: |
+          rm -rf changelog.d/
+          mv tmp/changelog.d/ .
+          git add changelog.d/
 
       - name: Bypass when no‑changelog label is present
-        if: env.PR_HAS_LABEL == 'true'
+        if: env.NO_CHANGELOG == 'true'
         run: |
           echo "'no-changelog' label detected – skipping changelog validation."
           exit 0
@@ -61,5 +61,6 @@ jobs:
           exit 0
 
       - name: Run changelog fragment checker
-        if: ${{ env.PR_HAS_LABEL == 'false' && github.event_name != 'merge_group' }}
-        run: ./base/scripts/check_changelog_fragments.sh
+        if: ${{ env.NO_CHANGELOG == 'false' && github.event_name != 'merge_group' }}
+        run: |
+          ./scripts/check_changelog_fragments.sh
