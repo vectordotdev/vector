@@ -1,9 +1,9 @@
 use std::fmt;
 
-use crate::sinks::prelude::*;
+use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 use vector_lib::{event::Event, partition::Partitioner};
 
-pub struct AzureBlobSink<Svc, RB, P> {
+pub struct AzureBlobSink<Svc, RB, P = KeyPartitioner> {
     service: Svc,
     request_builder: RB,
     partitioner: P,
