@@ -25,10 +25,16 @@ use super::util::EncodedLength;
 
 #[derive(Debug, Snafu)]
 pub(super) enum RedisSinkError {
-    #[snafu(display("Creating Redis producer failed: {}", source))]
+    #[snafu(display("Creating Redis producer failed: {source}"))]
     RedisCreateFailed { source: RedisError },
-    #[snafu(display("Error sending query: {}", source))]
-    SendError { source: RedisError },
+    #[snafu(display(
+        "Error sending query: {source}{}",
+        if let Some(id) = connection_id { format!(", conn_id={id}") } else { String::new() }
+    ))]
+    SendError {
+        source: RedisError,
+        connection_id: Option<u8>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Derivative)]

@@ -58,9 +58,14 @@ impl Service<RedisRequest> for RedisService {
         let byte_size = kvs.metadata.events_byte_size();
 
         Box::pin(async move {
-            let mut conn = match redis_conn.get_connection_manager().await {
+            let (mut conn, conn_id) = match redis_conn.get_connection_manager().await {
                 Ok(conn) => conn,
-                Err(error) => return Err(RedisSinkError::SendError { source: error }),
+                Err(error) => {
+                    return Err(RedisSinkError::SendError {
+                        source: error,
+                        connection_id: None,
+                    })
+                }
             };
 
             match pipe.query_async(&mut conn).await {
@@ -69,7 +74,10 @@ impl Service<RedisRequest> for RedisService {
                     events_byte_size: kvs.metadata.into_events_estimated_json_encoded_byte_size(),
                     byte_size,
                 }),
-                Err(error) => Err(RedisSinkError::SendError { source: error }),
+                Err(error) => Err(RedisSinkError::SendError {
+                    source: error,
+                    connection_id: conn_id,
+                }),
             }
         })
     }

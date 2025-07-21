@@ -19,6 +19,13 @@ use super::{
     RedisEvent,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RepairState {
+    Repaired,
+    UnknownBroken,
+    Broken(u8),
+}
+
 #[derive(Clone)]
 pub(super) enum RedisConnection {
     Direct(ConnectionManager),
@@ -28,10 +35,13 @@ pub(super) enum RedisConnection {
         sentinel: Arc<TokioMutex<Sentinel>>,
         service_name: String,
         node_connection_info: SentinelNodeConnectionInfo,
-        connection_manager: Arc<TokioMutex<ConnectionManager>>,
-        // Flag needed as we cannot call async methods to fix the redis
-        // connection from sentinel with the sync `RetryLogic::on_retriable_error`.
-        needs_fix: Arc<StdMutex<bool>>,
+        // Track the `ConnectionManager` and an id to associate with this
+        // `ConnectionManager` for use during error handling
+        connection_manager: Arc<TokioMutex<(ConnectionManager, u8)>>,
+        // State to track how the `connection_manager` needs to be repaired as
+        // we cannot call async methods to reapir the redis connection from
+        // sentinel with the sync `RetryLogic::on_retriable_error`.
+        repair_state: Arc<StdMutex<RepairState>>,
     },
 }
 
@@ -67,34 +77,45 @@ impl RedisConnection {
             sentinel: Arc::new(TokioMutex::new(sentinel)),
             service_name,
             node_connection_info,
-            connection_manager: Arc::new(TokioMutex::new(conn)),
-            needs_fix: Arc::new(StdMutex::new(false)),
+            connection_manager: Arc::new(TokioMutex::new((conn, 0))),
+            repair_state: Arc::new(StdMutex::new(RepairState::Repaired)),
         })
     }
 
-    pub(super) async fn get_connection_manager(&self) -> RedisResult<ConnectionManager> {
+    pub(super) async fn get_connection_manager(
+        &self,
+    ) -> RedisResult<(ConnectionManager, Option<u8>)> {
         match self {
-            Self::Direct(conn) => Ok(conn.clone()),
+            Self::Direct(conn) => Ok((conn.clone(), None)),
             Self::Sentinel {
                 sentinel,
                 service_name,
                 node_connection_info,
                 connection_manager,
-                needs_fix,
+                repair_state,
             } => {
-                // We need this in both branches
-                let mut conn_mngr = connection_manager.lock().await;
+                let mut conn_mngr_guard = connection_manager.lock().await;
 
-                // Scope needed since Rust compiler cannot understand the explicitly dropped
-                // MutexGuard isn't held anymore
+                // Scope needed since Rust borrow checker cannot understand the explicitly dropped
+                // MutexGuard isn't held anymore.
                 // See: https://github.com/rust-lang/rust/issues/128095
-                {
+                let connection_needs_repair = {
                     // SAFETY: if another thread panicked while holding this, we should panic too
-                    let needs_fix = needs_fix.lock().unwrap();
+                    let mut repair_state = repair_state.lock().unwrap();
 
-                    if !*needs_fix {
-                        return Ok(conn_mngr.clone());
+                    match *repair_state {
+                        RepairState::Repaired => false,
+                        RepairState::Broken(id) if id != conn_mngr_guard.1 => {
+                            // Disregard since we're on a different connection manager now
+                            *repair_state = RepairState::Repaired;
+                            false
+                        }
+                        _ => true,
                     }
+                };
+
+                if !connection_needs_repair {
+                    return Ok((conn_mngr_guard.0.clone(), Some(conn_mngr_guard.1)));
                 }
 
                 let mut sentinel = sentinel.lock().await;
@@ -105,22 +126,34 @@ impl RedisConnection {
                     node_connection_info,
                 )
                 .await?;
+                let new_conn_mngr_id = conn_mngr_guard.1.wrapping_add(1);
 
-                *conn_mngr = new_conn_mngr.clone();
+                *conn_mngr_guard = (new_conn_mngr.clone(), new_conn_mngr_id);
 
-                // Have to reacquire since we needed to do a few awaits
+                // Have to reacquire since we needed to do a few awaits, we can safely override
+                // it as we are the only thread that could've mutated the connection manager.
                 // SAFETY: if another thread panicked while holding this, we should panic too
-                let mut needs_fix = needs_fix.lock().unwrap();
-                *needs_fix = false;
-                Ok(new_conn_mngr)
+                let mut repair_state = repair_state.lock().unwrap();
+                *repair_state = RepairState::Repaired;
+                Ok((new_conn_mngr, Some(new_conn_mngr_id)))
             }
         }
     }
 
-    pub(super) fn signal_needs_fix(&self) {
-        if let Self::Sentinel { needs_fix, .. } = self {
+    pub(super) fn signal_broken(&self, whom: Option<u8>) {
+        if let Self::Sentinel { repair_state, .. } = self {
             // SAFETY: if another thread panicked while holding this, we should panic too
-            *needs_fix.lock().unwrap() = true;
+            let mut state = repair_state.lock().unwrap();
+
+            match (*state, whom) {
+                (RepairState::Broken(_) | RepairState::Repaired, None) => {
+                    *state = RepairState::UnknownBroken
+                }
+                (RepairState::Broken(_) | RepairState::Repaired, Some(id)) => {
+                    *state = RepairState::Broken(id)
+                }
+                (RepairState::UnknownBroken, _) => (),
+            }
         }
     }
 }
@@ -233,14 +266,18 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn on_retriable_error(&self, error: &Self::Error) {
-        if let RedisSinkError::SendError { source } = error {
+        if let RedisSinkError::SendError {
+            source,
+            connection_id,
+        } = error
+        {
             if matches!(
                 source.kind(),
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
             ) {
-                self.connection.signal_needs_fix();
+                self.connection.signal_broken(connection_id.clone());
             }
         }
     }
