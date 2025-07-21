@@ -1,0 +1,65 @@
+name: opentelemetry-vector-e2e
+services:
+  otel-collector-source:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector-source
+    init: true
+    volumes:
+      - type: bind
+        source: ./otel/collector-source.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
+  vector:
+    image: ghcr.io/vectordotdev/vector:nightly-debian
+    container_name: vector
+    init: true
+    depends_on:
+      - otel-collector-source
+    volumes:
+      - type: bind
+        source: ./vector/otel-to-otel-logs.yaml
+        target: /etc/vector/vector.yaml
+        read_only: true
+    environment:
+      - VECTOR_LOG=debug
+    command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
+    ports:
+      - "8686:8686"
+
+  otel-collector-sink:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector-sink
+    init: true
+    depends_on:
+      - vector
+    volumes:
+      - type: bind
+        source: ./otel/collector-sink.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ./otel/output
+        target: /tmp
+    ports:
+      - "5318:5318"
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
+  logs-generator:
+    image: python:3.11-alpine
+    container_name: logs-generator
+    init: true
+    depends_on:
+      - otel-collector-source
+    volumes:
+      - type: bind
+        source: ./generator
+        target: /generator
+    environment:
+      - PYTHONUNBUFFERED=1
+    entrypoint: [ "generator/entrypoint.sh" ]
+    command: [ "--interval", "5" ]
