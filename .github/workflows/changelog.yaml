@@ -33,6 +33,10 @@ jobs:
       # Checkout master
       - uses: actions/checkout@v4
         if: ${{ github.event_name != 'merge_group' }}
+        with:
+          sparse-checkout: |
+            scripts/
+            changelog.d/
 
       # Checkout PR's changelog.d into tmp/
       - uses: actions/checkout@v4
@@ -46,8 +50,8 @@ jobs:
       - name: Overwrite changelog.d/
         if: ${{ github.event_name != 'merge_group' }}
         run: |
-          rm -rf changelog.d/
-          mv tmp/changelog.d/ .
+          rm -rf changelog.d/*.md
+          mv tmp/changelog.d/*.md changelog.d/
           git add changelog.d/
 
       - name: Bypass when no‑changelog label is present
