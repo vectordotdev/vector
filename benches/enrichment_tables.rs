@@ -264,17 +264,16 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
             |(table, ip, expected)| {
                 assert_eq!(
                     Ok(expected.clone()),
-                    table
-                        .find_table_row(
-                            Case::Insensitive,
-                            &[Condition::Equals {
-                                field: "ip",
-                                value: ip.into(),
-                            }],
-                            None,
-                            None,
-                            None,
-                        )
+                    table.find_table_row(
+                        Case::Insensitive,
+                        &[Condition::Equals {
+                            field: "ip",
+                            value: ip.into(),
+                        }],
+                        None,
+                        None,
+                        None,
+                    )
                 )
             },
             BatchSize::SmallInput,

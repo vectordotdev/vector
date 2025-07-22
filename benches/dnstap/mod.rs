@@ -18,7 +18,14 @@ fn benchmark_query_parsing(c: &mut Criterion) {
     group.bench_function("dns_query_parsing", |b| {
         b.iter_batched(
             || dnstap_data.clone(),
-            |dnstap_data| DnstapParser::parse(&mut event, Bytes::from(dnstap_data), DnsParserOptions::default()).unwrap(),
+            |dnstap_data| {
+                DnstapParser::parse(
+                    &mut event,
+                    Bytes::from(dnstap_data),
+                    DnsParserOptions::default(),
+                )
+                .unwrap()
+            },
             BatchSize::SmallInput,
         )
     });

@@ -149,7 +149,7 @@ fn bench_field_filter(c: &mut Criterion) {
                 || (tx.clone(), events.clone()),
                 |(mut tx, events)| {
                     futures::executor::block_on(tx.send_all(&mut stream::iter(events).map(Ok)))
-                            .unwrap();
+                        .unwrap();
 
                     let output = futures::executor::block_on(collect_ready(&mut rx));
 

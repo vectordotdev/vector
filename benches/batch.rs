@@ -68,35 +68,32 @@ fn benchmark_batch(c: &mut Criterion) {
             )
         });
 
-        group.bench_function(
-            format!("unpartitioned/{compression}_{batch_size}"),
-            |b| {
-                b.iter_batched(
-                    || {
-                        let rt = runtime();
-                        let mut batch = BatchSettings::default();
-                        batch.size.bytes = *batch_size;
-                        batch.size.events = num_events;
+        group.bench_function(format!("unpartitioned/{compression}_{batch_size}"), |b| {
+            b.iter_batched(
+                || {
+                    let rt = runtime();
+                    let mut batch = BatchSettings::default();
+                    batch.size.bytes = *batch_size;
+                    batch.size.events = num_events;
 
-                        let batch_sink = BatchSink::new(
-                            tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                            Buffer::new(batch.size, *compression),
-                            Duration::from_secs(1),
-                        )
-                        .sink_map_err(|error| panic!("{}", error));
+                    let batch_sink = BatchSink::new(
+                        tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                        Buffer::new(batch.size, *compression),
+                        Duration::from_secs(1),
+                    )
+                    .sink_map_err(|error| panic!("{}", error));
 
-                        (
-                            rt,
-                            stream::iter(input.clone())
-                                .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
-                            batch_sink,
-                        )
-                    },
-                    |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
-                    criterion::BatchSize::LargeInput,
-                )
-            },
-        );
+                    (
+                        rt,
+                        stream::iter(input.clone())
+                            .map(|item| Ok(EncodedEvent::new(item, 0, JsonSize::zero()))),
+                        batch_sink,
+                    )
+                },
+                |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                criterion::BatchSize::LargeInput,
+            )
+        });
     }
 }
 
