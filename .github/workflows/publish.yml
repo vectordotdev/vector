@@ -300,9 +300,7 @@ jobs:
       - name: Bootstrap runner environment (macOS-specific)
         run: |
           bash scripts/environment/bootstrap-macos.sh
-          # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
-          rustup show active-toolchain || rustup toolchain install
-          rustup show
+          bash scripts/environment/prepare.sh --modules=rustup
       - name: Build Vector
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"

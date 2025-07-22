@@ -61,7 +61,7 @@ jobs:
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: cargo install cargo-nextest --version 0.9.95 --force --locked
+      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest
 
       - name: Unit Test
         run: make test
@@ -112,7 +112,7 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - run: cargo install dd-rust-license-tool --version 1.0.2 --force --locked
+      - run: bash ./scripts/environment/prepare.sh --modules=dd-rust-license-tool
       - run: make check-licenses
 
   check-docs:
@@ -132,7 +132,7 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@v4
-      - run: sudo npm -g install markdownlint-cli@0.30
+      - run: bash ./scripts/environment/prepare.sh --modules=markdownlint
       - run: make check-markdown
 
   check-component-docs:
@@ -168,7 +168,7 @@ jobs:
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
-      - run: cargo install --force --locked --version 0.13.1 wasm-pack
+      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
       - run: make test-vrl
 
   build-vrl-playground:
@@ -180,7 +180,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: cargo install --force --locked --version 0.13.1 wasm-pack
+      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
       - run: |
           cd lib/vector-vrl/web-playground/
           rustup target add wasm32-unknown-unknown
