@@ -7,8 +7,9 @@ test_filter: "opentelemetry::logs::"
 
 runner:
   env:
-    OTEL_COLLECTOR_SINK_PORT: '5318'
-    OTEL_COLLECTOR_SOURCE_PORT: '4318'
+    OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
+    OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'
+    OTEL_COLLECTOR_SINK_HTTP_PORT: '5318'
 
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use

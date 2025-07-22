@@ -10,8 +10,8 @@ services:
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
     ports:
-      - "${OTEL_COLLECTOR_SOURCE_PORT:-4317}:4317"  # OTLP gRPC
-      - "${OTEL_COLLECTOR_SOURCE_PORT:-4318}:4318"  # OTLP HTTP
+      - "${OTEL_COLLECTOR_SOURCE_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_SOURCE_HTTP_PORT:-4318}:4318"
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   vector:
@@ -47,7 +47,7 @@ services:
         source: ./otel/output
         target: /tmp
     ports:
-      - "${OTEL_COLLECTOR_SINK_PORT:-5318}:5318"
+      - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   logs-generator:
