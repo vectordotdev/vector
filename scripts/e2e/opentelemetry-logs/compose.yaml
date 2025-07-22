@@ -18,6 +18,9 @@ services:
     build:
       context: ../../../
       dockerfile: ./scripts/e2e/Dockerfile
+      args:
+        FEATURES: e2e-tests-opentelemetry
+        RUST_VERSION: ${RUST_VERSION:-1.88}
     image: vector-e2e:opentelemetry-logs
     container_name: vector
     init: true
@@ -31,6 +34,8 @@ services:
         read_only: true
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
+      - FEATURES=e2e-tests-opentelemetry
+      - OTEL_E2E_OUTPUT_PATH
     command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
 
   otel-collector-sink:
@@ -43,7 +48,7 @@ services:
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
       - type: bind
-        source: ${OTEL_E2E_OUTPUT_PATH}
+        source: ../../../tests/data/e2e/opentelemetry/logs/output/collector-sink.log
         target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"

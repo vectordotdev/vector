@@ -1,25 +1,33 @@
 use serde_json::Value;
-use std::{env, time::Duration};
+use std::time::Duration;
 use tokio::{io::AsyncBufReadExt, time::timeout};
 
 const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30); // Adjustable timeout
 const POLLING_INTERVAL: Duration = Duration::from_millis(500); // Poll every 500ms
 
+fn output_log_path() -> PathBuf {
+    let project_root = std::env::current_dir().expect("Failed to get current dir");
+    project_root
+        .join("tests")
+        .join("data")
+        .join("e2e")
+        .join("opentelemetry")
+        .join("logs")
+        .join("output")
+        .join("collector-sink.log")
+}
+
 #[tokio::test]
 async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
-    let output_log_file_path =
-        env::var("OTEL_E2E_OUTPUT_PATH").expect("OTEL_E2E_OUTPUT_PATH not set");
-    let expected_number_of_logs: u64 = env::var("OTEL_E2E_NUMBER_LOGS")
-        .expect("OTEL_E2E_NUMBER_LOGS not set")
-        .parse()
-        .expect("OTEL_E2E_NUMBER_LOGS is not numeric");
+    // Defined in scripts/e2e/opentelemetry-logs/compose.yaml.
+    let expected_number_of_logs: u64 = 100;
 
     let mut previous_log_id: Option<u64> = None;
     let mut total_log_lines_found = 0;
 
     let result = timeout(MAXIMUM_WAITING_DURATION, async {
         loop {
-            let log_file_contents = match tokio::fs::read_to_string(&output_log_file_path).await {
+            let log_file_contents = match tokio::fs::read_to_string(&output_log_path()).await {
                 Ok(contents) => contents,
                 Err(_) => {
                     tokio::time::sleep(POLLING_INTERVAL).await;

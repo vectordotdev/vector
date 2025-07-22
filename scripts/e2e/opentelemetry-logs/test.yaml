@@ -10,7 +10,6 @@ runner:
     OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
     OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'
     OTEL_COLLECTOR_SINK_HTTP_PORT: '5318'
-    OTEL_E2E_OUTPUT_PATH: '../../../tests/data/e2e/opentelemetry/logs/output/logs.log'
 
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use
