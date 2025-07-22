@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
-import time
-import requests
 import json
 import random
+import time
 import uuid
 
+import requests
 
 SEVERITIES = ["DEBUG", "INFO", "WARN", "ERROR"]
 PATHS = ["/", "/login", "/api/data", "/metrics", "/health"]
 SERVICES = ["auth-service", "web-frontend", "device-ingestor", "payment-api", "metrics-collector"]
 
 
-def generate_log(endpoint: str, count: int) -> bool:
+def generate_log(endpoint: str, count: int) -> dict:
     now_nanos = int(time.time() * 1e9)
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     severity = random.choice(SEVERITIES)
@@ -39,7 +39,7 @@ def generate_log(endpoint: str, count: int) -> bool:
                                 "body": {"stringValue": f"[{log_id}] {severity} log {count} at {timestamp}"},
                                 "attributes": [
                                     {"key": "request.path", "value": {"stringValue": path}},
-                                    {"key": "log.id", "value": {"stringValue": log_id}},
+                                    {"key": "log.id", "value": {"stringValue": log_id}}
                                 ]
                             }
                         ]
@@ -49,7 +49,6 @@ def generate_log(endpoint: str, count: int) -> bool:
         ]
     }
 
-
     try:
         response = requests.post(
             endpoint,
@@ -57,21 +56,28 @@ def generate_log(endpoint: str, count: int) -> bool:
             headers={"Content-Type": "application/json"},
             timeout=2
         )
-        if response.status_code != 200:
-            return (
-                f"HTTP {response.status_code}\n"
-                f"Response body:\n{response.text.strip() or '[empty]'}\n"
-                f"Endpoint: {endpoint}\n"
-                # f"Payload:\n{json.dumps(log_data, indent=2)}"
-            )
-        return True
+        if response.status_code == 200:
+            return {
+                "success": True,
+                "message": f"Log {count} sent successfully",
+                "log_id": log_id,
+                "status_code": response.status_code
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"HTTP {response.status_code}: {response.text.strip() or '[empty]'}",
+                "log_id": log_id,
+                "status code": response.status_code,
+            }
 
     except requests.exceptions.RequestException as e:
-        return (
-            f"⚠️ RequestException: {str(e)}\n"
-            f"Endpoint: {endpoint}\n"
-            # f"Payload:\n{json.dumps(log_data, indent=2)}"
-        )
+        return {
+            "success": False,
+            "message": f"RequestException: {str(e)}",
+            "log_id": log_id,
+        }
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate OTLP logs periodically.")
@@ -93,14 +99,11 @@ def main():
     while True:
         count += 1
         result = generate_log(endpoint, count)
-        if result is True:
-            print(f"✅ Sent log {count}")
+        if result["success"]:
+            print(f"✅ Sent log {count} (ID: {result['log_id']})")
             sent += 1
-        elif isinstance(result, str):
-            print(f"❌ Failed log {count}: {result}")
-            failed += 1
         else:
-            print(f"❌ Failed to send log {count}")
+            print(f"❌ Failed log {count} (ID: {result['log_id']}): {result['message']}")
             failed += 1
 
         if 0 < args.n <= count:
