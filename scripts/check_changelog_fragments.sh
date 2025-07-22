@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script is intended to run during CI, however it can be run locally by
 # committing changelog fragments before executing the script. If the script
