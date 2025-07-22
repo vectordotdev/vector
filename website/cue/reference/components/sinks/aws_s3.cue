@@ -104,7 +104,7 @@ components: sinks: aws_s3: components._aws & {
 		}
 
 		log_on_put: {
-			title: "Emit a log on object put"
+			title: "Emit a log when putting an object"
 			body: """
 				If you're using Vector to write objects to an s3-compatible storage, you can
 				set `VECTOR_LOG` to `vector::sinks::s3_common::service::put_object=trace` to
