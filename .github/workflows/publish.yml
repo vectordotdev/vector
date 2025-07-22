@@ -279,10 +279,11 @@ jobs:
       matrix:
         include:
           # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
+          # and to https://github.com/actions/runner-images
           - architecture: x86_64
-            runner: macos-latest-large
+            runner: macos-14-large
           - architecture: arm64
-            runner: macos-latest-xlarge
+            runner: macos-14-xlarge
     steps:
       - name: Verify Runner Architecture
         run: |
@@ -473,10 +474,11 @@ jobs:
     strategy:
       matrix:
         include:
+          # Refer to https://github.com/actions/runner-images
           - target: x86_64-apple-darwin
-            runner: macos-latest-large
+            runner: macos-14-large
           - target: arm64-apple-darwin
-            runner: macos-latest-xlarge
+            runner: macos-14
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v4
