@@ -10,6 +10,10 @@ runner:
     OTEL_COLLECTOR_SINK_PORT: '5318'
     OTEL_COLLECTOR_SOURCE_PORT: '4318'
 
+matrix:
+  # Determines which `otel/opentelemetry-collector-contrib` version to use
+  collector_version: [ 'latest' ]
+
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:
   - "src/sources/opentelemetry/**"

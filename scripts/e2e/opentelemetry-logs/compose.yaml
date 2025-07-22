@@ -1,7 +1,7 @@
 name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-source
     init: true
     volumes:
@@ -15,7 +15,10 @@ services:
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   vector:
-    image: ghcr.io/vectordotdev/vector:nightly-debian
+    build:
+      context: ../../../
+      dockerfile: ./scripts/e2e/Dockerfile
+    image: vector-e2e:opentelemetry-logs
     container_name: vector
     init: true
     depends_on:
