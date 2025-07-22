@@ -1,3 +1,0 @@
-Hello
-
-authors: me
