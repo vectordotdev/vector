@@ -27,6 +27,8 @@ if [ -z "$FRAGMENTS" ]; then
   exit 1
 fi
 
+[[ "$(wc -l <<< "$FRAGMENTS")" -gt 1000 ]] && exit 1
+
 # extract the basename from the file path
 FRAGMENTS=$(xargs -n1 basename <<< "${FRAGMENTS}")
 
