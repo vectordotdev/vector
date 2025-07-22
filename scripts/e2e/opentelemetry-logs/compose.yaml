@@ -43,7 +43,7 @@ services:
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
+        source: ${OTEL_E2E_OUTPUT_PATH}
         target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
@@ -62,4 +62,4 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     entrypoint: [ "generator/entrypoint.sh" ]
-    command: [ "--interval", "5" ]
+    command: [ "--interval", "5", "-n", "100" ]

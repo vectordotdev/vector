@@ -1,5 +1,5 @@
 features:
-- e2e-tests-datadog
+- e2e-tests-opentelemetry
 
 test: "e2e"
 
