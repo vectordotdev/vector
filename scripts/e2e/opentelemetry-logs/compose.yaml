@@ -6,7 +6,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ./otel/collector-source.yaml
+        source: ../../tests/data/e2e/opentelemetry/logs/collector-source.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
     ports:
@@ -23,9 +23,10 @@ services:
     init: true
     depends_on:
       - otel-collector-source
+      - otel-collector-sink
     volumes:
       - type: bind
-        source: ./vector/otel-to-otel-logs.yaml
+        source: ../../tests/data/e2e/opentelemetry/logs/vector.yaml
         target: /etc/vector/vector.yaml
         read_only: true
     environment:
@@ -33,18 +34,18 @@ services:
     command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
 
   otel-collector-sink:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-sink
     init: true
     depends_on:
       - vector
     volumes:
       - type: bind
-        source: ./otel/collector-sink.yaml
+        source: ../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
       - type: bind
-        source: ./otel/output
+        source: ../../tests/data/e2e/opentelemetry/logs/output
         target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
