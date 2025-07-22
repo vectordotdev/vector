@@ -37,7 +37,7 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-
+  VECTOR_LOG: ${{ env.ACTIONS_STEP_DEBUG == 'true' && 'debug' || 'info' }}
 jobs:
 
   changes:

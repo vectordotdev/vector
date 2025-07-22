@@ -26,7 +26,7 @@ services:
         target: /etc/vector/vector.yaml
         read_only: true
     environment:
-      - VECTOR_LOG=debug
+      - VECTOR_LOG
     command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
 
   otel-collector-sink:
