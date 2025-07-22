@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout)]
 use std::collections::HashSet;
 use std::{fs::read_dir, process::Command};
 

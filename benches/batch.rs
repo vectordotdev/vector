@@ -38,7 +38,7 @@ fn benchmark_batch(c: &mut Criterion) {
         .collect();
 
     for (compression, batch_size) in cases.iter() {
-        group.bench_function(format!("partitioned/{}_{}", compression, batch_size), |b| {
+        group.bench_function(format!("partitioned/{compression}_{batch_size}"), |b| {
             b.iter_batched(
                 || {
                     let rt = runtime();
@@ -69,7 +69,7 @@ fn benchmark_batch(c: &mut Criterion) {
         });
 
         group.bench_function(
-            format!("unpartitioned/{}_{}", compression, batch_size),
+            format!("unpartitioned/{compression}_{batch_size}"),
             |b| {
                 b.iter_batched(
                     || {

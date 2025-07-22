@@ -1,14 +1,15 @@
 use core::fmt;
 use std::{num::NonZeroUsize, time::Duration};
 
+use crate::common::{consume, FixedLogStream};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
-use vector::transforms::dedupe::{CacheConfig, Dedupe, DedupeConfig, FieldMatchConfig};
+use vector::transforms::dedupe::common::{CacheConfig, FieldMatchConfig};
+use vector::transforms::dedupe::config::DedupeConfig;
+use vector::transforms::dedupe::transform::Dedupe;
 use vector_lib::transform::Transform;
-
-use crate::common::{consume, FixedLogStream};
 
 #[derive(Debug)]
 struct Param {
@@ -91,8 +92,9 @@ fn dedupe(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("transform", param), &param, |b, param| {
             b.iter_batched(
                 || {
+                    let config = param.dedupe_config.clone();
                     let dedupe =
-                        Transform::event_task(Dedupe::new(param.dedupe_config.clone())).into_task();
+                        Transform::event_task(Dedupe::new(config.cache.num_events, config.fields.unwrap())).into_task();
                     (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {
