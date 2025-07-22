@@ -6,7 +6,7 @@ fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
     // Wait for the pipeline to process logs
     thread::sleep(Duration::from_secs(5));
 
-    let log_path = "./pront/otel/otel/output/logs.log";
+    let log_path = env::var("OTEL_E2E_OUTPUT_PATH").unwrap().as_str();
     let contents = fs::read_to_string(log_path)
         .expect("Failed to read otel collector sink log file");
 

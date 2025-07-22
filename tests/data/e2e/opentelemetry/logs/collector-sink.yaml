@@ -10,7 +10,7 @@ processors:
 exporters:
   debug: { }
   file:
-    path: /tmp/logs.log
+    path: /tmp/collector-sink.log
     rotation:
       max_megabytes: 10
       max_days: 1
