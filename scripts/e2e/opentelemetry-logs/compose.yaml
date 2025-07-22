@@ -37,8 +37,6 @@ services:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-sink
     init: true
-    depends_on:
-      - vector
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
