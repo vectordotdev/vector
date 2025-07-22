@@ -56,7 +56,11 @@ async fn redis_sink_sentinel_reaches_primary() {
     };
 
     let redis_connection = cnf.build_connection().await.unwrap();
-    let mut conn = redis_connection.get_connection_manager().await.unwrap().0;
+    let mut conn = redis_connection
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
 
     assert!(redis::cmd("PING")
         .query_async::<()>(&mut conn)
@@ -104,7 +108,7 @@ async fn redis_sink_sentinel_rpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().0;
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
         sink.run(input).await
@@ -119,7 +123,7 @@ async fn redis_sink_sentinel_rpush() {
         .get_connection_manager()
         .await
         .unwrap()
-        .0;
+        .connection;
 
     let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -177,7 +181,7 @@ async fn redis_sink_list_lpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().0;
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
         sink.run(input).await
@@ -192,7 +196,7 @@ async fn redis_sink_list_lpush() {
         .get_connection_manager()
         .await
         .unwrap()
-        .0;
+        .connection;
 
     let key_exists: bool = conn.exists(key.clone().to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -250,7 +254,7 @@ async fn redis_sink_list_rpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().0;
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
         sink.run(input).await
@@ -265,7 +269,7 @@ async fn redis_sink_list_rpush() {
         .get_connection_manager()
         .await
         .unwrap()
-        .0;
+        .connection;
 
     let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -493,7 +497,7 @@ async fn redis_sink_metrics() {
         .get_connection_manager()
         .await
         .unwrap()
-        .0;
+        .connection;
 
     let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);

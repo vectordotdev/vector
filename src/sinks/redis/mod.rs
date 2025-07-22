@@ -19,7 +19,7 @@ use snafu::Snafu;
 
 use crate::sinks::prelude::*;
 
-use self::config::Method;
+use self::{config::Method, sink::GenerationCount};
 
 use super::util::EncodedLength;
 
@@ -29,11 +29,11 @@ pub(super) enum RedisSinkError {
     RedisCreateFailed { source: RedisError },
     #[snafu(display(
         "Error sending query: {source}{}",
-        if let Some(id) = connection_id { format!(", conn_id={id}") } else { String::new() }
+        if let Some(gen) = generation { format!(", gen={gen}") } else { String::new() }
     ))]
     SendError {
         source: RedisError,
-        connection_id: Option<u8>,
+        generation: Option<GenerationCount>,
     },
 }
 

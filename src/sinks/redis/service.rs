@@ -2,7 +2,11 @@ use std::task::{Context, Poll};
 
 use crate::sinks::prelude::*;
 
-use super::{config::Method, sink::RedisConnection, RedisRequest, RedisSinkError};
+use super::{
+    config::Method,
+    sink::{ConnectionState, RedisConnection},
+    RedisRequest, RedisSinkError,
+};
 
 #[derive(Clone)]
 pub struct RedisService {
@@ -58,12 +62,15 @@ impl Service<RedisRequest> for RedisService {
         let byte_size = kvs.metadata.events_byte_size();
 
         Box::pin(async move {
-            let (mut conn, conn_id) = match redis_conn.get_connection_manager().await {
+            let ConnectionState {
+                connection: mut conn,
+                generation,
+            } = match redis_conn.get_connection_manager().await {
                 Ok(conn) => conn,
                 Err(error) => {
                     return Err(RedisSinkError::SendError {
                         source: error,
-                        connection_id: None,
+                        generation: None,
                     })
                 }
             };
@@ -76,7 +83,7 @@ impl Service<RedisRequest> for RedisService {
                 }),
                 Err(error) => Err(RedisSinkError::SendError {
                     source: error,
-                    connection_id: conn_id,
+                    generation,
                 }),
             }
         })

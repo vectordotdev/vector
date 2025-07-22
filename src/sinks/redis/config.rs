@@ -207,7 +207,7 @@ impl RedisSinkConfig {
 
     async fn healthcheck(conn: RedisConnection) -> crate::Result<()> {
         redis::cmd("PING")
-            .query_async(&mut conn.get_connection_manager().await?.0)
+            .query_async(&mut conn.get_connection_manager().await?.connection)
             .await
             .map_err(Into::into)
     }
