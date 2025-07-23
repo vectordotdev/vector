@@ -40,8 +40,8 @@ services:
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output/collector-sink.log
-        target: /tmp/collector-sink.log
+        source: ../../../tests/data/e2e/opentelemetry/logs/output
+        target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
