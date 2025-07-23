@@ -16,8 +16,43 @@ use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
-pub(crate) struct ComposeTest<T: ComposeTestT> {
-    test_data: std::marker::PhantomData<T>,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ComposeTestKind {
+    E2E,
+    INTEGRATION,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ComposeTestLocalConfig {
+    pub(crate) kind: ComposeTestKind,
+    pub(crate) directory: &'static str,
+    pub(crate) feature_flag: &'static str,
+}
+
+impl ComposeTestLocalConfig {
+    /// Integration tests are located in the `scripts/integration` dir,
+    /// and are the full feature flag is `all-integration-tests`.
+    pub(crate) fn integration() -> Self {
+        Self {
+            kind: ComposeTestKind::INTEGRATION,
+            directory: INTEGRATION_TESTS_DIR,
+            feature_flag: ALL_INTEGRATIONS_FEATURE_FLAG,
+        }
+    }
+
+    /// E2E tests are located in the `scripts/e2e` dir,
+    /// and are the full feature flag is `all-e2e-tests`.
+    pub(crate) fn e2e() -> Self {
+        Self {
+            kind: ComposeTestKind::E2E,
+            directory: E2E_TESTS_DIR,
+            feature_flag: E2E_FEATURE_FLAG,
+        }
+    }
+}
+
+pub(crate) struct ComposeTest {
+    local_config: ComposeTestLocalConfig,
     test_name: String,
     environment: String,
     config: ComposeTestConfig,
@@ -29,16 +64,17 @@ pub(crate) struct ComposeTest<T: ComposeTestT> {
     retries: u8,
 }
 
-impl<T: ComposeTestT> ComposeTest<T> {
+impl ComposeTest {
     pub(crate) fn generate(
+        local_config: ComposeTestLocalConfig,
         test_name: impl Into<String>,
         environment: impl Into<String>,
         build_all: bool,
         retries: u8,
-    ) -> Result<ComposeTest<T>> {
+    ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
         let environment = environment.into();
-        let (test_dir, config) = ComposeTestConfig::load(T::DIRECTORY, &test_name)?;
+        let (test_dir, config) = ComposeTestConfig::load(local_config.directory, &test_name)?;
         let envs_dir = EnvsDir::new(&test_name);
         let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
@@ -59,7 +95,7 @@ impl<T: ComposeTestT> ComposeTest<T> {
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
         Ok(ComposeTest {
-            test_data: Default::default(),
+            local_config,
             test_name,
             environment,
             config,
@@ -92,7 +128,7 @@ impl<T: ComposeTestT> ComposeTest<T> {
         args.push("--features".to_string());
 
         args.push(if self.build_all {
-            T::FEATURE_FLAG.to_string()
+            self.local_config.feature_flag.to_string()
         } else {
             self.config.features.join(",")
         });
@@ -127,7 +163,7 @@ impl<T: ComposeTestT> ComposeTest<T> {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            T::DIRECTORY,
+            self.local_config.directory,
         )?;
 
         if !active {
@@ -141,9 +177,9 @@ impl<T: ComposeTestT> ComposeTest<T> {
         // For end-to-end tests, we want to run vector as a service, leveraging the
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
-        if T::DIRECTORY == E2E_TESTS_DIR {
+        if self.local_config.kind == ComposeTestKind::E2E {
             self.runner
-                .build(Some(&self.config.features), T::DIRECTORY)?;
+                .build(Some(&self.config.features), self.local_config.directory)?;
         }
 
         self.config.check_required()?;
@@ -176,32 +212,6 @@ impl<T: ComposeTestT> ComposeTest<T> {
 
         Ok(())
     }
-}
-
-pub(crate) trait ComposeTestT {
-    const DIRECTORY: &'static str;
-
-    const FEATURE_FLAG: &'static str;
-}
-
-/// Integration tests are located in the `scripts/integration` dir,
-/// and are the full feature flag is `all-integration-tests`.
-pub(crate) struct IntegrationTest;
-
-impl ComposeTestT for IntegrationTest {
-    const DIRECTORY: &'static str = INTEGRATION_TESTS_DIR;
-
-    const FEATURE_FLAG: &'static str = ALL_INTEGRATIONS_FEATURE_FLAG;
-}
-
-/// E2E tests are located in the `scripts/e2e` dir,
-/// and are the full feature flag is `all-e2e-tests`.
-pub(crate) struct E2ETest;
-
-impl ComposeTestT for E2ETest {
-    const DIRECTORY: &'static str = E2E_TESTS_DIR;
-
-    const FEATURE_FLAG: &'static str = E2E_FEATURE_FLAG;
 }
 
 struct Compose {
