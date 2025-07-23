@@ -52,7 +52,12 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                     .and_then(|attributes| {
                         attributes.iter().find_map(|attribute| {
                             if attribute.get("key")?.as_str()? == "count" {
-                                attribute.get("value")?.get("intValue")?.as_str()?.parse::<u64>().ok()
+                                attribute
+                                    .get("value")?
+                                    .get("intValue")?
+                                    .as_str()?
+                                    .parse::<u64>()
+                                    .ok()
                             } else {
                                 None
                             }
