@@ -216,7 +216,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.baseline-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: baseline-image
           path: "${{ runner.temp }}/baseline-image.tar"
@@ -255,7 +255,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.comparison-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: comparison-image
           path: "${{ runner.temp }}/comparison-image.tar"
@@ -408,7 +408,7 @@ jobs:
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
@@ -523,7 +523,7 @@ jobs:
           path: ${{ runner.temp }}/outputs/report.md
 
       - name: Upload regression report to artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
