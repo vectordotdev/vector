@@ -47,7 +47,6 @@ Modules:
   wasm-pack
   markdownlint
   datadog-ci
-  release-flags
 
 If a module requires rust then rustup will be automatically installed.
 By default, all modules are installed. To install only a subset:
