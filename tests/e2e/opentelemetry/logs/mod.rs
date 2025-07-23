@@ -2,6 +2,8 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::timeout;
+use tracing::debug;
+
 const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30); // Adjustable timeout
 const POLLING_INTERVAL: Duration = Duration::from_millis(500); // Poll every 500ms
 
@@ -22,7 +24,7 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
     // Defined in scripts/e2e/opentelemetry-logs/compose.yaml.
     let expected_number_of_logs: u64 = 100;
 
-    let mut previous_log_id: Option<u64> = None;
+    let mut previous_count: Option<u64> = None;
     let mut total_log_lines_found = 0;
 
     let result = timeout(MAXIMUM_WAITING_DURATION, async {
@@ -34,6 +36,7 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                     continue;
                 }
             };
+            debug!("Read: {log_file_contents}");
 
             total_log_lines_found = 0;
             for (line_index, line_content) in log_file_contents.lines().enumerate() {
@@ -41,29 +44,29 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                     continue;
                 }
                 let json_value: Value = serde_json::from_str(line_content).unwrap_or_else(|_| panic!("Line {line_index} is not valid JSON: {line_content}"));
-                // Traverse to the log.id field
-                let log_id_string = json_value
+                let count_value = json_value
                     .pointer("/resourceLogs/0/scopeLogs/0/logRecords/0/attributes")
                     .and_then(|attributes| attributes.as_array())
                     .and_then(|attributes| {
                         attributes.iter().find_map(|attribute| {
-                            if attribute.get("key")?.as_str()? == "log.id" {
-                                attribute.get("value")?.get("stringValue")?.as_str()
+                            if attribute.get("key")?.as_str()? == "count" {
+                                attribute.get("value")?.get("intValue")?.as_u64()
                             } else {
                                 None
                             }
                         })
                     })
-                    .expect("Missing log.id attribute");
-                let log_id_numeric: u64 = log_id_string.parse().expect("log.id is not numeric");
+                    .expect("Missing count attribute");
 
-                if let Some(previous) = previous_log_id {
+                if let Some(previous) = previous_count {
                     assert!(
-                        log_id_numeric > previous,
-                        "log.id not monotonically increasing: previous={previous} current={log_id_numeric}"
+                        count_value > previous,
+                        "count not monotonically increasing: previous={} current={}",
+                        previous,
+                        count_value
                     );
                 }
-                previous_log_id = Some(log_id_numeric);
+                previous_count = Some(count_value);
                 total_log_lines_found += 1;
             }
 

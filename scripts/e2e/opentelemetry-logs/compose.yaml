@@ -42,9 +42,13 @@ services:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/output
         target: /tmp
+      - type: bind
+        source: ./otel-collector-sink/entrypoint.sh
+        target: /entrypoint.sh
+        read_only: true
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
-    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+    entrypoint: [ "/entrypoint.sh" ]
 
   vector:
     build:

@@ -39,7 +39,8 @@ def generate_log(endpoint: str, count: int) -> dict:
                                 "body": {"stringValue": f"[{log_id}] {severity} log {count} at {timestamp}"},
                                 "attributes": [
                                     {"key": "request.path", "value": {"stringValue": path}},
-                                    {"key": "log.id", "value": {"stringValue": log_id}}
+                                    {"key": "log.id", "value": {"stringValue": log_id}},
+                                    {"key": "count", "value": {"intValue": count}}
                                 ]
                             }
                         ]
