@@ -61,7 +61,7 @@ jobs:
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest
+      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
 
       - name: Unit Test
         run: make test

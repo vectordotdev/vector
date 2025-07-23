@@ -45,7 +45,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh --modules=cargo-nextest
+      - run: bash scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test-cli
       - name: Upload test results
