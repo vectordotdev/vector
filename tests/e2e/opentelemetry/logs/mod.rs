@@ -1,7 +1,7 @@
 use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::{io::AsyncBufReadExt, time::timeout};
+use tokio::time::timeout;
 const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30); // Adjustable timeout
 const POLLING_INTERVAL: Duration = Duration::from_millis(500); // Poll every 500ms
 
@@ -40,10 +40,7 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                 if line_content.trim().is_empty() {
                     continue;
                 }
-                let json_value: Value = serde_json::from_str(line_content).expect(&format!(
-                    "Line {} is not valid JSON: {}",
-                    line_index, line_content
-                ));
+                let json_value: Value = serde_json::from_str(line_content).unwrap_or_else(|_| panic!("Line {line_index} is not valid JSON: {line_content}"));
                 // Traverse to the log.id field
                 let log_id_string = json_value
                     .pointer("/resourceLogs/0/scopeLogs/0/logRecords/0/attributes")
@@ -63,9 +60,7 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                 if let Some(previous) = previous_log_id {
                     assert!(
                         log_id_numeric > previous,
-                        "log.id not monotonically increasing: previous={} current={}",
-                        previous,
-                        log_id_numeric
+                        "log.id not monotonically increasing: previous={previous} current={log_id_numeric}"
                     );
                 }
                 previous_log_id = Some(log_id_numeric);
@@ -84,10 +79,9 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
     match result {
         Ok(log_count) => assert_eq!(
             log_count, expected_number_of_logs,
-            "Expected {} logs, but found {}",
-            expected_number_of_logs, log_count
+            "Expected {expected_number_of_logs} logs, but found {log_count}"
         ),
-        Err(_) => panic!("Test timed out after {:?}", MAXIMUM_WAITING_DURATION),
+        Err(_) => panic!("Test timed out after {MAXIMUM_WAITING_DURATION:?}"),
     }
 
     assert!(

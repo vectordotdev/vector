@@ -13,6 +13,7 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         .collect()
 });
 
+#[derive(Debug)]
 pub struct EnvsDir {
     path: PathBuf,
 }

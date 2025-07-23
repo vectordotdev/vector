@@ -973,6 +973,9 @@ e2e-tests-datadog = [
 e2e-tests-opentelemetry = [
   "sources-opentelemetry",
   "sinks-opentelemetry",
+  "sources-internal_metrics",
+  "transforms-remap",
+  "sinks-console"
 ]
 
 vector-api-tests = [

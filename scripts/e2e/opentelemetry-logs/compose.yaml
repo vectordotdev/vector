@@ -14,6 +14,38 @@ services:
       - "${OTEL_COLLECTOR_SOURCE_HTTP_PORT:-4318}:4318"
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
+  logs-generator:
+    image: python:3.11-alpine
+    container_name: logs-generator
+    build:
+      context: ./generator
+    init: true
+    depends_on:
+      - otel-collector-source
+    volumes:
+      - type: bind
+        source: ./generator
+        target: /generator
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: [ "python", "/generator/logs_generator.py", "--interval", "5", "-n", "100" ]
+
+  otel-collector-sink:
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
+    container_name: otel-collector-sink
+    init: true
+    volumes:
+      - type: bind
+        source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: bind
+        source: ../../../tests/data/e2e/opentelemetry/logs/output/collector-sink.log
+        target: /tmp/collector-sink.log
+    ports:
+      - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
   vector:
     build:
       context: ../../../
@@ -36,35 +68,4 @@ services:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
       - OTEL_E2E_OUTPUT_PATH
-    command: [ "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
-
-  otel-collector-sink:
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
-    container_name: otel-collector-sink
-    init: true
-    volumes:
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
-        target: /etc/otelcol-contrib/config.yaml
-        read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output/collector-sink.log
-        target: /tmp
-    ports:
-      - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
-    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
-
-  logs-generator:
-    image: python:3.11-alpine
-    container_name: logs-generator
-    init: true
-    depends_on:
-      - otel-collector-source
-    volumes:
-      - type: bind
-        source: ./generator
-        target: /generator
-    environment:
-      - PYTHONUNBUFFERED=1
-    entrypoint: [ "generator/entrypoint.sh" ]
-    command: [ "--interval", "5", "-n", "100" ]
+    command: [ "vector", "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]

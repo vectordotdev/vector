@@ -1,6 +1,3 @@
-api:
-  enabled: true
-
 sources:
   source0:
     type: opentelemetry
@@ -74,8 +71,6 @@ sinks:
       - remap_otel
     encoding:
       codec: json
-    framing:
-      method: newline_delimited
 
   metrics_console_sink:
     type: console
