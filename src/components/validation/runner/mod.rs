@@ -192,6 +192,7 @@ impl Runner {
         }
     }
 
+    #[allow(clippy::print_stdout)]
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();

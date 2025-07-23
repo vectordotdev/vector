@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script is intended to run during CI, however it can be run locally by
 # committing changelog fragments before executing the script. If the script
@@ -26,6 +26,8 @@ if [ -z "$FRAGMENTS" ]; then
   echo "For details, see 'changelog.d/README.md'"
   exit 1
 fi
+
+[[ "$(wc -l <<< "$FRAGMENTS")" -gt "${MAX_FRAGMENTS:-1000}" ]] && exit 1
 
 # extract the basename from the file path
 FRAGMENTS=$(xargs -n1 basename <<< "${FRAGMENTS}")
