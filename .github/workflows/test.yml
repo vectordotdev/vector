@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-fmt
@@ -44,7 +44,7 @@ jobs:
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
@@ -57,7 +57,7 @@ jobs:
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - run: make check-version
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: make check-scripts
 
   check-events:
@@ -100,7 +100,7 @@ jobs:
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-events
@@ -111,7 +111,7 @@ jobs:
     if: needs.changes.outputs.dependencies == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: cargo install dd-rust-license-tool --version 1.0.2 --force --locked
       - run: make check-licenses
 
@@ -121,7 +121,7 @@ jobs:
     if: needs.changes.outputs.cue == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: make check-docs
 
@@ -131,7 +131,7 @@ jobs:
     if: needs.changes.outputs.markdown == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: sudo npm -g install markdownlint-cli@0.30
       - run: make check-markdown
 
@@ -141,7 +141,7 @@ jobs:
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
@@ -153,7 +153,7 @@ jobs:
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cd rust-doc && make docs
@@ -164,7 +164,7 @@ jobs:
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: sudo bash ./scripts/environment/install-protoc.sh
@@ -177,7 +177,7 @@ jobs:
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
     needs: changes
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install --force --locked --version 0.13.1 wasm-pack

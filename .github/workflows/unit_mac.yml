@@ -24,13 +24,13 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - uses: actions/cache@v4
         name: Cache Cargo registry + index
