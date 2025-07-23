@@ -97,6 +97,7 @@ fn test_timely_shutdown(cmd: Command) {
 }
 
 /// Returns stdout output
+#[allow(clippy::print_stdout)]
 fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
