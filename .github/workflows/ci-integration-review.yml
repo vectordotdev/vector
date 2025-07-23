@@ -146,7 +146,7 @@ jobs:
           max_attempts: 3
           command: bash scripts/int-e2e-test.sh e2e datadog-metrics
 
-      - name: datadog-e2e-metrics
+      - name: e2e-opentelemetry-logs
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-logs')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}

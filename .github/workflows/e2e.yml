@@ -99,7 +99,7 @@ jobs:
 
       - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
-        name: E2E OpenTelemetry Logs
+        name: e2e-opentelemetry-logs
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 35
