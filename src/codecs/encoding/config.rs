@@ -114,9 +114,9 @@ impl EncodingConfigWithFraming {
                 CharacterDelimitedEncoder::new(0).into()
             }
             (None, Serializer::Protobuf(_)) => {
-                // Protobuf uses varint length-delimited messages, see:
+                // Protobuf uses length-delimited messages, see:
                 // https://developers.google.com/protocol-buffers/docs/techniques#streaming
-                VarintLengthDelimitedEncoder::default().into()
+                LengthDelimitedEncoder::default().into()
             }
             (
                 None,

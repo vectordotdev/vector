@@ -15,7 +15,7 @@ sources:
     framing:
       method: varint_length_delimited
 
-# Alternative: using the default framing (varint is now default for protobuf)
+# Alternative: using the default framing (length_delimited is default for protobuf)
 sources:
   protobuf_source_default:
     type: socket
@@ -26,7 +26,7 @@ sources:
       protobuf:
         desc_file: "path/to/your/protobuf.desc"
         message_type: "your.package.MessageType"
-    # No framing specified - will use varint_length_delimited by default
+    # No framing specified - will use length_delimited by default
 
 # Sink configuration with explicit varint framing
 sinks:
@@ -42,7 +42,7 @@ sinks:
     framing:
       method: varint_length_delimited
 
-# Alternative: using the default framing (varint is now default for protobuf)
+# Alternative: using the default framing (length_delimited is default for protobuf)
 sinks:
   protobuf_sink_default:
     type: socket
@@ -53,7 +53,7 @@ sinks:
       protobuf:
         desc_file: "path/to/your/protobuf.desc"
         message_type: "your.package.MessageType"
-    # No framing specified - will use varint_length_delimited by default
+    # No framing specified - will use length_delimited by default
 
 # Complete pipeline example
 sources:
@@ -89,4 +89,4 @@ topology:
   sinks:
     - output
   edges:
-    - input -> output 
+    - input -> output

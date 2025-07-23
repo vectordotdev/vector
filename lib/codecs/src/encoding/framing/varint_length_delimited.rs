@@ -143,4 +143,4 @@ mod tests {
         encoder.encode((), &mut buffer).unwrap();
         assert_eq!(buffer.len(), 0);
     }
-} 
+}

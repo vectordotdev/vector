@@ -214,8 +214,8 @@ mod tests {
 
         // First decode should succeed
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), Bytes::from("foo"));
-        
+
         // Second decode should fail with trailing data
         assert!(decoder.decode_eof(&mut input).is_err());
     }
-} 
+}

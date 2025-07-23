@@ -38,7 +38,7 @@ fn test_varint_framing_roundtrip() {
                 break;
             }
             Err(e) => {
-                panic!("Decoding error: {:?}", e);
+                panic!("Decoding error: {e:?}");
             }
         }
     }
@@ -122,4 +122,4 @@ fn test_varint_framing_config() {
         max_frame_length: 1000,
     };
     let _decoder = decoder_config.build();
-} 
+}
