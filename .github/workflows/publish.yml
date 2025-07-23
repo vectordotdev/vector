@@ -583,7 +583,7 @@ jobs:
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
           REPOS: "timberio/vector,ghcr.io/vectordotdev/vector"
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 15
           max_attempts: 3
