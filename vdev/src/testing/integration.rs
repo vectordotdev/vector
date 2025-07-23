@@ -16,7 +16,8 @@ use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
-pub(crate) struct ComposeTest {
+pub(crate) struct ComposeTest<T: ComposeTestT> {
+    test_data: std::marker::PhantomData<T>,
     test_name: String,
     environment: String,
     config: ComposeTestConfig,
@@ -28,20 +29,16 @@ pub(crate) struct ComposeTest {
     retries: u8,
 }
 
-pub(crate) trait ComposeTestT {
-    const DIRECTORY: &'static str;
-
-    const FEATURE_FLAG: &'static str;
-
-    fn generate(
+impl<T: ComposeTestT> ComposeTest<T> {
+    pub(crate) fn generate(
         test_name: impl Into<String>,
         environment: impl Into<String>,
         build_all: bool,
         retries: u8,
-    ) -> Result<ComposeTest> {
-        let test_name = test_name.into();
+    ) -> Result<ComposeTest<T>> {
+        let test_name: String = test_name.into();
         let environment = environment.into();
-        let (test_dir, config) = ComposeTestConfig::load(Self::DIRECTORY, &test_name)?;
+        let (test_dir, config) = ComposeTestConfig::load(T::DIRECTORY, &test_name)?;
         let envs_dir = EnvsDir::new(&test_name);
         let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
@@ -62,6 +59,7 @@ pub(crate) trait ComposeTestT {
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
         Ok(ComposeTest {
+            test_data: Default::default(),
             test_name,
             environment,
             config,
@@ -74,35 +72,33 @@ pub(crate) trait ComposeTestT {
         })
     }
 
-    fn test(compose_test: &ComposeTest, extra_args: Vec<String>) -> Result<()> {
-        let active = compose_test
-            .envs_dir
-            .check_active(&compose_test.environment)?;
-        compose_test.config.check_required()?;
+    pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
+        let active = self.envs_dir.check_active(&self.environment)?;
+        self.config.check_required()?;
 
         if !active {
-            Self::start(compose_test)?;
+            self.start()?;
         }
 
-        let mut env_vars = compose_test.config.env.clone();
+        let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in config_env(&compose_test.env_config) {
+        for (key, value) in config_env(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
 
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
-        let mut args = compose_test.config.args.clone().unwrap_or_default();
+        let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
 
-        args.push(if compose_test.build_all {
-            Self::FEATURE_FLAG.to_string()
+        args.push(if self.build_all {
+            T::FEATURE_FLAG.to_string()
         } else {
-            compose_test.config.features.join(",")
+            self.config.features.join(",")
         });
 
         // If the test field is not present then use the --lib flag
-        match compose_test.config.test {
+        match self.config.test {
             Some(ref test_arg) => {
                 args.push("--test".to_string());
                 args.push(test_arg.to_string());
@@ -111,7 +107,7 @@ pub(crate) trait ComposeTestT {
         }
 
         // Ensure the test_filter args are passed as well
-        if let Some(ref filter) = compose_test.config.test_filter {
+        if let Some(ref filter) = self.config.test_filter {
             args.push(filter.to_string());
         }
         args.extend(extra_args);
@@ -121,71 +117,71 @@ pub(crate) trait ComposeTestT {
             args.push("--no-capture".to_string());
         }
 
-        if compose_test.retries > 0 {
+        if self.retries > 0 {
             args.push("--retries".to_string());
-            args.push(compose_test.retries.to_string());
+            args.push(self.retries.to_string());
         }
 
-        compose_test.runner.test(
+        self.runner.test(
             &env_vars,
-            &compose_test.config.runner.env,
-            Some(&compose_test.config.features),
+            &self.config.runner.env,
+            Some(&self.config.features),
             &args,
-            Self::DIRECTORY,
+            T::DIRECTORY,
         )?;
 
         if !active {
-            compose_test.runner.remove()?;
-            Self::stop(compose_test)?;
+            self.runner.remove()?;
+            self.stop()?;
         }
         Ok(())
     }
 
-    fn start(compose_test: &ComposeTest) -> Result<()> {
+    pub(crate) fn start(&self) -> Result<()> {
         // For end-to-end tests, we want to run vector as a service, leveraging the
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
-        if Self::DIRECTORY == E2E_TESTS_DIR {
-            compose_test
-                .runner
-                .build(Some(&compose_test.config.features), Self::DIRECTORY)?;
+        if T::DIRECTORY == E2E_TESTS_DIR {
+            self.runner
+                .build(Some(&self.config.features), T::DIRECTORY)?;
         }
 
-        compose_test.config.check_required()?;
-        if let Some(compose) = &compose_test.compose {
-            compose_test.runner.ensure_network()?;
+        self.config.check_required()?;
+        if let Some(compose) = &self.compose {
+            self.runner.ensure_network()?;
 
-            if compose_test
-                .envs_dir
-                .check_active(&compose_test.environment)?
-            {
+            if self.envs_dir.check_active(&self.environment)? {
                 bail!("environment is already up");
             }
 
-            compose.start(&compose_test.env_config)?;
+            compose.start(&self.env_config)?;
 
-            compose_test
-                .envs_dir
-                .save(&compose_test.environment, &compose_test.env_config)
+            self.envs_dir.save(&self.environment, &self.env_config)
         } else {
             Ok(())
         }
     }
 
-    fn stop(compose_test: &ComposeTest) -> Result<()> {
-        if let Some(compose) = &compose_test.compose {
+    pub(crate) fn stop(&self) -> Result<()> {
+        if let Some(compose) = &self.compose {
             // TODO: Is this check really needed?
-            if compose_test.envs_dir.load()?.is_none() {
-                bail!("No environment for {} is up.", compose_test.test_name);
+            if self.envs_dir.load()?.is_none() {
+                bail!("No environment for {} is up.", self.test_name);
             }
 
-            compose_test.runner.remove()?;
+            self.runner.remove()?;
             compose.stop()?;
-            compose_test.envs_dir.remove()?;
+            self.envs_dir.remove()?;
         }
 
         Ok(())
     }
+}
+
+pub(crate) trait ComposeTestT {
+    const DIRECTORY: &'static str;
+
+    const FEATURE_FLAG: &'static str;
 }
 
 /// Integration tests are located in the `scripts/integration` dir,

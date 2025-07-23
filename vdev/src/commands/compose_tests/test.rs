@@ -1,6 +1,10 @@
 use anyhow::{bail, Result};
 
-use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT, state::EnvsDir};
+use crate::testing::{
+    config::ComposeTestConfig,
+    integration::{ComposeTest, ComposeTestT},
+    state::EnvsDir,
+};
 
 pub fn exec<T: ComposeTestT>(
     integration: &str,
@@ -18,20 +22,18 @@ pub fn exec<T: ComposeTestT>(
         (Some(environment), Some(active)) if environment != active => {
             bail!("Requested environment {environment:?} does not match active one {active:?}")
         }
-        (Some(environment), _) => T::test(
-            &T::generate(integration, environment, build_all, retries)?,
-            args.to_owned(),
-        ),
-        (None, Some(active)) => T::test(
-            &T::generate(integration, active, build_all, retries)?,
-            args.to_owned(),
-        ),
+        (Some(environment), _) => {
+            ComposeTest::<T>::generate(integration, environment, build_all, retries)?
+                .test(args.to_owned())
+        }
+        (None, Some(active)) => {
+            ComposeTest::<T>::generate(integration, active, build_all, retries)?
+                .test(args.to_owned())
+        }
         (None, None) => {
             for env_name in envs.keys() {
-                T::test(
-                    &T::generate(integration, env_name, build_all, retries)?,
-                    args.to_owned(),
-                )?;
+                ComposeTest::<T>::generate(integration, env_name, build_all, retries)?
+                    .test(args.to_owned())?;
             }
             Ok(())
         }

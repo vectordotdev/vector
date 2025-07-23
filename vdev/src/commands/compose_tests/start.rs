@@ -1,6 +1,9 @@
 use anyhow::Result;
 
-use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT};
+use crate::testing::{
+    config::ComposeTestConfig,
+    integration::{ComposeTest, ComposeTestT},
+};
 
 pub(crate) fn exec<T: ComposeTestT>(
     integration: &str,
@@ -16,5 +19,5 @@ pub(crate) fn exec<T: ComposeTestT>(
         env.clone()
     };
 
-    T::start(&T::generate(integration, environment, build_all, 0)?)
+    ComposeTest::<T>::generate(integration, environment, build_all, 0)?.start()
 }
