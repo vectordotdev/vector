@@ -82,7 +82,7 @@ def generate_log(endpoint: str, count: int) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate OTLP logs periodically.")
-    parser.add_argument("--interval", type=float, default=5.0, help="Seconds between log sends (default: 5)")
+    parser.add_argument("--interval", type=float, default=0.1, help="Seconds between log sends")
     parser.add_argument("-n", type=int, default=0, help="Total logs to send (0 or negative = infinite)")
     parser.add_argument("--host", type=str, default="otel-collector-source", help="Host for the OTLP collector")
     parser.add_argument("--port", type=int, default=4318, help="Port for OTLP HTTP logs")

@@ -28,7 +28,7 @@ services:
         target: /generator
     environment:
       - PYTHONUNBUFFERED=1
-    command: [ "python", "/generator/logs_generator.py", "--interval", "5", "-n", "100" ]
+    command: [ "python", "/generator/logs_generator.py", "-n", "100" ]
 
   otel-collector-sink:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
@@ -72,4 +72,4 @@ services:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
       - OTEL_E2E_OUTPUT_PATH
-    command: [ "vector", "-c", "/etc/vector/vector.yaml", "--internal-log-rate-limit", "100" ]
+    command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
