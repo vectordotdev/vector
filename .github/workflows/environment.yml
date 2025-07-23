@@ -62,7 +62,7 @@ jobs:
             org.opencontainers.image.title=Vector development environment
             org.opencontainers.image.url=https://github.com/vectordotdev/vector
       - name: Build and push
-        uses: docker/build-push-action@v6.18.0
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: ./scripts/environment/Dockerfile
