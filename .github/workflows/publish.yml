@@ -64,7 +64,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         run: make package-x86_64-unknown-linux-musl-all
       - name: Stage package artifacts for publish
@@ -76,8 +76,8 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     name: Build Vector for x86_64-unknown-linux-gnu (.tar.gz, DEB, RPM)
     runs-on: release-builder-linux
-    needs: generate-publish-metadata
     timeout-minutes: 60
+    needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
@@ -90,7 +90,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         run: make package-x86_64-unknown-linux-gnu-all
       - name: Stage package artifacts for publish
@@ -116,7 +116,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
@@ -144,7 +144,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
@@ -172,7 +172,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
@@ -200,7 +200,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
@@ -228,7 +228,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"
@@ -242,6 +242,7 @@ jobs:
   build-arm-unknown-linux-musleabi-packages:
     name: Build Vector for arm-unknown-linux-musleabi (.tar.gz)
     runs-on: release-builder-linux
+    timeout-minutes: 60
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -255,7 +256,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
       - name: Build Vector
         env:
           DOCKER_PRIVILEGED: "true"

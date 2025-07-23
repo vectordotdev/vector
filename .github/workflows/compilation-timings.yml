@@ -18,7 +18,7 @@ jobs:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
@@ -34,7 +34,7 @@ jobs:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
@@ -45,7 +45,7 @@ jobs:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
 
@@ -56,7 +56,7 @@ jobs:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
       - run: touch src/app.rs
@@ -69,6 +69,6 @@ jobs:
       - uses: colpal/actions-clean@v1
       - uses: actions/checkout@v4
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo check

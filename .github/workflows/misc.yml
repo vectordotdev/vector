@@ -46,7 +46,7 @@ jobs:
 
       - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test-behavior
       - run: make check-examples

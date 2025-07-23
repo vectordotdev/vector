@@ -58,7 +58,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=cargo-deny
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Check cargo deny advisories/licenses
         run: make check-deny
