@@ -28,6 +28,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
       # Perform breaking change detection against the `master` branch
-      - uses: bufbuild/buf-breaking-action@v1.1.4
+      - uses: bufbuild/buf-breaking-action@c57b3d842a5c3f3b454756ef65305a50a587c5ba # v1.1.4
         with:
           against: "https://github.com/vectordotdev/vector.git#branch=master"
