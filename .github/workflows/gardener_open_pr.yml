@@ -20,7 +20,7 @@ jobs:
         with:
           app_id: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
-      - uses: tspascoal/get-user-teams-membership@v3
+      - uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         id: checkVectorMember
         with:
           username: ${{ github.actor }}
