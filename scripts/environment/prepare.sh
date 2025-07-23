@@ -7,6 +7,7 @@ ALL_MODULES=(
   cross
   cargo-nextest
   cargo-deny
+  cargo-msrv
   dd-rust-license-tool
   wasm-pack
   markdownlint
@@ -43,6 +44,7 @@ Modules:
   cross
   cargo-nextest
   cargo-deny
+  cargo-msrv
   dd-rust-license-tool
   wasm-pack
   markdownlint
@@ -76,7 +78,7 @@ contains_module() {
 git config --global --add safe.directory "$(pwd)"
 
 if ! contains_module rustup; then
-  REQUIRES_RUSTUP=(cargo-deb cross cargo-nextest cargo-deny dd-rust-license-tool wasm-pack)
+  REQUIRES_RUSTUP=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv dd-rust-license-tool wasm-pack)
   for tool in "${REQUIRES_RUSTUP[@]}"; do
     if contains_module "$tool"; then
       MODULES=(rustup "${MODULES[@]}")
@@ -113,6 +115,12 @@ fi
 if contains_module cargo-deny; then
   if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.16.2'; then
     rustup run stable cargo install cargo-deny --version 0.16.2 --force --locked
+  fi
+fi
+
+if contains_module cargo-msrv; then
+  if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
+    rustup run stable cargo install cargo-msrv --version 0.18.4 --force --locked
   fi
 fi
 
