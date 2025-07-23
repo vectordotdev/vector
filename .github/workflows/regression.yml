@@ -190,7 +190,7 @@ jobs:
       - should-run-gate
       - resolve-inputs
     steps:
-      - uses: colpal/actions-clean@v1
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -229,7 +229,7 @@ jobs:
       - should-run-gate
       - resolve-inputs
     steps:
-      - uses: colpal/actions-clean@v1
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
