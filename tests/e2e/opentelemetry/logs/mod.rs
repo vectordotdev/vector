@@ -43,7 +43,9 @@ async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
                 if line_content.trim().is_empty() {
                     continue;
                 }
-                let json_value: Value = serde_json::from_str(line_content).unwrap_or_else(|_| panic!("Line {line_index} is not valid JSON: {line_content}"));
+                let json_value: Value = serde_json::from_str(line_content).unwrap_or_else(|_| {
+                    panic!("Line {line_index} is not valid JSON: {line_content}")
+                });
                 let count_value = json_value
                     .pointer("/resourceLogs/0/scopeLogs/0/logRecords/0/attributes")
                     .and_then(|attributes| attributes.as_array())
