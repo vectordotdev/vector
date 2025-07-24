@@ -133,7 +133,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
                 // if the reader task finishes in time, extract its output
                 res = blocked_read => res,
                 // otherwise panics after 1s
-                _ = sleep(Duration::from_secs(1)) => {
+                () = sleep(Duration::from_secs(1)) => {
                     panic!("Reader not ready after 1s");
                 }
             };
