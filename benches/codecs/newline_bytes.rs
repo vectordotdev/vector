@@ -50,8 +50,8 @@ fn decoding(c: &mut Criterion) {
                         let framer = Framer::NewlineDelimited(
                             param
                                 .max_length
-                                .map(|ml| NewlineDelimitedDecoder::new_with_max_length(ml))
-                                .unwrap_or(NewlineDelimitedDecoder::new()),
+                                .map(NewlineDelimitedDecoder::new_with_max_length)
+                                .unwrap_or_default(),
                         );
                         let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = vector::codecs::Decoder::new(framer, deserializer);

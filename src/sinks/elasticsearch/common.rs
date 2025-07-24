@@ -241,7 +241,7 @@ impl ElasticsearchCommon {
     // extract the authentication from config or endpoint
     async fn extract_auth(
         config: &ElasticsearchConfig,
-        proxy_config: &ProxyConfig,
+        #[cfg_attr(not(feature = "aws-core"), allow(unused_variables))] proxy_config: &ProxyConfig,
         uri: &UriSerde,
     ) -> crate::Result<Option<Auth>> {
         let auth = match &config.auth {
