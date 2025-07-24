@@ -12,7 +12,7 @@ SEVERITIES = ["DEBUG", "INFO", "WARN", "ERROR"]
 PATHS = ["/", "/login", "/api/data", "/metrics", "/health"]
 
 def generate_log(endpoint: str, count: int) -> dict:
-    now_nanos = int(time.time() * 1e9)
+    now_nanos = time.time_ns()
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     severity = random.choice(SEVERITIES)
     log_id = str(uuid.uuid4())[:8]
