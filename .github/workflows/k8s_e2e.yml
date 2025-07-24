@@ -95,8 +95,8 @@ jobs:
 
       - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: ~/.cargo/bin/rustup target add x86_64-unknown-linux-gnu
+      - run: bash scripts/environment/prepare.sh --modules=rustup,cross
+      - run: rustup target add x86_64-unknown-linux-gnu
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 

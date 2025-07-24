@@ -63,7 +63,7 @@ jobs:
         with:
           submodules: "recursive"
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - run: docker image prune -af ; docker container prune -f
 

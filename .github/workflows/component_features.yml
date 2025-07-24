@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-component-features
 

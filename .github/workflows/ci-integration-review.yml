@@ -99,7 +99,7 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - run: docker image prune -af ; docker container prune -f
 
@@ -123,7 +123,7 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - run: docker image prune -af ; docker container prune -f
       - name: e2e-datadog-logs
