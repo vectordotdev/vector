@@ -2,22 +2,13 @@
 
 This end-to-end (E2E) test validates that log events generated in a container are correctly ingested by Vector, processed, and forwarded to an OpenTelemetry Collector sink, where they are exported to a file for verification.
 
-## What the Test Does
-
-- **Generates logs** using a custom log generator container.
-- **Forwards logs** to Vector via the OpenTelemetry Protocol (OTLP).
-- **Processes logs** in Vector, including optional remapping/transformation.
-- **Sends logs** from Vector to an OTEL Collector sink using OTLP HTTP.
-- **Exports logs** from the OTEL Collector sink to a file (`output/collector-file-exporter.log`).
-- **Test script** (`tests/e2e/opentelemetry/logs/mod.rs`) reads the exported file and asserts that expected log events are present, confirming end-to-end delivery.
-
-## What the Docker Compose Does
+## How this test works
 
 - **Orchestrates all required services:**
-  - **Log generator**: Emits synthetic OTLP logs at a configurable interval.
-  - **Vector**: Receives, optionally transforms, and forwards logs.
-  - **OTEL Collector Source**: (optional) Forwards or processes logs upstream.
-  - **OTEL Collector Sink**: Receives logs from Vector and writes them to a file and/or outputs to debug.
+  - **Log generator**: Emits fake OTLP logs.
+  - **Vector**: Receives, transforms, and forwards logs to the OTEL sink and a file.
+  - **OTEL Collector Source**: Forwards or processes logs upstream.
+  - **OTEL Collector Sink**: Receives logs from Vector and writes them to a file.
 - **Mounts volumes** to share configuration and output files between containers and the host.
 - **Exposes ports** for OTLP HTTP ingestion and for accessing Vector/collector APIs if needed.
 
