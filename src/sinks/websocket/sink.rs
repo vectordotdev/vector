@@ -251,7 +251,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-                common: WebSocketCommonConfig {
+            common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
                 tls: None,
                 ping_interval: None,
@@ -276,7 +276,7 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-                common: WebSocketCommonConfig {
+            common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
                 tls: None,
                 ping_interval: None,
@@ -299,7 +299,6 @@ mod tests {
         let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
-    
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("wss://{addr}"),
@@ -314,8 +313,8 @@ mod tests {
                 }),
                 ping_timeout: None,
                 ping_interval: None,
-                    auth: None,
-                },
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
         };
@@ -329,7 +328,7 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-                common: WebSocketCommonConfig {
+            common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
                 tls: None,
                 ping_interval: None,

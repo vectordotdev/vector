@@ -14,6 +14,31 @@ use crate::{
 use vector_config::configurable_component;
 use vector_lib::config::{LogNamespace, SourceOutput};
 
+/// Defines the different shapes the `pong_message` config can take.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(untagged)] // Allows this enum to match different structures
+pub enum PongMessage {
+    /// For simple, backward-compatible exact matching.
+    /// e.g., pong_message: "pong"
+    Simple(String),
+
+    /// For advanced matching strategies.
+    /// e.g., pong_message: { type: contains, value: "pong" }
+    Advanced(PongValidation),
+}
+
+/// Defines the advanced validation strategies for a pong message.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(tag = "type", content = "value")]
+pub enum PongValidation {
+    /// The entire message must be an exact match.
+    Exact(String),
+    /// The message must contain the value as a substring.
+    Contains(String),
+}
+
 /// Configuration for the `websocket` source.
 #[serde_as]
 #[configurable_component(source("websocket", "Collect events from a websocket endpoint.",))]
@@ -32,15 +57,28 @@ pub struct WebSocketConfig {
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
-    /// The namespace to use for logs. This overrides the global setting.
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default)]
-    pub log_namespace: Option<bool>,
-
     /// An optional message to send to the server upon connection.
     #[configurable]
     #[serde(default)]
     pub initial_message: Option<String>,
+
+    /// An optional application-level ping message to send over the WebSocket connection.
+    /// If not set, a standard WebSocket ping control frame will be sent instead.
+    #[configurable]
+    #[serde(default)]
+    pub ping_message: Option<String>,
+
+    /// The expected application-level pong message to listen for as a response to a custom `ping_message`.
+    /// This is only used when `ping_message` is also configured. When a custom ping is sent,
+    /// receiving this specific message confirms that the connection is still alive.
+    #[configurable]
+    #[serde(default)]
+    pub pong_message: Option<PongMessage>,
+
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
 }
 
 impl Default for WebSocketConfig {
@@ -50,6 +88,8 @@ impl Default for WebSocketConfig {
             decoding: default_decoding(),
             framing: default_framing_message_based(),
             initial_message: None,
+            ping_message: None,
+            pong_message: None,
             log_namespace: None,
         }
     }
@@ -72,8 +112,10 @@ impl WebSocketConfig {
 #[typetag::serde(name = "websocket")]
 impl SourceConfig for super::config::WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let tls = MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
-        let connector = WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
+        let tls =
+            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
+        let connector =
+            WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder = self.get_decoding_config(Some(log_namespace)).build()?;

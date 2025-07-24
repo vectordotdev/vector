@@ -2,14 +2,14 @@ use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 
+use crate::common::websocket::WebSocketCommonConfig;
 use crate::{
-    common::websocket::{ConnectSnafu, WebSocketConnector, WebSocketError},
     codecs::EncodingConfig,
+    common::websocket::{ConnectSnafu, WebSocketConnector, WebSocketError},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{websocket::sink::WebSocketSink, Healthcheck, VectorSink},
-    tls::{MaybeTlsSettings},
+    tls::MaybeTlsSettings,
 };
-use crate::common::websocket::WebSocketCommonConfig;
 
 /// Configuration for the `websocket` sink.
 #[configurable_component(sink(
@@ -70,7 +70,8 @@ impl SinkConfig for WebSocketSinkConfig {
 
 impl WebSocketSinkConfig {
     fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
-        let tls = MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
+        let tls =
+            MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())
     }
 }

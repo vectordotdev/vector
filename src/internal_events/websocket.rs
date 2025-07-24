@@ -205,7 +205,8 @@ impl InternalEvent for WsReceiveError {
             "error_code" => "ws_receive_error",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -232,7 +233,8 @@ impl InternalEvent for WsSendError {
             "error_code" => "ws_send_error",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -259,7 +261,8 @@ impl InternalEvent for WsBinaryDecodeError {
             "error_code" => "ws_binary_decode_error",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
@@ -286,7 +289,8 @@ impl InternalEvent for PongTimeoutError {
             "error_code" => "pong_timeout_error",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::CONNECTION_FAILED,
-        ).increment(1);
+        )
+        .increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
