@@ -1,12 +1,10 @@
 use std::{collections::HashMap, future::ready, pin::Pin, time::Duration};
 
-use serde_with::serde_as;
-
 use futures::{Stream, StreamExt};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 
-use crate::sinks::util::buffer::metrics::{MetricSet, TtlPolicy};
+use crate::sinks::util::buffer::metrics::{MetricSet, NormalizerConfig, NormalizerSettings};
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
@@ -15,7 +13,6 @@ use crate::{
 };
 
 /// Configuration for the `incremental_to_absolute` transform.
-#[serde_as]
 #[configurable_component(transform(
     "incremental_to_absolute",
     "Convert incremental metrics to absolute."
@@ -23,13 +20,23 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct IncrementalToAbsoluteConfig {
-    /// The amount of time, in seconds, that incremental metrics will persist in the internal
-    /// metrics cache after having not been updated before they expire and are removed.
-    /// Once removed, incremental counters are reset to 0.
-    #[serde(default = "default_expire_metrics_secs")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[configurable(metadata(docs::examples = "240"))]
-    pub expire_metrics_secs: Duration,
+    /// Configuration for the internal cache used to store a stream of incremental metrics before
+    /// they're converted to absolute metrics.
+    ///
+    /// By default, incremental metrics are evicted after 5 minutes of not being updated. The next
+    /// incremental value will be reset.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub cache: NormalizerConfig<IncrementalToAbsoluteDefaultNormalizerSettings>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct IncrementalToAbsoluteDefaultNormalizerSettings;
+
+impl NormalizerSettings for IncrementalToAbsoluteDefaultNormalizerSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = None;
+    const TIME_TO_IDLE: Option<u64> = Some(300);
 }
 
 pub const fn default_expire_metrics_secs() -> Duration {
@@ -65,8 +72,9 @@ pub struct IncrementalToAbsolute {
 
 impl IncrementalToAbsolute {
     pub fn new(config: &IncrementalToAbsoluteConfig) -> crate::Result<Self> {
+        // Create a new MetricSet with the proper cache settings
         Ok(Self {
-            data: MetricSet::with_ttl_policy(TtlPolicy::new(config.expire_metrics_secs)),
+            data: MetricSet::new(config.cache.validate()?.into_settings()),
         })
     }
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {

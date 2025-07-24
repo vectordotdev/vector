@@ -168,13 +168,13 @@ components: transforms: incremental_to_absolute: {
 			body: """
 				Converting incremental metrics to absolute metrics has two major benefits. First, incremental metrics require
 				the entire history to determine the current state, as they depend on previous values to calculate changes.
-				Each absolute metric represents a complete state, making it easier to maintain and analyze historical data
-				accurately for components like the File sink, where some files might end up missing or out of order.
-				Second, it can reduce overhead for downstream components like Prometheus Remote Write, which internally converts
+				Each absolute metric represents a complete state, making it easier to view historical data accurately for
+				components like the File sink, where some files might end up missing or out of order. Second, it can reduce
+				overhead for downstream components like Prometheus Remote Write, which internally converts
 				incremental to absolute metrics. Converting to absolute metric with this transform prevents the
 				creation of duplicate caches when sending to multiple Prometheus Remote Write sinks.
 
-				The conversion is performed based on the order in which incremental metrics are received, not their timestamps. 
+				The conversion is performed based on the order in which incremental metrics are received, not their timestamps.
 				Moreover, absolute metrics received by this transform are emitted unchanged.
 				"""
 		}

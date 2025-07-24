@@ -1,17 +1,32 @@
 package metadata
 
-generated: components: transforms: incremental_to_absolute: configuration: expire_metrics_secs: {
+generated: components: transforms: incremental_to_absolute: configuration: cache: {
 	description: """
-		The amount of time, in seconds, that incremental metrics will persist in the internal
-		metrics cache after having not been updated before they expire and are removed.
-		Once removed, incremental counters are reset to 0.
+		Configuration for the internal cache used to store a stream of incremental metrics before
+		they're converted to absolute metrics.
+
+		By default, incremental metrics are evicted after 5 minutes of not being updated. The next
+		incremental value will be reset.
 		"""
 	required: false
-	type: uint: {
-		default: 120
-		examples: [
-			"240",
-		]
-		unit: "seconds"
+	type: object: options: {
+		max_bytes: {
+			description: "The maximum size in bytes of the metrics normalizer cache."
+			required:    false
+			type: uint: unit: "bytes"
+		}
+		max_events: {
+			description: "The maximum number of events of the metrics normalizer cache"
+			required:    false
+			type: uint: unit: "events"
+		}
+		time_to_idle: {
+			description: "The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache"
+			required:    false
+			type: uint: {
+				default: 300
+				unit:    "seconds"
+			}
+		}
 	}
 }
