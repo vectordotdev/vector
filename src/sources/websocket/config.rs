@@ -97,17 +97,6 @@ impl Default for WebSocketConfig {
 
 impl_generate_config_from_default!(WebSocketConfig);
 
-impl WebSocketConfig {
-    pub fn get_decoding_config(&self, log_namespace: Option<LogNamespace>) -> DecodingConfig {
-        let decoding = self.decoding.clone();
-        let framing = self.framing.clone();
-        let log_namespace =
-            log_namespace.unwrap_or_else(|| self.log_namespace.unwrap_or(false).into());
-
-        DecodingConfig::new(framing, decoding, log_namespace)
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket")]
 impl SourceConfig for super::config::WebSocketConfig {
@@ -118,7 +107,8 @@ impl SourceConfig for super::config::WebSocketConfig {
             WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = self.get_decoding_config(Some(log_namespace)).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+            .build()?;
 
         Ok(Box::pin(super::source::recv_from_websocket(
             cx,
