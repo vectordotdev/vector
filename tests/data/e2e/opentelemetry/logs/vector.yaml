@@ -65,8 +65,9 @@ sinks:
         headers:
           content-type: application/json
 
-  otel_console_sink:
-    type: console
+  otel_file_sink:
+    type: file
+    path: "/tmp/vector-file-sink.log"
     inputs:
       - remap_otel
     encoding:

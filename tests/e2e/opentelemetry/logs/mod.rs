@@ -1,101 +1,80 @@
-use serde_json::Value;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::time::sleep;
 use tokio::time::timeout;
-use tracing::debug;
 
-const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30); // Adjustable timeout
-const POLLING_INTERVAL: Duration = Duration::from_millis(500); // Poll every 500ms
+const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30);
+const POLLING_INTERVAL: Duration = Duration::from_millis(500);
+const EXPECTED_LOG_COUNT: usize = 100;
 
-fn output_log_path() -> PathBuf {
-    let project_root = std::env::current_dir().expect("Failed to get current dir");
-    project_root
+fn log_output_dir() -> PathBuf {
+    std::env::current_dir()
+        .expect("Failed to get current dir")
         .join("tests")
         .join("data")
         .join("e2e")
         .join("opentelemetry")
         .join("logs")
         .join("output")
-        .join("collector-sink.log")
+}
+
+fn collector_log_path() -> PathBuf {
+    log_output_dir().join("collector-file-exporter.log")
+}
+
+fn vector_log_path() -> PathBuf {
+    log_output_dir().join("vector-file-sink.log")
+}
+
+async fn try_read_lines(path: &PathBuf) -> Option<Vec<String>> {
+    match tokio::fs::read_to_string(path).await {
+        Ok(contents) => Some(contents.lines().map(|l| l.to_string()).collect()),
+        Err(_) => None,
+    }
+}
+
+/// # Panics
+/// After the timeout, this function will panic.
+async fn wait_for_logs() -> (Vec<String>, Vec<String>) {
+    timeout(MAXIMUM_WAITING_DURATION, async {
+        loop {
+            let collector_lines = try_read_lines(&collector_log_path()).await;
+            let vector_lines = try_read_lines(&vector_log_path()).await;
+
+            if let (Some(c_lines), Some(v_lines)) = (collector_lines, vector_lines) {
+                if c_lines.len() >= EXPECTED_LOG_COUNT && v_lines.len() >= EXPECTED_LOG_COUNT {
+                    return (c_lines, v_lines);
+                }
+            }
+
+            sleep(POLLING_INTERVAL).await;
+        }
+    })
+    .await
+    .expect("Timed out waiting for both log files")
 }
 
 #[tokio::test]
-async fn otlp_log_reaches_collector_file_and_ids_are_monotonic() {
-    // Defined in scripts/e2e/opentelemetry-logs/compose.yaml.
-    let expected_number_of_logs: u64 = 100;
+async fn vector_sink_otel_sink_logs_match() {
+    let (collector_lines, vector_lines) = wait_for_logs().await;
 
-    let mut previous_count: Option<u64> = None;
-    let mut total_log_lines_found = 0;
+    assert_eq!(
+        collector_lines.len(),
+        EXPECTED_LOG_COUNT,
+        "Collector did not produce expected number of logs"
+    );
+    assert_eq!(
+        vector_lines.len(),
+        EXPECTED_LOG_COUNT,
+        "Vector did not produce expected number of logs"
+    );
 
-    let result = timeout(MAXIMUM_WAITING_DURATION, async {
-        loop {
-            let log_file_contents = match tokio::fs::read_to_string(&output_log_path()).await {
-                Ok(contents) => contents,
-                Err(_) => {
-                    tokio::time::sleep(POLLING_INTERVAL).await;
-                    continue;
-                }
-            };
-            debug!("Read: {log_file_contents}");
+    let collector_set: BTreeSet<_> = collector_lines.into_iter().collect();
+    let vector_set: BTreeSet<_> = vector_lines.into_iter().collect();
 
-            total_log_lines_found = 0;
-            for (line_index, line_content) in log_file_contents.lines().enumerate() {
-                if line_content.trim().is_empty() {
-                    continue;
-                }
-                let json_value: Value = serde_json::from_str(line_content).unwrap_or_else(|_| {
-                    panic!("Line {line_index} is not valid JSON: {line_content}")
-                });
-                let count_value = json_value
-                    .pointer("/resourceLogs/0/scopeLogs/0/logRecords/0/attributes")
-                    .and_then(|attributes| attributes.as_array())
-                    .and_then(|attributes| {
-                        attributes.iter().find_map(|attribute| {
-                            if attribute.get("key")?.as_str()? == "count" {
-                                attribute
-                                    .get("value")?
-                                    .get("intValue")?
-                                    .as_str()?
-                                    .parse::<u64>()
-                                    .ok()
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .expect("Missing count attribute");
-
-                if let Some(previous) = previous_count {
-                    assert!(
-                        count_value > previous,
-                        "count not monotonically increasing: previous={} current={}",
-                        previous,
-                        count_value
-                    );
-                }
-                previous_count = Some(count_value);
-                total_log_lines_found += 1;
-            }
-
-            if total_log_lines_found >= expected_number_of_logs {
-                break;
-            }
-            tokio::time::sleep(POLLING_INTERVAL).await;
-        }
-        total_log_lines_found
-    })
-    .await;
-
-    match result {
-        Ok(log_count) => assert_eq!(
-            log_count, expected_number_of_logs,
-            "Expected {expected_number_of_logs} logs, but found {log_count}"
-        ),
-        Err(_) => panic!("Test timed out after {MAXIMUM_WAITING_DURATION:?}"),
-    }
-
-    assert!(
-        total_log_lines_found > 0,
-        "No log lines found in collector sink output"
+    assert_eq!(
+        collector_set, vector_set,
+        "Collector and Vector logs do not match exactly"
     );
 }

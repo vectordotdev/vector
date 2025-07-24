@@ -118,7 +118,7 @@ def main():
         if 0 < args.n <= count:
             break
 
-        if args.interval is not 0:
+        if args.interval is not None:
             time.sleep(args.interval)
 
     print(f"\n📊 Finished: Sent={sent}, Failed={failed}")

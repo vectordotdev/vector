@@ -8,7 +8,7 @@ This end-to-end (E2E) test validates that log events generated in a container ar
 - **Forwards logs** to Vector via the OpenTelemetry Protocol (OTLP).
 - **Processes logs** in Vector, including optional remapping/transformation.
 - **Sends logs** from Vector to an OTEL Collector sink using OTLP HTTP.
-- **Exports logs** from the OTEL Collector sink to a file (`output/collector-sink.log`).
+- **Exports logs** from the OTEL Collector sink to a file (`output/collector-file-exporter.log`).
 - **Test script** (`tests/e2e/opentelemetry/logs/mod.rs`) reads the exported file and asserts that expected log events are present, confirming end-to-end delivery.
 
 ## What the Docker Compose Does
@@ -29,7 +29,7 @@ Build and start the stack:
    docker compose up --build
  ```
 
-After logs are generated and processed, the file `output/collector-sink.log` will contain the OTLP log records exported by the collector sink.
+After logs are generated and processed, the file `output/collector-file-exporter.log` will contain the OTLP log records exported by the collector sink.
 
 Run the Rust test to assert that the expected logs are present:
 

@@ -68,6 +68,9 @@ services:
         source: ../../../tests/data/e2e/opentelemetry/logs/vector.yaml
         target: /etc/vector/vector.yaml
         read_only: true
+      - type: bind
+        source: ../../../tests/data/e2e/opentelemetry/logs/output
+        target: /tmp
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
