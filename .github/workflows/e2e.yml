@@ -4,10 +4,12 @@
 #   - PRs if there are code changes to the source files that are noted in `vdev e2e ci_paths`
 #   - MQ (always pass)
 #   - Scheduled: at midnight UTC Tues-Sat
+#   - Manual trigger via Actions UI.
 
 name: E2E Test Suite
 
 on:
+  workflow_dispatch:
   pull_request:
   # Needs to pass by default in MQ
   merge_group:
@@ -55,6 +57,7 @@ jobs:
     needs: changes
     if: always() && (
       github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.e2e-datadog-logs == 'true' ||
       needs.changes.outputs.e2e-datadog-metrics == 'true'
       )
@@ -78,7 +81,9 @@ jobs:
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
           fi
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-logs
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -87,7 +92,9 @@ jobs:
           max_attempts: 3
           command: bash scripts/int-e2e-test.sh e2e datadog-logs
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-metrics
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
