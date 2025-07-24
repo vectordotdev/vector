@@ -23,19 +23,10 @@ This end-to-end (E2E) test validates that log events generated in a container ar
 
 ## How to Run
 
-Build and start the stack:
-
-```sh
-   docker compose up --build
- ```
-
-After logs are generated and processed, the file `output/collector-file-exporter.log` will contain the OTLP log records exported by the collector sink.
-
-Run the Rust test to assert that the expected logs are present:
-
- ```sh
- cargo test -p vector --test e2e -- opentelemetry::logs
- ```
+```shell
+# from the repo root directory
+./scripts/int-e2e-test.sh e2e opentelemetry-logs
+```
 
 ## Notes
 
