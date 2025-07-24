@@ -370,7 +370,6 @@ impl MetricSet {
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
-        self.debug_print();
         let series = metric.series().clone();
 
         if let Some(mut existing) = self.cache.get(&series) {
