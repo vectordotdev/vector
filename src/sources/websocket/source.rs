@@ -93,7 +93,6 @@ pub(crate) async fn recv_from_websocket(
     config: super::config::WebSocketConfig,
     params: WebSocketSourceParams,
 ) -> Result<(), ()> {
-    const PING: &[u8] = b"PING";
     let ping_interval = config.common.ping_interval;
     let ping_timeout = config.common.ping_timeout;
 
@@ -120,6 +119,12 @@ pub(crate) async fn recv_from_websocket(
     let mut ping = PingInterval::new(ping_interval.map(u64::from));
     let mut last_pong = Instant::now();
 
+    let ping_message = if let Some(ping_msg) = &config.ping_message {
+        Message::Text(ping_msg.clone())
+    } else {
+        Message::Ping(vec![])
+    };
+
     let out = cx.out.clone();
 
     loop {
@@ -132,16 +137,11 @@ pub(crate) async fn recv_from_websocket(
             _ = ping.tick() => {
                 match check_received_pong_time(ping_timeout, last_pong) {
                     Ok(()) => {
-                        let message_to_send = if let Some(ping_msg) = &config.ping_message {
-                            Message::Text(ping_msg.clone())
-                        } else {
-                            Message::Ping(PING.to_vec())
-                        };
-
-                        ws_sink.send(message_to_send).await.map_err(|error| {
+                        ws_sink.send(ping_message.clone()).await.map_err(|error| {
                             emit!(WsSendError { error });
                             WsError::Io(io::Error::new(io::ErrorKind::BrokenPipe, "Websocket connection is closed."))
                         })
+
                     }
                     Err(e) => Err(e)
                 }
