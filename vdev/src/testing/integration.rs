@@ -16,7 +16,6 @@ use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
-#[derive(Debug)]
 pub(crate) struct ComposeTest {
     test_name: String,
     environment: String,
@@ -62,7 +61,7 @@ pub(crate) trait ComposeTestT {
 
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
-        let result = ComposeTest {
+        Ok(ComposeTest {
             test_name,
             environment,
             config,
@@ -72,9 +71,7 @@ pub(crate) trait ComposeTestT {
             env_config,
             build_all,
             retries,
-        };
-        trace!("Generated: {result:#?}");
-        Ok(result)
+        })
     }
 
     fn test(compose_test: &ComposeTest, extra_args: Vec<String>) -> Result<()> {
@@ -211,7 +208,6 @@ impl ComposeTestT for E2ETest {
     const FEATURE_FLAG: &'static str = E2E_FEATURE_FLAG;
 }
 
-#[derive(Debug)]
 struct Compose {
     original_path: PathBuf,
     test_dir: PathBuf,
