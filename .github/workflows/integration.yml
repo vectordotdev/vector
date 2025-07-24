@@ -109,7 +109,7 @@ jobs:
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
-              sudo npm -g install @datadog/datadog-ci
+              bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
               bash scripts/int-e2e-test.sh int ${{ matrix.service }}
             else
