@@ -2,7 +2,7 @@ use std::{io::Cursor, time::Duration};
 
 use futures::{stream, StreamExt};
 use tokio::{select, time::sleep};
-use tokio_test::{assert_pending, assert_ready, task::spawn};
+use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 use vector_common::finalization::Finalizable;
 
