@@ -22,12 +22,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ inputs.checkout_ref }}
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: |
-          # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
-          rustup show active-toolchain || rustup toolchain install
-      - run: cargo install cargo-msrv --version 0.18.4
+      - run: bash scripts/environment/prepare.sh --modules=cargo-msrv
       - run: cargo msrv verify

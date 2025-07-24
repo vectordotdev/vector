@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::E2ETest;
+use crate::testing::integration::ComposeTestLocalConfig;
 
 /// Execute end-to-end tests
 ///
@@ -34,7 +34,8 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::test::exec::<E2ETest>(
+        crate::commands::compose_tests::test::exec(
+            ComposeTestLocalConfig::e2e(),
             &self.e2e_test,
             self.environment.as_ref(),
             self.build_all,
