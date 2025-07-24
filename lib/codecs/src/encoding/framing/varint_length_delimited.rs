@@ -55,7 +55,8 @@ impl VarintLengthDelimitedEncoder {
             return Err(VarintFramingError::FrameTooLarge {
                 length: value,
                 max: self.max_frame_length,
-            }.into());
+            }
+            .into());
         }
 
         let mut val = value;

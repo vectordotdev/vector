@@ -1,17 +1,13 @@
 use bytes::BytesMut;
-use tokio_util::codec::{Decoder, Encoder};
 use codecs::{
-    VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
     encoding::VarintLengthDelimitedEncoder, encoding::VarintLengthDelimitedEncoderConfig,
+    VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
+use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
 fn test_varint_framing_roundtrip() {
-    let test_data = vec![
-        b"hello".to_vec(),
-        b"world".to_vec(),
-        b"protobuf".to_vec(),
-    ];
+    let test_data = vec![b"hello".to_vec(), b"world".to_vec(), b"protobuf".to_vec()];
 
     let mut encoder = VarintLengthDelimitedEncoder::default();
     let mut decoder = VarintLengthDelimitedDecoder::default();

@@ -163,7 +163,9 @@ impl FramingConfig {
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
             FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
-            FramingConfig::VarintLengthDelimited(config) => Framer::VarintLengthDelimited(config.build()),
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
+            }
         }
     }
 }

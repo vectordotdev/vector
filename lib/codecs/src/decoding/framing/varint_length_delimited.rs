@@ -124,7 +124,8 @@ impl Decoder for VarintLengthDelimitedDecoder {
             return Err(VarintFramingError::FrameTooLarge {
                 length,
                 max: self.max_frame_length,
-            }.into());
+            }
+            .into());
         }
 
         // Check if we have enough data for the complete frame
@@ -166,7 +167,10 @@ mod tests {
         let mut input = BytesMut::from(&[0x03, b'f', b'o', b'o'][..]);
         let mut decoder = VarintLengthDelimitedDecoder::default();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), Bytes::from("foo"));
+        assert_eq!(
+            decoder.decode(&mut input).unwrap().unwrap(),
+            Bytes::from("foo")
+        );
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
@@ -201,7 +205,8 @@ mod tests {
 
     #[test]
     fn decode_frame_too_large() {
-        let mut input = BytesMut::from(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01][..]);
+        let mut input =
+            BytesMut::from(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01][..]);
         let mut decoder = VarintLengthDelimitedDecoder::new(1000);
 
         assert!(decoder.decode(&mut input).is_err());
@@ -213,7 +218,10 @@ mod tests {
         let mut decoder = VarintLengthDelimitedDecoder::default();
 
         // First decode should succeed
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), Bytes::from("foo"));
+        assert_eq!(
+            decoder.decode(&mut input).unwrap().unwrap(),
+            Bytes::from("foo")
+        );
 
         // Second decode should fail with trailing data
         assert!(decoder.decode_eof(&mut input).is_err());

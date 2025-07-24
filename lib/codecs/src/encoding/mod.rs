@@ -120,7 +120,9 @@ impl FramingConfig {
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
-            FramingConfig::VarintLengthDelimited(config) => Framer::VarintLengthDelimited(config.build()),
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
+            }
         }
     }
 }
@@ -393,8 +395,7 @@ impl SerializerConfig {
             // we should do so accurately, even if practically it doesn't need to be.
             //
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
-            SerializerConfig::Avro { .. }
-            | SerializerConfig::Native => {
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Protobuf(_) => {

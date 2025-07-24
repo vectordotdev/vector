@@ -26,10 +26,10 @@ pub use newline_delimited::{
 pub use octet_counting::{
     OctetCountingDecoder, OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
+use tokio_util::codec::LinesCodecError;
 pub use varint_length_delimited::{
     VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
-use tokio_util::codec::LinesCodecError;
 
 pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
 use super::StreamDecodingError;
