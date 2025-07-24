@@ -10,14 +10,11 @@ import requests
 
 SEVERITIES = ["DEBUG", "INFO", "WARN", "ERROR"]
 PATHS = ["/", "/login", "/api/data", "/metrics", "/health"]
-SERVICES = ["auth-service", "web-frontend", "device-ingestor", "payment-api", "metrics-collector"]
-
 
 def generate_log(endpoint: str, count: int) -> dict:
     now_nanos = int(time.time() * 1e9)
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     severity = random.choice(SEVERITIES)
-    service = random.choice(SERVICES)
     log_id = str(uuid.uuid4())[:8]
 
     log_data = {
@@ -25,7 +22,7 @@ def generate_log(endpoint: str, count: int) -> dict:
             {
                 "resource": {
                     "attributes": [
-                        {"key": "service.name", "value": {"stringValue": service}}
+                        {"key": "service.name", "value": {"stringValue": "opentelemetry-logs"}}
                     ]
                 },
                 "scopeLogs": [
@@ -106,8 +103,8 @@ def main():
     failed = 0
 
     while True:
-        count += 1
         result = generate_log(endpoint, count)
+        count += 1
         if result["success"]:
             print(f"✅ Sent log {count} (ID: {result['log_id']})")
             sent += 1

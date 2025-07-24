@@ -1,5 +1,14 @@
 name: opentelemetry-vector-e2e
 services:
+  cleanup-logs:
+    image: busybox
+    container_name: cleanup-logs
+    command: [ "sh", "-c", "rm -f /tmp/*.log" ]
+    volumes:
+      - type: bind
+        source: ../../../tests/data/e2e/opentelemetry/logs/output
+        target: /tmp
+
   otel-collector-source:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-source
@@ -42,13 +51,10 @@ services:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/output
         target: /tmp
-      - type: bind
-        source: ./otel-collector-sink/entrypoint.sh
-        target: /entrypoint.sh
-        read_only: true
+    depends_on:
+      - cleanup-logs
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
-    entrypoint: [ "/entrypoint.sh" ]
 
   vector:
     build:
@@ -61,6 +67,7 @@ services:
     container_name: vector
     init: true
     depends_on:
+      - cleanup-logs
       - otel-collector-source
       - otel-collector-sink
     volumes:

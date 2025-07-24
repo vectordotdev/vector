@@ -24,7 +24,7 @@ transforms:
           {
             "resource": {
               "attributes": [
-                { "key": "service.name", "value": { "stringValue": .resource_attributes.service.name } }
+                { "key": "service.name", "value": { "stringValue": "opentelemetry-logs" } }
               ]
             },
             "scopeLogs": [
@@ -38,7 +38,6 @@ transforms:
                     "severityText": .severity_text,
                     "body": { "stringValue": .message },
                     "attributes": [
-                      { "key": "log.id", "value": { "stringValue": get!(.attributes, ["log.id"]) } },
                       { "key": "count", "value": { "intValue": get!(.attributes, ["count"]) } }
                     ]
                   }
@@ -61,6 +60,8 @@ sinks:
         codec: json
       framing:
         method: newline_delimited
+      batch:
+        max_events: 1
       request:
         headers:
           content-type: application/json
