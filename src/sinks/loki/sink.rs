@@ -177,6 +177,13 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
+
+            // Skip fields with <null> value to match label expansion behavior
+            if value_s == "<null>" {
+                warn!("Skipping label '{}' with <null> value", key_s);
+                continue;
+            }
+
             let result = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
             // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
             if let Err(err) = result {
@@ -252,6 +259,16 @@ impl EventEncoder {
 
             let key_s = key.unwrap();
             let value_s = value.unwrap();
+
+            // Skip fields with <null> value to match label expansion behavior
+            if value_s == "<null>" {
+                warn!(
+                    "Skipping structured metadata field '{}' with <null> value",
+                    key_s
+                );
+                continue;
+            }
+
             let result = pair_expansion(
                 &key_s,
                 &value_s,
@@ -910,6 +927,48 @@ mod tests {
             "development".to_string()
         );
         assert_eq!(structured_metadata["cluster_version"], "1.2.3".to_string());
+        Ok(())
+    }
+
+    #[test]
+    fn encoder_with_null_structured_metadata_values() -> Result<(), serde_json::Error> {
+        let mut structured_metadata = HashMap::default();
+        structured_metadata.insert(
+            Template::try_from("*").unwrap(),
+            Template::try_from("{{ metadata }}").unwrap(),
+        );
+
+        let mut encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            transformer: Default::default(),
+            encoder: Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            labels: HashMap::default(),
+            structured_metadata,
+            remove_label_fields: false,
+            remove_structured_metadata_fields: false,
+            remove_timestamp: false,
+        };
+
+        let message = r#"
+        {
+            "metadata": {
+                "field1": "value1",
+                "field2": null,
+                "field3": "value3"
+            }
+        }
+        "#;
+        let msg: ObjectMap = serde_json::from_str(message)?;
+        let event = Event::Log(LogEvent::from(msg));
+        let record = encoder.encode_event(event).unwrap();
+
+        // Should only have 2 fields (field1 and field3), field2 with null should be skipped
+        assert_eq!(record.event.structured_metadata.len(), 2);
+        let structured_metadata: HashMap<String, String> =
+            record.event.structured_metadata.into_iter().collect();
+        assert_eq!(structured_metadata["field1"], "value1");
+        assert_eq!(structured_metadata["field3"], "value3");
+        assert!(!structured_metadata.contains_key("field2"));
         Ok(())
     }
 
