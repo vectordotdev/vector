@@ -19,7 +19,7 @@ const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComposeTestKind {
     E2E,
-    INTEGRATION,
+    Integration,
 }
 
 #[derive(Clone, Copy)]
@@ -34,7 +34,7 @@ impl ComposeTestLocalConfig {
     /// and are the full feature flag is `all-integration-tests`.
     pub(crate) fn integration() -> Self {
         Self {
-            kind: ComposeTestKind::INTEGRATION,
+            kind: ComposeTestKind::Integration,
             directory: INTEGRATION_TESTS_DIR,
             feature_flag: ALL_INTEGRATIONS_FEATURE_FLAG,
         }
