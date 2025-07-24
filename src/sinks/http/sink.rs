@@ -1,12 +1,14 @@
 //! Implementation of the `http` sink.
 
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use indexmap::IndexMap;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 
 pub(super) struct HttpSink<S> {
     service: S,
     uri: Template,
+    headers: IndexMap<String, Template>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
@@ -22,12 +24,14 @@ where
     pub(super) const fn new(
         service: S,
         uri: Template,
+        headers: IndexMap<String, Template>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
         Self {
             service,
             uri,
+            headers,
             batch_settings,
             request_builder,
         }
@@ -39,7 +43,7 @@ where
         };
         input
             // Batch the input stream with size calculation based on the configured codec
-            .batched_partitioned(KeyPartitioner::new(self.uri), || {
+            .batched_partitioned(KeyPartitioner::new(self.uri, self.headers), || {
                 self.batch_settings.as_item_size_config(batch_sizer.clone())
             })
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
@@ -82,18 +86,30 @@ where
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub uri: String,
+    pub headers: IndexMap<String, String>,
+}
+
+impl std::hash::Hash for PartitionKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uri.hash(state);
+        for (k, v) in &self.headers {
+            k.hash(state);
+            v.hash(state);
+        }
+    }
 }
 
 struct KeyPartitioner {
     uri: Template,
+    headers: IndexMap<String, Template>,
 }
 
 impl KeyPartitioner {
-    const fn new(uri: Template) -> Self {
-        Self { uri }
+    const fn new(uri: Template, headers: IndexMap<String, Template>) -> Self {
+        Self { uri, headers }
     }
 }
 
@@ -114,6 +130,21 @@ impl Partitioner for KeyPartitioner {
             })
             .ok()?;
 
-        Some(PartitionKey { uri })
+        let mut headers = IndexMap::new();
+        for (name, template) in &self.headers {
+            let value = template
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("headers"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            headers.insert(name.clone(), value);
+        }
+
+        Some(PartitionKey { uri, headers })
     }
 }

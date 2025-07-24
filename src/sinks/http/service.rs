@@ -28,7 +28,7 @@ use super::sink::PartitionKey;
 pub(super) struct HttpSinkRequestBuilder {
     method: HttpMethod,
     auth: Option<Auth>,
-    headers: IndexMap<HeaderName, HeaderValue>,
+    static_headers: IndexMap<HeaderName, HeaderValue>,
     content_type: Option<String>,
     content_encoding: Option<String>,
 }
@@ -38,14 +38,14 @@ impl HttpSinkRequestBuilder {
     pub(super) const fn new(
         method: HttpMethod,
         auth: Option<Auth>,
-        headers: IndexMap<HeaderName, HeaderValue>,
+        static_headers: IndexMap<HeaderName, HeaderValue>,
         content_type: Option<String>,
         content_encoding: Option<String>,
     ) -> Self {
         Self {
             method,
             auth,
-            headers,
+            static_headers,
             content_type,
             content_encoding,
         }
@@ -80,8 +80,18 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
             // The request building should not have errors at this point, and if it did it would fail in the call to `body()` also.
             .expect("Failed to access headers in http::Request builder- builder has errors.");
 
-        for (header, value) in self.headers.iter() {
-            headers.insert(header, value.clone());
+        // Static headers from config
+        for (header_name, header_value) in self.static_headers.iter() {
+            headers.insert(header_name, header_value.clone());
+        }
+
+        // Template headers from the partition key
+        for (name, value) in metadata.headers.iter() {
+            let header_name = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|e| format!("Invalid header name '{name}': {e}"))?;
+            let header_value = HeaderValue::from_bytes(value.as_bytes())
+                .map_err(|e| format!("Invalid header value '{value}': {e}"))?;
+            headers.insert(header_name, header_value);
         }
 
         // The request building should not have errors at this point
