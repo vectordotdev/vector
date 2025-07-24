@@ -73,7 +73,7 @@ pub(crate) trait ComposeTestT {
             build_all,
             retries,
         };
-        debug!("Generated: {result:#?}");
+        trace!("Generated: {result:#?}");
         Ok(result)
     }
 

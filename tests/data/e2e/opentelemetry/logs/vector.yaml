@@ -39,7 +39,6 @@ transforms:
                     "body": { "stringValue": .message },
                     "attributes": [
                       { "key": "log.id", "value": { "stringValue": get!(.attributes, ["log.id"]) } },
-                      { "key": "request.path", "value": { "stringValue": get!(.attributes, ["request.path"]) } },
                       { "key": "count", "value": { "intValue": get!(.attributes, ["count"]) } }
                     ]
                   }

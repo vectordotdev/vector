@@ -17,7 +17,6 @@ def generate_log(endpoint: str, count: int) -> dict:
     now_nanos = int(time.time() * 1e9)
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     severity = random.choice(SEVERITIES)
-    path = random.choice(PATHS)
     service = random.choice(SERVICES)
     log_id = str(uuid.uuid4())[:8]
 
@@ -38,8 +37,6 @@ def generate_log(endpoint: str, count: int) -> dict:
                                 "severityText": severity,
                                 "body": {"stringValue": f"[{log_id}] {severity} log {count} at {timestamp}"},
                                 "attributes": [
-                                    {"key": "request.path", "value": {"stringValue": path}},
-                                    {"key": "log.id", "value": {"stringValue": log_id}},
                                     {"key": "count", "value": {"intValue": count}}
                                 ]
                             }
@@ -80,9 +77,20 @@ def generate_log(endpoint: str, count: int) -> dict:
         }
 
 
+def non_negative_float(value):
+    f = float(value)
+    if f < 0:
+        raise argparse.ArgumentTypeError(f"Interval must be non-negative, got {value}")
+    return f
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate OTLP logs periodically.")
-    parser.add_argument("--interval", type=float, default=0.1, help="Seconds between log sends")
+    parser.add_argument(
+        "--interval",
+        type=non_negative_float,
+        help="Seconds between log sends (non-negative, optional)"
+    )
     parser.add_argument("-n", type=int, default=0, help="Total logs to send (0 or negative = infinite)")
     parser.add_argument("--host", type=str, default="otel-collector-source", help="Host for the OTLP collector")
     parser.add_argument("--port", type=int, default=4318, help="Port for OTLP HTTP logs")
@@ -110,7 +118,8 @@ def main():
         if 0 < args.n <= count:
             break
 
-        time.sleep(args.interval)
+        if args.interval is not 0:
+            time.sleep(args.interval)
 
     print(f"\n📊 Finished: Sent={sent}, Failed={failed}")
 
