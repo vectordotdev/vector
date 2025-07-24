@@ -150,11 +150,7 @@ jobs:
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-logs')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
+        run: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
 
   update-pr-status:
     name: Signal result to PR
