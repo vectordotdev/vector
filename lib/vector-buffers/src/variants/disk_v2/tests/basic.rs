@@ -1,7 +1,7 @@
-use std::io::Cursor;
+use std::{io::Cursor, time::Duration};
 
 use futures::{stream, StreamExt};
-use tokio::select;
+use tokio::{select, time::sleep};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
 use vector_common::finalization::Finalizable;
@@ -133,7 +133,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
                 // if the reader task finishes in time, extract its output
                 res = blocked_read => res,
                 // otherwise panics after 1s
-                _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                _ = sleep(Duration::from_secs(1)) => {
                     panic!("Reader not ready after 1s");
                 }
             };
