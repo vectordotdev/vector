@@ -1,5 +1,6 @@
 use mini_moka::sync::Cache;
 use std::marker::PhantomData;
+use std::time::Duration;
 
 use vector_lib::event::{
     metric::{MetricData, MetricSeries},
@@ -9,7 +10,6 @@ use vector_lib::event::{
 use metrics::gauge;
 use serde_with::serde_as;
 use snafu::Snafu;
-use std::time::Duration;
 use vector_common::internal_event::InternalEvent;
 use vector_config_macros::configurable_component;
 use vector_lib::ByteSizeOf;
@@ -22,25 +22,30 @@ pub enum NormalizerError {
     InvalidMaxEvents,
     #[snafu(display("`time_to_idle` must be greater than zero"))]
     InvalidTimeToIdle,
+    #[snafu(display("cannot specify both max_bytes and max_events"))]
+    ConflictingLimits,
 }
 
-/// Defines behavior for creating the MetricNormalizer
+/// Defines behavior for creating the MetricNormalizer. Note that the mini-moka LRU cache
+/// supports either `max_events` or `max_bytes` (or neither), but not both.
 #[serde_as]
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
     /// The maximum size in bytes of the metrics normalizer cache.
+    /// Either `max_bytes` or `max_events` can be specified, or neither, but not both.
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
 
-    /// The maximum number of events of the metrics normalizer cache
+    /// The maximum number of events of the metrics normalizer cache.
+    /// Either `max_bytes` or `max_events` can be specified, or neither, but not both.
     #[serde(default = "default_max_events::<D>")]
     #[configurable(metadata(docs::type_unit = "events"))]
     pub max_events: Option<usize>,
 
-    /// The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache
+    /// The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache.
     #[serde(default = "default_time_to_idle::<D>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Time To Idle"))]
@@ -74,7 +79,7 @@ impl<D: NormalizerSettings + Clone> NormalizerConfig<D> {
             (Some(0), _, _) => Err(NormalizerError::InvalidMaxBytes),
             (_, Some(0), _) => Err(NormalizerError::InvalidMaxEvents),
             (_, _, Some(timeout)) if timeout <= 0 => Err(NormalizerError::InvalidTimeToIdle),
-
+            (Some(_), Some(_), _) => Err(NormalizerError::ConflictingLimits),
             _ => Ok(config),
         }
     }
@@ -243,11 +248,11 @@ impl Default for MetricSetSettings {
     }
 }
 
-/// LRU cache using Mini-Moka with optional eviction based on any combination of memory usage,
-/// entry count, and time-to-idle
+/// LRU cache using Mini-Moka with optional eviction based on (optionally) TTI or (optionally)
+/// either memory usage OR entry count, but not both
 #[derive(Clone, Debug)]
 pub struct MetricSet {
-    // LRU cache with configurable eviction policies
+    /// Mini-Moka LRU cache configured with either memory-based or count-based eviction
     cache: Cache<MetricSeries, MetricEntry>,
     /// Current configuration for debugging/monitoring
     settings: MetricSetSettings,
@@ -258,16 +263,28 @@ impl MetricSet {
     pub fn new(settings: MetricSetSettings) -> Self {
         let mut builder = Cache::builder();
 
-        // Set memory limit if specified
-        if let Some(max_bytes) = settings.max_bytes {
-            builder = builder.max_capacity(max_bytes as u64).weigher(
-                |series: &MetricSeries, entry: &MetricEntry| -> u32 {
-                    series.allocated_bytes() as u32 + entry.allocated_bytes() as u32
-                },
-            );
+        // Configure either memory-based OR count-based eviction, but not both (not supported by moka).
+        match (settings.max_bytes, settings.max_events) {
+            (Some(max_bytes), None) => {
+                // Memory-based eviction using weigher
+                builder = builder.max_capacity(max_bytes as u64).weigher(
+                    |series: &MetricSeries, entry: &MetricEntry| -> u32 {
+                        (series.allocated_bytes() + entry.allocated_bytes()) as u32
+                    },
+                );
+            }
+            (None, Some(max_events)) => {
+                // Entry count-based eviction
+                builder = builder.max_capacity(max_events as u64);
+            }
+            (None, None) => {
+                // No capacity limit - unlimited cache
+            }
+            (Some(_), Some(_)) => {
+                // This should be caught during validation
+                panic!("Cannot specify both max_bytes and max_events");
+            }
         }
-
-        // TODO: Add entry limit
 
         // Set TTI if specified
         if let Some(tti) = settings.time_to_idle {

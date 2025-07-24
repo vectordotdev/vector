@@ -20,8 +20,8 @@ use crate::{
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct IncrementalToAbsoluteConfig {
-    /// Configuration for the internal cache used to store a stream of incremental metrics before
-    /// they're converted to absolute metrics.
+    /// Configuration for the internal metrics cache used to normalize a stream of incremental
+    /// metrics into absolute metrics.
     ///
     /// By default, incremental metrics are evicted after 5 minutes of not being updated. The next
     /// incremental value will be reset.
@@ -142,7 +142,8 @@ mod tests {
     async fn test_incremental_to_absolute() {
         let config = toml::from_str::<IncrementalToAbsoluteConfig>(
             r#"
-expire_metrics_secs = 9999
+[cache]
+max_events = 100
 "#,
         )
         .unwrap();
