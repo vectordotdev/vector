@@ -15,6 +15,7 @@ use vector_lib::{
     sensitive_string::SensitiveString,
     TimeZone,
 };
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, CompileConfig, Program},
     core::Value,
@@ -135,6 +136,7 @@ impl HttpServerAuthConfig {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<HttpServerAuthMatcher> {
         match self {
             HttpServerAuthConfig::Basic { username, password } => {
@@ -148,12 +150,14 @@ impl HttpServerAuthConfig {
                     .into_iter()
                     .chain(vector_lib::enrichment::vrl_functions())
                     .chain(vector_vrl_functions::all())
+                    .chain(vector_vrl_metrics::all())
                     .collect::<Vec<_>>();
 
                 let state = TypeState::default();
 
                 let mut config = CompileConfig::default();
                 config.set_custom(enrichment_tables.clone());
+                config.set_custom(metrics_storage.clone());
                 config.set_read_only();
 
                 let CompilationResult {

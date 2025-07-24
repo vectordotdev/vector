@@ -17,6 +17,7 @@ use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
 use vector_lib::schema::Definition;
 use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vector_vrl_metrics::{self, MetricsStorage};
 use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
 use vrl::compiler::{CompileConfig, ExpressionError, Program, TypeState, VrlRuntime};
@@ -178,6 +179,7 @@ impl RemapConfig {
     fn compile_vrl_program(
         &self,
         enrichment_tables: TableRegistry,
+        metrics_storage: MetricsStorage,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, MeaningList)> {
         if let Some((_, res)) = self
@@ -210,6 +212,7 @@ impl RemapConfig {
         #[cfg(feature = "sources-dnstap")]
         functions.append(&mut dnstap_parser::vrl_functions());
         functions.append(&mut vector_vrl_functions::all());
+        functions.append(&mut vector_vrl_metrics::all());
 
         let state = TypeState {
             local: Default::default(),
@@ -221,6 +224,7 @@ impl RemapConfig {
         let mut config = CompileConfig::default();
 
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(metrics_storage);
         config.set_custom(MeaningList::default());
 
         let res = compile_vrl(&source, &functions, &state, config)
@@ -281,9 +285,8 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let merged_definition: Definition = input_definitions
             .iter()
@@ -295,7 +298,11 @@ impl TransformConfig for RemapConfig {
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let compiled = self
-            .compile_vrl_program(enrichment_tables, merged_definition)
+            .compile_vrl_program(
+                context.enrichment_tables.clone(),
+                context.metrics_storage.clone(),
+                merged_definition,
+            )
             .map(|(program, _, meaning_list)| (program.final_type_info().state, meaning_list.0))
             .map_err(|_| ());
 
@@ -449,6 +456,7 @@ impl Remap<AstRunner> {
     ) -> crate::Result<(Self, String)> {
         let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
             context.merged_schema_definition.clone(),
         )?;
 

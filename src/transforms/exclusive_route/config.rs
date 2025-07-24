@@ -1,7 +1,6 @@
 use crate::conditions::{AnyCondition, ConditionConfig, VrlConfig};
 use crate::config::{
-    DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
+    DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
 };
 use crate::schema;
 use crate::sinks::prelude::configurable_component;
@@ -134,9 +133,8 @@ impl TransformConfig for ExclusiveRouteConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let mut outputs: Vec<_> = self
             .routes

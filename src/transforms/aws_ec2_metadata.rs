@@ -11,7 +11,6 @@ use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
 use vector_lib::lookup::owned_value_path;
@@ -246,9 +245,8 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 

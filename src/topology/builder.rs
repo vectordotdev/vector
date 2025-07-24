@@ -16,7 +16,6 @@ use tokio::{
     time::timeout,
 };
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::{
     self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
 };
@@ -32,6 +31,7 @@ use vector_lib::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     fanout::{self, Fanout},
@@ -58,6 +58,7 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
@@ -132,6 +133,7 @@ impl<'a> Builder<'a> {
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
                 utilization_emitter: Some(self.utilization_emitter),
+                metrics_storage: METRICS_STORAGE.clone(),
             })
         } else {
             Err(self.errors)
@@ -342,6 +344,7 @@ impl<'a> Builder<'a> {
                 key: key.clone(),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 shutdown: shutdown_signal,
                 out: pipeline,
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -465,9 +468,13 @@ impl<'a> Builder<'a> {
             let schema_definitions = transform
                 .inner
                 .outputs(
-                    enrichment_tables.clone(),
+                    &TransformContext {
+                        enrichment_tables: enrichment_tables.clone(),
+                        metrics_storage: METRICS_STORAGE.clone(),
+                        schema: self.config.schema,
+                        ..Default::default()
+                    },
                     &input_definitions,
-                    self.config.schema.log_namespace(),
                 )
                 .into_iter()
                 .map(|output| {
@@ -480,19 +487,15 @@ impl<'a> Builder<'a> {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
 
-            let node = TransformNode::from_parts(
-                key.clone(),
-                enrichment_tables.clone(),
-                transform,
-                &input_definitions,
-                self.config.schema.log_namespace(),
-            );
+            let node =
+                TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
 
             let transform = match transform
                 .inner
@@ -602,6 +605,7 @@ impl<'a> Builder<'a> {
                 healthcheck,
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
@@ -720,6 +724,7 @@ pub struct TopologyPieces {
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) utilization_emitter: Option<UtilizationEmitter>,
+    pub(crate) metrics_storage: MetricsStorage,
 }
 
 impl TopologyPieces {
@@ -774,21 +779,16 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(
-                enrichment_tables,
-                schema_definition,
-                global_log_namespace,
-            ),
+            outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

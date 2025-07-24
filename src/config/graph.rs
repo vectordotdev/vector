@@ -1,6 +1,6 @@
 use super::{
-    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput, WildcardMatching,
+    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput,
+    TransformContext, TransformOuter, TransformOutput, WildcardMatching,
 };
 use indexmap::{set::IndexSet, IndexMap};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -108,9 +108,11 @@ impl Graph {
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
                     outputs: transform.inner.outputs(
-                        vector_lib::enrichment::TableRegistry::default(),
+                        &TransformContext {
+                            schema,
+                            ..Default::default()
+                        },
                         &[(id.into(), schema::Definition::any())],
-                        schema.log_namespace(),
                     ),
                 },
             );

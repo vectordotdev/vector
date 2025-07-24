@@ -4,6 +4,7 @@ use vrl::path::PathParseError;
 use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
+use vector_vrl_metrics::MetricsStorage;
 use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
 use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
 use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
@@ -59,6 +60,7 @@ impl ConditionalConfig for DatadogSearchConfig {
     fn build(
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        _: &MetricsStorage,
     ) -> crate::Result<Condition> {
         let matcher = as_log(build_matcher(&self.source, &EventFilter).map_err(|e| e.to_string())?);
 
@@ -1610,7 +1612,7 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default())
+                .build(&Default::default(), Default::default())
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
             assert!(

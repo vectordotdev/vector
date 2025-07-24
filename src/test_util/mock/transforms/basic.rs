@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
@@ -51,9 +50,8 @@ impl TransformConfig for BasicTransformConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),

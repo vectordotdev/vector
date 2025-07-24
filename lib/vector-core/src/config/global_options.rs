@@ -139,6 +139,13 @@ pub struct GlobalOptions {
     /// the global default value, defined using `expire_metrics_secs`.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
+
+    /// The amount of time, in seconds, that internal metrics cache used for VRL will be refreshed.
+    ///
+    /// Higher values will lead to stale metric values from `get_vector_metric` and
+    /// `find_vector_metrics` functions.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub metrics_storage_refresh_period: Option<f64>,
 }
 
 impl_generate_config_from_default!(GlobalOptions);
@@ -287,6 +294,9 @@ impl GlobalOptions {
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
+                metrics_storage_refresh_period: self
+                    .metrics_storage_refresh_period
+                    .or(with.metrics_storage_refresh_period),
             })
         } else {
             Err(errors)

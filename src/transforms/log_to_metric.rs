@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::LogEvent;
 use vector_lib::{
-    config::LogNamespace,
     event::DatadogMetricOriginMetadata,
     event::{
         metric::Sample,
@@ -208,9 +207,8 @@ impl TransformConfig for LogToMetricConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]

@@ -99,11 +99,10 @@ impl TransformConfig for MetricToLogConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         input_definitions: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let log_namespace = context.schema.log_namespace().merge(self.log_namespace);
         let schema_definition = schema_definition(log_namespace);
 
         vec![TransformOutput::new(

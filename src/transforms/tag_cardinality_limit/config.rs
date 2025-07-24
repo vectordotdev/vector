@@ -6,7 +6,6 @@ use crate::config::{
 use crate::schema;
 use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
-use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 
 /// Configuration for the `tag_cardinality_limit` transform.
@@ -146,9 +145,8 @@ impl TransformConfig for TagCardinalityLimitConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }

@@ -16,6 +16,7 @@ use crate::{
 use futures::Stream;
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
+use vector_vrl_metrics::MetricsStorage;
 use vrl::path::{parse_target_path, OwnedTargetPath};
 use vrl::prelude::KeyString;
 
@@ -168,6 +169,7 @@ impl Reduce {
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -176,12 +178,12 @@ impl Reduce {
         let ends_when = config
             .ends_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables))
+            .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let starts_when = config
             .starts_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables))
+            .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
@@ -936,7 +938,12 @@ merge_strategies.bar = "concat"
             "#,
         ))
         .unwrap();
-        let error = Reduce::new(&config, &TableRegistry::default()).unwrap_err();
+        let error = Reduce::new(
+            &config,
+            &TableRegistry::default(),
+            &MetricsStorage::default(),
+        )
+        .unwrap_err();
         assert_eq!(
             error.to_string(),
             "Merge strategies with indexes are currently not supported. Path: `nested.msg[0]`"

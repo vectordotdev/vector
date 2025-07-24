@@ -2,7 +2,6 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures_util::Stream;
-use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
@@ -41,9 +40,8 @@ impl TransformConfig for NoopTransformConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         definitions: &[(OutputId, Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),
