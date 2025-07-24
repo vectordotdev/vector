@@ -123,6 +123,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
       e2e-datadog-metrics:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
+      e2e-opentelemetry-logs:
+        value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
 env:
   BASE_REF: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
   HEAD_REF: ${{ inputs.head_ref  || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}

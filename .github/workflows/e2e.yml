@@ -39,7 +39,6 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-
 jobs:
 
   changes:
@@ -59,7 +58,8 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.e2e-datadog-logs == 'true' ||
-      needs.changes.outputs.e2e-datadog-metrics == 'true'
+      needs.changes.outputs.e2e-datadog-metrics == 'true' ||
+      needs.changes.outputs.e2e-opentelemetry-logs == 'true'
       )
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -102,6 +102,11 @@ jobs:
           timeout_minutes: 35
           max_attempts: 3
           command: bash scripts/int-e2e-test.sh e2e datadog-metrics
+
+      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: e2e-opentelemetry-logs
+        run: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
 
 
   e2e-test-suite:
