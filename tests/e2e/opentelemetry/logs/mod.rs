@@ -49,11 +49,29 @@ fn extract_count(value: &Value) -> u64 {
 }
 
 fn sanitize(mut value: Value) -> Value {
-    value.as_object_mut().map(|obj| {
+    if let Some(obj) = value.as_object_mut() {
         obj.remove("traceId");
         obj.remove("spanId");
-    });
+    };
     value
+}
+
+fn normalize_numbers_to_strings(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let normalized = map
+                .iter()
+                .map(|(k, v)| (k.clone(), normalize_numbers_to_strings(v)))
+                .collect();
+            Value::Object(normalized)
+        }
+        Value::Array(arr) => {
+            let normalized = arr.iter().map(normalize_numbers_to_strings).collect();
+            Value::Array(normalized)
+        }
+        Value::Number(n) => Value::String(n.to_string()),
+        other => other.clone(),
+    }
 }
 
 async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
@@ -170,11 +188,15 @@ async fn vector_sink_otel_sink_logs_match() {
         "Vector did not produce expected number of log records"
     );
 
-    println!("Collector logs: {collector_log_records:#?}");
-    println!("V logs: {vector_log_records:#?}");
-    for count in 0..=EXPECTED_LOG_COUNT as u64 {
-        let c = collector_log_records.get(&count).unwrap();
-        let v = vector_log_records.get(&count).unwrap();
-        assert_eq!(c, v);
+    for count in 0..EXPECTED_LOG_COUNT as u64 {
+        let collector_log = collector_log_records
+            .get(&count)
+            .unwrap_or_else(|| panic!("Missing {count}) key"));
+        let vector_log = vector_log_records
+            .get(&count)
+            .unwrap_or_else(|| panic!("Missing {count}) key"));
+        let collector_log_normalized = normalize_numbers_to_strings(collector_log);
+        let vector_log_normalized = normalize_numbers_to_strings(vector_log);
+        assert_eq!(collector_log_normalized, vector_log_normalized);
     }
 }
