@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
 use futures::{stream, StreamExt};
+use tokio::select;
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
 use vector_common::finalization::Finalizable;
@@ -127,7 +128,15 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             // albeit with a return value of `None`... because the writer is closed, and we read all
             // the records, so nothing is left. :)
             assert!(blocked_read.is_woken());
-            let second_read = assert_ready!(blocked_read.poll());
+
+            let second_read = select! {
+                // if the reader task finishes in time, extract its output
+                res = blocked_read => res,
+                // otherwise panics after 1s
+                _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                    panic!("Reader not ready after 1s");
+                }
+            };
             assert_eq!(second_read.expect("read should not fail"), None);
 
             // All records should be consumed at this point.
