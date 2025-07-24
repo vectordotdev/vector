@@ -103,7 +103,9 @@ jobs:
           max_attempts: 3
           command: bash scripts/int-e2e-test.sh e2e datadog-metrics
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-opentelemetry-logs
         run: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
