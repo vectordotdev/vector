@@ -1,86 +1,28 @@
-use bytes::Bytes;
-use std::{io, num::NonZeroU64};
-use vector_common::json_size::JsonSize;
-use vector_lib::{
-    config::{log_schema, LegacyKey, LogNamespace},
-    event::{Event, EventArray, EventContainer, LogEvent},
-    lookup::{metadata_path, path},
-    EstimatedJsonEncodedSizeOf,
-};
-
-use bytes::BytesMut;
+use crate::vector_lib::codecs::StreamDecodingError;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use tokio::time;
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
-use tokio_util::codec::Decoder as DecoderTrait;
+use tokio_util::codec::FramedRead;
+use vector_lib::{
+    config::LogNamespace,
+    event::{Event, LogEvent},
+    EstimatedJsonEncodedSizeOf,
+};
 
 use crate::{
     codecs::Decoder,
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, PongTimeoutError, WsBinaryDecodeError, WsBytesReceived,
-        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
+        ConnectionOpen, OpenGauge, PongTimeoutError, WsBytesReceived, WsConnectionShutdown, WsKind,
+        WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
-    sources::websocket::config::{PongMessage, PongValidation},
+    sources::websocket::config::{PongMessage, PongValidation, WebSocketConfig},
     SourceSender,
 };
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
-
-#[derive(Debug, PartialEq)]
-struct WebSocketEvent<'a> {
-    payload: String,
-    log_namespace: &'a LogNamespace,
-}
-
-impl WebSocketEvent<'_> {
-    const NAME: &'static str = "websocket";
-}
-
-impl From<WebSocketEvent<'_>> for LogEvent {
-    fn from(frame: WebSocketEvent) -> LogEvent {
-        let WebSocketEvent {
-            payload,
-            log_namespace,
-        } = frame;
-
-        let mut log = LogEvent::default();
-
-        log_namespace.insert_vector_metadata(
-            &mut log,
-            log_schema().source_type_key(),
-            path!("source_type"),
-            Bytes::from_static(WebSocketEvent::NAME.as_bytes()),
-        );
-
-        if let LogNamespace::Vector = log_namespace {
-            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
-        }
-
-        log_namespace.insert_source_metadata(
-            WebSocketEvent::NAME,
-            &mut log,
-            Some(LegacyKey::Overwrite(path!("payload"))),
-            path!("payload"),
-            payload,
-        );
-
-        log
-    }
-}
-
-impl From<WebSocketEvent<'_>> for Event {
-    fn from(frame: WebSocketEvent) -> Event {
-        LogEvent::from(frame).into()
-    }
-}
-
-impl EstimatedJsonEncodedSizeOf for WebSocketEvent<'_> {
-    fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        self.payload.estimated_json_encoded_size_of()
-    }
-}
 
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,
@@ -88,242 +30,224 @@ pub(crate) struct WebSocketSourceParams {
     pub log_namespace: LogNamespace,
 }
 
-pub(crate) async fn recv_from_websocket(
-    cx: SourceContext,
-    config: super::config::WebSocketConfig,
+pub(crate) struct WebSocketSource {
+    config: WebSocketConfig,
     params: WebSocketSourceParams,
-) -> Result<(), ()> {
-    let (mut ws_sink, ws_source) = create_sink_and_stream(params.connector.clone()).await;
+}
 
-    // Send the initial message upon first connection.
-    if let Some(initial_message) = &config.initial_message {
-        if let Err(error) = ws_sink.send(Message::Text(initial_message.clone())).await {
-            emit!(WsSendError { error });
+impl WebSocketSource {
+    pub const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
+        Self { config, params }
+    }
+
+    pub async fn run(self, cx: SourceContext) -> Result<(), ()> {
+        let (mut ws_sink, ws_source) = self.create_sink_and_stream().await;
+        self.send_initial_message(&mut ws_sink).await;
+
+        pin_mut!(ws_sink, ws_source);
+
+        let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        let ping_message = if let Some(ping_msg) = &self.config.ping_message {
+            Message::Text(ping_msg.clone())
         } else {
-            info!(message = %initial_message, "Sent initial message.");
-        }
-    }
+            Message::Ping(vec![])
+        };
 
-    pin_mut!(ws_sink);
-    pin_mut!(ws_source);
+        let mut ping = PingInterval::new(self.config.common.ping_interval.map(u64::from));
+        let mut last_pong = Instant::now();
 
-    let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        let mut out = cx.out;
 
-    let mut ping = PingInterval::new(config.common.ping_interval.map(u64::from));
-    let mut last_pong = Instant::now();
-    let ping_message = if let Some(ping_msg) = &config.ping_message {
-        Message::Text(ping_msg.clone())
-    } else {
-        Message::Ping(vec![])
-    };
+        loop {
+            let result = tokio::select! {
+                _ = cx.shutdown.clone() => {
+                    info!("Received shutdown signal.");
+                    break;
+                },
 
-    let out = cx.out.clone();
+                _ = ping.tick() => {
+                    self.handle_ping_tick(&mut ws_sink, last_pong, &ping_message).await
+                },
 
-    loop {
-        let result = tokio::select! {
-            _ = cx.shutdown.clone() => {
-                info!("Received shutdown signal.");
-                break;
-            },
-
-            _ = ping.tick() => {
-                handle_ping_tick(&mut ws_sink, config.common.ping_timeout, last_pong, &ping_message).await
-            },
-
-            Some(msg) = ws_source.next() => {
-                match msg {
-                    Ok(Message::Pong(_)) => {
-                        last_pong = Instant::now();
-                        Ok(())
-                    },
-                    Ok(Message::Text(msg_txt)) => {
-                        if is_custom_pong(&msg_txt, &config) {
+                Some(msg) = ws_source.next() => {
+                    match msg {
+                        Ok(Message::Pong(_)) => {
                             last_pong = Instant::now();
-                            debug!("Received custom pong response.");
-                        } else {
-                            emit!(WsBytesReceived{
-                                byte_size: msg_txt.len(),
-                                url: &config.common.uri,
-                                protocol: PROTOCOL,
-                                kind: WsKind::Text,
-                            });
-                            handle_message(
-                                &mut out.clone(),
-                                WebSocketEvent{ payload: msg_txt, log_namespace: &params.log_namespace },
-                                &config.common.uri,
-                            ).await;
+                            Ok(())
+                        },
+                        Ok(Message::Text(msg_txt)) => {
+                            if self.is_custom_pong(&msg_txt) {
+                                last_pong = Instant::now();
+                                debug!("Received custom pong response.");
+                            } else {
+                                self.handle_message(&msg_txt, WsKind::Text, &mut out).await;
+                            }
+                            Ok(())
+                        },
+                        Ok(Message::Binary(msg_bytes)) => {
+                            self.handle_message(&msg_bytes, WsKind::Binary, &mut out).await;
+                            Ok(())
+                        },
+                        Ok(Message::Ping(_)) => Ok(()),
+                        Ok(Message::Close(_)) => Err(WsError::ConnectionClosed),
+                        Ok(Message::Frame(_)) => {
+                            warn!("Unsupported message type received: frame.");
+                             Ok(())
                         }
-                        Ok(())
-                    },
-                    Ok(Message::Binary(msg_bytes)) => {
-                        emit!(WsBytesReceived{
-                            byte_size: msg_bytes.len(),
-                            url: &config.common.uri,
-                            protocol: PROTOCOL,
-                            kind: WsKind::Binary,
-                        });
-
-                        handle_binary_payload(msg_bytes, &params, &config.common.uri, out.clone()).await
-                    },
-                    Ok(Message::Ping(_)) => Ok(()), // Ignore pings from the server
-                    Ok(Message::Close(_)) => Err(WsError::ConnectionClosed),
-                    Ok(Message::Frame(_)) => {
-                        warn!("Unsupported message type received: frame.");
-                         Ok(())
+                        Err(e) => Err(e),
                     }
-                    Err(e) => Err(e),
+                }
+            };
+
+            if let Err(error) = result {
+                if is_closed(&error) {
+                    emit!(WsConnectionShutdown);
+                    return Err(());
+                }
+
+                emit!(WsReceiveError { error });
+
+                // Reconnection logic
+                let (new_sink, new_source) = self.create_sink_and_stream().await;
+                ws_sink.set(new_sink);
+                ws_source.set(new_source);
+
+                self.send_initial_message(&mut ws_sink).await;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_message<T>(&self, payload: &T, kind: WsKind, out: &mut SourceSender)
+    where
+        T: AsRef<[u8]> + ?Sized,
+    {
+        let payload_bytes = payload.as_ref();
+
+        emit!(WsBytesReceived {
+            byte_size: payload_bytes.len(),
+            url: &self.config.common.uri,
+            protocol: PROTOCOL,
+            kind,
+        });
+        self.process_payload(payload_bytes, kind, out).await;
+    }
+
+    async fn process_payload(&self, payload: &[u8], kind: WsKind, out: &mut SourceSender) {
+        let mut stream = FramedRead::new(payload, self.params.decoder.clone());
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok((events, _)) => {
+                    if events.is_empty() {
+                        continue;
+                    }
+
+                    let event_count = events.len();
+                    let byte_size = events.estimated_json_encoded_size_of();
+
+                    register!(EventsReceived).emit(CountByteSize(event_count, byte_size));
+                    emit!(WsMessageReceived {
+                        count: event_count,
+                        byte_size,
+                        url: &self.config.common.uri,
+                        protocol: PROTOCOL,
+                        kind,
+                    });
+
+                    let events_with_meta = events.into_iter().map(|mut event| {
+                        if let Event::Log(event) = &mut event {
+                            self.add_metadata(event);
+                        }
+                        event
+                    });
+
+                    if let Err(error) = out.send_batch(events_with_meta).await {
+                        error!(message = "Error sending events.", %error);
+                    }
+                }
+                Err(error) => {
+                    if !error.can_continue() {
+                        break;
+                    }
                 }
             }
-        };
+        }
+    }
 
-        if let Err(error) = result {
-            if is_closed(&error) {
-                emit!(WsConnectionShutdown);
-                return Err(());
-            }
+    fn add_metadata(&self, event: &mut LogEvent) {
+        self.params
+            .log_namespace
+            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
+    }
 
-            emit!(WsReceiveError { error });
-
-            // Reconnection logic
-            let (new_sink, new_source) = create_sink_and_stream(params.connector.clone()).await;
-            ws_sink.set(new_sink);
-            ws_source.set(new_source);
-
-            if let Some(initial_message) = &config.initial_message {
-                if ws_sink
-                    .send(Message::Text(initial_message.clone()))
-                    .await
-                    .is_err()
-                {
+    async fn send_initial_message(
+        &self,
+        ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
+    ) {
+        if let Some(initial_message) = &self.config.initial_message {
+            match ws_sink.send(Message::Text(initial_message.clone())).await {
+                Ok(_) => debug!(message = %initial_message, "Sent initial message."),
+                Err(error) => {
+                    emit!(WsSendError { error });
                     // Avoid a tight loop if sending the initial message fails repeatedly.
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    continue;
+                    time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }
     }
 
-    Ok(())
-}
+    async fn create_sink_and_stream(
+        &self,
+    ) -> (
+        impl Sink<Message, Error = WsError>,
+        impl Stream<Item = Result<Message, WsError>>,
+    ) {
+        let ws_stream = self.params.connector.connect_backoff().await;
+        ws_stream.split()
+    }
 
-async fn create_sink_and_stream(
-    connector: WebSocketConnector,
-) -> (
-    impl Sink<Message, Error = WsError>,
-    impl Stream<Item = Result<Message, WsError>>,
-) {
-    let ws_stream = connector.connect_backoff().await;
-    ws_stream.split()
-}
-
-fn check_received_pong_time(
-    ping_timeout: Option<NonZeroU64>,
-    last_pong: Instant,
-) -> Result<(), WsError> {
-    if let Some(ping_timeout) = ping_timeout {
-        if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-            let error = io::Error::new(io::ErrorKind::TimedOut, "Pong not received in time.");
-            emit!(PongTimeoutError {
-                timeout_secs: ping_timeout,
-            });
-            return Err(WsError::Io(error));
+    fn is_custom_pong(&self, msg_txt: &str) -> bool {
+        if let Some(pong_config) = &self.config.pong_message {
+            return match pong_config {
+                PongMessage::Simple(expected) => msg_txt == expected,
+                PongMessage::Advanced(validation) => match validation {
+                    PongValidation::Exact(expected) => msg_txt == expected,
+                    PongValidation::Contains(substring) => msg_txt.contains(substring),
+                },
+            };
         }
+        false
     }
 
-    Ok(())
-}
+    async fn handle_ping_tick(
+        &self,
+        ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
+        last_pong: Instant,
+        ping_message: &Message,
+    ) -> Result<(), WsError> {
+        let ping_timeout = self.config.common.ping_timeout;
 
-async fn handle_message<'a>(out: &mut SourceSender, msg: WebSocketEvent<'a>, endpoint: &str) {
-    let events_received = register!(EventsReceived);
+        if let Some(ping_timeout) = ping_timeout {
+            if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
+                let error =
+                    std::io::Error::new(std::io::ErrorKind::TimedOut, "Pong not received in time.");
+                emit!(PongTimeoutError {
+                    timeout_secs: ping_timeout,
+                });
+                return Err(WsError::Io(error));
+            }
+        }
 
-    let json_size = msg.estimated_json_encoded_size_of();
-    let events = EventArray::Logs(vec![msg.into()]);
-
-    events_received.emit(CountByteSize(events.len(), json_size));
-
-    emit!(WsMessageReceived {
-        count: events.len(),
-        byte_size: json_size,
-        url: endpoint,
-        protocol: WebSocketEvent::NAME,
-        kind: WsKind::Text,
-    });
-
-    if let Err(error) = out.send_event(events).await {
-        error!("Could not send events: {}.", error);
-    }
-}
-
-async fn handle_binary_payload(
-    msg_bytes: Vec<u8>,
-    params: &WebSocketSourceParams,
-    uri: &str,
-    mut out: SourceSender,
-) -> Result<(), WsError> {
-    let mut buf: BytesMut = msg_bytes.iter().collect();
-    match params
-        .decoder
-        .clone()
-        .decode(&mut buf)
-        .map(|maybe_msg| async {
-            maybe_msg
-                .and_then(|(msg, _)| msg.into_iter().next())
-                .and_then(|e| {
-                    if let Event::Log(log_evt) = e {
-                        Some(WebSocketEvent {
-                            payload: log_evt.value().to_string(),
-                            log_namespace: &params.log_namespace,
-                        })
-                    } else {
-                        warn!("Decoded unsupported event: {:?}.", e);
-                        None
-                    }
-                })
-                .map(|evt| async { handle_message(&mut out, evt, uri).await })
-                .ok_or(())?
-                .await;
-            Ok::<(), ()>(())
+        ws_sink.send(ping_message.clone()).await.map_err(|error| {
+            emit!(WsSendError { error });
+            WsError::Io(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "Websocket connection is closed.",
+            ))
         })
-        .map_err(|error| {
-            emit!(WsBinaryDecodeError { error });
-        }) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            // This case should ideally not be reached since map_err should handle it.
-            // However, to be safe, we emit a generic error here.
-            error!("Failed to send binary message: {:?}.", e);
-            Ok(())
-        }
     }
-}
-
-fn is_custom_pong(msg_txt: &str, config: &super::config::WebSocketConfig) -> bool {
-    if let Some(pong_config) = &config.pong_message {
-        return match pong_config {
-            PongMessage::Simple(expected) => msg_txt == expected,
-            PongMessage::Advanced(validation) => match validation {
-                PongValidation::Exact(expected) => msg_txt == expected,
-                PongValidation::Contains(substring) => msg_txt.contains(substring),
-            },
-        };
-    }
-    false
-}
-
-async fn handle_ping_tick(
-    ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
-    ping_timeout: Option<NonZeroU64>,
-    last_pong: Instant,
-    ping_message: &Message,
-) -> Result<(), WsError> {
-    check_received_pong_time(ping_timeout, last_pong)?;
-    ws_sink.send(ping_message.clone()).await.map_err(|error| {
-        emit!(WsSendError { error });
-        WsError::Io(io::Error::new(
-            io::ErrorKind::BrokenPipe,
-            "Websocket connection is closed.",
-        ))
-    })
 }
 
 #[cfg(feature = "websocket-integration-tests")]
@@ -410,9 +334,9 @@ mod integration_test {
 
         // Now assert that the event was received and is correct.
         assert!(!events.is_empty(), "No events received from source");
-        let log = events[0].as_log();
-        assert_eq!(log["payload"], "message from server".into());
-        assert_eq!(*log.get_source_type().unwrap(), "websocket".into());
+        let event = events[0].as_log();
+        assert_eq!(event["message"], "message from server".into());
+        assert_eq!(*event.get_source_type().unwrap(), "websocket".into());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -428,8 +352,8 @@ mod integration_test {
             run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
 
         assert!(!events.is_empty(), "No events received from source");
-        let log = events[0].as_log();
-        assert_eq!(log["payload"], response_msg.into());
-        assert_eq!(*log.get_source_type().unwrap(), "websocket".into());
+        let event = events[0].as_log();
+        assert_eq!(event["message"], response_msg.into());
+        assert_eq!(*event.get_source_type().unwrap(), "websocket".into());
     }
 }

@@ -2,6 +2,7 @@ use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 
+use super::source::{WebSocketSource, WebSocketSourceParams};
 use crate::common::websocket::WebSocketCommonConfig;
 use crate::{
     codecs::DecodingConfig,
@@ -107,18 +108,19 @@ impl SourceConfig for super::config::WebSocketConfig {
             WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
 
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
-            .build()?;
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
+                .build()?;
 
-        Ok(Box::pin(super::source::recv_from_websocket(
-            cx,
-            self.clone(),
-            super::source::WebSocketSourceParams {
-                connector,
-                decoder,
-                log_namespace,
-            },
-        )))
+        let params = WebSocketSourceParams {
+            connector,
+            decoder,
+            log_namespace,
+        };
+
+        let source = WebSocketSource::new(self.clone(), params);
+
+        Ok(Box::pin(source.run(cx)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

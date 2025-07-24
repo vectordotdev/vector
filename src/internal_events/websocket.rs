@@ -100,7 +100,7 @@ impl InternalEvent for WsConnectionError {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum WsKind {
     Ping,
     Pong,
