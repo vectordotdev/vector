@@ -93,17 +93,12 @@ pub(crate) async fn recv_from_websocket(
     config: super::config::WebSocketConfig,
     params: WebSocketSourceParams,
 ) -> Result<(), ()> {
-    let ping_interval = config.common.ping_interval;
-    let ping_timeout = config.common.ping_timeout;
-
     let (mut ws_sink, ws_source) = create_sink_and_stream(params.connector.clone()).await;
 
     // Send the initial message upon first connection.
     if let Some(initial_message) = &config.initial_message {
         if let Err(error) = ws_sink.send(Message::Text(initial_message.clone())).await {
             emit!(WsSendError { error });
-            // The connection is likely unusable. The main loop will fail on the next read and
-            // trigger reconnection logic.
         } else {
             info!(message = %initial_message, "Sent initial message.");
         }
@@ -114,11 +109,8 @@ pub(crate) async fn recv_from_websocket(
 
     let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-    // tokio::time::Interval panics if the period arg is zero. Since the struct members are
-    // using NonZeroU64 that is not something we need to account for.
-    let mut ping = PingInterval::new(ping_interval.map(u64::from));
+    let mut ping = PingInterval::new(config.common.ping_interval.map(u64::from));
     let mut last_pong = Instant::now();
-
     let ping_message = if let Some(ping_msg) = &config.ping_message {
         Message::Text(ping_msg.clone())
     } else {
@@ -135,52 +127,17 @@ pub(crate) async fn recv_from_websocket(
             },
 
             _ = ping.tick() => {
-                match check_received_pong_time(ping_timeout, last_pong) {
-                    Ok(()) => {
-                        ws_sink.send(ping_message.clone()).await.map_err(|error| {
-                            emit!(WsSendError { error });
-                            WsError::Io(io::Error::new(io::ErrorKind::BrokenPipe, "Websocket connection is closed."))
-                        })
-
-                    }
-                    Err(e) => Err(e)
-                }
+                handle_ping_tick(&mut ws_sink, config.common.ping_timeout, last_pong, &ping_message).await
             },
 
             Some(msg) = ws_source.next() => {
-
-                // Pong control frames are sent automatically by tungstenite during reading from the stream.
                 match msg {
-                    Ok(Message::Ping(ping)) => {
-                        emit!(WsBytesReceived{
-                            byte_size: ping.len(),
-                            url: &config.common.uri,
-                            protocol: PROTOCOL,
-                            kind: WsKind::Ping,
-                        });
-
-                        Ok(())
-                    },
-
                     Ok(Message::Pong(_)) => {
                         last_pong = Instant::now();
                         Ok(())
                     },
-
                     Ok(Message::Text(msg_txt)) => {
-                        let mut is_custom_pong = false;
-
-                        if let Some(pong_config) = &config.pong_message {
-                            is_custom_pong = match pong_config {
-                                PongMessage::Simple(expected_str) => msg_txt == *expected_str,
-                                PongMessage::Advanced(validation) => match validation {
-                                    PongValidation::Exact(expected_str) => msg_txt == *expected_str,
-                                    PongValidation::Contains(substring) => msg_txt.contains(substring),
-                                },
-                            };
-                        }
-
-                        if is_custom_pong {
+                        if is_custom_pong(&msg_txt, &config) {
                             last_pong = Instant::now();
                             debug!("Received custom pong response.");
                         } else {
@@ -190,19 +147,14 @@ pub(crate) async fn recv_from_websocket(
                                 protocol: PROTOCOL,
                                 kind: WsKind::Text,
                             });
-
-                        handle_message(
-                            &mut out.clone(),
-                            WebSocketEvent{
-                                payload: msg_txt,
-                                log_namespace: &params.log_namespace,
-                            },
-                            &config.common.uri,
+                            handle_message(
+                                &mut out.clone(),
+                                WebSocketEvent{ payload: msg_txt, log_namespace: &params.log_namespace },
+                                &config.common.uri,
                             ).await;
                         }
                         Ok(())
                     },
-
                     Ok(Message::Binary(msg_bytes)) => {
                         emit!(WsBytesReceived{
                             byte_size: msg_bytes.len(),
@@ -213,17 +165,12 @@ pub(crate) async fn recv_from_websocket(
 
                         handle_binary_payload(msg_bytes, &params, &config.common.uri, out.clone()).await
                     },
-
-                    Ok(Message::Close(_)) => {
-                        info!("Received message: connection closed from server.");
-                        Err(WsError::ConnectionClosed)
-                    },
-
+                    Ok(Message::Ping(_)) => Ok(()), // Ignore pings from the server
+                    Ok(Message::Close(_)) => Err(WsError::ConnectionClosed),
                     Ok(Message::Frame(_)) => {
                         warn!("Unsupported message type received: frame.");
-                        Ok(())
-                    },
-
+                         Ok(())
+                    }
                     Err(e) => Err(e),
                 }
             }
@@ -233,26 +180,25 @@ pub(crate) async fn recv_from_websocket(
             if is_closed(&error) {
                 emit!(WsConnectionShutdown);
                 return Err(());
-            } else {
-                emit!(WsReceiveError { error });
-                let (mut new_sink, new_source) =
-                    create_sink_and_stream(params.connector.clone()).await;
+            }
 
-                // Resend initial message on reconnect
-                if let Some(initial_message) = &config.initial_message {
-                    if let Err(error) = new_sink.send(Message::Text(initial_message.clone())).await
-                    {
-                        emit!(WsSendError { error });
-                        // Avoid tight loop on repeated send failures.
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
-                    } else {
-                        info!(message = %initial_message, "Sent initial message on reconnect.");
-                    }
+            emit!(WsReceiveError { error });
+
+            // Reconnection logic
+            let (new_sink, new_source) = create_sink_and_stream(params.connector.clone()).await;
+            ws_sink.set(new_sink);
+            ws_source.set(new_source);
+
+            if let Some(initial_message) = &config.initial_message {
+                if ws_sink
+                    .send(Message::Text(initial_message.clone()))
+                    .await
+                    .is_err()
+                {
+                    // Avoid a tight loop if sending the initial message fails repeatedly.
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
                 }
-
-                ws_sink.set(new_sink);
-                ws_source.set(new_source);
             }
         }
     }
@@ -350,6 +296,36 @@ async fn handle_binary_payload(
         }
     }
 }
+
+fn is_custom_pong(msg_txt: &str, config: &super::config::WebSocketConfig) -> bool {
+    if let Some(pong_config) = &config.pong_message {
+        return match pong_config {
+            PongMessage::Simple(expected) => msg_txt == expected,
+            PongMessage::Advanced(validation) => match validation {
+                PongValidation::Exact(expected) => msg_txt == expected,
+                PongValidation::Contains(substring) => msg_txt.contains(substring),
+            },
+        };
+    }
+    false
+}
+
+async fn handle_ping_tick(
+    ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
+    ping_timeout: Option<NonZeroU64>,
+    last_pong: Instant,
+    ping_message: &Message,
+) -> Result<(), WsError> {
+    check_received_pong_time(ping_timeout, last_pong)?;
+    ws_sink.send(ping_message.clone()).await.map_err(|error| {
+        emit!(WsSendError { error });
+        WsError::Io(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "Websocket connection is closed.",
+        ))
+    })
+}
+
 #[cfg(feature = "websocket-integration-tests")]
 #[cfg(test)]
 mod integration_test {
