@@ -29,7 +29,8 @@ fn vector_log_path() -> PathBuf {
 }
 
 fn extract_count(value: &Value) -> u64 {
-    value.get("attributes")
+    value
+        .get("attributes")
         .and_then(|attrs| attrs.as_array())
         .and_then(|arr| {
             arr.iter().find_map(|attr| {
@@ -63,22 +64,48 @@ async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
     let mut result = BTreeMap::new();
 
     for (idx, line) in content.lines().enumerate() {
-        let root: Value = serde_json::from_str(line)
-            .unwrap_or_else(|_| panic!("Malformed JSON on line {} in {}\nLine: {line}", idx + 1, path.display()));
+        let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
+            panic!(
+                "Malformed JSON on line {} in {}\nLine: {line}",
+                idx + 1,
+                path.display()
+            )
+        });
 
-        let resource_logs = root.get("resourceLogs")
+        let resource_logs = root
+            .get("resourceLogs")
             .and_then(|v| v.as_array())
-            .unwrap_or_else(|| panic!("Missing or invalid 'resourceLogs' in line {} of {}", idx + 1, path.display()));
+            .unwrap_or_else(|| {
+                panic!(
+                    "Missing or invalid 'resourceLogs' in line {} of {}",
+                    idx + 1,
+                    path.display()
+                )
+            });
 
         for resource in resource_logs {
-            let scope_logs = resource.get("scopeLogs")
+            let scope_logs = resource
+                .get("scopeLogs")
                 .and_then(|v| v.as_array())
-                .unwrap_or_else(|| panic!("Missing or invalid 'scopeLogs' in line {} of {}", idx + 1, path.display()));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Missing or invalid 'scopeLogs' in line {} of {}",
+                        idx + 1,
+                        path.display()
+                    )
+                });
 
             for scope in scope_logs {
-                let log_records = scope.get("logRecords")
+                let log_records = scope
+                    .get("logRecords")
                     .and_then(|v| v.as_array())
-                    .unwrap_or_else(|| panic!("Missing or invalid 'logRecords' in line {} of {}", idx + 1, path.display()));
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Missing or invalid 'logRecords' in line {} of {}",
+                            idx + 1,
+                            path.display()
+                        )
+                    });
 
                 for record in log_records {
                     let count = extract_count(record);
@@ -125,7 +152,7 @@ async fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
         }
     })
     .await
-        .expect("Timed out waiting for both log files to contain sufficient records")
+    .expect("Timed out waiting for both log files to contain sufficient records")
 }
 
 #[tokio::test]
@@ -146,12 +173,8 @@ async fn vector_sink_otel_sink_logs_match() {
     println!("Collector logs: {collector_log_records:#?}");
     println!("V logs: {vector_log_records:#?}");
     for count in 0..=EXPECTED_LOG_COUNT as u64 {
-        let c = collector_log_records
-            .get(&count)
-            .unwrap();
-        let v = vector_log_records
-            .get(&count)
-            .unwrap();
+        let c = collector_log_records.get(&count).unwrap();
+        let v = vector_log_records.get(&count).unwrap();
         assert_eq!(c, v);
     }
 }
