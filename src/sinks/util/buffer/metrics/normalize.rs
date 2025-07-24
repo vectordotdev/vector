@@ -259,6 +259,26 @@ pub struct MetricSet {
 }
 
 impl MetricSet {
+    /// Prints the configuration and contents of the cache for debugging purposes.
+    pub fn debug_print(&self) {
+        // Print configuration
+        println!("MetricSet Configuration:");
+        println!("  Max Bytes: {:?}", self.settings.max_bytes);
+        println!("  Max Events: {:?}", self.settings.max_events);
+        println!("  Time To Idle: {:?}", self.settings.time_to_idle);
+        println!("  Entry Count: {}", self.cache.entry_count());
+        println!("  Weighted Size: {} bytes", self.cache.weighted_size());
+
+        // Print cache contents
+        println!("\nMetricSet Cache Contents:");
+        for (i, (series, entry)) in self.iter().enumerate() {
+            println!(
+                "  Item {}: Series: {:?}, Value: {:?}, Kind: {:?}",
+                i, series, entry.data.value, entry.data.kind
+            );
+        }
+    }
+
     /// Creates a new MetricSet with the given configuration.
     pub fn new(settings: MetricSetSettings) -> Self {
         let mut builder = Cache::builder();
@@ -350,6 +370,7 @@ impl MetricSet {
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
+        self.debug_print();
         let series = metric.series().clone();
 
         if let Some(mut existing) = self.cache.get(&series) {
