@@ -44,7 +44,7 @@ env:
 jobs:
   generate-publish-metadata:
     name: Generate Publish-related Metadata
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 5
     outputs:
       vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
@@ -61,7 +61,7 @@ jobs:
 
   build-x86_64-unknown-linux-musl-packages:
     name: Build Vector for x86_64-unknown-linux-musl (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -87,7 +87,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu-packages:
     name: Build Vector for x86_64-unknown-linux-gnu (.tar.gz, DEB, RPM)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -113,7 +113,7 @@ jobs:
 
   build-aarch64-unknown-linux-musl-packages:
     name: Build Vector for aarch64-unknown-linux-musl (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -141,7 +141,7 @@ jobs:
 
   build-aarch64-unknown-linux-gnu-packages:
     name: Build Vector for aarch64-unknown-linux-gnu (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -169,7 +169,7 @@ jobs:
 
   build-armv7-unknown-linux-gnueabihf-packages:
     name: Build Vector for armv7-unknown-linux-gnueabihf (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -197,7 +197,7 @@ jobs:
 
   build-armv7-unknown-linux-musleabihf-packages:
     name: Build Vector for armv7-unknown-linux-musleabihf (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -225,7 +225,7 @@ jobs:
 
   build-arm-unknown-linux-gnueabi-packages:
     name: Build Vector for arm-unknown-linux-gnueabi (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -253,7 +253,7 @@ jobs:
 
   build-arm-unknown-linux-musleabi-packages:
     name: Build Vector for arm-unknown-linux-musleabi (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: self-hosted
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -282,7 +282,7 @@ jobs:
 
   deb-verify:
     name: Verify DEB Packages
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -329,7 +329,7 @@ jobs:
 
   rpm-verify:
     name: Verify RPM Packages
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 5
     needs:
       - generate-publish-metadata
@@ -380,7 +380,7 @@ jobs:
 
   publish-docker:
     name: Publish to Docker
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 15
     needs:
       - generate-publish-metadata
