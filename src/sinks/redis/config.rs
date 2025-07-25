@@ -14,7 +14,7 @@ impl TowerRequestConfigDefaults for RedisTowerRequestConfigDefaults {
 
 /// Redis data type to store messages in.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DataTypeConfig {
@@ -30,6 +30,12 @@ pub enum DataTypeConfig {
     ///
     /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
+
+    /// The Redis `stream` type.
+    ///
+    /// Redis streams are an append-only log data structure that can be used for messaging,
+    /// event sourcing, and other use cases requiring ordered, persistent message storage.
+    Stream,
 }
 
 /// List-specific options.
@@ -61,6 +67,20 @@ pub enum Method {
     LPush,
 }
 
+/// Stream-specific options.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub struct StreamOption {
+    /// The maximum length of the stream before trimming.
+    ///
+    /// When set, the stream will be automatically trimmed to this length using the `MAXLEN ~` option.
+    /// The `~` means "approximately" which is more efficient than exact trimming.
+    /// If not set, the stream will grow indefinitely.
+    #[configurable(metadata(docs::examples = 1000))]
+    pub(super) max_length: Option<usize>,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RedisDefaultBatchSettings;
 
@@ -85,6 +105,10 @@ pub struct RedisSinkConfig {
     #[configurable(derived)]
     #[serde(alias = "list")]
     pub(super) list_option: Option<ListOption>,
+
+    #[configurable(derived)]
+    #[serde(alias = "stream")]
+    pub(super) stream_option: Option<StreamOption>,
 
     /// The URL of the Redis endpoint to connect to.
     ///

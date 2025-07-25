@@ -24,9 +24,14 @@ pub(super) struct RedisSink {
 impl RedisSink {
     pub(super) fn new(config: &RedisSinkConfig, conn: ConnectionManager) -> crate::Result<Self> {
         let method = config.list_option.map(|option| option.method);
+        let max_length = config
+            .stream_option
+            .as_ref()
+            .and_then(|option| option.max_length);
         let data_type = match config.data_type {
             DataTypeConfig::Channel => super::DataType::Channel,
             DataTypeConfig::List => super::DataType::List(method.unwrap_or_default()),
+            DataTypeConfig::Stream => super::DataType::Stream(max_length),
         };
 
         let batcher_settings = config.batch.validate()?.into_batcher_settings()?;
