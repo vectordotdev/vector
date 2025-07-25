@@ -36,7 +36,10 @@ print_compose_logs_on_failure() {
 }
 
 if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-  find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
+  docker run --rm \
+    -v opentelemetry-logs_otel-e2e-output:/data \
+    alpine \
+    sh -c 'find /data -type f -name "*.log" -delete'
 fi
 
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
