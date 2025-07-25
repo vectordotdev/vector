@@ -4,7 +4,8 @@ features:
 test_filter: "::redis::"
 
 env:
-  REDIS_URL: redis://redis:6379/0
+  REDIS_URL: redis://redis-primary:6379/0
+  SENTINEL_URL: redis://redis-sentinel:26379/
 
 matrix:
   version: [6-alpine]
