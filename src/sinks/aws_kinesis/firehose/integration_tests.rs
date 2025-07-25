@@ -299,7 +299,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         .await
     {
         Ok(res) => res.domain_status.expect("no domain status").arn,
-        Err(error) => panic!("Unable to create the Elasticsearch domain {:?}", error),
+        Err(error) => panic!("Unable to create the Elasticsearch domain {error:?}"),
     };
 
     // wait for ES to be available; it starts up when the ES domain is created
@@ -347,7 +347,7 @@ async fn ensure_elasticsearch_delivery_stream(
         .await
     {
         Ok(_) => (),
-        Err(error) => panic!("Unable to create the delivery stream {:?}", error),
+        Err(error) => panic!("Unable to create the delivery stream {error:?}"),
     };
 }
 

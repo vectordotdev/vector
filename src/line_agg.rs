@@ -183,10 +183,13 @@ where
 
             // If we're in draining mode, short circuit here.
             if let Some(to_drain) = &mut this.draining {
-                if let Some(val) = to_drain.pop() {
-                    return Poll::Ready(Some(val));
-                } else {
-                    return Poll::Ready(None);
+                match to_drain.pop() {
+                    Some(val) => {
+                        return Poll::Ready(Some(val));
+                    }
+                    _ => {
+                        return Poll::Ready(None);
+                    }
                 }
             }
 
@@ -749,7 +752,7 @@ mod tests {
             "START msg 1".to_string(), // will be stashed
         ];
         for i in 0..n {
-            lines.push(format!("line {}", i));
+            lines.push(format!("line {i}"));
         }
         let config = Config {
             start_pattern: Regex::new("").unwrap(),
@@ -760,7 +763,7 @@ mod tests {
 
         let mut expected = "START msg 1".to_string();
         for i in 0..n {
-            write!(expected, "\nline {}", i).expect("write to String never fails");
+            write!(expected, "\nline {i}").expect("write to String never fails");
         }
 
         let (mut send, recv) = futures::channel::mpsc::unbounded();

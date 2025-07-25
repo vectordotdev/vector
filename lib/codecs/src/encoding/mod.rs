@@ -39,8 +39,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::SerializingError(error) => write!(formatter, "SerializingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::SerializingError(error) => write!(formatter, "SerializingError({error})"),
         }
     }
 }

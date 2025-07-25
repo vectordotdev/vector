@@ -76,7 +76,7 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("[top] Encountered shutdown error: {}", err);
+                eprintln!("[top] Encountered shutdown error: {err}");
             }
             connection.abort();
             exitcode::IOERR

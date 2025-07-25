@@ -34,7 +34,7 @@ impl HealthSubscription {
     async fn heartbeat(
         &self,
         #[graphql(default = 1000, validator(minimum = 10, maximum = 60_000))] interval: i32,
-    ) -> impl Stream<Item = Heartbeat> {
+    ) -> impl Stream<Item = Heartbeat> + use<> {
         IntervalStream::new(tokio::time::interval(Duration::from_millis(
             interval as u64,
         )))

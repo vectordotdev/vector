@@ -176,7 +176,7 @@ impl<'a> Builder<'a> {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
-                            .push(format!("Enrichment Table \"{}\": {}", name, error));
+                            .push(format!("Enrichment Table \"{name}\": {error}"));
                         continue;
                     }
                 };
@@ -356,7 +356,7 @@ impl<'a> Builder<'a> {
             let source = source.inner.build(context).await;
             let server = match source {
                 Err(error) => {
-                    self.errors.push(format!("Source \"{}\": {}", key, error));
+                    self.errors.push(format!("Source \"{key}\": {error}"));
                     continue;
                 }
                 Ok(server) => server,
@@ -504,8 +504,7 @@ impl<'a> Builder<'a> {
                 .await
             {
                 Err(error) => {
-                    self.errors
-                        .push(format!("Transform \"{}\": {}", key, error));
+                    self.errors.push(format!("Transform \"{key}\": {error}"));
                     continue;
                 }
                 Ok(transform) => transform,
@@ -576,28 +575,30 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
-                buffer
-            } else {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{}\": {}", key, error));
-                        continue;
+            let (tx, rx) = match self.buffers.remove(key) {
+                Some(buffer) => buffer,
+                _ => {
+                    let buffer_type =
+                        match sink.buffer.stages().first().expect("cant ever be empty") {
+                            BufferType::Memory { .. } => "memory",
+                            BufferType::DiskV2 { .. } => "disk",
+                        };
+                    let buffer_span = error_span!("sink", buffer_type);
+                    let buffer = sink
+                        .buffer
+                        .build(
+                            self.config.global.data_dir.clone(),
+                            key.to_string(),
+                            buffer_span,
+                        )
+                        .await;
+                    match buffer {
+                        Err(error) => {
+                            self.errors.push(format!("Sink \"{key}\": {error}"));
+                            continue;
+                        }
+                        Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                     }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                 }
             };
 
@@ -615,7 +616,7 @@ impl<'a> Builder<'a> {
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
-                    self.errors.push(format!("Sink \"{}\": {}", key, error));
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
                     continue;
                 }
                 Ok(built) => built,

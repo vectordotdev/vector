@@ -46,7 +46,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             exitcode::OK
         }
         Err(e) => {
-            eprintln!("error while generating schema: {:?}", e);
+            eprintln!("error while generating schema: {e:?}");
             exitcode::SOFTWARE
         }
     }

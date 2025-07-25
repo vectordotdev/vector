@@ -108,7 +108,7 @@ async fn mqtt_happy() {
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             }
         }
         assert!(expected_messages.is_empty());

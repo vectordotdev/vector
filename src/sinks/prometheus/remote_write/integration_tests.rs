@@ -32,7 +32,7 @@ async fn insert_metrics(url: &str) {
         let cx = SinkContext::default();
 
         let config = RemoteWriteConfig {
-            endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+            endpoint: format!("{url}/api/v1/prom/write?db={database}"),
             tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
@@ -44,7 +44,7 @@ async fn insert_metrics(url: &str) {
         let (sink, _) = config.build(cx).await.expect("error building config");
         sink.run_events(events.clone()).await.unwrap();
 
-        let result = query(url, &format!("show series on {}", database)).await;
+        let result = query(url, &format!("show series on {database}")).await;
 
         let values = &result["results"][0]["series"][0]["values"];
         assert_eq!(values.as_array().unwrap().len(), 5);
@@ -105,6 +105,6 @@ fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
 
 fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
     name_range
-        .map(move |num| create_event(format!("metric_{}", num), value(num as f64)))
+        .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
         .collect()
 }

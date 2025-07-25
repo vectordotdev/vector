@@ -27,7 +27,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
-            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
         tform.transform(event, &mut outputs);
@@ -90,7 +90,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
-            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
         tform.transform(event, &mut outputs);
@@ -144,7 +144,7 @@ fn benchmark_remap(c: &mut Criterion) {
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
             let mut outputs = TransformOutputsBuf::new_with_capacity(
-                vec![TransformOutput::new(DataType::all(), HashMap::new())],
+                vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
                 1,
             );
             tform.transform(event, &mut outputs);

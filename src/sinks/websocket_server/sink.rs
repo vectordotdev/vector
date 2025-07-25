@@ -420,7 +420,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     }
 
                     let peers = peers.lock().expect("mutex poisoned");
-                    let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
+                    let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
                             emit!(WsListenerSendError {

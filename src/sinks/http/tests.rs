@@ -778,7 +778,7 @@ where
         "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
         "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
         "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
-        _ => panic!("undefined compression: {}", compression),
+        _ => panic!("undefined compression: {compression}"),
     }
 }
 
@@ -808,14 +808,12 @@ async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::
 
     let config = format!(
         r#"
-                uri = "http://{addr}/frames"
+                uri = "http://{in_addr}/frames"
                 compression = "gzip"
                 framing.method = "newline_delimited"
                 encoding.codec = "json"
-                {extras}
+                {extra_config}
             "#,
-        addr = in_addr,
-        extras = extra_config,
     );
     let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

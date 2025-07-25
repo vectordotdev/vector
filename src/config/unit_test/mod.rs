@@ -139,7 +139,7 @@ pub async fn build_unit_tests(
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
                 test_error = test_error.replace('\n', "\n  ");
-                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                test_error.insert_str(0, &format!("Failed to build test '{test_name}':\n  "));
                 build_errors.push(test_error);
             }
         }
@@ -568,8 +568,7 @@ fn build_outputs(
             match condition.build(&Default::default(), &Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
-                    "failed to create test condition '{}': {}",
-                    index, error
+                    "failed to create test condition '{index}': {error}"
                 )),
             }
         }

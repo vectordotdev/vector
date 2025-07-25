@@ -189,7 +189,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.endpoint = Some(format!("http://{}", addr));
+        config.endpoint = Some(format!("http://{addr}"));
 
         let (sink, _) = config.build(cx).await.unwrap();
 
