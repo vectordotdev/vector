@@ -1,6 +1,7 @@
 use crate::vector_lib::codecs::StreamDecodingError;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use std::pin::Pin;
 use tokio::time;
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
@@ -23,6 +24,9 @@ use crate::{
     SourceSender,
 };
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
+
+type WsSink = Pin<Box<dyn Sink<Message, Error = WsError> + Send>>;
+type WsStream = Pin<Box<dyn Stream<Item = Result<Message, WsError>> + Send>>;
 
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,
@@ -104,15 +108,9 @@ impl WebSocketSource {
                     emit!(WsConnectionShutdown);
                     return Err(());
                 }
-
                 emit!(WsReceiveError { error });
 
-                // Reconnection logic
-                let (new_sink, new_source) = self.create_sink_and_stream().await;
-                ws_sink.set(new_sink);
-                ws_source.set(new_source);
-
-                self.maybe_send_initial_message(&mut ws_sink).await;
+                self.reconnect(&mut ws_sink, &mut ws_source).await;
             }
         }
 
@@ -198,14 +196,24 @@ impl WebSocketSource {
         }
     }
 
-    async fn create_sink_and_stream(
-        &self,
-    ) -> (
-        impl Sink<Message, Error = WsError>,
-        impl Stream<Item = Result<Message, WsError>>,
-    ) {
+    async fn reconnect(&self, ws_sink: &mut WsSink, ws_source: &mut WsStream) {
+        info!("Reconnecting to WebSocket...");
+        let (new_sink, new_source) = self.create_sink_and_stream().await;
+
+        *ws_sink = new_sink;
+        *ws_source = new_source;
+
+        self.maybe_send_initial_message(ws_sink).await;
+    }
+
+    async fn create_sink_and_stream(&self) -> (WsSink, WsStream) {
         let ws_stream = self.params.connector.connect_backoff().await;
-        ws_stream.split()
+        let (sink, stream) = ws_stream.split();
+
+        let sink: WsSink = Box::pin(sink);
+        let stream: WsStream = Box::pin(stream);
+
+        (sink, stream)
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
