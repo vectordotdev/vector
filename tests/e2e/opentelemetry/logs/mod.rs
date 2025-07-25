@@ -86,7 +86,7 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
 }
 
 async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
-    let contents = tokio::fs::read_to_string(path).await.unwrap();
+    let contents = tokio::fs::read_to_string(path).await.expect(&format!("unable to read {}", path.display()));
     let mut result = BTreeMap::new();
 
     for (idx, line) in contents.lines().enumerate() {
