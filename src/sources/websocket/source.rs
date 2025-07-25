@@ -97,10 +97,10 @@ impl WebSocketSource {
             if let Err(error) = result {
                 if is_closed(&error) {
                     emit!(WsConnectionShutdown);
-                    return Err(());
                 }
                 emit!(WsReceiveError { error });
 
+                // Attempt to reconnect
                 self.reconnect(&mut ws_sink, &mut ws_source).await;
             }
         }
@@ -366,6 +366,56 @@ mod integration_test {
         });
 
         server_addr
+    }
+
+    async fn start_reconnect_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            // First connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            websocket
+                .send(Message::Text("first message".to_string()))
+                .await
+                .unwrap();
+            // Close the connection to force a reconnect from the client
+            websocket.close(None).await.unwrap();
+
+            // Second connection
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+            websocket
+                .send(Message::Text("second message".to_string()))
+                .await
+                .unwrap();
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_reconnects_after_disconnect() {
+        let server_addr = start_reconnect_server().await;
+        let config = make_config(&server_addr);
+
+        // Run for a longer duration to allow for reconnection
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+
+        assert_eq!(
+            events.len(),
+            2,
+            "Should have received messages from both connections"
+        );
+
+        let event = events[0].as_log();
+        assert_eq!(event["message"], "first message".into());
+
+        let event = events[1].as_log();
+        assert_eq!(event["message"], "second message".into());
     }
 
     #[tokio::test(flavor = "multi_thread")]
