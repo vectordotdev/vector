@@ -14,29 +14,45 @@ fi
 
 set -x
 
+SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 TEST_TYPE=$1 # either "int" or "e2e"
 TEST_NAME=$2
 
+print_compose_logs_on_failure() {
+  local LAST_RETURN_CODE=$1
+
+  if [[ $LAST_RETURN_CODE -ne 0 ]]; then
+    case "$TEST_TYPE" in
+      int) TYPE_DIR="integration" ;;
+      e2e) TYPE_DIR="e2e" ;;
+      *) TYPE_DIR="" ;;
+    esac
+
+    if [[ -n "$TYPE_DIR" ]]; then
+      local COMPOSE_DIR="${SCRIPT_DIR}/${TYPE_DIR}/${TEST_NAME}"
+      (docker compose -f "${COMPOSE_DIR}/compose.yaml" logs) || echo "Failed to collect logs"
+    fi
+  fi
+}
+
+if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
+  find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
+fi
+
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
+START_RET=$?
+print_compose_logs_on_failure $START_RET
+
 # TODO this is arbitrary sleep. Investigate if it can be safely removed.
 sleep 15
-cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
-RET=$?
 
-# Output docker compose logs on failure
-if [[ $RET -ne 0 ]]; then
-  SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-
-  case "$TEST_TYPE" in
-    int) TYPE_DIR="integration" ;;
-    e2e) TYPE_DIR="e2e" ;;
-    *) TYPE_DIR="" ;;
-  esac
-
-  if [[ -n "$TYPE_DIR" ]]; then
-    COMPOSE_DIR="${SCRIPT_DIR}/${TYPE_DIR}/${TEST_NAME}"
-    (cd "${COMPOSE_DIR}" && docker compose logs)
-  fi
+if [[ $START_RET -eq 0 ]]; then
+  cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
+  RET=$?
+  print_compose_logs_on_failure $RET
+else
+  echo "Skipping test phase because 'vdev start' failed"
+  RET=$START_RET
 fi
 
 cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
