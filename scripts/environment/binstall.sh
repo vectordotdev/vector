@@ -67,26 +67,9 @@ fi
 echo "${download_sha256sum} $(echo output.*)" | sha256sum --check
 
 case "$(echo output.*)" in
-    *.zip) unzip output.* ;; # Cargo home is already in path
+    *.zip) unzip output.* ;;
     *.tgz) tar -xvzf output.* ;;
     *) >&2 echo "output.* not found"; exit 1 ;;
 esac
 
 ./cargo-binstall --self-install || ./cargo-binstall -y --force cargo-binstall
-
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-
-case ":$PATH:" in
-    *":$CARGO_HOME/bin:"*) ;;
-    *) needs_cargo_home=1 ;;
-esac
-
-if [ -n "${needs_cargo_home:-}" ]; then
-    if [ -n "${CI:-}" ] && [ -n "${GITHUB_PATH:-}" ]; then
-        echo "$CARGO_HOME/bin" >> "$GITHUB_PATH"
-    else
-        echo
-        printf "\033[0;31mYour path is missing %s, you might want to add it.\033[0m\n" "$CARGO_HOME/bin"
-        echo
-    fi
-fi
