@@ -54,6 +54,25 @@ impl Service<RedisRequest> for RedisService {
                         pipe.publish(kv.key, kv.value.as_ref());
                     }
                 }
+                super::DataType::Stream(max_length) => {
+                    // For streams, we use XADD with automatic ID generation (*)
+                    // and optional MAXLEN trimming
+                    let mut cmd = redis::cmd("XADD");
+                    cmd.arg(kv.key);
+
+                    if let Some(len) = max_length {
+                        cmd.arg("MAXLEN").arg("~").arg(len);
+                    }
+
+                    cmd.arg("*"); // Auto-generate ID
+                    cmd.arg("data").arg(kv.value.as_ref());
+
+                    if count > 1 {
+                        pipe.atomic().add_command(cmd);
+                    } else {
+                        pipe.add_command(cmd);
+                    }
+                }
             }
         }
 
@@ -61,11 +80,27 @@ impl Service<RedisRequest> for RedisService {
 
         Box::pin(async move {
             match pipe.query_async(&mut conn).await {
-                Ok(event_status) => Ok(RedisResponse {
-                    event_status,
-                    events_byte_size: kvs.metadata.into_events_estimated_json_encoded_byte_size(),
-                    byte_size,
-                }),
+                Ok(response) => {
+                    // Convert response to Vec<bool> based on data type
+                    let event_status = match response {
+                        redis::Value::Nil => {
+                            // Nil response indicates failure
+                            vec![false]
+                        }
+                        _ => {
+                            // For any other response type (including strings from XADD, integers from LPUSH, etc.), consider it success
+                            vec![true]
+                        }
+                    };
+
+                    Ok(RedisResponse {
+                        event_status,
+                        events_byte_size: kvs
+                            .metadata
+                            .into_events_estimated_json_encoded_byte_size(),
+                        byte_size,
+                    })
+                }
                 Err(error) => Err(RedisSinkError::SendError { source: error }),
             }
         })
