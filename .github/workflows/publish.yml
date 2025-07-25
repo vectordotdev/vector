@@ -15,21 +15,21 @@ on:
       channel:
         type: string
         required: true
-    workflow_dispatch:
-      inputs:
-        git_ref:
-          description: 'Git ref to build from (branch, tag, or commit)'
-          required: true
-          default: 'master'
-        channel:
-          description: 'Release channel'
-          required: true
-          default: 'custom'
-          type: choice
-          options:
-            - release
-            - nightly
-            - custom
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: 'Git ref to build from (branch, tag, or commit)'
+        required: true
+        default: 'master'
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'custom'
+        type: choice
+        options:
+          - release
+          - nightly
+          - custom
 
 env:
   VERBOSE: true
