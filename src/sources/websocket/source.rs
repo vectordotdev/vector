@@ -42,7 +42,7 @@ impl WebSocketSource {
 
     pub async fn run(self, cx: SourceContext) -> Result<(), ()> {
         let (mut ws_sink, ws_source) = self.create_sink_and_stream().await;
-        self.send_initial_message(&mut ws_sink).await;
+        self.maybe_send_initial_message(&mut ws_sink).await;
 
         pin_mut!(ws_sink, ws_source);
 
@@ -112,7 +112,7 @@ impl WebSocketSource {
                 ws_sink.set(new_sink);
                 ws_source.set(new_source);
 
-                self.send_initial_message(&mut ws_sink).await;
+                self.maybe_send_initial_message(&mut ws_sink).await;
             }
         }
 
@@ -182,7 +182,7 @@ impl WebSocketSource {
             .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
     }
 
-    async fn send_initial_message(
+    async fn maybe_send_initial_message(
         &self,
         ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
     ) {
