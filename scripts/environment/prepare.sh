@@ -100,7 +100,7 @@ if [ "${require_binstall}" = "false" ] && ! contains_module rustup; then
   done
 fi
 
-install="install"
+install=(install)
 if contains_module rustup; then
   . scripts/environment/release-flags.sh
 
@@ -109,7 +109,7 @@ if contains_module rustup; then
 
   if [ "${require_binstall}" = "true" ]; then
     if cargo binstall -V &>/dev/null || ./scripts/environment/binstall.sh; then
-      install="binstall -y"
+      install=(binstall -y)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
     fi
@@ -118,31 +118,31 @@ fi
 set -e -o verbose
 if contains_module cargo-deb; then
   if [[ "$(cargo-deb --version 2>/dev/null)" != "2.0.2" ]]; then
-    rustup run stable cargo $install cargo-deb --version 2.0.2 --force --locked
+    rustup run stable cargo "${install[@]}" cargo-deb --version 2.0.2 --force --locked
   fi
 fi
 
 if contains_module cross; then
   if ! cross --version 2>/dev/null | grep -q '^cross 0.2.5'; then
-    rustup run stable cargo $install cross --version 0.2.5 --force --locked
+    rustup run stable cargo "${install[@]}" cross --version 0.2.5 --force --locked
   fi
 fi
 
 if contains_module cargo-nextest; then
   if ! cargo-nextest --version 2>/dev/null | grep -q '^cargo-nextest 0.9.95'; then
-    rustup run stable cargo $install cargo-nextest --version 0.9.95 --force --locked
+    rustup run stable cargo "${install[@]}" cargo-nextest --version 0.9.95 --force --locked
   fi
 fi
 
 if contains_module cargo-deny; then
   if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.16.2'; then
-    rustup run stable cargo $install cargo-deny --version 0.16.2 --force --locked
+    rustup run stable cargo "${install[@]}" cargo-deny --version 0.16.2 --force --locked
   fi
 fi
 
 if contains_module cargo-msrv; then
   if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
-    rustup run stable cargo $install cargo-msrv --version 0.18.4 --force --locked
+    rustup run stable cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
   fi
 fi
 
@@ -154,7 +154,7 @@ fi
 
 if contains_module wasm-pack; then
   if ! wasm-pack --version | grep -q '^wasm-pack 0.13.1'; then
-    rustup run stable cargo $install --locked --version 0.13.1 wasm-pack
+    rustup run stable cargo "${install[@]}" --locked --version 0.13.1 wasm-pack
   fi
 fi
 
