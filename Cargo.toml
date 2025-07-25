@@ -434,17 +434,18 @@ assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
 azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
+azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.22.1"
 criterion = { version = "0.6.0", features = ["html_reports", "async_tokio"] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 libc = "0.2.174"
-similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.25.0" }
+similar-asserts = "1.7.0"
+tar = { version = "0.4.44" }
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { version = "1.45.1", features = ["test-util"] }

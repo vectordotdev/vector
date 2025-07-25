@@ -1,15 +1,24 @@
+use bollard::query_parameters::DownloadFromContainerOptions;
+use bollard::Docker;
+use futures_util::StreamExt;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::env;
+use std::fs::File;
+use std::io::Cursor;
 use std::path::Path;
-use std::path::PathBuf;
 use std::time::Duration;
+use tar::Archive;
 use tokio::time::{sleep, timeout};
 use tracing::info;
 
 const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30);
 const POLLING_INTERVAL: Duration = Duration::from_millis(500);
 const EXPECTED_LOG_COUNT: usize = 100;
+
+const OTEL_COLLECTOR_SINK_CONTAINER: &str = "otel-collector-sink";
+const OTEL_COLLECTOR_SINK_LOG_PATH: &str = "/tmp/file-exporter.log";
+const VECTOR_CONTAINER: &str = "vector";
+const VECTOR_LOG_PATH: &str = "/tmp/file-sink.log";
 
 #[tokio::test]
 async fn vector_sink_otel_sink_logs_match() {
@@ -85,18 +94,16 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
-    let contents = tokio::fs::read_to_string(path)
-        .await
-        .expect(&format!("unable to read {}", path.display()));
+async fn read_log_records(container_name: &str, container_path: &str) -> BTreeMap<u64, Value> {
+    let contents = copy_file_from_container(container_name, container_path).await;
+
     let mut result = BTreeMap::new();
 
     for (idx, line) in contents.lines().enumerate() {
         let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
             panic!(
-                "Malformed JSON on line {} in {}\nLine: {line}",
+                "Malformed JSON on line {} in {container_path}\nLine: {line}",
                 idx + 1,
-                path.display()
             )
         });
 
@@ -105,9 +112,8 @@ async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
             .and_then(|v| v.as_array())
             .unwrap_or_else(|| {
                 panic!(
-                    "Missing or invalid 'resourceLogs' in line {} of {}",
+                    "Missing or invalid 'resourceLogs' in line {container_path} of {}",
                     idx + 1,
-                    path.display()
                 )
             });
 
@@ -117,9 +123,8 @@ async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
                 .and_then(|v| v.as_array())
                 .unwrap_or_else(|| {
                     panic!(
-                        "Missing or invalid 'scopeLogs' in line {} of {}",
+                        "Missing or invalid 'scopeLogs' in line {} of {container_path}",
                         idx + 1,
-                        path.display()
                     )
                 });
 
@@ -129,9 +134,8 @@ async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
                     .and_then(|v| v.as_array())
                     .unwrap_or_else(|| {
                         panic!(
-                            "Missing or invalid 'logRecords' in line {} of {}",
+                            "Missing or invalid 'logRecords' in line {} of {container_path}",
                             idx + 1,
-                            path.display()
                         )
                     });
 
@@ -139,7 +143,7 @@ async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
                     let count = extract_count(record);
                     let sanitized = sanitize(record.clone());
                     if result.insert(count, sanitized).is_some() {
-                        panic!("Duplicate count value {count} in {}", path.display());
+                        panic!("Duplicate count value {count} in {container_path}");
                     }
                 }
             }
@@ -148,26 +152,43 @@ async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
     result
 }
 
-pub fn test_dir() -> PathBuf {
-    PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
-}
+async fn copy_file_from_container(container: &str, container_path: &str) -> String {
+    let docker = Docker::connect_with_local_defaults()
+        .expect("Failed to connect to Docker with local defaults");
+    let mut archive_stream = docker.download_from_container(
+        container,
+        Some(DownloadFromContainerOptions {
+            path: container_path.to_string(),
+        }),
+    );
 
-fn log_output_dir() -> PathBuf {
-    test_dir()
-        .join("tests")
-        .join("data")
-        .join("e2e")
-        .join("opentelemetry")
-        .join("logs")
-        .join("output")
-}
+    let mut archive_data = Vec::new();
+    while let Some(chunk) = archive_stream.next().await {
+        let chunk = chunk.expect("Failed to get chunk from archive stream");
+        archive_data.extend_from_slice(&chunk);
+    }
 
-fn collector_log_path() -> PathBuf {
-    log_output_dir().join("file-exporter.log")
-}
+    let mut archive = Archive::new(Cursor::new(archive_data));
+    let tmpfile = tempfile::NamedTempFile::new().expect("Failed to create temporary file");
+    let local_path = tmpfile.path();
 
-fn vector_log_path() -> PathBuf {
-    log_output_dir().join("file-sink.log")
+    for entry in archive
+        .entries()
+        .expect("Failed to read entries from archive")
+    {
+        let mut entry = entry.expect("Failed to read entry from archive");
+        if entry.path().expect("Failed to get entry path").file_name()
+            == Path::new(container_path).file_name()
+        {
+            let mut out_file = File::create(local_path).expect("Failed to create output file");
+            std::io::copy(&mut entry, &mut out_file)
+                .expect("Failed to copy archive entry to output file");
+            break;
+        }
+    }
+
+    // Read contents and return
+    std::fs::read_to_string(local_path).expect("Failed to read contents from output file")
 }
 
 /// # Panics
@@ -178,8 +199,9 @@ async fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
 
     timeout(MAXIMUM_WAITING_DURATION, async {
         loop {
-            let collector_read = read_log_records(&collector_log_path()).await;
-            let vector_read = read_log_records(&vector_log_path()).await;
+            let collector_read =
+                read_log_records(OTEL_COLLECTOR_SINK_CONTAINER, OTEL_COLLECTOR_SINK_LOG_PATH).await;
+            let vector_read = read_log_records(VECTOR_CONTAINER, VECTOR_LOG_PATH).await;
 
             // Merge into accumulators, skipping duplicates
             for (k, v) in collector_read {
