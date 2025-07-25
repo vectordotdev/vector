@@ -44,7 +44,7 @@ pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
     /// The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache
     #[serde(default = "default_time_to_live::<D>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::human_name = "Time To Idle"))]
+    #[configurable(metadata(docs::human_name = "Time To Live"))]
     pub time_to_live: Option<u64>,
 
     #[serde(skip)]
@@ -192,6 +192,68 @@ impl<N> From<N> for MetricNormalizer<N> {
     }
 }
 
+/// Represents a stored metric entry with its data, metadata, and timestamp.
+#[derive(Clone, Debug)]
+pub struct MetricEntry {
+    /// The metric data containing the value and kind
+    pub data: MetricData,
+    /// Event metadata associated with this metric
+    pub metadata: EventMetadata,
+    /// Optional timestamp for TTL tracking
+    pub timestamp: Option<Instant>,
+}
+
+impl ByteSizeOf for MetricEntry {
+    fn allocated_bytes(&self) -> usize {
+        self.data.allocated_bytes() + self.metadata.allocated_bytes()
+    }
+}
+
+impl MetricEntry {
+    /// Creates a new MetricEntry with the given data, metadata, and timestamp.
+    pub const fn new(
+        data: MetricData,
+        metadata: EventMetadata,
+        timestamp: Option<Instant>,
+    ) -> Self {
+        Self {
+            data,
+            metadata,
+            timestamp,
+        }
+    }
+
+    /// Creates a new MetricEntry from a Metric.
+    pub fn from_metric(metric: Metric, timestamp: Option<Instant>) -> (MetricSeries, Self) {
+        let (series, data, metadata) = metric.into_parts();
+        let entry = Self::new(data, metadata, timestamp);
+        (series, entry)
+    }
+
+    /// Converts this entry back to a Metric with the given series.
+    pub fn into_metric(self, series: MetricSeries) -> Metric {
+        Metric::from_parts(series, self.data, self.metadata)
+    }
+
+    /// Updates this entry's timestamp.
+    pub fn update_timestamp(&mut self, timestamp: Option<Instant>) {
+        self.timestamp = timestamp;
+    }
+
+    /// Checks if this entry has expired based on the given TTL.
+    pub fn is_expired(&self, ttl: Duration) -> bool {
+        match self.timestamp {
+            Some(ts) => Instant::now().duration_since(ts) >= ttl,
+            None => false,
+        }
+    }
+
+    /// Gets the total memory size of this entry including the series.
+    pub fn total_size_with_series(&self, series: &MetricSeries) -> usize {
+        self.allocated_bytes() + series.allocated_bytes()
+    }
+}
+
 /// Configuration for capacity-based eviction (memory and/or entry count limits).
 #[derive(Clone, Debug)]
 pub struct CapacityPolicy {
@@ -299,68 +361,6 @@ impl TtlPolicy {
     /// Marks cleanup as having been performed.
     pub fn mark_cleanup_done(&mut self) {
         self.last_cleanup = Instant::now();
-    }
-}
-
-/// Represents a stored metric entry with its data, metadata, and timestamp.
-#[derive(Clone, Debug)]
-pub struct MetricEntry {
-    /// The metric data containing the value and kind
-    pub data: MetricData,
-    /// Event metadata associated with this metric
-    pub metadata: EventMetadata,
-    /// Optional timestamp for TTL tracking
-    pub timestamp: Option<Instant>,
-}
-
-impl ByteSizeOf for MetricEntry {
-    fn allocated_bytes(&self) -> usize {
-        self.data.allocated_bytes() + self.metadata.allocated_bytes()
-    }
-}
-
-impl MetricEntry {
-    /// Creates a new MetricEntry with the given data, metadata, and timestamp.
-    pub const fn new(
-        data: MetricData,
-        metadata: EventMetadata,
-        timestamp: Option<Instant>,
-    ) -> Self {
-        Self {
-            data,
-            metadata,
-            timestamp,
-        }
-    }
-
-    /// Creates a new MetricEntry from a Metric.
-    pub fn from_metric(metric: Metric, timestamp: Option<Instant>) -> (MetricSeries, Self) {
-        let (series, data, metadata) = metric.into_parts();
-        let entry = Self::new(data, metadata, timestamp);
-        (series, entry)
-    }
-
-    /// Converts this entry back to a Metric with the given series.
-    pub fn into_metric(self, series: MetricSeries) -> Metric {
-        Metric::from_parts(series, self.data, self.metadata)
-    }
-
-    /// Updates this entry's timestamp.
-    pub fn update_timestamp(&mut self, timestamp: Option<Instant>) {
-        self.timestamp = timestamp;
-    }
-
-    /// Checks if this entry has expired based on the given TTL.
-    pub fn is_expired(&self, ttl: Duration) -> bool {
-        match self.timestamp {
-            Some(ts) => Instant::now().duration_since(ts) >= ttl,
-            None => false,
-        }
-    }
-
-    /// Gets the total memory size of this entry including the series.
-    pub fn total_size_with_series(&self, series: &MetricSeries) -> usize {
-        self.allocated_bytes() + series.allocated_bytes()
     }
 }
 
@@ -682,25 +682,24 @@ impl MetricSet {
 
     pub fn insert_update(&mut self, metric: Metric) {
         self.maybe_cleanup();
-        let series = metric.series().clone();
         let timestamp = self.create_timestamp();
-
         let update = match metric.kind() {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
                 // Incremental metrics update existing entries, if present
-                if let Some(existing) = self.cache.get_mut(&series) {
-                    let (series, data, metadata) = metric.into_parts();
-                    if existing.data.update(&data) {
-                        existing.metadata.merge(metadata);
-                        existing.update_timestamp(timestamp);
-                        None
-                    } else {
-                        warn!(message = "Metric changed type, dropping old value.", %series);
-                        Some(Metric::from_parts(series, data, metadata))
+                match self.cache.get_mut(metric.series()) {
+                    Some(existing) => {
+                        let (series, data, metadata) = metric.into_parts();
+                        if existing.data.update(&data) {
+                            existing.metadata.merge(metadata);
+                            existing.update_timestamp(timestamp);
+                            None
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", %series);
+                            Some(Metric::from_parts(series, data, metadata))
+                        }
                     }
-                } else {
-                    Some(metric)
+                    None => Some(metric),
                 }
             }
         };
