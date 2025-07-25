@@ -35,10 +35,6 @@ print_compose_logs_on_failure() {
   fi
 }
 
-if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-  find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
-fi
-
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 START_RET=$?
 print_compose_logs_on_failure $START_RET
