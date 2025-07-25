@@ -977,7 +977,8 @@ e2e-tests-opentelemetry = [
   "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
-  "sinks-file"
+  "sinks-file",
+  "dep:bollard"
 ]
 
 vector-api-tests = [
