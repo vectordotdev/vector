@@ -59,35 +59,9 @@ jobs:
         id: generate-publish-metadata
         run: make ci-generate-publish-metadata
 
-  build-x86_64-unknown-linux-musl-packages:
-    name: Build Vector for x86_64-unknown-linux-musl (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        run: make package-x86_64-unknown-linux-musl-all
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
-          path: target/artifacts/vector*
-
   build-x86_64-unknown-linux-gnu-packages:
     name: Build Vector for x86_64-unknown-linux-gnu (.tar.gz, DEB, RPM)
-    runs-on: release-builder-linux
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -111,37 +85,9 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts/vector*
 
-  build-aarch64-unknown-linux-musl-packages:
-    name: Build Vector for aarch64-unknown-linux-musl (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        env:
-          DOCKER_PRIVILEGED: "true"
-        run: make package-aarch64-unknown-linux-musl-all
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
-          path: target/artifacts/vector*
-
   build-aarch64-unknown-linux-gnu-packages:
     name: Build Vector for aarch64-unknown-linux-gnu (.tar.gz)
-    runs-on: release-builder-linux
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: generate-publish-metadata
     env:
@@ -167,217 +113,6 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts/vector*
 
-  build-armv7-unknown-linux-gnueabihf-packages:
-    name: Build Vector for armv7-unknown-linux-gnueabihf (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        env:
-          DOCKER_PRIVILEGED: "true"
-        run: make package-armv7-unknown-linux-gnueabihf-all
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
-          path: target/artifacts/vector*
-
-  build-armv7-unknown-linux-musleabihf-packages:
-    name: Build Vector for armv7-unknown-linux-musleabihf (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        env:
-          DOCKER_PRIVILEGED: "true"
-        run: make package-armv7-unknown-linux-musleabihf
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
-          path: target/artifacts/vector*
-
-  build-arm-unknown-linux-gnueabi-packages:
-    name: Build Vector for arm-unknown-linux-gnueabi (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        env:
-          DOCKER_PRIVILEGED: "true"
-        run: make package-arm-unknown-linux-gnueabi-all
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
-          path: target/artifacts/vector*
-
-  build-arm-unknown-linux-musleabi-packages:
-    name: Build Vector for arm-unknown-linux-musleabi (.tar.gz)
-    runs-on: release-builder-linux
-    timeout-minutes: 60
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (Ubuntu-specific)
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - name: Build Vector
-        env:
-          DOCKER_PRIVILEGED: "true"
-        run: make package-arm-unknown-linux-musleabi
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
-          path: target/artifacts/vector*
-
-
-  deb-verify:
-    name: Verify DEB Packages
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      DD_PKG_VERSION: "latest"
-    strategy:
-      matrix:
-        container:
-          - ubuntu:20.04
-          - ubuntu:22.04
-          - ubuntu:24.04
-          - debian:11
-          - debian:12
-    container:
-      image: ${{ matrix.container }}
-    steps:
-      - run: |
-          apt-get update && \
-          apt-get install -y \
-          ca-certificates \
-          curl \
-          git \
-          systemd \
-          make
-      - name: Install dd-pkg for linting
-        run: |
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
-      - name: Fix Git safe directories issue when in containers (actions/checkout#760)
-        run: git config --global --add safe.directory /__w/vector/vector
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Verify install of DEB package.
-        run: |
-          ./scripts/verify-install.sh target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb
-
-  rpm-verify:
-    name: Verify RPM Packages
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      DD_PKG_VERSION: "latest"
-    strategy:
-      matrix:
-        container:
-          - "quay.io/centos/centos:stream9"
-          - "amazonlinux:2023"
-          - "fedora:39"
-          - "fedora:40"
-    container:
-      image: ${{ matrix.container }}
-    steps:
-      - run: |
-          yum update -y
-          yum install -y \
-          ca-certificates \
-          git \
-          systemd \
-          tar \
-          make
-          # conflicts with curl-minimal on some distros and --allowerased is not
-          # supported on some distros
-          if ! command -v curl &> /dev/null ; then
-            yum install -y curl
-          fi
-      - name: Install dd-pkg for linting
-        run: |
-          curl -sSL "https://dd-package-tools.s3.amazonaws.com/dd-pkg/${DD_PKG_VERSION}/dd-pkg_Linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin dd-pkg
-      - name: Fix Git safe directories issue when in containers (actions/checkout#760)
-        run: git config --global --add safe.directory /__w/vector/vector
-      - name: Checkout Vector
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Verify install of RPM package.
-        run: |
-          ./scripts/verify-install.sh target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-
   publish-docker:
     name: Publish to Docker
     runs-on: ubuntu-24.04
@@ -385,14 +120,7 @@ jobs:
     needs:
       - generate-publish-metadata
       - build-aarch64-unknown-linux-gnu-packages
-      - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - build-arm-unknown-linux-gnueabi-packages
-      - build-arm-unknown-linux-musleabi-packages
-      - deb-verify
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
       VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
@@ -423,49 +151,17 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
           path: target/artifacts
-      - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
-          path: target/artifacts
       - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
           path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
-          path: target/artifacts
-      - name: Download staged package artifacts (arm-unknown-linux-gnueabi)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-gnueabi
-          path: target/artifacts
-      - name: Download staged package artifacts (arm-unknown-linux-musleabi)
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
-          path: target/artifacts
-      - name: Build and publish Docker images
-        env:
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
-          REPOS: "${{ secrets.YOUR_REGISTRY_URL }}/vector"
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
-        with:
-          timeout_minutes: 15
-          max_attempts: 3
-          retry_wait_seconds: 60
-          command: make release-docker
-
+      - name: Build and publish distroless-libc Docker image
+        run: |
+          docker buildx build \
+            --platform="linux/amd64,linux/arm64" \
+            --tag "${{ secrets.YOUR_REGISTRY_URL }}/vector:${{ env.VECTOR_VERSION }}-distroless-libc" \
+            --tag "${{ secrets.YOUR_REGISTRY_URL }}/vector:0.48.0-distroless-libc" \
+            --push \
+            target/artifacts \
+            -f distribution/docker/distroless-libc/Dockerfile
