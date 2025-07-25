@@ -2,7 +2,6 @@ name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
-    container_name: otel-collector-source
     init: true
     volumes:
       - type: bind
@@ -16,7 +15,6 @@ services:
 
   logs-generator:
     image: python:3.11-alpine
-    container_name: logs-generator
     build:
       context: ./generator
     init: true
@@ -32,7 +30,6 @@ services:
 
   otel-collector-sink:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
-    container_name: otel-collector-sink
     init: true
     volumes:
       - type: bind
@@ -53,7 +50,6 @@ services:
         FEATURES: e2e-tests-opentelemetry
         RUST_VERSION: ${RUST_VERSION:-1.88}
     image: vector-e2e:opentelemetry-logs
-    container_name: vector
     init: true
     depends_on:
       - otel-collector-source
