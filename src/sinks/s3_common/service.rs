@@ -126,11 +126,11 @@ impl Service<S3Request> for S3Service {
         let client = self.client.clone();
 
         Box::pin(async move {
-            let request = client
+            let put_request = client
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
-                .bucket(request.bucket)
-                .key(request.metadata.s3_key)
+                .bucket(request.bucket.clone())
+                .key(request.metadata.s3_key.clone())
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))
@@ -144,9 +144,18 @@ impl Service<S3Request> for S3Service {
                 .set_tagging(tagging)
                 .content_md5(content_md5);
 
-            let result = request.send().in_current_span().await;
+            let result = put_request.send().in_current_span().await;
 
-            result.map(|_| S3Response { events_byte_size })
+            result.map(|_| {
+                trace!(
+                    target: "vector::sinks::s3_common::service::put_object",
+                    message = "Put object to s3-compatible storage.",
+                    bucket = request.bucket,
+                    key = request.metadata.s3_key
+                );
+
+                S3Response { events_byte_size }
+            })
         })
     }
 }
