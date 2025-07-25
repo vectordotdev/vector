@@ -1,13 +1,6 @@
-use bollard::query_parameters::DownloadFromContainerOptions;
-use bollard::Docker;
-use futures_util::StreamExt;
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::Cursor;
-use std::path::Path;
 use std::time::Duration;
-use tar::Archive;
 use tokio::time::{sleep, timeout};
 use tracing::info;
 
@@ -153,42 +146,25 @@ async fn read_log_records(container_name: &str, container_path: &str) -> BTreeMa
 }
 
 async fn copy_file_from_container(container: &str, container_path: &str) -> String {
-    let docker = Docker::connect_with_local_defaults()
-        .expect("Failed to connect to Docker with local defaults");
-    let mut archive_stream = docker.download_from_container(
-        container,
-        Some(DownloadFromContainerOptions {
-            path: container_path.to_string(),
-        }),
-    );
+    use std::process::Command;
 
-    let mut archive_data = Vec::new();
-    while let Some(chunk) = archive_stream.next().await {
-        let chunk = chunk.expect("Failed to get chunk from archive stream");
-        archive_data.extend_from_slice(&chunk);
-    }
-
-    let mut archive = Archive::new(Cursor::new(archive_data));
     let tmpfile = tempfile::NamedTempFile::new().expect("Failed to create temporary file");
-    let local_path = tmpfile.path();
+    let local_path = tmpfile.path().to_path_buf();
 
-    for entry in archive
-        .entries()
-        .expect("Failed to read entries from archive")
-    {
-        let mut entry = entry.expect("Failed to read entry from archive");
-        if entry.path().expect("Failed to get entry path").file_name()
-            == Path::new(container_path).file_name()
-        {
-            let mut out_file = File::create(local_path).expect("Failed to create output file");
-            std::io::copy(&mut entry, &mut out_file)
-                .expect("Failed to copy archive entry to output file");
-            break;
-        }
+    let status = Command::new("docker")
+        .args([
+            "cp",
+            &format!("{container}:{container_path}"),
+            local_path.to_str().expect("Invalid temp path"),
+        ])
+        .status()
+        .expect("Failed to run docker cp command");
+
+    if !status.success() {
+        panic!("docker cp failed with status: {}", status);
     }
 
-    // Read contents and return
-    std::fs::read_to_string(local_path).expect("Failed to read contents from output file")
+    std::fs::read_to_string(&local_path).expect("Failed to read copied log file")
 }
 
 /// # Panics

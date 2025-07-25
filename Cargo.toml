@@ -445,7 +445,6 @@ quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 rstest = { version = "0.25.0" }
 similar-asserts = "1.7.0"
-tar = { version = "0.4.44" }
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { version = "1.45.1", features = ["test-util"] }
@@ -977,8 +976,7 @@ e2e-tests-opentelemetry = [
   "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
-  "sinks-file",
-  "dep:bollard"
+  "sinks-file"
 ]
 
 vector-api-tests = [
