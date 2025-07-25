@@ -10,10 +10,7 @@ processors:
 exporters:
   debug: { }
   file:
-    path: /tmp/collector-file-exporter.log
-    rotation:
-      max_megabytes: 10
-      max_days: 1
+    path: /tmp/file-exporter.log
 
 service:
   pipelines:
