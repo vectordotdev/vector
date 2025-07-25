@@ -1,5 +1,7 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::env;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
@@ -9,23 +11,32 @@ const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30);
 const POLLING_INTERVAL: Duration = Duration::from_millis(500);
 const EXPECTED_LOG_COUNT: usize = 100;
 
-fn log_output_dir() -> PathBuf {
-    std::env::current_dir()
-        .expect("Failed to get current dir")
-        .join("tests")
-        .join("data")
-        .join("e2e")
-        .join("opentelemetry")
-        .join("logs")
-        .join("output")
-}
+#[tokio::test]
+async fn vector_sink_otel_sink_logs_match() {
+    let (collector_log_records, vector_log_records) = wait_for_logs().await;
 
-fn collector_log_path() -> PathBuf {
-    log_output_dir().join("collector-file-exporter.log")
-}
+    assert_eq!(
+        collector_log_records.len(),
+        EXPECTED_LOG_COUNT,
+        "Collector did not produce expected number of log records"
+    );
+    assert_eq!(
+        vector_log_records.len(),
+        EXPECTED_LOG_COUNT,
+        "Vector did not produce expected number of log records"
+    );
 
-fn vector_log_path() -> PathBuf {
-    log_output_dir().join("vector-file-sink.log")
+    for count in 0..EXPECTED_LOG_COUNT as u64 {
+        let collector_log = collector_log_records
+            .get(&count)
+            .unwrap_or_else(|| panic!("Missing {count}) key"));
+        let vector_log = vector_log_records
+            .get(&count)
+            .unwrap_or_else(|| panic!("Missing {count}) key"));
+        let collector_log_normalized = normalize_numbers_to_strings(collector_log);
+        let vector_log_normalized = normalize_numbers_to_strings(vector_log);
+        assert_eq!(collector_log_normalized, vector_log_normalized);
+    }
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -74,14 +85,11 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
-    let content = tokio::fs::read_to_string(path)
-        .await
-        .unwrap_or_else(|_| panic!("Failed to read log file {}", path.display()));
-
+async fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
+    let contents = tokio::fs::read_to_string(path).await.unwrap();
     let mut result = BTreeMap::new();
 
-    for (idx, line) in content.lines().enumerate() {
+    for (idx, line) in contents.lines().enumerate() {
         let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
             panic!(
                 "Malformed JSON on line {} in {}\nLine: {line}",
@@ -138,6 +146,28 @@ async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
     result
 }
 
+pub fn test_dir() -> PathBuf {
+    PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap())
+}
+
+fn log_output_dir() -> PathBuf {
+    test_dir()
+        .join("tests")
+        .join("data")
+        .join("e2e")
+        .join("opentelemetry")
+        .join("logs")
+        .join("output")
+}
+
+fn collector_log_path() -> PathBuf {
+    log_output_dir().join("file-exporter.log")
+}
+
+fn vector_log_path() -> PathBuf {
+    log_output_dir().join("file-sink.log")
+}
+
 /// # Panics
 /// After the timeout, this function will panic if both logs are not ready.
 async fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
@@ -171,32 +201,4 @@ async fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
     })
     .await
     .expect("Timed out waiting for both log files to contain sufficient records")
-}
-
-#[tokio::test]
-async fn vector_sink_otel_sink_logs_match() {
-    let (collector_log_records, vector_log_records) = wait_for_logs().await;
-
-    assert_eq!(
-        collector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Collector did not produce expected number of log records"
-    );
-    assert_eq!(
-        vector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Vector did not produce expected number of log records"
-    );
-
-    for count in 0..EXPECTED_LOG_COUNT as u64 {
-        let collector_log = collector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let vector_log = vector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let collector_log_normalized = normalize_numbers_to_strings(collector_log);
-        let vector_log_normalized = normalize_numbers_to_strings(vector_log);
-        assert_eq!(collector_log_normalized, vector_log_normalized);
-    }
 }

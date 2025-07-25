@@ -1,17 +1,7 @@
 name: opentelemetry-vector-e2e
 services:
-  cleanup-logs:
-    image: busybox
-    container_name: cleanup-logs
-    command: [ "sh", "-c", "rm -f /tmp/*.log" ]
-    volumes:
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
-
   otel-collector-source:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
-    container_name: otel-collector-source
     init: true
     volumes:
       - type: bind
@@ -25,7 +15,6 @@ services:
 
   logs-generator:
     image: python:3.11-alpine
-    container_name: logs-generator
     build:
       context: ./generator
     init: true
@@ -41,18 +30,13 @@ services:
 
   otel-collector-sink:
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
-    container_name: otel-collector-sink
     init: true
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
-    depends_on:
-      - cleanup-logs
+      - ../../../tests/data/e2e/opentelemetry/logs/output:/tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
 
@@ -63,11 +47,8 @@ services:
       args:
         FEATURES: e2e-tests-opentelemetry
         RUST_VERSION: ${RUST_VERSION:-1.88}
-    image: vector-e2e:opentelemetry-logs
-    container_name: vector
     init: true
     depends_on:
-      - cleanup-logs
       - otel-collector-source
       - otel-collector-sink
     volumes:
@@ -75,11 +56,12 @@ services:
         source: ../../../tests/data/e2e/opentelemetry/logs/vector.yaml
         target: /etc/vector/vector.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
+      - ../../../tests/data/e2e/opentelemetry/logs/output:/tmp
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
-      - OTEL_E2E_OUTPUT_PATH
     command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
+
+volumes:
+  # The containers write output logs in this volume
+  otel_logs:
