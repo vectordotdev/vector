@@ -1,6 +1,7 @@
 use crate::vector_lib::codecs::StreamDecodingError;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use std::num::NonZeroU64;
 use std::pin::Pin;
 use tokio::time;
 use tokio::time::{Duration, Instant};
@@ -51,15 +52,7 @@ impl WebSocketSource {
         pin_mut!(ws_sink, ws_source);
 
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
-        let ping_message = if let Some(ping_msg) = &self.config.ping_message {
-            Message::Text(ping_msg.clone())
-        } else {
-            Message::Ping(vec![])
-        };
-
-        let mut ping = PingInterval::new(self.config.common.ping_interval.map(u64::from));
-        let mut last_pong = Instant::now();
-
+        let mut ping_manager = PingManager::new(&self.config);
         let mut out = cx.out;
 
         loop {
@@ -69,19 +62,17 @@ impl WebSocketSource {
                     break;
                 },
 
-                _ = ping.tick() => {
-                    self.handle_ping_tick(&mut ws_sink, last_pong, &ping_message).await
-                },
+                res = ping_manager.tick(&mut ws_sink) => res,
 
                 Some(msg) = ws_source.next() => {
                     match msg {
                         Ok(Message::Pong(_)) => {
-                            last_pong = Instant::now();
+                            ping_manager.record_pong();
                             Ok(())
                         },
                         Ok(Message::Text(msg_txt)) => {
                             if self.is_custom_pong(&msg_txt) {
-                                last_pong = Instant::now();
+                                ping_manager.record_pong();
                                 debug!("Received custom pong response.");
                             } else {
                                 self.handle_message(&msg_txt, WsKind::Text, &mut out).await;
@@ -228,27 +219,52 @@ impl WebSocketSource {
         }
         false
     }
+}
 
-    async fn handle_ping_tick(
-        &self,
-        ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
-        last_pong: Instant,
-        ping_message: &Message,
-    ) -> Result<(), WsError> {
-        let ping_timeout = self.config.common.ping_timeout;
+struct PingManager {
+    interval: PingInterval,
+    timeout: Option<NonZeroU64>,
+    last_pong: Instant,
+    message: Message,
+}
 
-        if let Some(ping_timeout) = ping_timeout {
-            if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
+impl PingManager {
+    fn new(config: &WebSocketConfig) -> Self {
+        let ping_message = if let Some(ping_msg) = &config.ping_message {
+            Message::Text(ping_msg.clone())
+        } else {
+            Message::Ping(vec![])
+        };
+
+        Self {
+            interval: PingInterval::new(config.common.ping_interval.map(u64::from)),
+            timeout: config.common.ping_timeout,
+            last_pong: Instant::now(),
+            message: ping_message,
+        }
+    }
+
+    fn record_pong(&mut self) {
+        self.last_pong = Instant::now();
+    }
+
+    async fn tick(&mut self, ws_sink: &mut WsSink) -> Result<(), WsError> {
+        self.interval.tick().await;
+
+        if let Some(timeout) = self.timeout {
+            if self.last_pong.elapsed() > Duration::from_secs(timeout.get()) {
                 let error =
                     std::io::Error::new(std::io::ErrorKind::TimedOut, "Pong not received in time.");
+
                 emit!(PongTimeoutError {
-                    timeout_secs: ping_timeout,
+                    timeout_secs: timeout,
                 });
+
                 return Err(WsError::Io(error));
             }
         }
 
-        ws_sink.send(ping_message.clone()).await.map_err(|error| {
+        ws_sink.send(self.message.clone()).await.map_err(|error| {
             emit!(WsSendError { error });
             WsError::Io(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
