@@ -11,8 +11,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::conditions::AnyCondition;
 use crate::config::{
-    schema, DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
+    schema, DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
 };
 use crate::schema::Definition;
 use crate::transforms::reduce::merge_strategy::MergeStrategy;
@@ -117,7 +116,8 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables).map(Transform::event_task)
+        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
+            .map(Transform::event_task)
     }
 
     fn input(&self) -> Input {
@@ -126,9 +126,8 @@ impl TransformConfig for ReduceConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // Events may be combined, so there isn't a true single "source" for events.
         // All of the definitions must be merged.

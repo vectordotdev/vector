@@ -1,7 +1,4 @@
-use vector_lib::{
-    config::{clone_input_definitions, LogNamespace},
-    configurable::configurable_component,
-};
+use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
 use crate::{
     config::{
@@ -57,9 +54,8 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log,
