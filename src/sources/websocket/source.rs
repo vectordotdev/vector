@@ -289,6 +289,7 @@ mod integration_test {
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::{accept_async, tungstenite::Message};
     use url::Url;
+    use vector_lib::codecs::decoding::DeserializerConfig;
 
     fn make_config(uri: &str) -> WebSocketConfig {
         WebSocketConfig {
@@ -298,6 +299,26 @@ mod integration_test {
             },
             ..Default::default()
         }
+    }
+
+    /// Starts a WebSocket server that pushes a binary message to the first client.
+    async fn start_binary_push_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+
+            let binary_payload = br#"{"message": "binary data"}"#.to_vec();
+            websocket
+                .send(Message::Binary(binary_payload))
+                .await
+                .unwrap();
+        });
+
+        server_addr
     }
 
     /// Starts a WebSocket server that pushes a message to the first client that connects.
@@ -345,6 +366,22 @@ mod integration_test {
         });
 
         server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_consume_binary_event() {
+        let server_addr = start_binary_push_server().await;
+        let mut config = make_config(&server_addr);
+        let decoding = DeserializerConfig::Json(Default::default());
+        config.decoding = decoding;
+
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(2), &SOURCE_TAGS).await;
+
+        assert!(!events.is_empty(), "No events received from source");
+        let event = events[0].as_log();
+        assert_eq!(event["message"], "binary data".into());
+        assert_eq!(*event.get_source_type().unwrap(), "websocket".into());
     }
 
     #[tokio::test(flavor = "multi_thread")]
