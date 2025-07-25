@@ -36,7 +36,7 @@ pub struct IncrementalToAbsoluteDefaultNormalizerSettings;
 impl NormalizerSettings for IncrementalToAbsoluteDefaultNormalizerSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = None;
-    const TIME_TO_IDLE: Option<u64> = Some(300);
+    const TIME_TO_LIVE: Option<u64> = Some(300);
 }
 
 pub const fn default_expire_metrics_secs() -> Duration {

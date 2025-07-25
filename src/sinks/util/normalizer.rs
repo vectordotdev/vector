@@ -36,7 +36,7 @@ where
     pub fn new_with_ttl(stream: St, normalizer: N, ttl: Duration) -> Self {
         // Create a new MetricSetConfig with the proper settings type
         let config = NormalizerConfig::<DefaultNormalizerSettings> {
-            time_to_idle: Some(ttl.as_secs()),
+            time_to_live: Some(ttl.as_secs()),
             max_bytes: None,
             max_events: None,
             _d: std::marker::PhantomData,
