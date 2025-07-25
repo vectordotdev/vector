@@ -840,10 +840,12 @@ generated: components: sinks: http: configuration: {
 				type: object: {
 					examples: [{
 						Accept:               "text/plain"
+						"X-Event-Level":      "{{level}}"
+						"X-Event-Timestamp":  "{{timestamp}}"
 						"X-My-Custom-Header": "A-Value"
 					}]
 					options: "*": {
-						description: "An HTTP request header and it's value."
+						description: "An HTTP request header and its value. Supports both static strings and templated values."
 						required:    true
 						type: string: {}
 					}

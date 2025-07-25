@@ -272,6 +272,96 @@ async fn http_passes_custom_headers() {
 }
 
 #[tokio::test]
+async fn http_passes_template_headers() {
+    run_sink_with_events(
+        r#"
+        [request.headers]
+        Static-Header = "static-value"
+        Accept = "application/vnd.api+json"
+        X-Event-Level = "{{level}}"
+        X-Event-Message = "{{message}}"
+        X-Static-Template = "constant-value"
+    "#,
+        || {
+            let mut event = Event::Log(LogEvent::from("test message"));
+            event.as_mut_log().insert("level", "info");
+            event.as_mut_log().insert("message", "templated message");
+            event
+        },
+        10,
+        |parts| {
+            assert_eq!(
+                Some("static-value"),
+                parts
+                    .headers
+                    .get("Static-Header")
+                    .map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("application/vnd.api+json"),
+                parts.headers.get("Accept").map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("constant-value"),
+                parts
+                    .headers
+                    .get("X-Static-Template")
+                    .map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("info"),
+                parts
+                    .headers
+                    .get("X-Event-Level")
+                    .map(|v| v.to_str().unwrap())
+            );
+            assert_eq!(
+                Some("templated message"),
+                parts
+                    .headers
+                    .get("X-Event-Message")
+                    .map(|v| v.to_str().unwrap())
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn http_template_headers_missing_fields() {
+    run_sink_with_events(
+        r#"
+        [request.headers]
+        X-Required-Field = "{{required_field}}"
+        X-Static = "static-value"
+    "#,
+        || {
+            let mut event = Event::Log(LogEvent::from("good event"));
+            event.as_mut_log().insert("required_field", "present");
+            event
+        },
+        10,
+        |parts| {
+            assert_eq!(
+                Some("present"),
+                parts
+                    .headers
+                    .get("X-Required-Field")
+                    .map(|v| v.to_str().unwrap())
+            );
+            assert_eq!(
+                Some("static-value"),
+                parts.headers.get("X-Static").map(|v| v.to_str().unwrap())
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn retries_on_no_connection() {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 10;
@@ -801,6 +891,26 @@ async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts
 
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
+}
+
+async fn run_sink_with_events(
+    extra_config: &str,
+    event_generator: impl Fn() -> Event + Clone,
+    num_events: usize,
+    assert_parts: impl Fn(http::request::Parts),
+) {
+    let (in_addr, sink) = build_sink(extra_config).await;
+    let (rx, trigger, server) = build_test_server(in_addr);
+    tokio::spawn(server);
+
+    let (events, mut receiver) = create_events_batch_with_fn(event_generator, num_events);
+    let events = stream::iter(events);
+
+    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+    drop(trigger);
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    let _output_lines = get_received_gzip(rx, assert_parts).await;
 }
 
 async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {

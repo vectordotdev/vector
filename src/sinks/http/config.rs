@@ -246,7 +246,8 @@ impl SinkConfig for HttpSinkConfig {
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
 
-        let headers = validate_headers(&request.headers, self.auth.is_some())?;
+        validate_headers(&request.headers, self.auth.is_some())?;
+        let (static_headers, template_headers) = request.split_headers();
 
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
@@ -285,10 +286,19 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
+        let converted_static_headers = static_headers
+            .into_iter()
+            .map(|(k, v)| {
+                let header_name = HeaderName::from_bytes(k.as_bytes()).unwrap();
+                let header_value = HeaderValue::from_str(&v).unwrap();
+                (header_name, header_value)
+            })
+            .collect();
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.method,
             self.auth.clone(),
-            headers,
+            converted_static_headers,
             content_type,
             content_encoding,
         );
@@ -329,7 +339,13 @@ impl SinkConfig for HttpSinkConfig {
             .settings(request_limits, http_response_retry_logic())
             .service(service);
 
-        let sink = HttpSink::new(service, self.uri.clone(), batch_settings, request_builder);
+        let sink = HttpSink::new(
+            service,
+            self.uri.clone(),
+            template_headers,
+            batch_settings,
+            request_builder,
+        );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }

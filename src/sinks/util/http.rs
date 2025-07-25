@@ -42,6 +42,7 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
+    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -611,7 +612,7 @@ pub struct RequestConfig {
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value."
+        docs::additional_props_description = "An HTTP request header and its value. Supports both static strings and templated values."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: IndexMap<String, String>,
@@ -621,6 +622,8 @@ fn headers_examples() -> IndexMap<String, String> {
     IndexMap::<_, _>::from_iter([
         ("Accept".to_owned(), "text/plain".to_owned()),
         ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
+        ("X-Event-Level".to_owned(), "{{level}}".to_owned()),
+        ("X-Event-Timestamp".to_owned(), "{{timestamp}}".to_owned()),
     ])
 }
 
@@ -630,6 +633,27 @@ impl RequestConfig {
             warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
             self.headers.extend(headers);
         }
+    }
+
+    pub fn split_headers(&self) -> (IndexMap<String, String>, IndexMap<String, Template>) {
+        let mut static_headers = IndexMap::new();
+        let mut template_headers = IndexMap::new();
+
+        for (name, value) in &self.headers {
+            match Template::try_from(value.as_str()) {
+                Ok(template) if !template.is_dynamic() => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+                Ok(template) => {
+                    template_headers.insert(name.clone(), template);
+                }
+                Err(_) => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+            }
+        }
+
+        (static_headers, template_headers)
     }
 }
 
