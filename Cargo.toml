@@ -197,7 +197,7 @@ dnstap-parser = { path = "lib/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
-vector-common = { path = "lib/vector-common", default-features = false}
+vector-common = { path = "lib/vector-common", default-features = false }
 vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
@@ -384,7 +384,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2 = { version = "0.5.10", default-features = false }
-sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
+sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional = true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -691,6 +691,7 @@ transforms-logs = [
 transforms-metrics = [
   "transforms-aggregate",
   "transforms-filter",
+  "transforms-incremental_to_absolute",
   "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
@@ -703,6 +704,7 @@ transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["transforms-impl-dedupe"]
 transforms-filter = []
+transforms-incremental_to_absolute = []
 transforms-window = []
 transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
