@@ -577,20 +577,19 @@ impl MetricSet {
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
         let timestamp = self.create_timestamp();
+        // We always call insert() to track memory usage
         match self.inner.get_mut(metric.series()) {
             Some(existing) => {
-                if existing.data.value.add(metric.value()) {
-                    metric = metric.with_value(existing.data.value.clone());
-                    existing.update_timestamp(timestamp);
-                } else {
-                    // Metric changed type, store this as the new reference value
-                    let (series, entry) = MetricEntry::from_metric(metric.clone(), timestamp);
-                    self.insert_with_tracking(series, entry);
+                let mut new_value = existing.data.value().clone();
+                if new_value.add(metric.value()) {
+                    // Update the stored value
+                    metric = metric.with_value(new_value);
                 }
+                // Insert the updated stored value, or as store a new reference value (if the Metric changed type)
+                self.insert(metric.clone(), timestamp);
             }
             None => {
-                let (series, entry) = MetricEntry::from_metric(metric.clone(), timestamp);
-                self.insert_with_tracking(series, entry);
+                self.insert(metric.clone(), timestamp);
             }
         }
         metric.into_absolute()
@@ -619,13 +618,18 @@ impl MetricSet {
         // again, but this is a behavior we have to observe for sinks that can only handle
         // incremental updates.
         let timestamp = self.create_timestamp();
+        // We always call insert() to track memory usage
         match self.inner.get_mut(metric.series()) {
             Some(reference) => {
                 let new_value = metric.value().clone();
+                // Create a copy of the reference so we can insert and
+                // replace the existing entry, tracking memory usage
+                let mut new_reference = reference.clone();
                 // From the stored reference value, emit an increment
                 if metric.subtract(&reference.data) {
-                    reference.data.value = new_value;
-                    reference.update_timestamp(timestamp);
+                    new_reference.data.value = new_value;
+                    new_reference.timestamp = timestamp;
+                    self.insert_with_tracking(metric.series().clone(), new_reference);
                     Some(metric.into_incremental())
                 } else {
                     // Metric changed type, store this and emit nothing
