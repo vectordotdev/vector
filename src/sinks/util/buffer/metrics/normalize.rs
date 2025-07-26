@@ -1,6 +1,5 @@
 use lru::LruCache;
 use std::marker::PhantomData;
-use std::num::NonZeroUsize;
 use std::time::{Duration, Instant};
 
 use vector_lib::event::{
@@ -275,16 +274,6 @@ impl CapacityPolicy {
         }
     }
 
-    /// Returns true if memory limit is configured.
-    pub fn has_memory_limit(&self) -> bool {
-        self.max_bytes.is_some()
-    }
-
-    /// Returns true if entry count limit is configured.
-    pub fn has_entry_limit(&self) -> bool {
-        self.max_events.is_some()
-    }
-
     /// Gets the current memory usage.
     pub fn current_memory(&self) -> usize {
         self.current_memory
@@ -417,20 +406,9 @@ impl MetricSet {
         capacity_policy: Option<CapacityPolicy>,
         ttl_policy: Option<TtlPolicy>,
     ) -> Self {
-        // Create an unbounded cache if either:
-        // 1. No capacity policy is set, or
-        // 2. Capacity policy is set but doesn't specify max_events
-        let cache = match capacity_policy.as_ref() {
-            Some(policy) if policy.max_events.is_some() => {
-                // Use the max_events from capacity policy
-                let capacity = policy.max_events.unwrap();
-                LruCache::new(NonZeroUsize::new(capacity).unwrap())
-            }
-            _ => {
-                // No capacity policy or no entry limit - use unbounded
-                LruCache::unbounded()
-            }
-        };
+        // Always use an unbounded cache since we manually track limits
+        // This ensures our capacity policy can properly track memory for all evicted entries
+        let cache = LruCache::unbounded();
 
         Self {
             cache,
@@ -482,7 +460,7 @@ impl MetricSet {
         }
     }
 
-    /// Enforce both memory and entry limits by evicting LRU entries.
+    /// Enforce memory and entry limits by evicting LRU entries.
     fn enforce_limits(&mut self) {
         let Some(ref mut capacity_policy) = self.capacity_policy else {
             return; // No capacity limits configured
