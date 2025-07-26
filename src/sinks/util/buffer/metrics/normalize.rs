@@ -689,29 +689,6 @@ impl MetricSet {
             }
         }
     }
-
-    /// Returns true if the cache contains the specified series.
-    pub fn contains(&self, series: &MetricSeries) -> bool {
-        self.inner.contains(series)
-    }
-
-    /// Gets a clone of the entry for the given series, if it exists.
-    pub fn get(&mut self, series: &MetricSeries) -> Option<MetricEntry> {
-        self.inner.get(series).cloned()
-    }
-
-    /// Clears all entries from the cache.
-    pub fn clear(&mut self) {
-        self.inner.clear();
-        if let Some(ref mut capacity_policy) = self.capacity_policy {
-            capacity_policy.current_memory = 0;
-        }
-    }
-
-    /// Returns an iterator over all cached entries.
-    pub fn iter(&self) -> impl Iterator<Item = (MetricSeries, MetricEntry)> + '_ {
-        self.inner.iter().map(|(k, v)| (k.clone(), v.clone()))
-    }
 }
 
 impl Default for MetricSet {
