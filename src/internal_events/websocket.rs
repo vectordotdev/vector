@@ -215,11 +215,11 @@ impl InternalEvent for WsReceiveError {
 }
 
 #[derive(Debug)]
-pub struct WsSendError {
-    pub error: WsError,
+pub struct WsSendError<'a> {
+    pub error: &'a WsError,
 }
 
-impl InternalEvent for WsSendError {
+impl InternalEvent for WsSendError<'_> {
     fn emit(self) {
         error!(
             message = "Error sending message to websocket.",

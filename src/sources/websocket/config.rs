@@ -1,5 +1,6 @@
 use serde_with::serde_as;
 use snafu::ResultExt;
+use std::time::Duration;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 
 use super::source::{WebSocketSource, WebSocketSourceParams};
@@ -58,6 +59,19 @@ pub struct WebSocketConfig {
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
+    /// Number of seconds before timing out while connecting.
+    #[configurable]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_connect_timeout_secs")]
+    pub connect_timeout_secs: Duration,
+
+    /// Number of seconds before timing out while waiting for a reply to the initial message.
+    /// This is only used when `initial_message` is also configured.
+    #[configurable]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_initial_message_timeout_secs")]
+    pub initial_message_timeout_secs: Duration,
+
     /// An optional message to send to the server upon connection.
     #[configurable]
     #[serde(default)]
@@ -82,13 +96,23 @@ pub struct WebSocketConfig {
     pub log_namespace: Option<bool>,
 }
 
+const fn default_connect_timeout_secs() -> Duration {
+    Duration::from_secs(30)
+}
+
+const fn default_initial_message_timeout_secs() -> Duration {
+    Duration::from_secs(2)
+}
+
 impl Default for WebSocketConfig {
     fn default() -> Self {
         Self {
             common: WebSocketCommonConfig::default(),
             decoding: default_decoding(),
             framing: default_framing_message_based(),
+            connect_timeout_secs: default_connect_timeout_secs(),
             initial_message: None,
+            initial_message_timeout_secs: default_initial_message_timeout_secs(),
             ping_message: None,
             pong_message: None,
             log_namespace: None,

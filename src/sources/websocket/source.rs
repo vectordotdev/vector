@@ -18,8 +18,8 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, PongTimeoutError, WsBytesReceived, WsConnectionShutdown, WsKind,
-        WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
+        ConnectionOpen, OpenGauge, PongTimeoutError, WsBytesReceived, WsConnectionEstablished,
+        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
     sources::websocket::config::{PongMessage, PongValidation, WebSocketConfig},
     SourceSender,
@@ -46,14 +46,19 @@ impl WebSocketSource {
     }
 
     pub async fn run(self, cx: SourceContext) -> Result<(), ()> {
-        let (mut ws_sink, ws_source) = self.create_sink_and_stream().await;
-        self.maybe_send_initial_message(&mut ws_sink).await;
-
-        pin_mut!(ws_sink, ws_source);
-
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
+
         let mut out = cx.out;
+
+        let (ws_sink, ws_source) = match self.connect(&mut out).await {
+            Ok(stream_and_sink) => stream_and_sink,
+            Err(()) => {
+                return Ok(());
+            }
+        };
+
+        pin_mut!(ws_sink, ws_source);
 
         loop {
             let result = tokio::select! {
@@ -75,12 +80,12 @@ impl WebSocketSource {
                                 ping_manager.record_pong();
                                 debug!("Received custom pong response.");
                             } else {
-                                self.handle_message(&msg_txt, WsKind::Text, &mut out).await;
+                                self.process_message(&msg_txt, WsKind::Text, &mut out).await;
                             }
                             Ok(())
                         },
                         Ok(Message::Binary(msg_bytes)) => {
-                            self.handle_message(&msg_bytes, WsKind::Binary, &mut out).await;
+                            self.process_message(&msg_bytes, WsKind::Binary, &mut out).await;
                             Ok(())
                         },
                         Ok(Message::Ping(_)) => Ok(()),
@@ -99,16 +104,19 @@ impl WebSocketSource {
                     emit!(WsConnectionShutdown);
                 }
                 emit!(WsReceiveError { error });
-
-                // Attempt to reconnect
-                self.reconnect(&mut ws_sink, &mut ws_source).await;
+                if self
+                    .reconnect(&mut out, &mut ws_sink, &mut ws_source)
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
             }
         }
-
         Ok(())
     }
 
-    async fn handle_message<T>(&self, payload: &T, kind: WsKind, out: &mut SourceSender)
+    async fn process_message<T>(&self, payload: &T, kind: WsKind, out: &mut SourceSender)
     where
         T: AsRef<[u8]> + ?Sized,
     {
@@ -120,11 +128,7 @@ impl WebSocketSource {
             protocol: PROTOCOL,
             kind,
         });
-        self.process_payload(payload_bytes, kind, out).await;
-    }
-
-    async fn process_payload(&self, payload: &[u8], kind: WsKind, out: &mut SourceSender) {
-        let mut stream = FramedRead::new(payload, self.params.decoder.clone());
+        let mut stream = FramedRead::new(payload_bytes, self.params.decoder.clone());
 
         while let Some(result) = stream.next().await {
             match result {
@@ -163,6 +167,7 @@ impl WebSocketSource {
                 }
             }
         }
+
     }
 
     fn add_metadata(&self, event: &mut LogEvent) {
@@ -171,40 +176,85 @@ impl WebSocketSource {
             .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
     }
 
-    async fn maybe_send_initial_message(
+    async fn send_initial_message(
         &self,
-        ws_sink: &mut (impl Sink<Message, Error = WsError> + Unpin),
-    ) {
-        if let Some(initial_message) = &self.config.initial_message {
-            match ws_sink.send(Message::Text(initial_message.clone())).await {
-                Ok(_) => debug!(message = %initial_message, "Sent initial message."),
-                Err(error) => {
-                    emit!(WsSendError { error });
-                    // Avoid a tight loop if sending the initial message fails repeatedly.
-                    time::sleep(Duration::from_secs(1)).await;
-                }
-            }
+        ws_sink: &mut WsSink,
+        ws_source: &mut WsStream,
+        out: &mut SourceSender,
+    ) -> Result<(), ()> {
+        let initial_message = self.config.initial_message.as_ref().unwrap();
+        ws_sink
+            .send(Message::Text(initial_message.clone()))
+            .await
+            .map_err(|e| error!("Failed to send initial message: {e}."))?;
+
+        debug!("Sent initial message, awaiting response from server.");
+
+        let response_result =
+            time::timeout(self.config.initial_message_timeout_secs, ws_source.next())
+                .await
+                .map_err(|_| error!("Server did not respond to initial message within timeout."))?
+                .ok_or_else(|| error!("Connection closed after initial message without response."))?
+                .map_err(|e| error!("Error waiting for server response: {e}."));
+
+        match response_result {
+            Ok(response) => self.handle_initial_response(response, out).await,
+            Err(_) => Err(()),
         }
     }
 
-    async fn reconnect(&self, ws_sink: &mut WsSink, ws_source: &mut WsStream) {
+    async fn handle_initial_response(&self, msg: Message, out: &mut SourceSender) -> Result<(), ()> {
+        match msg {
+            Message::Text(txt) => self.process_message(&txt, WsKind::Text, out).await,
+            Message::Binary(bin) => self.process_message(&bin, WsKind::Binary, out).await,
+            Message::Close(Some(frame)) => {
+                error!("Connection closed by server. Code: {}, Reason: '{}'", frame.code, frame.reason);
+                return Err(());
+            }
+            // Ignore other message types like pong
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn reconnect(
+        &self,
+        out: &mut SourceSender,
+        ws_sink: &mut WsSink,
+        ws_source: &mut WsStream,
+    ) -> Result<(), ()> {
         info!("Reconnecting to WebSocket...");
-        let (new_sink, new_source) = self.create_sink_and_stream().await;
+
+        let (new_sink, new_source) = self.connect(out).await?;
 
         *ws_sink = new_sink;
         *ws_source = new_source;
 
-        self.maybe_send_initial_message(ws_sink).await;
+        Ok(())
     }
 
-    async fn create_sink_and_stream(&self) -> (WsSink, WsStream) {
-        let ws_stream = self.params.connector.connect_backoff().await;
+    async fn connect(&self, out: &mut SourceSender) -> Result<(WsSink, WsStream), ()> {
+        let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
+
+        if self.config.initial_message.is_some() {
+            self.send_initial_message(&mut ws_sink, &mut ws_source, out).await?;
+        }
+
+        Ok((ws_sink, ws_source))
+    }
+
+    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), ()> {
+        let connect_future = self.params.connector.connect_backoff();
+        let timeout = self.config.connect_timeout_secs;
+
+        let ws_stream = time::timeout(timeout, connect_future).await.map_err(|_| {
+            error!("Connection attempt timed out after {:?}.", timeout);
+        })?;
+
+        emit!(WsConnectionEstablished {});
         let (sink, stream) = ws_stream.split();
 
-        let sink: WsSink = Box::pin(sink);
-        let stream: WsStream = Box::pin(stream);
-
-        (sink, stream)
+        Ok((Box::pin(sink), Box::pin(stream)))
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
@@ -265,7 +315,7 @@ impl PingManager {
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
-            emit!(WsSendError { error });
+            emit!(WsSendError { error: &error });
             WsError::Io(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
                 "Websocket connection is closed.",
