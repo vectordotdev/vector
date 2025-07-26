@@ -78,12 +78,7 @@ impl IncrementalToAbsolute {
         })
     }
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
-        if let Some(metric) = self.data.make_absolute(event.as_metric().clone()) {
-            // Create a new Event from the metric
-            Some(Event::Metric(metric))
-        } else {
-            None
-        }
+        self.data.make_absolute(event.as_metric().clone()).map(Event::Metric)
     }
 }
 

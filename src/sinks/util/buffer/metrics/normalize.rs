@@ -73,12 +73,12 @@ impl<D: NormalizerSettings + Clone> NormalizerConfig<D> {
         match (config.max_bytes, config.max_events, config.time_to_live) {
             (Some(0), _, _) => Err(NormalizerError::InvalidMaxBytes),
             (_, Some(0), _) => Err(NormalizerError::InvalidMaxEvents),
-            (_, _, Some(timeout)) if timeout <= 0 => Err(NormalizerError::InvalidTimeToLive),
+            (_, _, Some(0)) => Err(NormalizerError::InvalidTimeToLive),
             _ => Ok(config),
         }
     }
 
-    pub fn into_settings(self) -> MetricSetSettings {
+    pub const fn into_settings(self) -> MetricSetSettings {
         MetricSetSettings {
             max_bytes: self.max_bytes,
             max_events: self.max_events,
@@ -150,7 +150,7 @@ impl<N> MetricNormalizer<N> {
     ) -> Self {
         let settings = config
             .validate()
-            .unwrap_or_else(|e| panic!("Invalid cache settings: {:?}", e))
+            .unwrap_or_else(|e| panic!("Invalid cache settings: {e:?}"))
             .into_settings();
         Self {
             state: MetricSet::new(settings),
@@ -235,14 +235,16 @@ impl MetricEntry {
     }
 
     /// Updates this entry's timestamp.
-    pub fn update_timestamp(&mut self, timestamp: Option<Instant>) {
+    pub const fn update_timestamp(&mut self, timestamp: Option<Instant>) {
         self.timestamp = timestamp;
     }
 
-    /// Checks if this entry has expired based on the given TTL.
-    pub fn is_expired(&self, ttl: Duration) -> bool {
+    /// Checks if this entry has expired based on the given TTL and reference time.
+    ///
+    /// Using a provided reference time ensures consistency across multiple expiration checks.
+    pub fn is_expired(&self, ttl: Duration, reference_time: Instant) -> bool {
         match self.timestamp {
-            Some(ts) => Instant::now().duration_since(ts) >= ttl,
+            Some(ts) => reference_time.duration_since(ts) >= ttl,
             None => false,
         }
     }
@@ -266,7 +268,7 @@ pub struct CapacityPolicy {
 
 impl CapacityPolicy {
     /// Creates a new capacity policy with both memory and entry limits.
-    pub fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
+    pub const fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
         Self {
             max_bytes,
             max_events,
@@ -275,22 +277,22 @@ impl CapacityPolicy {
     }
 
     /// Gets the current memory usage.
-    pub fn current_memory(&self) -> usize {
+    pub const fn current_memory(&self) -> usize {
         self.current_memory
     }
 
     /// Updates memory tracking when an entry is added.
-    fn add_memory(&mut self, bytes: usize) {
+    const fn add_memory(&mut self, bytes: usize) {
         self.current_memory = self.current_memory.saturating_add(bytes);
     }
 
     /// Updates memory tracking when an entry is removed.
-    fn remove_memory(&mut self, bytes: usize) {
+    const fn remove_memory(&mut self, bytes: usize) {
         self.current_memory = self.current_memory.saturating_sub(bytes);
     }
 
     /// Updates memory tracking when an entry is replaced.
-    fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
+    const fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
         self.current_memory = self
             .current_memory
             .saturating_sub(old_bytes)
@@ -298,7 +300,7 @@ impl CapacityPolicy {
     }
 
     /// Checks if the current state exceeds memory limits.
-    fn exceeds_memory_limit(&self) -> bool {
+    const fn exceeds_memory_limit(&self) -> bool {
         if let Some(max_bytes) = self.max_bytes {
             self.current_memory > max_bytes
         } else {
@@ -307,7 +309,7 @@ impl CapacityPolicy {
     }
 
     /// Checks if the given entry count exceeds entry limits.
-    fn exceeds_entry_limit(&self, entry_count: usize) -> bool {
+    const fn exceeds_entry_limit(&self, entry_count: usize) -> bool {
         if let Some(max_events) = self.max_events {
             entry_count > max_events
         } else {
@@ -316,7 +318,7 @@ impl CapacityPolicy {
     }
 
     /// Returns true if any limits are currently exceeded.
-    fn needs_eviction(&self, entry_count: usize) -> bool {
+    const fn needs_eviction(&self, entry_count: usize) -> bool {
         self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
     }
 }
@@ -343,31 +345,28 @@ impl TtlPolicy {
     }
 
     /// Checks if it's time to run cleanup.
-    pub fn should_cleanup(&self) -> bool {
-        Instant::now().duration_since(self.last_cleanup) >= self.cleanup_interval
+    ///
+    /// Returns Some(current_time) if cleanup should be performed, None otherwise.
+    pub fn should_cleanup(&self) -> Option<Instant> {
+        let now = Instant::now();
+        if now.duration_since(self.last_cleanup) >= self.cleanup_interval {
+            Some(now)
+        } else {
+            None
+        }
     }
 
-    /// Marks cleanup as having been performed.
-    pub fn mark_cleanup_done(&mut self) {
-        self.last_cleanup = Instant::now();
+    /// Marks cleanup as having been performed with the provided timestamp.
+    pub const fn mark_cleanup_done(&mut self, now: Instant) {
+        self.last_cleanup = now;
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct MetricSetSettings {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
     pub time_to_live: Option<u64>,
-}
-
-impl Default for MetricSetSettings {
-    fn default() -> Self {
-        Self {
-            max_events: None,
-            max_bytes: None,
-            time_to_live: None,
-        }
-    }
 }
 
 /// Dual-limit cache using standard LRU with optional capacity and TTL policies.
@@ -376,8 +375,8 @@ impl Default for MetricSetSettings {
 /// memory and entry count limits via CapacityPolicy, plus optional TTL via TtlPolicy.
 #[derive(Clone, Debug)]
 pub struct MetricSet {
-    /// Standard LRU cache with large capacity
-    cache: LruCache<MetricSeries, MetricEntry>,
+    /// LRU cache
+    inner: LruCache<MetricSeries, MetricEntry>,
     /// Optional capacity policy for memory and/or entry count limits
     capacity_policy: Option<CapacityPolicy>,
     /// Optional TTL policy for time-based expiration
@@ -396,7 +395,7 @@ impl MetricSet {
         // Create TTL policy if time-to-live is set
         let ttl_policy = settings
             .time_to_live
-            .map(|tti| TtlPolicy::new(Duration::from_secs(tti)));
+            .map(|ttl| TtlPolicy::new(Duration::from_secs(ttl)));
 
         Self::with_policies(capacity_policy, ttl_policy)
     }
@@ -408,10 +407,8 @@ impl MetricSet {
     ) -> Self {
         // Always use an unbounded cache since we manually track limits
         // This ensures our capacity policy can properly track memory for all evicted entries
-        let cache = LruCache::unbounded();
-
         Self {
-            cache,
+            inner: LruCache::unbounded(),
             capacity_policy,
             ttl_policy,
         }
@@ -434,41 +431,35 @@ impl MetricSet {
 
     /// Gets the current number of entries in the cache.
     pub fn len(&self) -> usize {
-        self.cache.len()
+        self.inner.len()
     }
 
     /// Returns true if the cache contains no entries.
     pub fn is_empty(&self) -> bool {
-        self.cache.is_empty()
+        self.inner.is_empty()
     }
 
     /// Gets the current memory usage in bytes.
     pub fn weighted_size(&self) -> u64 {
-        if let Some(ref capacity_policy) = self.capacity_policy {
-            capacity_policy.current_memory() as u64
-        } else {
-            0 // No tracking when no capacity policy
-        }
+        self.capacity_policy
+            .as_ref()
+            .map_or(0, |cp| cp.current_memory() as u64)
     }
 
     /// Creates a timestamp if TTL is enabled.
     fn create_timestamp(&self) -> Option<Instant> {
-        if self.ttl_policy.is_some() {
-            Some(Instant::now())
-        } else {
-            None
-        }
+        self.ttl_policy.as_ref().map(|_| Instant::now())
     }
 
     /// Enforce memory and entry limits by evicting LRU entries.
-    fn enforce_limits(&mut self) {
+    fn enforce_capacity_policy(&mut self) {
         let Some(ref mut capacity_policy) = self.capacity_policy else {
             return; // No capacity limits configured
         };
 
         // Keep evicting until we're within limits
-        while capacity_policy.needs_eviction(self.cache.len()) {
-            if let Some((series, entry)) = self.cache.pop_lru() {
+        while capacity_policy.needs_eviction(self.inner.len()) {
+            if let Some((series, entry)) = self.inner.pop_lru() {
                 let freed_memory = entry.total_size_with_series(&series);
                 capacity_policy.remove_memory(freed_memory);
             } else {
@@ -479,41 +470,40 @@ impl MetricSet {
 
     /// Perform TTL cleanup if configured and needed.
     fn maybe_cleanup(&mut self) {
-        // Return early if no cleanup is needed
-        if !self
-            .ttl_policy()
-            .is_some_and(|config| config.should_cleanup())
-        {
-            return;
-        }
+        // Check if cleanup is needed and get the current timestamp in one operation
+        let now = match self.ttl_policy().and_then(|config| config.should_cleanup()) {
+            Some(timestamp) => timestamp,
+            None => return, // No cleanup needed
+        };
 
-        let ttl = self.ttl_policy().map(|policy| policy.ttl);
+        // Perform the cleanup using the same timestamp
+        self.cleanup_expired(now);
 
-        // Only run cleanup if we have a TTL value
-        if let Some(ttl) = ttl {
-            self.cleanup_expired(ttl);
-
-            // Mark cleanup as done
-            if let Some(config) = self.ttl_policy_mut() {
-                config.mark_cleanup_done();
-            }
+        // Mark cleanup as done with the same timestamp
+        if let Some(config) = self.ttl_policy_mut() {
+            config.mark_cleanup_done(now);
         }
     }
 
-    /// Remove expired entries based on TTL.
-    fn cleanup_expired(&mut self, ttl: Duration) {
+    /// Remove expired entries based on TTL using the provided timestamp.
+    fn cleanup_expired(&mut self, now: Instant) {
+        // Get the TTL from the policy
+        let Some(ttl) = self.ttl_policy().map(|policy| policy.ttl) else {
+            return; // No TTL policy, nothing to do
+        };
+
         let mut expired_keys = Vec::new();
 
-        // Collect expired keys
-        for (series, entry) in self.cache.iter() {
-            if entry.is_expired(ttl) {
+        // Collect expired keys using the provided timestamp
+        for (series, entry) in self.inner.iter() {
+            if entry.is_expired(ttl, now) {
                 expired_keys.push(series.clone());
             }
         }
 
         // Remove expired entries and update memory tracking
         for series in expired_keys {
-            if let Some(entry) = self.cache.pop(&series) {
+            if let Some(entry) = self.inner.pop(&series) {
                 let freed_memory = entry.total_size_with_series(&series);
                 if let Some(ref mut capacity_policy) = self.capacity_policy {
                     capacity_policy.remove_memory(freed_memory);
@@ -527,14 +517,14 @@ impl MetricSet {
         let entry_size = entry.total_size_with_series(&series);
 
         // Check if this is replacing an existing entry
-        let existing_size = if let Some(existing) = self.cache.peek(&series) {
+        let existing_size = if let Some(existing) = self.inner.peek(&series) {
             existing.total_size_with_series(&series)
         } else {
             0
         };
 
         // Insert the entry
-        self.cache.put(series, entry);
+        self.inner.put(series, entry);
 
         // Update memory tracking in capacity policy
         if let Some(ref mut capacity_policy) = self.capacity_policy {
@@ -548,16 +538,15 @@ impl MetricSet {
         }
 
         // Enforce limits after insertion
-        self.enforce_limits();
+        self.enforce_capacity_policy();
     }
 
     /// Consumes this MetricSet and returns a vector of Metric.
     pub fn into_metrics(mut self) -> Vec<Metric> {
-        // Clean up expired entries first
-        self.maybe_cleanup();
-
+        // Clean up expired entries first (using current time)
+        self.cleanup_expired(Instant::now());
         let mut metrics = Vec::new();
-        while let Some((series, entry)) = self.cache.pop_lru() {
+        while let Some((series, entry)) = self.inner.pop_lru() {
             metrics.push(entry.into_metric(series));
         }
         metrics
@@ -588,7 +577,7 @@ impl MetricSet {
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
         let timestamp = self.create_timestamp();
-        match self.cache.get_mut(metric.series()) {
+        match self.inner.get_mut(metric.series()) {
             Some(existing) => {
                 if existing.data.value.add(metric.value()) {
                     metric = metric.with_value(existing.data.value.clone());
@@ -630,7 +619,7 @@ impl MetricSet {
         // again, but this is a behavior we have to observe for sinks that can only handle
         // incremental updates.
         let timestamp = self.create_timestamp();
-        match self.cache.get_mut(metric.series()) {
+        match self.inner.get_mut(metric.series()) {
             Some(reference) => {
                 let new_value = metric.value().clone();
                 // From the stored reference value, emit an increment
@@ -646,7 +635,6 @@ impl MetricSet {
             }
             None => {
                 // No reference so store this and emit nothing
-                // Metric changed type, store this and emit nothing
                 self.insert(metric, timestamp);
                 None
             }
@@ -665,7 +653,7 @@ impl MetricSet {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
                 // Incremental metrics update existing entries, if present
-                match self.cache.get_mut(metric.series()) {
+                match self.inner.get_mut(metric.series()) {
                     Some(existing) => {
                         let (series, data, metadata) = metric.into_parts();
                         if existing.data.update(&data) {
@@ -690,7 +678,7 @@ impl MetricSet {
     ///
     /// If the series existed and was removed, returns true.  Otherwise, false.
     pub fn remove(&mut self, series: &MetricSeries) {
-        if let Some(entry) = self.cache.pop(series) {
+        if let Some(entry) = self.inner.pop(series) {
             let freed_memory = entry.total_size_with_series(series);
             if let Some(ref mut capacity_policy) = self.capacity_policy {
                 capacity_policy.remove_memory(freed_memory);
@@ -700,17 +688,17 @@ impl MetricSet {
 
     /// Returns true if the cache contains the specified series.
     pub fn contains(&self, series: &MetricSeries) -> bool {
-        self.cache.contains(series)
+        self.inner.contains(series)
     }
 
     /// Gets a clone of the entry for the given series, if it exists.
     pub fn get(&mut self, series: &MetricSeries) -> Option<MetricEntry> {
-        self.cache.get(series).cloned()
+        self.inner.get(series).cloned()
     }
 
     /// Clears all entries from the cache.
     pub fn clear(&mut self) {
-        self.cache.clear();
+        self.inner.clear();
         if let Some(ref mut capacity_policy) = self.capacity_policy {
             capacity_policy.current_memory = 0;
         }
@@ -718,7 +706,7 @@ impl MetricSet {
 
     /// Returns an iterator over all cached entries.
     pub fn iter(&self) -> impl Iterator<Item = (MetricSeries, MetricEntry)> + '_ {
-        self.cache.iter().map(|(k, v)| (k.clone(), v.clone()))
+        self.inner.iter().map(|(k, v)| (k.clone(), v.clone()))
     }
 }
 
@@ -734,8 +722,8 @@ impl InternalEvent for MetricSet {
         // Clean up expired entries first
         self.maybe_cleanup();
 
-        if self.cache.len() != 0 {
-            gauge!("cache_events").set(self.cache.len() as f64);
+        if !self.inner.is_empty() {
+            gauge!("cache_events").set(self.inner.len() as f64);
         }
         if let Some(ref capacity_policy) = self.capacity_policy {
             let memory_usage = capacity_policy.current_memory();
