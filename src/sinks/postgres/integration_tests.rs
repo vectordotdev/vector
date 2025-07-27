@@ -190,7 +190,7 @@ async fn healthcheck_fails_unknown_host() {
     assert!(healthcheck.await.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn healthcheck_fails_timed_out() {
     trace_init();
 
