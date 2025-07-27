@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result};
-use std::num::NonZeroU64;
 
 use metrics::{counter, histogram};
 use tokio_tungstenite::tungstenite::error::Error as WsError;
@@ -268,33 +267,5 @@ impl InternalEvent for WsBinaryDecodeError {
 
     fn name(&self) -> Option<&'static str> {
         Some("WsBinaryDecodeError")
-    }
-}
-
-#[derive(Debug)]
-pub struct PongTimeoutError {
-    pub timeout_secs: NonZeroU64,
-}
-
-impl InternalEvent for PongTimeoutError {
-    fn emit(self) {
-        error!(
-            message = "Pong not received in time.",
-            timeout_secs = %self.timeout_secs,
-            error_code = "pong_timeout_error",
-            stage = error_stage::PROCESSING,
-            error_type = error_type::CONNECTION_FAILED,
-        );
-        counter!(
-            "component_errors_total",
-            "error_code" => "pong_timeout_error",
-            "stage" => error_stage::PROCESSING,
-            "error_type" => error_type::CONNECTION_FAILED,
-        )
-        .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("PongTimeoutError")
     }
 }

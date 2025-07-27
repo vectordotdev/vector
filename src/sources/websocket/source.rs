@@ -18,8 +18,8 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, PongTimeoutError, WsBytesReceived, WsConnectionEstablished,
-        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
+        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionEstablished, WsConnectionShutdown,
+        WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
     sources::websocket::config::{PongMessage, PongValidation, WebSocketConfig},
     SourceSender,
@@ -51,12 +51,7 @@ impl WebSocketSource {
 
         let mut out = cx.out;
 
-        let (ws_sink, ws_source) = match self.connect(&mut out).await {
-            Ok(stream_and_sink) => stream_and_sink,
-            Err(()) => {
-                return Ok(());
-            }
-        };
+        let (ws_sink, ws_source) = self.connect(&mut out).await?;
 
         pin_mut!(ws_sink, ws_source);
 
@@ -103,7 +98,6 @@ impl WebSocketSource {
                 if is_closed(&error) {
                     emit!(WsConnectionShutdown);
                 }
-                emit!(WsReceiveError { error: &error });
                 if self
                     .reconnect(&mut out, &mut ws_sink, &mut ws_source)
                     .await
@@ -327,14 +321,9 @@ impl PingManager {
 
         if let Some(timeout) = self.timeout {
             if self.last_pong.elapsed() > Duration::from_secs(timeout.get()) {
-                let error =
-                    std::io::Error::new(std::io::ErrorKind::TimedOut, "Pong not received in time.");
-
-                emit!(PongTimeoutError {
-                    timeout_secs: timeout,
-                });
-
-                return Err(WsError::Io(error));
+                let error = WsError::ConnectionClosed;
+                emit!(WsReceiveError { error: &error });
+                return Err(error);
             }
         }
 
@@ -362,6 +351,7 @@ mod integration_test {
     };
     use futures::{sink::SinkExt, StreamExt};
     use std::borrow::Cow;
+    use std::num::NonZeroU64;
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::tungstenite::{
         protocol::frame::coding::CloseCode, protocol::frame::CloseFrame,
@@ -576,6 +566,37 @@ mod integration_test {
         config.initial_message = Some("hello, server!".to_string());
         config.initial_message_timeout_secs = Duration::from_secs(2);
 
+        run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+    }
+
+    async fn start_unresponsive_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            if let Ok((stream, _)) = listener.accept().await {
+                // Accept the connection to establish the WebSocket.
+                let mut websocket = accept_async(stream).await.expect("Failed to accept");
+                // Simply wait forever without responding to pings.
+                while websocket.next().await.is_some() {
+                    // Do nothing
+                }
+            }
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_exits_on_pong_timeout() {
+        let server_addr = start_unresponsive_server().await;
+
+        let mut config = make_config(&server_addr);
+        config.common.ping_interval = NonZeroU64::new(1);
+        config.common.ping_timeout = NonZeroU64::new(1);
+
+        // The source should fail because the server never sends a pong.
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
     }
 }
