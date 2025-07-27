@@ -51,7 +51,7 @@ impl InternalEvent for WsConnectionFailedError {
     }
 
     fn name(&self) -> Option<&'static str> {
-        Some("WsConnectionFailed")
+        Some("WsConnectionFailedError")
     }
 }
 
@@ -86,6 +86,7 @@ impl InternalEvent for WsConnectionError {
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "ws_connection_error",
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,

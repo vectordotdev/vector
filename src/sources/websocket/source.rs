@@ -18,8 +18,8 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionEstablished, WsConnectionShutdown,
-        WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
+        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionEstablished,
+        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
     sources::websocket::config::{PongMessage, PongValidation, WebSocketConfig},
     SourceSender,
@@ -266,7 +266,12 @@ impl WebSocketSource {
         let timeout = self.config.connect_timeout_secs;
 
         let ws_stream = time::timeout(timeout, connect_future).await.map_err(|_| {
-            error!("Connection attempt timed out after {:?}.", timeout);
+            let error = WsError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "Connection attempt timed out",
+            ));
+
+            emit!(WsConnectionError { error: error });
         })?;
 
         emit!(WsConnectionEstablished {});
@@ -597,6 +602,28 @@ mod integration_test {
         config.common.ping_timeout = NonZeroU64::new(1);
 
         // The source should fail because the server never sends a pong.
+        run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+    }
+
+    async fn start_blackhole_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            let (mut _socket, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_exits_on_connection_timeout() {
+        let server_addr = start_blackhole_server().await;
+        let mut config = make_config(&server_addr);
+        config.connect_timeout_secs = Duration::from_secs(1);
+
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
     }
 }
