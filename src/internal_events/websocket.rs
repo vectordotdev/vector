@@ -187,11 +187,11 @@ impl InternalEvent for WsMessageReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct WsReceiveError {
-    pub error: WsError,
+pub struct WsReceiveError<'a> {
+    pub error: &'a WsError,
 }
 
-impl InternalEvent for WsReceiveError {
+impl InternalEvent for WsReceiveError<'_> {
     fn emit(self) {
         error!(
             message = "Error receiving message from websocket.",
@@ -202,6 +202,7 @@ impl InternalEvent for WsReceiveError {
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "ws_receive_error",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,

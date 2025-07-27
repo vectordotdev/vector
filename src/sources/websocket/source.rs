@@ -103,7 +103,7 @@ impl WebSocketSource {
                 if is_closed(&error) {
                     emit!(WsConnectionShutdown);
                 }
-                emit!(WsReceiveError { error });
+                emit!(WsReceiveError { error: &error });
                 if self
                     .reconnect(&mut out, &mut ws_sink, &mut ws_source)
                     .await
@@ -167,7 +167,6 @@ impl WebSocketSource {
                 }
             }
         }
-
     }
 
     fn add_metadata(&self, event: &mut LogEvent) {
@@ -203,18 +202,42 @@ impl WebSocketSource {
         }
     }
 
-    async fn handle_initial_response(&self, msg: Message, out: &mut SourceSender) -> Result<(), ()> {
+    async fn handle_initial_response(
+        &self,
+        msg: Message,
+        out: &mut SourceSender,
+    ) -> Result<(), ()> {
         match msg {
-            Message::Text(txt) => self.process_message(&txt, WsKind::Text, out).await,
-            Message::Binary(bin) => self.process_message(&bin, WsKind::Binary, out).await,
-            Message::Close(Some(frame)) => {
-                error!("Connection closed by server. Code: {}, Reason: '{}'", frame.code, frame.reason);
-                return Err(());
+            Message::Text(txt) => {
+                self.process_message(&txt, WsKind::Text, out).await;
+                Ok(())
             }
-            // Ignore other message types like pong
-            _ => {}
+            Message::Binary(bin) => {
+                self.process_message(&bin, WsKind::Binary, out).await;
+                Ok(())
+            }
+            Message::Close(Some(frame)) => {
+                let error = WsError::ConnectionClosed;
+
+                emit!(WsReceiveError { error: &error });
+
+                error!(
+                    message = "Connection closed by server.",
+                    code = %frame.code,
+                    reason = %frame.reason,
+                );
+
+                Err(())
+            }
+            Message::Close(None) => {
+                let error = WsError::ConnectionClosed;
+                emit!(WsReceiveError { error: &error });
+                error!("Connection closed without a frame.");
+                Err(())
+            }
+            // Ignore other message types
+            _ => Ok(()),
         }
-        Ok(())
     }
 
     async fn reconnect(
@@ -237,7 +260,8 @@ impl WebSocketSource {
         let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
 
         if self.config.initial_message.is_some() {
-            self.send_initial_message(&mut ws_sink, &mut ws_source, out).await?;
+            self.send_initial_message(&mut ws_sink, &mut ws_source, out)
+                .await?;
         }
 
         Ok((ws_sink, ws_source))
@@ -327,6 +351,7 @@ impl PingManager {
 #[cfg(feature = "websocket-integration-tests")]
 #[cfg(test)]
 mod integration_test {
+    use crate::test_util::components::run_and_assert_source_error;
     use crate::{
         common::websocket::WebSocketCommonConfig,
         sources::websocket::config::WebSocketConfig,
@@ -336,7 +361,11 @@ mod integration_test {
         },
     };
     use futures::{sink::SinkExt, StreamExt};
+    use std::borrow::Cow;
     use tokio::{net::TcpListener, time::Duration};
+    use tokio_tungstenite::tungstenite::{
+        protocol::frame::coding::CloseCode, protocol::frame::CloseFrame,
+    };
     use tokio_tungstenite::{accept_async, tungstenite::Message};
     use url::Url;
     use vector_lib::codecs::decoding::DeserializerConfig;
@@ -516,5 +545,37 @@ mod integration_test {
         let event = events[0].as_log();
         assert_eq!(event["message"], response_msg.into());
         assert_eq!(*event.get_source_type().unwrap(), "websocket".into());
+    }
+
+    async fn start_reject_initial_message_server() -> String {
+        let addr = next_addr();
+        let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
+        let server_addr = format!("ws://{}", listener.local_addr().unwrap());
+
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut websocket = accept_async(stream).await.expect("Failed to accept");
+
+            if websocket.next().await.is_some() {
+                let close_frame = CloseFrame {
+                    code: CloseCode::Error,
+                    reason: Cow::from("Simulated Internal Server Error"),
+                };
+                let _ = websocket.close(Some(close_frame)).await;
+            }
+        });
+
+        server_addr
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn websocket_source_exits_on_rejected_intial_messsage() {
+        let server_addr = start_reject_initial_message_server().await;
+
+        let mut config = make_config(&server_addr);
+        config.initial_message = Some("hello, server!".to_string());
+        config.initial_message_timeout_secs = Duration::from_secs(2);
+
+        run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
     }
 }
