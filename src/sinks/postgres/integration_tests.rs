@@ -177,7 +177,7 @@ async fn healthcheck_fails_unknown_host() {
     trace_init();
 
     let table = random_table_name();
-    let endpoint = "postgres://unkown_host".to_string();
+    let endpoint = "postgres://unknown_host".to_string();
     let config_str = format!(
         r#"
             endpoint = "{endpoint}"
