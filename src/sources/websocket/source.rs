@@ -67,7 +67,7 @@ impl WebSocketSource {
                 Some(msg_result) = ws_source.next() => {
                     match msg_result {
                         Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
-                        Err(e) => Err(e.into()),
+                        Err(e) => Err(e),
                     }
                 }
             };
@@ -217,7 +217,7 @@ impl WebSocketSource {
                 "Connection attempt timed out",
             ));
 
-            emit!(WsConnectionError { error: error });
+            emit!(WsConnectionError { error });
         })?;
 
         emit!(WsConnectionEstablished {});
