@@ -168,14 +168,20 @@ fn wait_for_container_healthy(container: &str, timeout: Duration) {
             .output()
             .expect("Failed to run docker inspect");
 
-        let status = String::from_utf8_lossy(&output.stdout).trim().trim_matches('"').to_string();
+        let status = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .trim_matches('"')
+            .to_string();
         if status == "healthy" {
             return;
         }
 
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
-    panic!("Timed out waiting for container {} to become healthy", container);
+    panic!(
+        "Timed out waiting for container {} to become healthy",
+        container
+    );
 }
 
 /// # Panics
