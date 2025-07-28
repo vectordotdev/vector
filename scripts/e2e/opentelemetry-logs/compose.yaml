@@ -16,7 +16,6 @@ services:
 
   logs-generator:
     container_name: logs-generator
-    image: python:3.11-alpine
     build:
       context: ./generator
     init: true
