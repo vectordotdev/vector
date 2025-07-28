@@ -4,11 +4,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
-use tokio::time::{sleep, timeout};
-use tracing::info;
 
-const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(30);
-const POLLING_INTERVAL: Duration = Duration::from_millis(500);
+const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(15);
 const EXPECTED_LOG_COUNT: usize = 100;
 
 fn log_output_dir() -> PathBuf {
@@ -30,8 +27,8 @@ fn vector_log_path() -> PathBuf {
     log_output_dir().join("vector-file-sink.log")
 }
 
-pub async fn read_file_contents(path: &Path) -> String {
-    match tokio::fs::read_to_string(path).await {
+pub fn read_file_contents(path: &Path) -> String {
+    match std::fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(e) => {
             eprintln!("Failed to read log file: {}", path.display());
@@ -101,8 +98,8 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path).await;
+fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
+    let content = read_file_contents(path);
 
     let mut result = BTreeMap::new();
 
@@ -163,44 +160,50 @@ async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
     result
 }
 
-/// # Panics
-/// After the timeout, this function will panic if both logs are not ready.
-async fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    let mut collector_acc: BTreeMap<u64, Value> = BTreeMap::new();
-    let mut vector_acc: BTreeMap<u64, Value> = BTreeMap::new();
+fn wait_for_container_healthy(container: &str, timeout: Duration) {
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout {
+        let output = std::process::Command::new("docker")
+            .args(["inspect", "--format", "{{.State.Health.Status}}", container])
+            .output()
+            .expect("Failed to run docker inspect");
 
-    timeout(MAXIMUM_WAITING_DURATION, async {
-        loop {
-            let collector_read = read_log_records(&collector_log_path()).await;
-            let vector_read = read_log_records(&vector_log_path()).await;
-
-            // Merge into accumulators, skipping duplicates
-            for (k, v) in collector_read {
-                collector_acc.entry(k).or_insert(v);
-            }
-            for (k, v) in vector_read {
-                vector_acc.entry(k).or_insert(v);
-            }
-
-            let c_len = collector_acc.len();
-            let v_len = vector_acc.len();
-
-            if c_len >= EXPECTED_LOG_COUNT && v_len >= EXPECTED_LOG_COUNT {
-                return (collector_acc, vector_acc);
-            }
-
-            info!("Waiting for logs... collector: {c_len}, vector: {v_len}");
-
-            sleep(POLLING_INTERVAL).await;
+        let status = String::from_utf8_lossy(&output.stdout).trim().trim_matches('"').to_string();
+        if status == "healthy" {
+            return;
         }
-    })
-    .await
-    .expect("Timed out waiting for both log files to contain sufficient records")
+
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+    panic!("Timed out waiting for container {} to become healthy", container);
 }
 
-#[tokio::test]
-async fn vector_sink_otel_sink_logs_match() {
-    let (collector_log_records, vector_log_records) = wait_for_logs().await;
+/// # Panics
+/// After the timeout, this function will panic if both logs are not ready.
+fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
+    wait_for_container_healthy("opentelemetry-logs-vector", MAXIMUM_WAITING_DURATION);
+    wait_for_container_healthy("opentelemetry-logs-otel-collector-sink", MAXIMUM_WAITING_DURATION);
+
+    let collector_logs = read_log_records(&collector_log_path());
+    let vector_logs = read_log_records(&vector_log_path());
+
+    assert_eq!(
+        collector_logs.len(),
+        EXPECTED_LOG_COUNT,
+        "Collector did not produce expected number of log records"
+    );
+    assert_eq!(
+        vector_logs.len(),
+        EXPECTED_LOG_COUNT,
+        "Vector did not produce expected number of log records"
+    );
+
+    (collector_logs, vector_logs)
+}
+
+#[test]
+fn vector_sink_otel_sink_logs_match() {
+    let (collector_log_records, vector_log_records) = wait_for_logs();
 
     assert_eq!(
         collector_log_records.len(),

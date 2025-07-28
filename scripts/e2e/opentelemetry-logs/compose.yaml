@@ -1,6 +1,7 @@
 name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
+    container_name: otel-collector-source
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     init: true
     volumes:
@@ -14,6 +15,7 @@ services:
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   logs-generator:
+    container_name: logs-generator
     image: python:3.11-alpine
     build:
       context: ./generator
@@ -29,6 +31,7 @@ services:
     command: [ "python", "/generator/logs_generator.py", "-n", "100" ]
 
   otel-collector-sink:
+    container_name: otel-collector-sink
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     init: true
     volumes:
@@ -41,8 +44,14 @@ services:
         target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "test -s /tmp/collector-file-exporter.log" ]
+      interval: 1s
+      timeout: 1s
+      retries: 30
 
   vector:
+    container_name: vector
     build:
       context: ../../../
       dockerfile: ./scripts/e2e/Dockerfile
@@ -67,3 +76,8 @@ services:
       - FEATURES=e2e-tests-opentelemetry
       - OTEL_E2E_OUTPUT_PATH
     command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "test -s /tmp/vector-file-sink.log" ]
+      interval: 1s
+      timeout: 1s
+      retries: 30
