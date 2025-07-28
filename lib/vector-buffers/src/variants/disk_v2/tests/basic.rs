@@ -67,17 +67,7 @@ async fn basic_read_write_loop() {
     .await;
 }
 
-// run `cargo test --no-run -p vector-buffers`
-// copy output path should look like (target/debug/deps/vector_buffers-xxxx)
-// to test run:
-// ```
-// for i in $(seq 1 10000); do
-//   echo $i
-//   ./target/debug/deps/vector_buffers-xxxx reader_exits_cleanly_when_writer_done_and_in_flight_acks || break
-// done
-// ```
-// This test fails once in ~3000 runs
-#[ignore = "flaky"]
+#[ignore = "flaky, fails once every ~3000 runs. blocked_read is not immediately woken after first_read"]
 #[tokio::test]
 async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     let assertion_registry = install_tracing_helpers();
