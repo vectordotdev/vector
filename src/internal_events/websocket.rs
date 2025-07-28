@@ -242,31 +242,3 @@ impl InternalEvent for WsSendError<'_> {
         Some("WsSendError")
     }
 }
-
-#[derive(Debug)]
-pub struct WsBinaryDecodeError {
-    pub error: vector_lib::codecs::decoding::Error,
-}
-
-impl InternalEvent for WsBinaryDecodeError {
-    fn emit(self) {
-        error!(
-            message = "Failed to decode binary message from websocket.",
-            error = %self.error,
-            error_code = "ws_binary_decode_error",
-            stage = error_stage::PROCESSING,
-            error_type = error_type::PARSER_FAILED,
-        );
-        counter!(
-            "component_errors_total",
-            "error_code" => "ws_binary_decode_error",
-            "stage" => error_stage::PROCESSING,
-            "error_type" => error_type::PARSER_FAILED,
-        )
-        .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WsBinaryDecodeError")
-    }
-}
