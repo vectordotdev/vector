@@ -128,7 +128,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             // Our blocked read should be woken up, and when we poll it, it should be also be ready,
             // albeit with a return value of `None`... because the writer is closed, and we read all
             // the records, so nothing is left. :)
-            assert!(blocked_read.is_woken()); // Panics here
+            assert!(blocked_read.is_woken());
 
             let second_read = select! {
                 // if the reader task finishes in time, extract its output
