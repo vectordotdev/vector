@@ -328,16 +328,19 @@ impl HttpResourceOutputContext<'_> {
                     match hyper::body::to_bytes(request.into_body()).await {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
+                            let byte_size = body.len();
                             let mut body = BytesMut::from(&body[..]);
                             loop {
                                 match decoder.decode_eof(&mut body) {
-                                    Ok(Some((events, byte_size))) => {
+                                    // `decoded_byte_size` is the decoded size of an individual frame. `byte_size` represents the size of the
+                                    // entire payload which may contain multiple frames and their delimiters.
+                                    Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
-                                            info!("HTTP server external output resource decoded {byte_size} bytes but test case configured to reject.");
+                                            info!("HTTP server external output resource decoded {decoded_byte_size} bytes but test case configured to reject.");
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
-                                            info!("HTTP server external output resource decoded {byte_size} bytes.");
+                                            info!("HTTP server external output resource decoded {decoded_byte_size} bytes.");
 
                                             // Update the runner metrics for the received events. This will later
                                             // be used in the Validators, as the "expected" case.
