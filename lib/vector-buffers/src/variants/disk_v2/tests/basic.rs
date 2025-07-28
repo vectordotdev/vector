@@ -67,7 +67,7 @@ async fn basic_read_write_loop() {
     .await;
 }
 
-#[ignore = "flaky, fails once every ~3000 runs. blocked_read is not immediately woken after first_read"]
+#[ignore = "flaky. See https://github.com/vectordotdev/vector/issues/23456"]
 #[tokio::test]
 async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     let assertion_registry = install_tracing_helpers();
