@@ -28,13 +28,8 @@ generated: components: sinks: websocket: configuration: {
 		}
 	}
 	auth: {
-		description: """
-			Configuration of the authentication strategy for HTTP requests.
-
-			HTTP authentication should be used with HTTPS only, as the authentication credentials are passed as an
-			HTTP header without any additional encryption beyond what is provided by the transport itself.
-			"""
-		required: false
+		description: "HTTP Authentication."
+		required:    false
 		type: object: options: {
 			auth: {
 				description:   "The AWS authentication configuration."
@@ -578,7 +573,7 @@ generated: components: sinks: websocket: configuration: {
 		type: uint: unit: "seconds"
 	}
 	tls: {
-		description: "Configures the TLS options for incoming/outgoing connections."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
