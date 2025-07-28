@@ -1,3 +1,3 @@
-`http` sink now has support for templated header values
+The `http` sink now supports templated header values.
 
 authors: notchairmk
