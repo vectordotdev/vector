@@ -119,6 +119,8 @@ define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
 endef
 endif
 
+CIDFILE := $(shell mktemp -u /tmp/vector-environment-docker-cid.XXXXXX)
+
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
@@ -134,11 +136,13 @@ define ENVIRONMENT_EXEC
 			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--cidfile $(CIDFILE),) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=$(CIDFILE)$(COMMA)target=/.docker-container-id,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
 			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
-			$(ENVIRONMENT_UPSTREAM)
+			$(ENVIRONMENT_UPSTREAM); rm -f $(CIDFILE)
 endef
 
 
