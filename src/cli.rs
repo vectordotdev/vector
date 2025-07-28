@@ -177,6 +177,28 @@ pub struct RootOpts {
     )]
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
+    /// Watch for changes in enrichment tables files, and reload accordingly.
+    #[arg(long, env = "VECTOR_WATCH_ENRICHMENT_TABLES")]
+    pub watch_enrichment_tables: bool,
+
+    /// Method for enrichment table files watching.
+    #[arg(
+        long,
+        default_value = "recommended",
+        env = "VECTOR_WATCH_ENRICHMENT_TABLES"
+    )]
+    pub watch_enrichment_tables_method: WatchConfigMethod,
+
+    /// Poll for changes in the enrichment tables files at the given interval.
+    ///
+    /// This setting is only applicable if `Poll` is set in `--watch-enrichment-tables-method`.
+    #[arg(
+        long,
+        env = "VECTOR_WATCH_ENRICHMENT_TABLES_POLL_INTERVAL_SECONDS",
+        default_value = "30"
+    )]
+    pub watch_enrichment_tables_poll_interval_seconds: NonZeroU64,
+
     /// Set the internal log rate limit
     /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(

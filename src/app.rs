@@ -77,9 +77,19 @@ impl ApplicationConfig {
             None
         };
 
+        let enrichment_watcher_conf = if opts.watch_enrichment_tables {
+            Some(watcher_config(
+                opts.watch_enrichment_tables_method,
+                opts.watch_enrichment_tables_poll_interval_seconds,
+            ))
+        } else {
+            None
+        };
+
         let config = load_configs(
             &config_paths,
             watcher_conf,
+            enrichment_watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
@@ -379,6 +389,15 @@ async fn handle_signal(
 
             reload_config_from_result(topology_controller, new_config).await
         }
+        Ok(SignalTo::ReloadTables) => {
+            let topology_controller = topology_controller.lock().await;
+
+            topology_controller
+                .topology
+                .reload_enrichment_tables()
+                .await;
+            None
+        }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
             None
@@ -505,6 +524,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
 pub async fn load_configs(
     config_paths: &[ConfigPath],
     watcher_conf: Option<config::watcher::WatcherConfig>,
+    enrichment_watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
@@ -566,6 +586,33 @@ pub async fn load_configs(
         )
         .map_err(|error| {
             error!(message = "Unable to start config watcher.", %error);
+            exitcode::CONFIG
+        })?;
+    }
+
+    if let Some(enrichment_watcher_conf) = enrichment_watcher_conf {
+        let mut watched_table_paths = Vec::new();
+        for (name, table) in config.enrichment_tables() {
+            let files = table.inner.files_to_watch();
+            let component_config =
+                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            watched_table_paths.push(component_config);
+        }
+
+        info!(
+            message = "Starting enrichment table watcher.",
+            paths = ?watched_table_paths
+        );
+
+        // Start listening for enrichment table changes.
+        config::watcher::spawn_thread_for_enrichment(
+            enrichment_watcher_conf,
+            signal_handler.clone_tx(),
+            watched_table_paths,
+            None,
+        )
+        .map_err(|error| {
+            error!(message = "Unable to start enrichment table watcher.", %error);
             exitcode::CONFIG
         })?;
     }
