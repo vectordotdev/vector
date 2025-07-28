@@ -22,6 +22,8 @@ services:
     init: true
     depends_on:
       - otel-collector-source
+      - vector
+      - otel-collector-sink
     volumes:
       - type: bind
         source: ./generator
@@ -60,9 +62,6 @@ services:
         RUST_VERSION: ${RUST_VERSION:-1.88}
     image: vector-e2e:opentelemetry-logs
     init: true
-    depends_on:
-      - otel-collector-source
-      - otel-collector-sink
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/vector.yaml
