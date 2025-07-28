@@ -3,9 +3,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
 
-const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(15);
 const EXPECTED_LOG_COUNT: usize = 100;
 
 fn log_output_dir() -> PathBuf {
@@ -160,36 +158,9 @@ fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
     result
 }
 
-fn wait_for_container_healthy(container: &str, timeout: Duration) {
-    let start = std::time::Instant::now();
-    while start.elapsed() < timeout {
-        let output = std::process::Command::new("docker")
-            .args(["inspect", "--format", "{{.State.Health.Status}}", container])
-            .output()
-            .expect("Failed to run docker inspect");
-
-        let status = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .trim_matches('"')
-            .to_string();
-        if status == "healthy" {
-            return;
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-    panic!(
-        "Timed out waiting for container {} to become healthy",
-        container
-    );
-}
-
 /// # Panics
 /// After the timeout, this function will panic if both logs are not ready.
 fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    wait_for_container_healthy("vector-otel-logs-e2e", MAXIMUM_WAITING_DURATION);
-    // TODO: A healthcheck for the `otel-collector-sink` would also make sense here
-    //       but the base image doesn't have `test` or `sh`.
     let collector_logs = read_log_records(&collector_log_path());
     let vector_logs = read_log_records(&vector_log_path());
 

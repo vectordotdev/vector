@@ -70,8 +70,3 @@ services:
       - FEATURES=e2e-tests-opentelemetry
       - OTEL_E2E_OUTPUT_PATH
     command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
-    healthcheck:
-      test: [ "CMD", "sh", "-c", "test -s /tmp/vector-file-sink.log" ]
-      interval: 1s
-      timeout: 1s
-      retries: 60
