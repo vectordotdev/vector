@@ -67,6 +67,17 @@ async fn basic_read_write_loop() {
     .await;
 }
 
+// run `cargo test --no-run -p vector-buffers`
+// copy output path should look like (target/debug/deps/vector_buffers-xxxx)
+// to test run:
+// ```
+// for i in $(seq 1 10000); do
+//   echo $i
+//   ./target/debug/deps/vector_buffers-xxxx reader_exits_cleanly_when_writer_done_and_in_flight_acks || break
+// done
+// ```
+// This test fails once in ~3000 runs
+#[ignore = "flaky"]
 #[tokio::test]
 async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     let assertion_registry = install_tracing_helpers();
@@ -127,7 +138,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             // Our blocked read should be woken up, and when we poll it, it should be also be ready,
             // albeit with a return value of `None`... because the writer is closed, and we read all
             // the records, so nothing is left. :)
-            assert!(blocked_read.is_woken());
+            assert!(blocked_read.is_woken()); // Panics here
 
             let second_read = select! {
                 // if the reader task finishes in time, extract its output
