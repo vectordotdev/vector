@@ -64,32 +64,10 @@ impl WebSocketSource {
 
                 res = ping_manager.tick(&mut ws_sink) => res,
 
-                Some(msg) = ws_source.next() => {
-                    match msg {
-                        Ok(Message::Pong(_)) => {
-                            ping_manager.record_pong();
-                            Ok(())
-                        },
-                        Ok(Message::Text(msg_txt)) => {
-                            if self.is_custom_pong(&msg_txt) {
-                                ping_manager.record_pong();
-                                debug!("Received custom pong response.");
-                            } else {
-                                self.process_message(&msg_txt, WsKind::Text, &mut out).await;
-                            }
-                            Ok(())
-                        },
-                        Ok(Message::Binary(msg_bytes)) => {
-                            self.process_message(&msg_bytes, WsKind::Binary, &mut out).await;
-                            Ok(())
-                        },
-                        Ok(Message::Ping(_)) => Ok(()),
-                        Ok(Message::Close(_)) => Err(WsError::ConnectionClosed),
-                        Ok(Message::Frame(_)) => {
-                            warn!("Unsupported message type received: frame.");
-                             Ok(())
-                        }
-                        Err(e) => Err(e),
+                Some(msg_result) = ws_source.next() => {
+                    match msg_result {
+                        Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
+                        Err(e) => Err(e.into()),
                     }
                 }
             };
@@ -108,6 +86,39 @@ impl WebSocketSource {
             }
         }
         Ok(())
+    }
+
+    async fn handle_message(
+        &self,
+        msg: Message,
+        ping_manager: &mut PingManager,
+        out: &mut SourceSender,
+    ) -> Result<(), WsError> {
+        match msg {
+            Message::Pong(_) => {
+                ping_manager.record_pong();
+                Ok(())
+            }
+            Message::Text(msg_txt) => {
+                if self.is_custom_pong(&msg_txt) {
+                    ping_manager.record_pong();
+                    debug!("Received custom pong response.");
+                } else {
+                    self.process_message(&msg_txt, WsKind::Text, out).await;
+                }
+                Ok(())
+            }
+            Message::Binary(msg_bytes) => {
+                self.process_message(&msg_bytes, WsKind::Binary, out).await;
+                Ok(())
+            }
+            Message::Ping(_) => Ok(()),
+            Message::Close(_) => Err(WsError::ConnectionClosed),
+            Message::Frame(_) => {
+                warn!("Unsupported message type received: frame.");
+                Ok(())
+            }
+        }
     }
 
     async fn process_message<T>(&self, payload: &T, kind: WsKind, out: &mut SourceSender)
