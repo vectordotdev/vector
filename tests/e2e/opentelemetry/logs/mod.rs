@@ -181,9 +181,9 @@ fn wait_for_container_healthy(container: &str, timeout: Duration) {
 /// # Panics
 /// After the timeout, this function will panic if both logs are not ready.
 fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    wait_for_container_healthy("opentelemetry-logs-vector", MAXIMUM_WAITING_DURATION);
-    wait_for_container_healthy("opentelemetry-logs-otel-collector-sink", MAXIMUM_WAITING_DURATION);
-
+    wait_for_container_healthy("vector-otel-logs-e2e", MAXIMUM_WAITING_DURATION);
+    // TODO: A healthcheck for the `otel-collector-sink` would also make sense here
+    //       but the base image doesn't have `test` or `sh`.
     let collector_logs = read_log_records(&collector_log_path());
     let vector_logs = read_log_records(&vector_log_path());
 

@@ -46,14 +46,9 @@ services:
         target: /tmp
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
-    healthcheck:
-      test: [ "CMD", "sh", "-c", "test -s /tmp/collector-file-exporter.log" ]
-      interval: 1s
-      timeout: 1s
-      retries: 30
 
   vector:
-    container_name: vector
+    container_name: vector-otel-logs-e2e
     build:
       context: ../../../
       dockerfile: ./scripts/e2e/Dockerfile
@@ -79,4 +74,4 @@ services:
       test: [ "CMD", "sh", "-c", "test -s /tmp/vector-file-sink.log" ]
       interval: 1s
       timeout: 1s
-      retries: 30
+      retries: 60
