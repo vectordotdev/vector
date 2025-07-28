@@ -16,6 +16,7 @@ mod integration_tests;
 use bytes::Bytes;
 use redis::RedisError;
 use snafu::Snafu;
+use tokio::sync::watch::error::RecvError;
 
 use crate::sinks::prelude::*;
 
@@ -35,6 +36,8 @@ pub(super) enum RedisSinkError {
         source: RedisError,
         generation: Option<GenerationCount>,
     },
+    #[snafu(display("Repair channel was closed: {source}"))]
+    RepairChannelError { source: RecvError },
 }
 
 #[derive(Clone, Copy, Debug, Derivative)]

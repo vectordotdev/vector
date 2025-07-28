@@ -28,7 +28,7 @@ impl Service<RedisRequest> for RedisService {
     fn call(&mut self, kvs: RedisRequest) -> Self::Future {
         let count = kvs.request.len();
 
-        let redis_conn = self.conn.clone();
+        let mut redis_conn = self.conn.clone();
         let mut pipe = redis::pipe();
 
         for kv in kvs.request {
@@ -65,15 +65,7 @@ impl Service<RedisRequest> for RedisService {
             let ConnectionState {
                 connection: mut conn,
                 generation,
-            } = match redis_conn.get_connection_manager().await {
-                Ok(conn) => conn,
-                Err(error) => {
-                    return Err(RedisSinkError::SendError {
-                        source: error,
-                        generation: None,
-                    })
-                }
-            };
+            } = redis_conn.get_connection_manager().await?;
 
             match pipe.query_async(&mut conn).await {
                 Ok(event_status) => Ok(RedisResponse {

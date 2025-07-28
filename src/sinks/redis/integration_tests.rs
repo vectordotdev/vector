@@ -55,7 +55,7 @@ async fn redis_sink_sentinel_reaches_primary() {
         acknowledgements: Default::default(),
     };
 
-    let redis_connection = cnf.build_connection().await.unwrap();
+    let mut redis_connection = cnf.build_connection().await.unwrap();
     let mut conn = redis_connection
         .get_connection_manager()
         .await
