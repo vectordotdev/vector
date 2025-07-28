@@ -21,7 +21,7 @@ TEST_NAME=$2
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
 
-  if [[ $LAST_RETURN_CODE -ne 0 ]]; then
+  if [[ $LAST_RETURN_CODE -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
     case "$TEST_TYPE" in
       int) TYPE_DIR="integration" ;;
       e2e) TYPE_DIR="e2e" ;;

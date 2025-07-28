@@ -1,6 +1,8 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use tracing::info;
@@ -26,6 +28,31 @@ fn collector_log_path() -> PathBuf {
 
 fn vector_log_path() -> PathBuf {
     log_output_dir().join("vector-file-sink.log")
+}
+
+pub async fn read_file_contents(path: &Path) -> String {
+    match tokio::fs::read_to_string(path).await {
+        Ok(contents) => contents,
+        Err(e) => {
+            eprintln!("Failed to read log file: {}", path.display());
+            eprintln!("Error: {e}");
+
+            if let Some(parent) = path.parent() {
+                let output = Command::new("ls")
+                    .arg("-ltr")
+                    .arg(parent)
+                    .output()
+                    .unwrap_or_else(|_| panic!("Failed to run ls on {}", parent.display()));
+                eprintln!(
+                    "ls -ltr {}:\n{}",
+                    parent.display(),
+                    String::from_utf8_lossy(&output.stdout)
+                );
+            }
+
+            panic!("Failed to read log file {}", path.display());
+        }
+    }
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -75,9 +102,7 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
 }
 
 async fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
-    let content = tokio::fs::read_to_string(path)
-        .await
-        .unwrap_or_else(|_| panic!("Failed to read log file {}", path.display()));
+    let content = read_file_contents(path).await;
 
     let mut result = BTreeMap::new();
 
