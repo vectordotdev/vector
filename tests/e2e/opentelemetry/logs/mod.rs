@@ -26,8 +26,8 @@ fn vector_log_path() -> PathBuf {
 use std::{fs, io, path::Path, thread, time::Duration};
 
 pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
-    let max_retries = 10;
-    let retry_delay = Duration::from_secs(1);
+    let max_retries = 5;
+    let retry_delay = Duration::from_secs(2);
     let mut last_err: Option<io::Error> = None;
     for attempt in 1..=max_retries {
         match fs::read_to_string(path) {

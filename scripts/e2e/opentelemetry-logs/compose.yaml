@@ -55,7 +55,6 @@ services:
       args:
         FEATURES: e2e-tests-opentelemetry
         RUST_VERSION: ${RUST_VERSION:-1.88}
-    image: vector-e2e:opentelemetry-logs
     init: true
     volumes:
       - type: bind
