@@ -1,8 +1,6 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
@@ -25,29 +23,29 @@ fn vector_log_path() -> PathBuf {
     log_output_dir().join("vector-file-sink.log")
 }
 
-pub fn read_file_contents(path: &Path) -> String {
-    match std::fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(e) => {
-            eprintln!("Failed to read log file: {}", path.display());
-            eprintln!("Error: {e}");
+use std::{fs, io, path::Path, thread, time::Duration};
 
-            if let Some(parent) = path.parent() {
-                let output = Command::new("ls")
-                    .arg("-ltr")
-                    .arg(parent)
-                    .output()
-                    .unwrap_or_else(|_| panic!("Failed to run ls on {}", parent.display()));
+pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
+    let max_retries = 10;
+    let retry_delay = Duration::from_secs(1);
+    let mut last_err: Option<io::Error> = None;
+    for attempt in 1..=max_retries {
+        match fs::read_to_string(path) {
+            Ok(contents) => return Ok(contents),
+            Err(e) => {
                 eprintln!(
-                    "ls -ltr {}:\n{}",
-                    parent.display(),
-                    String::from_utf8_lossy(&output.stdout)
+                    "Attempt {attempt}/{max_retries}: Failed to read file '{}': {e}",
+                    path.display()
                 );
+                last_err = Some(e);
+                if attempt < max_retries {
+                    thread::sleep(retry_delay);
+                    continue;
+                }
             }
-
-            panic!("Failed to read log file {}", path.display());
         }
     }
+    Err(last_err.unwrap())
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -96,8 +94,8 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path);
+fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
+    let content = read_file_contents(path).unwrap();
 
     let mut result = BTreeMap::new();
 
