@@ -278,7 +278,11 @@ impl Compose {
 
     fn stop(&self) -> Result<()> {
         // The config settings are not needed when stopping a compose setup.
-        self.run("Stopping", &["down", "--timeout", "0", "--volumes"], None)
+        self.run(
+            "Stopping",
+            &["down", "--timeout", "0", "--volumes", "--remove-orphans"],
+            None,
+        )
     }
 
     fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {

@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   unit-mac:
-    runs-on: macos-14
+    runs-on: macos-14-xlarge
     timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
