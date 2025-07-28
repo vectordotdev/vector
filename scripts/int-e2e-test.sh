@@ -43,9 +43,6 @@ cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 START_RET=$?
 print_compose_logs_on_failure $START_RET
 
-# TODO this is arbitrary sleep. Investigate if it can be safely removed.
-sleep 15
-
 if [[ $START_RET -eq 0 ]]; then
   cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
   RET=$?
