@@ -1,11 +1,7 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
-use std::time::Duration;
 
-const MAXIMUM_WAITING_DURATION: Duration = Duration::from_secs(15);
 const EXPECTED_LOG_COUNT: usize = 100;
 
 fn log_output_dir() -> PathBuf {
@@ -27,29 +23,29 @@ fn vector_log_path() -> PathBuf {
     log_output_dir().join("vector-file-sink.log")
 }
 
-pub fn read_file_contents(path: &Path) -> String {
-    match std::fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(e) => {
-            eprintln!("Failed to read log file: {}", path.display());
-            eprintln!("Error: {e}");
+use std::{fs, io, path::Path, thread, time::Duration};
 
-            if let Some(parent) = path.parent() {
-                let output = Command::new("ls")
-                    .arg("-ltr")
-                    .arg(parent)
-                    .output()
-                    .unwrap_or_else(|_| panic!("Failed to run ls on {}", parent.display()));
+pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
+    let max_retries = 5;
+    let retry_delay = Duration::from_secs(2);
+    let mut last_err: Option<io::Error> = None;
+    for attempt in 1..=max_retries {
+        match fs::read_to_string(path) {
+            Ok(contents) => return Ok(contents),
+            Err(e) => {
                 eprintln!(
-                    "ls -ltr {}:\n{}",
-                    parent.display(),
-                    String::from_utf8_lossy(&output.stdout)
+                    "Attempt {attempt}/{max_retries}: Failed to read file '{}': {e}",
+                    path.display()
                 );
+                last_err = Some(e);
+                if attempt < max_retries {
+                    thread::sleep(retry_delay);
+                    continue;
+                }
             }
-
-            panic!("Failed to read log file {}", path.display());
         }
     }
+    Err(last_err.unwrap())
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -98,8 +94,8 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path);
+fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
+    let content = read_file_contents(path).unwrap();
 
     let mut result = BTreeMap::new();
 
@@ -160,30 +156,9 @@ fn read_log_records(path: &PathBuf) -> BTreeMap<u64, Value> {
     result
 }
 
-fn wait_for_container_healthy(container: &str, timeout: Duration) {
-    let start = std::time::Instant::now();
-    while start.elapsed() < timeout {
-        let output = std::process::Command::new("docker")
-            .args(["inspect", "--format", "{{.State.Health.Status}}", container])
-            .output()
-            .expect("Failed to run docker inspect");
-
-        let status = String::from_utf8_lossy(&output.stdout).trim().trim_matches('"').to_string();
-        if status == "healthy" {
-            return;
-        }
-
-        std::thread::sleep(std::time::Duration::from_millis(500));
-    }
-    panic!("Timed out waiting for container {} to become healthy", container);
-}
-
 /// # Panics
 /// After the timeout, this function will panic if both logs are not ready.
 fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    wait_for_container_healthy("opentelemetry-logs-vector", MAXIMUM_WAITING_DURATION);
-    wait_for_container_healthy("opentelemetry-logs-otel-collector-sink", MAXIMUM_WAITING_DURATION);
-
     let collector_logs = read_log_records(&collector_log_path());
     let vector_logs = read_log_records(&vector_log_path());
 
