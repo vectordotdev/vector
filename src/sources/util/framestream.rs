@@ -451,8 +451,10 @@ pub fn build_framestream_tcp_source(
         let connection_gauge = OpenGauge::new();
         let shutdown_clone = shutdown.clone();
 
-        let request_limiter =
-            RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+        let request_limiter = RequestLimiter::new(
+            MAX_IN_FLIGHT_EVENTS_TARGET,
+            frame_handler.max_frame_handling_tasks(),
+        );
 
         listener
             .accept_stream_limited(frame_handler.max_connections())
