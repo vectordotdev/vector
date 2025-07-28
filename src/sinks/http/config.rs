@@ -5,8 +5,9 @@ use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
+use crate::sinks::util::http::OrderedHeaderName;
 use hyper::Body;
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
@@ -62,7 +63,7 @@ pub struct HttpSinkConfig {
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub headers: Option<IndexMap<String, String>>,
+    pub headers: Option<BTreeMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -200,13 +201,13 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
 }
 
 pub(super) fn validate_headers(
-    headers: &IndexMap<String, String>,
+    headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
     let headers = crate::sinks::util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
-        if configures_auth && name == AUTHORIZATION {
+        if configures_auth && name.inner() == &AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
     }

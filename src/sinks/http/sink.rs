@@ -1,14 +1,14 @@
 //! Implementation of the `http` sink.
 
 use crate::sinks::{prelude::*, util::http::HttpRequest};
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 
 pub(super) struct HttpSink<S> {
     service: S,
     uri: Template,
-    headers: IndexMap<String, Template>,
+    headers: BTreeMap<String, Template>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
@@ -24,7 +24,7 @@ where
     pub(super) const fn new(
         service: S,
         uri: Template,
-        headers: IndexMap<String, Template>,
+        headers: BTreeMap<String, Template>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
@@ -89,7 +89,7 @@ where
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct PartitionKey {
     pub uri: String,
-    pub headers: IndexMap<String, String>,
+    pub headers: BTreeMap<String, String>,
 }
 
 impl std::hash::Hash for PartitionKey {
@@ -104,11 +104,11 @@ impl std::hash::Hash for PartitionKey {
 
 struct KeyPartitioner {
     uri: Template,
-    headers: IndexMap<String, Template>,
+    headers: BTreeMap<String, Template>,
 }
 
 impl KeyPartitioner {
-    const fn new(uri: Template, headers: IndexMap<String, Template>) -> Self {
+    const fn new(uri: Template, headers: BTreeMap<String, Template>) -> Self {
         Self { uri, headers }
     }
 }
@@ -130,7 +130,7 @@ impl Partitioner for KeyPartitioner {
             })
             .ok()?;
 
-        let mut headers = IndexMap::new();
+        let mut headers = BTreeMap::new();
         for (name, template) in &self.headers {
             let value = template
                 .render_string(event)

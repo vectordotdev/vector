@@ -6,10 +6,41 @@ use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, Sink};
 use headers::HeaderName;
 use http::{header, HeaderValue, Request, Response, StatusCode};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OrderedHeaderName(HeaderName);
+
+impl OrderedHeaderName {
+    pub fn new(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+
+    pub fn inner(&self) -> &HeaderName {
+        &self.0
+    }
+}
+
+impl From<HeaderName> for OrderedHeaderName {
+    fn from(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+}
+
+impl Ord for OrderedHeaderName {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.as_str().cmp(other.0.as_str())
+    }
+}
+
+impl PartialOrd for OrderedHeaderName {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 use hyper::{body, Body};
-use indexmap::IndexMap;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
+use std::collections::BTreeMap;
 use std::{
     fmt,
     future::Future,
@@ -615,11 +646,11 @@ pub struct RequestConfig {
         docs::additional_props_description = "An HTTP request header and its value. Supports both static strings and templated values."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
-    pub headers: IndexMap<String, String>,
+    pub headers: BTreeMap<String, String>,
 }
 
-fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter([
+fn headers_examples() -> BTreeMap<String, String> {
+    BTreeMap::<_, _>::from_iter([
         ("Accept".to_owned(), "text/plain".to_owned()),
         ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
         ("X-Event-Level".to_owned(), "{{level}}".to_owned()),
@@ -628,16 +659,16 @@ fn headers_examples() -> IndexMap<String, String> {
 }
 
 impl RequestConfig {
-    pub fn add_old_option(&mut self, headers: Option<IndexMap<String, String>>) {
+    pub fn add_old_option(&mut self, headers: Option<BTreeMap<String, String>>) {
         if let Some(headers) = headers {
             warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
             self.headers.extend(headers);
         }
     }
 
-    pub fn split_headers(&self) -> (IndexMap<String, String>, IndexMap<String, Template>) {
-        let mut static_headers = IndexMap::new();
-        let mut template_headers = IndexMap::new();
+    pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
+        let mut static_headers = BTreeMap::new();
+        let mut template_headers = BTreeMap::new();
 
         for (name, value) in &self.headers {
             match Template::try_from(value.as_str()) {
@@ -672,16 +703,16 @@ pub enum HeaderValidationError {
 }
 
 pub fn validate_headers(
-    headers: &IndexMap<String, String>,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
-    let mut validated_headers = IndexMap::new();
+    headers: &BTreeMap<String, String>,
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
+    let mut validated_headers = BTreeMap::new();
     for (name, value) in headers {
         let name = HeaderName::from_bytes(name.as_bytes())
             .with_context(|_| InvalidHeaderNameSnafu { name })?;
         let value = HeaderValue::from_bytes(value.as_bytes())
             .with_context(|_| InvalidHeaderValueSnafu { value })?;
 
-        validated_headers.insert(name, value);
+        validated_headers.insert(name.into(), value);
     }
 
     Ok(validated_headers)
