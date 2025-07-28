@@ -119,6 +119,7 @@ define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
 endef
 endif
 
+# docker container id file needs to live in the host machine and is later mounted into the container
 CIDFILE := $(shell mktemp -u /tmp/vector-environment-docker-cid.XXXXXX)
 
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
