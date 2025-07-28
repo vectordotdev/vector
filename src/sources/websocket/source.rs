@@ -180,6 +180,52 @@ impl WebSocketSource {
             .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
     }
 
+    async fn reconnect(
+        &self,
+        out: &mut SourceSender,
+        ws_sink: &mut WsSink,
+        ws_source: &mut WsStream,
+    ) -> Result<(), ()> {
+        info!("Reconnecting to WebSocket...");
+
+        let (new_sink, new_source) = self.connect(out).await?;
+
+        *ws_sink = new_sink;
+        *ws_source = new_source;
+
+        Ok(())
+    }
+
+    async fn connect(&self, out: &mut SourceSender) -> Result<(WsSink, WsStream), ()> {
+        let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
+
+        if self.config.initial_message.is_some() {
+            self.send_initial_message(&mut ws_sink, &mut ws_source, out)
+                .await?;
+        }
+
+        Ok((ws_sink, ws_source))
+    }
+
+    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), ()> {
+        let connect_future = self.params.connector.connect_backoff();
+        let timeout = self.config.connect_timeout_secs;
+
+        let ws_stream = time::timeout(timeout, connect_future).await.map_err(|_| {
+            let error = WsError::Io(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "Connection attempt timed out",
+            ));
+
+            emit!(WsConnectionError { error: error });
+        })?;
+
+        emit!(WsConnectionEstablished {});
+        let (sink, stream) = ws_stream.split();
+
+        Ok((Box::pin(sink), Box::pin(stream)))
+    }
+
     async fn send_initial_message(
         &self,
         ws_sink: &mut WsSink,
@@ -243,52 +289,6 @@ impl WebSocketSource {
             // Ignore other message types
             _ => Ok(()),
         }
-    }
-
-    async fn reconnect(
-        &self,
-        out: &mut SourceSender,
-        ws_sink: &mut WsSink,
-        ws_source: &mut WsStream,
-    ) -> Result<(), ()> {
-        info!("Reconnecting to WebSocket...");
-
-        let (new_sink, new_source) = self.connect(out).await?;
-
-        *ws_sink = new_sink;
-        *ws_source = new_source;
-
-        Ok(())
-    }
-
-    async fn connect(&self, out: &mut SourceSender) -> Result<(WsSink, WsStream), ()> {
-        let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
-
-        if self.config.initial_message.is_some() {
-            self.send_initial_message(&mut ws_sink, &mut ws_source, out)
-                .await?;
-        }
-
-        Ok((ws_sink, ws_source))
-    }
-
-    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), ()> {
-        let connect_future = self.params.connector.connect_backoff();
-        let timeout = self.config.connect_timeout_secs;
-
-        let ws_stream = time::timeout(timeout, connect_future).await.map_err(|_| {
-            let error = WsError::Io(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                "Connection attempt timed out",
-            ));
-
-            emit!(WsConnectionError { error: error });
-        })?;
-
-        emit!(WsConnectionEstablished {});
-        let (sink, stream) = ws_stream.split();
-
-        Ok((Box::pin(sink), Box::pin(stream)))
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
