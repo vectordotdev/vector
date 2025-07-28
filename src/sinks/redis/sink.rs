@@ -81,7 +81,7 @@ pub(super) enum RedisConnection {
     Sentinel {
         connection_recv: Receiver<RepairState>,
         connection_send: Sender<RepairState>,
-        // Background task that acts on `repair_state`.
+        // Background task that fixes the redis connection when it breaks
         repair_task: Arc<JoinHandle<()>>,
     },
 }
