@@ -29,15 +29,15 @@ pub(super) enum RepairState {
 }
 
 impl RepairState {
-    pub(super) fn needs_repair(&self) -> bool {
+    pub(super) const fn needs_repair(&self) -> bool {
         matches!(self, RepairState::Broken)
     }
 
-    pub(super) fn is_active(&self) -> bool {
+    pub(super) const fn is_active(&self) -> bool {
         matches!(self, RepairState::Active { .. })
     }
 
-    pub(super) fn get_active_state(&self) -> Option<&ConnectionStateInner> {
+    pub(super) const fn get_active_state(&self) -> Option<&ConnectionStateInner> {
         if let RepairState::Active { state } = self {
             Some(state)
         } else {
@@ -68,7 +68,7 @@ pub(super) struct ConnectionState {
 }
 
 impl ConnectionState {
-    pub fn new_no_generation(conn: ConnectionManager) -> Self {
+    pub const fn new_no_generation(conn: ConnectionManager) -> Self {
         Self {
             connection: conn,
             generation: None,
@@ -365,7 +365,7 @@ impl RetryLogic for RedisRetryLogic {
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
             ) {
-                self.connection.signal_broken(generation.clone());
+                self.connection.signal_broken(*generation);
             }
         }
     }
