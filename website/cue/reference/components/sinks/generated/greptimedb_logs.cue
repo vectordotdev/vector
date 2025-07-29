@@ -153,7 +153,8 @@ generated: components: sinks: greptimedb_logs: configuration: {
 			"""
 		required: false
 		type: object: {
-			examples: [{}]
+			examples: [{},
+			]
 			options: "*": {
 				description: "Extra header key-value pairs."
 				required:    true
