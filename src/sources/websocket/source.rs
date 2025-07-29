@@ -1,28 +1,39 @@
 use crate::vector_lib::codecs::StreamDecodingError;
-use chrono::Utc;
-use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
-use std::pin::Pin;
-use tokio::time;
-use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
-use tokio_util::codec::FramedRead;
-use vector_lib::{
-    config::LogNamespace,
-    event::{Event, LogEvent},
-    EstimatedJsonEncodedSizeOf,
-};
-
 use crate::{
     codecs::Decoder,
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
         ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionEstablished,
-        WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
+        WsConnectionFailedError, WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError,
+        WsSendError, PROTOCOL,
     },
     sources::websocket::config::WebSocketConfig,
     SourceSender,
 };
+use chrono::Utc;
+use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use snafu::Snafu;
+use std::pin::Pin;
+use tokio::time;
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
+use tokio_util::codec::FramedRead;
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
+use vector_lib::{
+    config::LogNamespace,
+    event::{Event, LogEvent},
+    EstimatedJsonEncodedSizeOf,
+};
+
+macro_rules! fail_with_event {
+    ($context:expr) => {{
+        emit!(WsConnectionFailedError {
+            error: Box::new($context.build())
+        });
+        return $context.fail();
+    }};
+}
 
 type WsSink = Pin<Box<dyn Sink<Message, Error = WsError> + Send>>;
 type WsStream = Pin<Box<dyn Stream<Item = Result<Message, WsError>> + Send>>;
@@ -38,12 +49,38 @@ pub(crate) struct WebSocketSource {
     params: WebSocketSourceParams,
 }
 
+#[derive(Debug, Snafu)]
+pub enum WebSocketSourceError {
+    #[snafu(display("Connection attempt timed out"))]
+    ConnectTimeout,
+
+    #[snafu(display("Server did not respond to the initial message in time"))]
+    InitialMessageTimeout,
+
+    #[snafu(display(
+        "The connection was closed after sending the initial message, but before a response."
+    ))]
+    ConnectionClosedPrematurely,
+
+    #[snafu(display("Connection closed by server with code '{}' and reason: '{}'", frame.code, frame.reason))]
+    RemoteClosed { frame: CloseFrame<'static> },
+
+    #[snafu(display("Connection closed by server without a close frame"))]
+    RemoteClosedEmpty,
+
+    #[snafu(display("Connection timed out while waiting for a pong response"))]
+    PongTimeout,
+
+    #[snafu(display("A WebSocket error occurred: {}", source))]
+    Tungstenite { source: WsError },
+}
+
 impl WebSocketSource {
     pub const fn new(config: WebSocketConfig, params: WebSocketSourceParams) -> Self {
         Self { config, params }
     }
 
-    pub async fn run(self, cx: SourceContext) -> Result<(), ()> {
+    pub async fn run(self, cx: SourceContext) -> Result<(), WebSocketSourceError> {
         let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
         let mut ping_manager = PingManager::new(&self.config);
 
@@ -65,14 +102,55 @@ impl WebSocketSource {
                 Some(msg_result) = ws_source.next() => {
                     match msg_result {
                         Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
-                        Err(e) => Err(e),
+                        Err(error) => {
+                            emit!(WsReceiveError { error: &error });
+                            Err(WebSocketSourceError::Tungstenite { source: error })
+                        }
                     }
                 }
             };
 
             if let Err(error) = result {
-                if is_closed(&error) {
-                    emit!(WsConnectionShutdown);
+                match error {
+                    WebSocketSourceError::RemoteClosed { frame } => {
+                        warn!(
+                            message = "Connection closed by server.",
+                            code = %frame.code,
+                            reason = %frame.reason
+                        );
+                        emit!(WsConnectionShutdown);
+                    }
+                    WebSocketSourceError::RemoteClosedEmpty => {
+                        warn!("Connection closed by server without a close frame.");
+                        emit!(WsConnectionShutdown);
+                    }
+                    WebSocketSourceError::PongTimeout => {
+                        error!("Disconnecting due to pong timeout.");
+                        emit!(WsReceiveError {
+                            error: &WsError::Io(std::io::Error::new(
+                                std::io::ErrorKind::TimedOut,
+                                "Pong timeout"
+                            ))
+                        });
+                        emit!(WsConnectionShutdown);
+                        return Err(error);
+                    }
+                    WebSocketSourceError::Tungstenite { source: ws_err } => {
+                        if is_closed(&ws_err) {
+                            emit!(WsConnectionShutdown);
+                        }
+                        error!(message = "WebSocket connection error.", error = %ws_err);
+                    }
+                    // These errors should only happen during `connect` or `reconnect`,
+                    // not in the main loop's result.
+                    WebSocketSourceError::ConnectTimeout
+                    | WebSocketSourceError::InitialMessageTimeout
+                    | WebSocketSourceError::ConnectionClosedPrematurely => {
+                        unreachable!(
+                            "Encountered a connection-time error during runtime: {:?}",
+                            error
+                        );
+                    }
                 }
                 if self
                     .reconnect(&mut out, &mut ws_sink, &mut ws_source)
@@ -91,7 +169,7 @@ impl WebSocketSource {
         msg: Message,
         ping_manager: &mut PingManager,
         out: &mut SourceSender,
-    ) -> Result<(), WsError> {
+    ) -> Result<(), WebSocketSourceError> {
         match msg {
             Message::Pong(_) => {
                 ping_manager.record_pong();
@@ -111,7 +189,7 @@ impl WebSocketSource {
                 Ok(())
             }
             Message::Ping(_) => Ok(()),
-            Message::Close(_) => Err(WsError::ConnectionClosed),
+            Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
                 warn!("Unsupported message type received: frame.");
                 Ok(())
@@ -183,7 +261,7 @@ impl WebSocketSource {
         out: &mut SourceSender,
         ws_sink: &mut WsSink,
         ws_source: &mut WsStream,
-    ) -> Result<(), ()> {
+    ) -> Result<(), WebSocketSourceError> {
         info!("Reconnecting to WebSocket...");
 
         let (new_sink, new_source) = self.connect(out).await?;
@@ -194,7 +272,10 @@ impl WebSocketSource {
         Ok(())
     }
 
-    async fn connect(&self, out: &mut SourceSender) -> Result<(WsSink, WsStream), ()> {
+    async fn connect(
+        &self,
+        out: &mut SourceSender,
+    ) -> Result<(WsSink, WsStream), WebSocketSourceError> {
         let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
 
         if self.config.initial_message.is_some() {
@@ -205,18 +286,22 @@ impl WebSocketSource {
         Ok((ws_sink, ws_source))
     }
 
-    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), ()> {
+    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), WebSocketSourceError> {
         let connect_future = self.params.connector.connect_backoff();
         let timeout = self.config.connect_timeout_secs;
 
-        let ws_stream = time::timeout(timeout, connect_future).await.map_err(|_| {
-            let error = WsError::Io(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                "Connection attempt timed out",
-            ));
-
-            emit!(WsConnectionError { error });
-        })?;
+        let ws_stream = match time::timeout(timeout, connect_future).await {
+            Ok(ws) => ws,
+            Err(_) => {
+                emit!(WsConnectionError {
+                    error: WsError::Io(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "Connection attempt timed out",
+                    ))
+                });
+                return Err(WebSocketSourceError::ConnectTimeout);
+            }
+        };
 
         emit!(WsConnectionEstablished {});
         let (sink, stream) = ws_stream.split();
@@ -229,34 +314,31 @@ impl WebSocketSource {
         ws_sink: &mut WsSink,
         ws_source: &mut WsStream,
         out: &mut SourceSender,
-    ) -> Result<(), ()> {
+    ) -> Result<(), WebSocketSourceError> {
         let initial_message = self.config.initial_message.as_ref().unwrap();
         ws_sink
             .send(Message::Text(initial_message.clone()))
             .await
-            .map_err(|e| error!("Failed to send initial message: {e}."))?;
+            .map_err(|error| {
+                emit!(WsSendError { error: &error });
+                WebSocketSourceError::Tungstenite { source: error }
+            })?;
 
         debug!("Sent initial message, awaiting response from server.");
 
-        let response_result =
-            time::timeout(self.config.initial_message_timeout_secs, ws_source.next())
-                .await
-                .map_err(|_| error!("Server did not respond to initial message within timeout."))?
-                .ok_or_else(|| error!("Connection closed after initial message without response."))?
-                .map_err(|e| error!("Error waiting for server response: {e}."));
+        let response =
+            match time::timeout(self.config.initial_message_timeout_secs, ws_source.next()).await {
+                Ok(Some(msg)) => msg,
+                Ok(None) => fail_with_event!(ConnectionClosedPrematurelySnafu),
+                Err(_) => fail_with_event!(InitialMessageTimeoutSnafu),
+            };
 
-        match response_result {
-            Ok(response) => self.handle_initial_response(response, out).await,
-            Err(_) => Err(()),
-        }
-    }
+        let message = response.map_err(|source| {
+            emit!(WsReceiveError { error: &source });
+            WebSocketSourceError::Tungstenite { source }
+        })?;
 
-    async fn handle_initial_response(
-        &self,
-        msg: Message,
-        out: &mut SourceSender,
-    ) -> Result<(), ()> {
-        match msg {
+        match message {
             Message::Text(txt) => {
                 self.process_message(&txt, WsKind::Text, out).await;
                 Ok(())
@@ -265,28 +347,39 @@ impl WebSocketSource {
                 self.process_message(&bin, WsKind::Binary, out).await;
                 Ok(())
             }
-            Message::Close(Some(frame)) => {
-                let error = WsError::ConnectionClosed;
-
-                emit!(WsReceiveError { error: &error });
-
-                error!(
-                    message = "Connection closed by server.",
-                    code = %frame.code,
-                    reason = %frame.reason,
-                );
-
-                Err(())
-            }
-            Message::Close(None) => {
-                let error = WsError::ConnectionClosed;
-                emit!(WsReceiveError { error: &error });
-                error!("Connection closed without a frame.");
-                Err(())
-            }
-            // Ignore other message types
+            Message::Close(frame) => self.handle_close_frame(frame),
             _ => Ok(()),
         }
+    }
+
+    fn handle_close_frame(
+        &self,
+        frame: Option<CloseFrame<'_>>,
+    ) -> Result<(), WebSocketSourceError> {
+        let (error_message, specific_error) = match frame {
+            Some(frame) => {
+                let msg = format!(
+                    "Connection closed by server with code '{}' and reason: '{}'",
+                    frame.code, frame.reason
+                );
+                let err = WebSocketSourceError::RemoteClosed {
+                    frame: frame.into_owned(),
+                };
+                (msg, err)
+            }
+            None => (
+                "Connection closed by server without a close frame".to_string(),
+                WebSocketSourceError::RemoteClosedEmpty,
+            ),
+        };
+
+        let error = WsError::Io(std::io::Error::new(
+            std::io::ErrorKind::ConnectionAborted,
+            error_message,
+        ));
+        emit!(WsReceiveError { error: &error });
+
+        Err(specific_error)
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
@@ -322,22 +415,16 @@ impl PingManager {
         self.waiting_for_pong = false;
     }
 
-    async fn tick(&mut self, ws_sink: &mut WsSink) -> Result<(), WsError> {
+    async fn tick(&mut self, ws_sink: &mut WsSink) -> Result<(), WebSocketSourceError> {
         self.interval.tick().await;
 
         if self.waiting_for_pong {
-            let error = WsError::ConnectionClosed;
-            emit!(WsReceiveError { error: &error });
-            error!("Never received a pong response in time. Disconnecting.");
-            return Err(error);
+            return Err(WebSocketSourceError::PongTimeout);
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
             emit!(WsSendError { error: &error });
-            WsError::Io(std::io::Error::new(
-                std::io::ErrorKind::BrokenPipe,
-                "Websocket connection is closed.",
-            ))
+            WebSocketSourceError::Tungstenite { source: error }
         })?;
 
         self.waiting_for_pong = true;
@@ -573,7 +660,7 @@ mod integration_test {
 
         let mut config = make_config(&server_addr);
         config.initial_message = Some("hello, server!".to_string());
-        config.initial_message_timeout_secs = Duration::from_secs(2);
+        config.initial_message_timeout_secs = Duration::from_secs(1);
 
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
     }

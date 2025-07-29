@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use std::time::Duration;
@@ -10,7 +11,7 @@ use crate::{
     common::websocket::{ConnectSnafu, WebSocketConnector},
     config::{SourceConfig, SourceContext},
     serde::{default_decoding, default_framing_message_based},
-    sources,
+    sources::Source,
     tls::MaybeTlsSettings,
 };
 use vector_config::configurable_component;
@@ -143,8 +144,8 @@ impl_generate_config_from_default!(WebSocketConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket")]
-impl SourceConfig for super::config::WebSocketConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+impl SourceConfig for WebSocketConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         let connector =
@@ -163,7 +164,7 @@ impl SourceConfig for super::config::WebSocketConfig {
 
         let source = WebSocketSource::new(self.clone(), params);
 
-        Ok(Box::pin(source.run(cx)))
+        Ok(Box::pin(source.run(cx).map_err(|_err| ())))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
