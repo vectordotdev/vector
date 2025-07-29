@@ -959,7 +959,8 @@ test-utils = []
 
 # End-to-End testing-related features
 all-e2e-tests = [
-  "e2e-tests-datadog"
+  "e2e-tests-datadog",
+  "e2e-tests-opentelemetry"
 ]
 
 e2e-tests-datadog = [
@@ -967,6 +968,15 @@ e2e-tests-datadog = [
   "sinks-datadog_logs",
   "sinks-datadog_metrics",
   "dep:async-compression"
+]
+
+e2e-tests-opentelemetry = [
+  "sources-opentelemetry",
+  "sinks-opentelemetry",
+  "sources-internal_metrics",
+  "transforms-remap",
+  "sinks-console",
+  "sinks-file"
 ]
 
 vector-api-tests = [
