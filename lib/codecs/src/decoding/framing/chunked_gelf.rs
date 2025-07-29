@@ -67,7 +67,7 @@ pub struct ChunkedGelfDecoderOptions {
     /// be dropped. If this option is not set, the decoder does not limit the length of messages and
     /// the per-message memory is unbounded.
     ///
-    /// Note that a message can be composed of multiple chunks and this limit is applied to the whole
+    /// **Note**: A message can be composed of multiple chunks and this limit is applied to the whole
     /// message, not to individual chunks.
     ///
     /// This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
