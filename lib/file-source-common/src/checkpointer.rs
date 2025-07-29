@@ -499,8 +499,8 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(ignore_before);
 
-            assert_eq!(chkptr.get_checkpoint(newer.0), Some(position));
             assert_eq!(chkptr.get_checkpoint(newish.0), Some(position));
+            assert_eq!(chkptr.get_checkpoint(newer.0), Some(position));
             assert_eq!(chkptr.get_checkpoint(oldish.0), None);
             assert_eq!(chkptr.get_checkpoint(older.0), None);
         }
