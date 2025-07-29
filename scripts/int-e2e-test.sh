@@ -21,17 +21,8 @@ TEST_NAME=$2
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
 
-  if [[ $LAST_RETURN_CODE -ne 0 ]]; then
-    case "$TEST_TYPE" in
-      int) TYPE_DIR="integration" ;;
-      e2e) TYPE_DIR="e2e" ;;
-      *) TYPE_DIR="" ;;
-    esac
-
-    if [[ -n "$TYPE_DIR" ]]; then
-      local COMPOSE_DIR="${SCRIPT_DIR}/${TYPE_DIR}/${TEST_NAME}"
-      (docker compose -f "${COMPOSE_DIR}/compose.yaml" logs) || echo "Failed to collect logs"
-    fi
+  if [[ $LAST_RETURN_CODE -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
+      (docker compose --project-name "${TEST_NAME}" logs) || echo "Failed to collect logs"
   fi
 }
 
@@ -42,9 +33,6 @@ fi
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
 START_RET=$?
 print_compose_logs_on_failure $START_RET
-
-# TODO this is arbitrary sleep. Investigate if it can be safely removed.
-sleep 15
 
 if [[ $START_RET -eq 0 ]]; then
   cargo vdev -v "${TEST_TYPE}" test --retries 2 -a "${TEST_NAME}"
