@@ -248,11 +248,6 @@ impl MetricEntry {
             None => false,
         }
     }
-
-    /// Gets the total memory size of this entry including the series.
-    pub fn total_size_with_series(&self, series: &MetricSeries) -> usize {
-        self.allocated_bytes() + series.allocated_bytes()
-    }
 }
 
 /// Configuration for capacity-based eviction (memory and/or entry count limits).
@@ -281,17 +276,12 @@ impl CapacityPolicy {
         self.current_memory
     }
 
-    /// Updates memory tracking when an entry is added.
-    const fn add_memory(&mut self, bytes: usize) {
-        self.current_memory = self.current_memory.saturating_add(bytes);
-    }
-
     /// Updates memory tracking when an entry is removed.
     const fn remove_memory(&mut self, bytes: usize) {
         self.current_memory = self.current_memory.saturating_sub(bytes);
     }
 
-    /// Updates memory tracking when an entry is replaced.
+    /// Updates memory tracking.
     const fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
         self.current_memory = self
             .current_memory
@@ -320,6 +310,30 @@ impl CapacityPolicy {
     /// Returns true if any limits are currently exceeded.
     const fn needs_eviction(&self, entry_count: usize) -> bool {
         self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
+    }
+
+    /// Gets the total memory size of entry/series, including LRU cache overhead.
+    pub fn entry_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
+        // Content size: The actual memory used by the entry and series
+        let content_size = entry.allocated_bytes() + series.allocated_bytes();
+
+        // LRU Cache Overhead calculation:
+        // 1. HashMap entry in KeyMap:
+        //    - KeyRef (pointer to key): 8 bytes
+        //    - NodeRef (pointer to node): 8 bytes
+        //    - Hash value: 8 bytes
+        //    - Alignment/padding: ~8 bytes
+        // 2. LruEntry node:
+        //    - Key (pointer to actual key): 8 bytes
+        //    - Val (pointer to actual value): 8 bytes
+        //    - Next pointer: 8 bytes
+        //    - Prev pointer: 8 bytes
+        // 3. HashMap capacity/bookkeeping: ~8 bytes per entry (amortized)
+
+        // Total overhead per entry: ~72 bytes
+        const LRU_OVERHEAD_PER_ENTRY: usize = 72;
+
+        content_size + LRU_OVERHEAD_PER_ENTRY
     }
 }
 
@@ -460,7 +474,7 @@ impl MetricSet {
         // Keep evicting until we're within limits
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
-                let freed_memory = entry.total_size_with_series(&series);
+                let freed_memory = capacity_policy.entry_size(&series, &entry);
                 capacity_policy.remove_memory(freed_memory);
             } else {
                 break; // No more entries to evict
@@ -504,8 +518,8 @@ impl MetricSet {
         // Remove expired entries and update memory tracking
         for series in expired_keys {
             if let Some(entry) = self.inner.pop(&series) {
-                let freed_memory = entry.total_size_with_series(&series);
                 if let Some(ref mut capacity_policy) = self.capacity_policy {
+                    let freed_memory = capacity_policy.entry_size(&series, &entry);
                     capacity_policy.remove_memory(freed_memory);
                 }
             }
@@ -514,29 +528,21 @@ impl MetricSet {
 
     /// Internal insert that updates memory tracking and enforces limits.
     fn insert_with_tracking(&mut self, series: MetricSeries, entry: MetricEntry) {
-        let entry_size = entry.total_size_with_series(&series);
+        let Some(ref mut capacity_policy) = self.capacity_policy else {
+            self.inner.put(series, entry);
+            return; // No capacity limits configured, return immediately
+        };
 
+        // Update memory tracking in capacity policy
+        let entry_size = capacity_policy.entry_size(&series, &entry);
         // Check if this is replacing an existing entry
         let existing_size = if let Some(existing) = self.inner.peek(&series) {
-            existing.total_size_with_series(&series)
+            capacity_policy.entry_size(&series, existing)
         } else {
             0
         };
-
-        // Insert the entry
         self.inner.put(series, entry);
-
-        // Update memory tracking in capacity policy
-        if let Some(ref mut capacity_policy) = self.capacity_policy {
-            if existing_size > 0 {
-                // Replacing existing entry
-                capacity_policy.replace_memory(existing_size, entry_size);
-            } else {
-                // New entry
-                capacity_policy.add_memory(entry_size);
-            }
-        }
-
+        capacity_policy.replace_memory(existing_size, entry_size);
         // Enforce limits after insertion
         self.enforce_capacity_policy();
     }
@@ -681,13 +687,15 @@ impl MetricSet {
     /// Removes a series from the cache.
     ///
     /// If the series existed and was removed, returns true.  Otherwise, false.
-    pub fn remove(&mut self, series: &MetricSeries) {
+    pub fn remove(&mut self, series: &MetricSeries) -> bool {
         if let Some(entry) = self.inner.pop(series) {
-            let freed_memory = entry.total_size_with_series(series);
             if let Some(ref mut capacity_policy) = self.capacity_policy {
+                let freed_memory = capacity_policy.entry_size(series, &entry);
                 capacity_policy.remove_memory(freed_memory);
             }
+            return true;
         }
+        false
     }
 }
 
