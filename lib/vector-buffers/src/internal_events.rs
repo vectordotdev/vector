@@ -163,8 +163,8 @@ registered_event! {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
     use super::*;
+    use std::sync::Mutex;
     use std::thread;
 
     static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
