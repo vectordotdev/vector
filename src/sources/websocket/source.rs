@@ -307,8 +307,7 @@ impl WebSocketSource {
 
 struct PingManager {
     interval: PingInterval,
-    timeout: Option<NonZeroU64>,
-    last_pong: Instant,
+    waiting_for_pong: bool,
     message: Message,
 }
 
@@ -322,25 +321,23 @@ impl PingManager {
 
         Self {
             interval: PingInterval::new(config.common.ping_interval.map(u64::from)),
-            timeout: config.common.ping_timeout,
-            last_pong: Instant::now(),
+            waiting_for_pong: false,
             message: ping_message,
         }
     }
 
     fn record_pong(&mut self) {
-        self.last_pong = Instant::now();
+        self.waiting_for_pong = false;
     }
 
     async fn tick(&mut self, ws_sink: &mut WsSink) -> Result<(), WsError> {
         self.interval.tick().await;
 
-        if let Some(timeout) = self.timeout {
-            if self.last_pong.elapsed() > Duration::from_secs(timeout.get()) {
-                let error = WsError::ConnectionClosed;
-                emit!(WsReceiveError { error: &error });
-                return Err(error);
-            }
+        if self.waiting_for_pong {
+            let error = WsError::ConnectionClosed;
+            emit!(WsReceiveError { error: &error });
+            error!("Never received a pong response in time. Disconnecting.");
+            return Err(error);
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
@@ -349,7 +346,10 @@ impl PingManager {
                 std::io::ErrorKind::BrokenPipe,
                 "Websocket connection is closed.",
             ))
-        })
+        })?;
+
+        self.waiting_for_pong = true;
+        Ok(())
     }
 }
 
