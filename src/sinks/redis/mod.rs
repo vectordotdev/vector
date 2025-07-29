@@ -44,6 +44,12 @@ pub enum DataType {
     ///
     /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
+
+    /// The Redis `stream` type.
+    ///
+    /// Redis streams are an append-only log data structure that can be used for messaging,
+    /// event sourcing, and other use cases requiring ordered, persistent message storage.
+    Stream(Option<usize>),
 }
 
 /// Wrapper for an `Event` that also stored the rendered key.

@@ -11,7 +11,7 @@ use crate::event::{
     BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent,
 };
 
-use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig};
+use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig, StreamOption};
 use crate::{
     sinks::prelude::*,
     test_util::{
@@ -46,6 +46,7 @@ async fn redis_sink_list_lpush() {
         list_option: Some(ListOption {
             method: Method::LPush,
         }),
+        stream_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -110,6 +111,7 @@ async fn redis_sink_list_rpush() {
         list_option: Some(ListOption {
             method: Method::RPush,
         }),
+        stream_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -187,6 +189,7 @@ async fn redis_sink_channel() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
         list_option: None,
+        stream_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -262,6 +265,7 @@ async fn redis_sink_channel_data_volume_tags() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
         list_option: None,
+        stream_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -311,6 +315,7 @@ async fn redis_sink_metrics() {
         list_option: Some(ListOption {
             method: Method::RPush,
         }),
+        stream_option: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -405,6 +410,7 @@ async fn redis_sink_traces() {
             list_option: Some(ListOption {
                 method: Method::RPush,
             }),
+            stream_option: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
@@ -453,4 +459,182 @@ async fn redis_sink_traces() {
         assert_eq!(json["service"], "redis_test");
     })
     .await;
+}
+
+#[tokio::test]
+async fn redis_sink_stream() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-stream-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(100..500);
+    debug!("Test events num: {}.", num_events);
+
+    let cnf = RedisSinkConfig {
+        endpoint: redis_server(),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::Stream,
+        list_option: None,
+        stream_option: None,
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        acknowledgements: Default::default(),
+    };
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let s: String = i.to_string();
+        let e = LogEvent::from(s);
+        events.push(e.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events.
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    // Use raw Redis client for stream operations
+    let mut conn = redis::Client::open(redis_server())
+        .unwrap()
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
+
+    let key_exists: bool = conn.exists(key.clone().to_string()).await.unwrap();
+    debug!("Test key: {} exists: {}.", key, key_exists);
+    assert!(key_exists);
+
+    let xlen: usize = redis::cmd("XLEN").arg(key.clone().to_string()).query_async(&mut conn).await.unwrap();
+    debug!("Test key: {} len: {}.", key, xlen);
+    assert_eq!(xlen, num_events);
+
+    // Read all events from the stream
+    let stream_entries: Vec<(String, Vec<(String, Vec<(String, String)>)>)> = redis::cmd("XREAD")
+        .arg("STREAMS")
+        .arg(key.clone().to_string())
+        .arg("0")
+        .query_async(&mut conn)
+        .await
+        .unwrap();
+
+    assert_eq!(stream_entries.len(), 1);
+    let (_, entries) = &stream_entries[0];
+    assert_eq!(entries.len(), num_events);
+
+    // Verify the content of each event
+    for (i, (_, fields)) in entries.iter().enumerate() {
+        let e: &LogEvent = events.get(i).unwrap().as_log();
+        let s = serde_json::to_string(e).unwrap_or_default();
+
+        // Find the "data" field in the stream entry
+        let data_field = fields.iter().find(|(k, _)| k == "data").unwrap();
+        assert_eq!(data_field.1, s);
+    }
+}
+
+#[tokio::test]
+async fn redis_sink_stream_with_max_length() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-stream-maxlen-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let max_length = 10;
+    let num_events = 20; // More events than max_length to test trimming
+    debug!(
+        "Test events num: {}, max_length: {}.",
+        num_events, max_length
+    );
+
+    let cnf = RedisSinkConfig {
+        endpoint: redis_server(),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::Stream,
+        list_option: None,
+        stream_option: Some(StreamOption {
+            max_length: Some(max_length),
+        }),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        acknowledgements: Default::default(),
+    };
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let s: String = i.to_string();
+        let e = LogEvent::from(s);
+        events.push(e.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events.
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    // Use raw Redis client for stream operations
+    let mut conn = redis::Client::open(redis_server())
+        .unwrap()
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
+
+    let key_exists: bool = conn.exists(key.clone().to_string()).await.unwrap();
+    debug!("Test key: {} exists: {}.", key, key_exists);
+    assert!(key_exists);
+
+    let xlen: usize = redis::cmd("XLEN").arg(key.clone().to_string()).query_async(&mut conn).await.unwrap();
+    debug!("Test key: {} len: {}.", key, xlen);
+    // The stream should be trimmed to approximately max_length
+    assert!(xlen <= max_length);
+    assert!(xlen > 0);
+
+    // Read all events from the stream
+    let stream_entries: Vec<(String, Vec<(String, Vec<(String, String)>)>)> = redis::cmd("XREAD")
+        .arg("STREAMS")
+        .arg(key.clone().to_string())
+        .arg("0")
+        .query_async(&mut conn)
+        .await
+        .unwrap();
+
+    assert_eq!(stream_entries.len(), 1);
+    let (_, entries) = &stream_entries[0];
+    assert!(entries.len() <= max_length);
+    assert!(!entries.is_empty());
+
+    // Verify that we have the most recent events (highest numbers)
+    // Since we're using approximate trimming, we can't guarantee exact count
+    // but we can verify the last few events are present
+    let last_entries: Vec<usize> = entries
+        .iter()
+        .map(|(_, fields)| {
+            let data_field = fields.iter().find(|(k, _)| k == "data").unwrap();
+            data_field.1.parse::<usize>().unwrap()
+        })
+        .collect();
+
+    // The last entry should be the highest number we sent
+    assert_eq!(last_entries.last().unwrap(), &(num_events - 1));
 }
