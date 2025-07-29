@@ -11,7 +11,7 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use crate::FileFingerprint;
+use crate::{FileFingerprint, Fingerprinter};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
@@ -163,7 +163,7 @@ impl CheckpointsView {
         &self,
         path: &Path,
         fng: FileFingerprint,
-        fingerprinter: &crate::Fingerprinter,
+        fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
         if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path, fingerprint_buffer) {
@@ -286,7 +286,7 @@ impl Checkpointer {
         &mut self,
         path: &Path,
         fresh: FileFingerprint,
-        fingerprinter: &crate::Fingerprinter,
+        fingerprinter: &Fingerprinter,
         fingerprint_buffer: &mut Vec<u8>,
     ) {
         self.checkpoints
