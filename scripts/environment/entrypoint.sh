@@ -9,7 +9,7 @@ fi
 if [ -z "$HOSTNAME" ]; then
   echo "Failed to properly set HOSTNAME, cross may not work"
   # Fallback if everything else fails
-  HOSTNAME="$(hostname || echo init)"
+  HOSTNAME="vector-environment"
   export HOSTNAME
 fi
 
