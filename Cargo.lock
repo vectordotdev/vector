@@ -2643,6 +2643,32 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bf7af66b0989381bd0be551bd7cc91912a655a58c6918420c9527b1fd8b4679"
@@ -2967,6 +2993,19 @@ checksum = "7762d17f1241643615821a8455a0b2c3e803784b058693d990b11f2dce25a0ca"
 
 [[package]]
 name = "dashmap"
+version = "5.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -3228,7 +3267,7 @@ dependencies = [
 name = "dnsmsg-parser"
 version = "0.1.0"
 dependencies = [
- "criterion",
+ "criterion 0.6.0",
  "data-encoding",
  "hickory-proto",
  "snafu 0.8.6",
@@ -3767,8 +3806,9 @@ dependencies = [
  "bytes 1.10.1",
  "chrono",
  "crc",
- "criterion",
- "dashmap",
+ "criterion 0.6.0",
+ "dashmap 6.1.0",
+ "file-source-common",
  "flate2",
  "futures 0.3.31",
  "glob",
@@ -3784,6 +3824,29 @@ dependencies = [
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
+ "winapi",
+]
+
+[[package]]
+name = "file-source-common"
+version = "0.1.0"
+dependencies = [
+ "bstr 1.12.0",
+ "bytes 1.10.1",
+ "chrono",
+ "crc",
+ "dashmap 5.5.3",
+ "flate2",
+ "glob",
+ "libc",
+ "quickcheck",
+ "scan_fmt",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "tempfile",
+ "tracing 0.1.41",
+ "vector-common",
  "winapi",
 ]
 
@@ -4205,7 +4268,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbe789d04bf14543f03c4b60cd494148aa79438c8440ae7d81a7778147745c3"
 dependencies = [
  "cfg-if",
- "dashmap",
+ "dashmap 6.1.0",
  "futures-sink",
  "futures-timer",
  "futures-util",
@@ -4297,7 +4360,7 @@ name = "greptimedb-ingester"
 version = "0.1.0"
 source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust?rev=f7243393808640f5123b0d5b7b798da591a4df6e#f7243393808640f5123b0d5b7b798da591a4df6e"
 dependencies = [
- "dashmap",
+ "dashmap 6.1.0",
  "derive_builder",
  "enum_dispatch",
  "futures 0.3.31",
@@ -4838,7 +4901,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -5234,6 +5297,36 @@ checksum = "daca1df1c957320b2cf139ac61e7bd64fed304c5040df000a745aa1de3b4ef71"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "ifile-source"
+version = "0.1.0"
+dependencies = [
+ "bstr 1.12.0",
+ "bytes 1.10.1",
+ "chrono",
+ "crc",
+ "criterion 0.5.1",
+ "dashmap 6.1.0",
+ "file-source-common",
+ "flate2",
+ "futures 0.3.31",
+ "glob",
+ "indexmap 2.10.0",
+ "libc",
+ "notify",
+ "quickcheck",
+ "scan_fmt",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.41",
+ "vector-common",
+ "vector-config",
+ "winapi",
 ]
 
 [[package]]
@@ -8028,7 +8121,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -8074,7 +8167,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.95",
  "quote 1.0.40",
  "syn 2.0.104",
@@ -11293,8 +11386,8 @@ dependencies = [
 name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
- "criterion",
- "dashmap",
+ "criterion 0.6.0",
+ "dashmap 6.1.0",
  "mock_instant",
  "tracing 0.1.41",
  "tracing-core 0.1.33",
@@ -11857,7 +11950,7 @@ dependencies = [
  "clap",
  "colored",
  "console-subscriber",
- "criterion",
+ "criterion 0.6.0",
  "crossterm 0.29.0",
  "csv",
  "databend-client",
@@ -12043,7 +12136,7 @@ dependencies = [
  "bytes 1.10.1",
  "clap",
  "crc32fast",
- "criterion",
+ "criterion 0.6.0",
  "crossbeam-queue",
  "crossbeam-utils",
  "derivative",
@@ -12162,7 +12255,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "chrono-tz",
- "criterion",
+ "criterion 0.6.0",
  "crossbeam-utils",
  "derivative",
  "dyn-clone",
@@ -12237,6 +12330,8 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
+ "file-source-common",
+ "ifile-source",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
