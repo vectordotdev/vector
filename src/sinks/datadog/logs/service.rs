@@ -20,7 +20,10 @@ use vector_lib::stream::DriverResponse;
 use crate::{
     http::HttpClient,
     sinks::util::{retries::RetryLogic, Compression},
-    sinks::{datadog::DatadogApiError, util::http::{validate_headers, OrderedHeaderName}},
+    sinks::{
+        datadog::DatadogApiError,
+        util::http::{validate_headers, OrderedHeaderName},
+    },
 };
 
 #[derive(Debug, Default, Clone)]
