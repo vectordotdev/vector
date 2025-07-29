@@ -433,7 +433,7 @@ mod test {
 
     use super::{Checkpoint, Checkpointer, CHECKPOINT_FILE_NAME, TMP_FILE_NAME};
     use crate::fingerprinter::FINGERPRINT_CRC;
-    use crate::{FileFingerprint, FingerprintStrategy, Fingerprinter};
+    use crate::{FileFingerprint, FilePosition, FingerprintStrategy, Fingerprinter};
 
     #[test]
     fn test_checkpointer_basics() {
@@ -444,7 +444,7 @@ mod test {
             FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
-            let position: u64 = 1234;
+            let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             let mut chkptr = Checkpointer::new(data_dir.path());
             assert_eq!(
