@@ -351,6 +351,7 @@ mod integration_test {
     use crate::test_util::components::run_and_assert_source_error;
     use crate::{
         common::websocket::WebSocketCommonConfig,
+        sources::websocket::config::PongMessage,
         sources::websocket::config::WebSocketConfig,
         test_util::{
             components::{run_and_assert_source_compliance, SOURCE_TAGS},
@@ -601,8 +602,10 @@ mod integration_test {
         let server_addr = start_unresponsive_server().await;
 
         let mut config = make_config(&server_addr);
-        config.common.ping_interval = NonZeroU64::new(1);
+        config.common.ping_interval = NonZeroU64::new(3);
         config.common.ping_timeout = NonZeroU64::new(1);
+        config.ping_message = Some("ping".to_string());
+        config.pong_message = Some(PongMessage::Simple("pong".to_string()));
 
         // The source should fail because the server never sends a pong.
         run_and_assert_source_error(config, Duration::from_secs(5), &SOURCE_TAGS).await;
