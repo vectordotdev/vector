@@ -1,6 +1,8 @@
 use std::io::Error;
 
 fn main() -> Result<(), Error> {
+    println!("cargo:rerun-if-changed=src/proto/opentelemetry-proto");
+
     tonic_build::configure()
         .build_client(true)
         .build_server(true)
