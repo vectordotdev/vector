@@ -8625,6 +8625,7 @@ dependencies = [
  "num-bigint",
  "percent-encoding",
  "pin-project-lite",
+ "rand 0.9.1",
  "ryu",
  "socket2 0.5.10",
  "tokio",
