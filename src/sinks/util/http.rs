@@ -40,8 +40,8 @@ impl PartialOrd for OrderedHeaderName {
 use hyper::{body, Body};
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
-use std::collections::BTreeMap;
 use std::{
+    collections::BTreeMap,
     fmt,
     future::Future,
     hash::Hash,
@@ -643,19 +643,20 @@ pub struct RequestConfig {
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and its value. Supports both static strings and templated values."
+        docs::additional_props_description = "An HTTP request header and its value. Both header names and values support templating with event data."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
     pub headers: BTreeMap<String, String>,
 }
 
 fn headers_examples() -> BTreeMap<String, String> {
-    BTreeMap::<_, _>::from_iter([
-        ("Accept".to_owned(), "text/plain".to_owned()),
-        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-        ("X-Event-Level".to_owned(), "{{level}}".to_owned()),
-        ("X-Event-Timestamp".to_owned(), "{{timestamp}}".to_owned()),
-    ])
+    btreemap! {
+        "Accept" => "text/plain",
+        "X-My-Custom-Header" => "A-Value",
+        "X-Event-Level" => "{{level}}",
+        "X-Event-Timestamp" => "{{timestamp}}",
+        "{{header_name}}" => "{{header_value}}"
+    }
 }
 
 impl RequestConfig {

@@ -1,5 +1,6 @@
 //! Service implementation for the `http` sink.
 
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use bytes::Bytes;
@@ -7,7 +8,6 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_TYPE},
     HeaderName, HeaderValue, Method, Request,
 };
-use std::collections::BTreeMap;
 
 use crate::{
     http::{Auth, MaybeAuth},

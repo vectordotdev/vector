@@ -86,20 +86,10 @@ where
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash)]
 pub struct PartitionKey {
     pub uri: String,
     pub headers: BTreeMap<String, String>,
-}
-
-impl std::hash::Hash for PartitionKey {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.uri.hash(state);
-        for (k, v) in &self.headers {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
 }
 
 struct KeyPartitioner {
