@@ -105,7 +105,7 @@ where
 
         let app_name = crate::get_app_name();
         let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("{}/{}", app_name, version))
+        let user_agent = HeaderValue::from_str(&format!("{app_name}/{version}"))
             .expect("Invalid header value for user-agent!");
 
         Ok(HttpClient {
@@ -363,7 +363,7 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
         // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
         // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
         // client anyways.
-        s => panic!("invalid URI scheme for HTTP client: {}", s),
+        s => panic!("invalid URI scheme for HTTP client: {s}"),
     })
 }
 
@@ -569,6 +569,73 @@ where
     }
 }
 
+/// The type of a query parameter's value, determines if it's treated as a plain string or a VRL expression.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ParamType {
+    /// The parameter value is a plain string.
+    #[default]
+    String,
+    /// The parameter value is a VRL expression that will be evaluated before each request.
+    Vrl,
+}
+
+impl ParamType {
+    fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// Represents a query parameter value, which can be a simple string or a typed object
+/// indicating whether the value is a string or a VRL expression.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum ParameterValue {
+    /// A simple string value. For backwards compatibility.
+    String(String),
+    /// A value with an explicit type.
+    Typed {
+        /// The raw value of the parameter.
+        value: String,
+        /// The type of the parameter, indicating how the `value` should be treated.
+        #[serde(
+            default,
+            skip_serializing_if = "ParamType::is_default",
+            rename = "type"
+        )]
+        r#type: ParamType,
+    },
+}
+
+impl ParameterValue {
+    /// Returns true if the parameter is a VRL expression.
+    pub const fn is_vrl(&self) -> bool {
+        match self {
+            ParameterValue::String(_) => false,
+            ParameterValue::Typed { r#type, .. } => matches!(r#type, ParamType::Vrl),
+        }
+    }
+
+    /// Returns the raw string value of the parameter.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn value(&self) -> &str {
+        match self {
+            ParameterValue::String(s) => s,
+            ParameterValue::Typed { value, .. } => value,
+        }
+    }
+
+    /// Consumes the `ParameterValue` and returns the owned raw string value.
+    pub fn into_value(self) -> String {
+        match self {
+            ParameterValue::String(s) => s,
+            ParameterValue::Typed { value, .. } => value,
+        }
+    }
+}
+
 /// Configuration of the query parameter value for HTTP requests.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -576,23 +643,22 @@ where
 #[configurable(metadata(docs::enum_tag_description = "Query parameter value"))]
 pub enum QueryParameterValue {
     /// Query parameter with single value
-    SingleParam(String),
+    SingleParam(ParameterValue),
     /// Query parameter with multiple values
-    MultiParams(Vec<String>),
+    MultiParams(Vec<ParameterValue>),
 }
 
 impl QueryParameterValue {
-    /// Returns an iterator over string slices of the parameter values
-    pub fn iter(&self) -> std::iter::Map<std::slice::Iter<'_, String>, fn(&String) -> &str> {
+    /// Returns an iterator over the contained `ParameterValue`s.
+    pub fn iter(&self) -> impl Iterator<Item = &ParameterValue> {
         match self {
             QueryParameterValue::SingleParam(param) => std::slice::from_ref(param).iter(),
             QueryParameterValue::MultiParams(params) => params.iter(),
         }
-        .map(String::as_str)
     }
 
-    /// Convert to Vec<String> for owned iteration
-    fn into_vec(self) -> Vec<String> {
+    /// Convert to `Vec<ParameterValue>` for owned iteration.
+    fn into_vec(self) -> Vec<ParameterValue> {
         match self {
             QueryParameterValue::SingleParam(param) => vec![param],
             QueryParameterValue::MultiParams(params) => params,
@@ -600,20 +666,10 @@ impl QueryParameterValue {
     }
 }
 
-// Implement IntoIterator for &QueryParameterValue
-impl<'a> IntoIterator for &'a QueryParameterValue {
-    type Item = &'a str;
-    type IntoIter = std::iter::Map<std::slice::Iter<'a, String>, fn(&String) -> &str>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
 // Implement IntoIterator for owned QueryParameterValue
 impl IntoIterator for QueryParameterValue {
-    type Item = String;
-    type IntoIter = std::vec::IntoIter<String>;
+    type Item = ParameterValue;
+    type IntoIter = std::vec::IntoIter<ParameterValue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.into_vec().into_iter()
@@ -846,13 +902,13 @@ mod tests {
 
         // Responses generated before the client's max connection age has elapsed do not
         // include a `Connection: close` header in the response.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
 
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -861,7 +917,7 @@ mod tests {
         // The first response generated after the client's max connection age has elapsed should
         // include the `Connection: close` header.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -873,7 +929,7 @@ mod tests {
         // The next request should establish a new connection.
         // Importantly, this also confirms that each connection has its own independent
         // connection age timer.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();

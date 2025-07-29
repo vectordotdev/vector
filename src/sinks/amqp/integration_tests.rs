@@ -3,6 +3,7 @@ use crate::{
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
+    sinks::amqp::channel::new_channel_pool,
     template::{Template, UnsignedIntTemplate},
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -12,7 +13,7 @@ use crate::{
 };
 use config::AmqpPropertiesConfig;
 use futures::StreamExt;
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, time::Duration};
 use vector_lib::{config::LogNamespace, event::LogEvent};
 
 pub fn make_config() -> AmqpSinkConfig {
@@ -24,8 +25,7 @@ pub fn make_config() -> AmqpSinkConfig {
     let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
     let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
     let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-    config.connection.connection_string =
-        format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+    config.connection.connection_string = format!("amqp://{user}:{pass}@{host}:5672/{vhost}");
     config
 }
 
@@ -37,8 +37,8 @@ async fn healthcheck() {
     let mut config = make_config();
     config.exchange = Template::try_from(exchange.as_str()).unwrap();
     await_connection(&config.connection).await;
-    let (_conn, channel) = config.connection.connect().await.unwrap();
-    super::config::healthcheck(Arc::new(channel)).await.unwrap();
+    let channels = new_channel_pool(&config).unwrap();
+    super::config::healthcheck(channels).await.unwrap();
 }
 
 #[tokio::test]

@@ -129,7 +129,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
                         return Err(TopologyError::NextStageNotUsed { stage_idx });
                     }
                 }
-            };
+            }
 
             // Create the buffer usage handle for this stage and initialize it as we create the
             // sender/receiver.  This is slightly awkward since we just end up actually giving
@@ -193,7 +193,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
 
-        let memory_buffer = Box::new(MemoryBuffer::new(max_events));
+        let memory_buffer = Box::new(MemoryBuffer::with_max_events(max_events));
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
@@ -229,7 +229,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         when_full: WhenFull,
         usage_handle: BufferUsageHandle,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let memory_buffer = Box::new(MemoryBuffer::new(max_events));
+        let memory_buffer = Box::new(MemoryBuffer::with_max_events(max_events));
         let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
@@ -263,8 +263,10 @@ mod tests {
 
     use super::TopologyBuilder;
     use crate::{
-        topology::builder::TopologyError,
-        topology::test_util::{assert_current_send_capacity, Sample},
+        topology::{
+            builder::TopologyError,
+            test_util::{assert_current_send_capacity, Sample},
+        },
         variants::MemoryBuffer,
         WhenFull,
     };
@@ -273,7 +275,7 @@ mod tests {
     async fn single_stage_topology_block() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
         let result = builder.build(String::from("test"), Span::none()).await;
@@ -287,7 +289,7 @@ mod tests {
     async fn single_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
         );
         let result = builder.build(String::from("test"), Span::none()).await;
@@ -301,7 +303,7 @@ mod tests {
     async fn single_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
         );
         let result = builder.build(String::from("test"), Span::none()).await;
@@ -315,11 +317,11 @@ mod tests {
     async fn two_stage_topology_block() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
         let result = builder.build(String::from("test"), Span::none()).await;
@@ -333,11 +335,11 @@ mod tests {
     async fn two_stage_topology_drop_newest() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
         );
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
         let result = builder.build(String::from("test"), Span::none()).await;
@@ -351,11 +353,11 @@ mod tests {
     async fn two_stage_topology_overflow() {
         let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
         );
         builder.stage(
-            MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
+            MemoryBuffer::with_max_events(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
 

@@ -165,7 +165,7 @@ impl DnstapParser {
             }
         } else {
             emit!(DnstapParseWarning {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
+                error: format!("Unknown dnstap data type: {dnstap_data_type_id}")
             });
             need_raw_data = true;
         }
@@ -393,11 +393,10 @@ impl DnstapParser {
 
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
-
             let timestamp = Utc
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
-                .expect("invalid timestamp");
+                .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 DnstapParser::insert(event, prefix.clone(), timestamp_key, timestamp);
             }
@@ -991,8 +990,7 @@ fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
         Ok("INET6")
     } else {
         Err(Error::from(format!(
-            "Unknown socket family: {}",
-            socket_family
+            "Unknown socket family: {socket_family}"
         )))
     }
 }
@@ -1012,8 +1010,7 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
-            "Unknown socket protocol: {}",
-            socket_protocol
+            "Unknown socket protocol: {socket_protocol}"
         )))
     }
 }
@@ -1041,7 +1038,7 @@ fn to_dnstap_message_type(type_id: i32) -> String {
         12 => String::from("ToolResponse"),
         13 => String::from("UpdateQuery"),
         14 => String::from("UpdateResponse"),
-        _ => format!("Unknown dnstap message type: {}", type_id),
+        _ => format!("Unknown dnstap message type: {type_id}"),
     }
 }
 
@@ -1358,9 +1355,9 @@ mod tests {
         fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
             let mut event = LogEvent::default();
             let root = owned_value_path!();
-            let type_ids = HashSet::new();
+            let type_ids = HashSet::from([1]);
             DnstapParser::parse_dnstap_message_time(
-                &mut event, &root, time_sec, time_nsec, 0, None, &type_ids,
+                &mut event, &root, time_sec, time_nsec, 1, None, &type_ids,
             )
         }
         // okay case
@@ -1374,7 +1371,9 @@ mod tests {
         // overflow in add
         assert!(
             test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
-        )
+        );
+        // cannot be parsed by timestamp_opt
+        assert!(test_one_timestamp_parse(96, Some(1616928816)).is_err());
     }
 
     #[test]

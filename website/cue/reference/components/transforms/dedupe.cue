@@ -24,12 +24,18 @@ components: transforms: dedupe: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.dedupe.configuration
+	configuration: generated.components.transforms.dedupe.configuration
 
 	input: {
 		logs:    true
 		metrics: null
 		traces:  false
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
 	}
 
 	how_it_works: {

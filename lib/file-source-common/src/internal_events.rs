@@ -1,5 +1,7 @@
 use std::{io::Error, path::Path, time::Duration};
 
+use bytes::BytesMut;
+
 /// Every internal event in this crate has a corresponding
 /// method in this trait which should emit the event.
 pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
@@ -26,6 +28,13 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_files_open(&self, count: usize);
 
     fn emit_path_globbing_failed(&self, path: &Path, error: &Error);
+
+    fn emit_file_line_too_long(
+        &self,
+        truncated_bytes: &BytesMut,
+        configured_limit: usize,
+        encountered_size_so_far: usize,
+    );
 }
 
 /// Extended internal events for file sources with active/passive mode switching

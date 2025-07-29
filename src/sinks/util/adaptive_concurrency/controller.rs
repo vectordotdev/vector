@@ -105,7 +105,9 @@ impl<L> Controller<L> {
         }
     }
 
-    pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
+    pub(super) fn acquire(
+        &self,
+    ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
         Arc::clone(&self.semaphore).acquire()
     }
 
@@ -291,7 +293,6 @@ where
                     warn!(
                         message = "Unhandled error response.",
                         %error,
-                        internal_log_rate_limit = true
                     );
                     false
                 }

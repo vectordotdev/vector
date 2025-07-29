@@ -52,7 +52,7 @@ components: sources: postgresql_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.postgresql_metrics.configuration
+	configuration: generated.components.sources.postgresql_metrics.configuration
 
 	how_it_works: {
 		privileges: {

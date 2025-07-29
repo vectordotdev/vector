@@ -248,7 +248,7 @@ fn decode_trace_body(
     let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -274,7 +274,7 @@ fn decode_log_body(
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -299,7 +299,7 @@ fn decode_metrics_body(
     let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -367,7 +367,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
     } else {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
+            message: format!("{err:?}"),
             ..Default::default()
         });
 

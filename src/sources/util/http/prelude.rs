@@ -133,7 +133,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {
-                                a.handle_auth(addr.as_ref().map(|a| a.0).as_ref(), &headers)
+                                a.handle_auth(
+                                    addr.as_ref().map(|a| a.0).as_ref(),
+                                    &headers,
+                                    path.as_str(),
+                                )
                             })
                             .and_then(|()| self.decode(encoding_header.as_deref(), body))
                             .and_then(|body| {
@@ -177,7 +181,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 } else {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
-                        message: &format!("Internal error: {:?}", r)
+                        message: &format!("Internal error: {r:?}")
                     });
                     Err(r)
                 }

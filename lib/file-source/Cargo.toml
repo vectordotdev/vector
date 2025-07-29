@@ -39,12 +39,12 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "2.9.0"
+version = "2.10.0"
 default-features = false
 features = ["serde"]
 
 [dependencies.flate2]
-version = "1.0"
+version = "1.1"
 default-features = false
 features = ["rust_backend"]
 
@@ -74,7 +74,7 @@ default-features = false
 features = ["full"]
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.6"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

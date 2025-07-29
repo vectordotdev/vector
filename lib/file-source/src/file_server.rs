@@ -18,8 +18,9 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::FileWatcher, paths_provider::PathsProvider, Checkpointer, CheckpointsView,
-    ReadFrom,
+    file_watcher::{FileWatcher, RawLineResult},
+    paths_provider::PathsProvider,
+    Checkpointer, CheckpointsView, ReadFrom,
 };
 use file_source_common::{
     internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter,
@@ -263,7 +264,19 @@ where
 
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
-                while let Ok(Some(line)) = watcher.read_line() {
+                while let Ok(RawLineResult {
+                    raw_line: Some(line),
+                    discarded_for_size_and_truncated,
+                }) = watcher.read_line()
+                {
+                    discarded_for_size_and_truncated.iter().for_each(|buf| {
+                        self.emitter.emit_file_line_too_long(
+                            &buf.clone(),
+                            self.max_line_bytes,
+                            buf.len(),
+                        )
+                    });
+
                     let sz = line.bytes.len();
                     trace!(
                         message = "Read bytes.",

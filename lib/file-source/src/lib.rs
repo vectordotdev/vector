@@ -12,11 +12,9 @@ pub use file_source_common::{
     buffer,
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
     internal_events::FileSourceInternalEvents,
-    FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
+    FileFingerprint, FilePosition, FingerprintStrategy, Fingerprinter, PortableFileExt,
 };
 use vector_config::configurable_component;
-
-pub type FilePosition = u64;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum ReadFrom {

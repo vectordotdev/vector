@@ -51,8 +51,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({error})"),
         }
     }
 }
@@ -205,11 +205,11 @@ impl tokio_util::codec::Decoder for Framer {
     }
 }
 
-/// Deserializer configuration.
+/// Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+/// type (log, metric, trace).
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
-#[configurable(description = "Configures how events are decoded from raw bytes.")]
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for decoding events."))]
 pub enum DeserializerConfig {
     /// Uses the raw bytes as-is.
@@ -237,6 +237,8 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
     ///
+    /// This decoder can output all types of events (logs, metrics, traces).
+    ///
     /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -244,6 +246,8 @@ pub enum DeserializerConfig {
     Native,
 
     /// Decodes the raw bytes as [native JSON format][vector_native_json].
+    ///
+    /// This decoder can output all types of events (logs, metrics, traces).
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -464,6 +468,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.

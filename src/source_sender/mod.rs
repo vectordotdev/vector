@@ -1,12 +1,15 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{histogram, Histogram};
 use tracing::Span;
-use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
 use vector_lib::buffers::EventCount;
+use vector_lib::buffers::{
+    config::MemoryBufferSize,
+    topology::channel::{self, LimitedReceiver, LimitedSender},
+};
 use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(any(test, feature = "test-utils"))]
 use vector_lib::event::{into_event_stream, EventStatus};
@@ -247,7 +250,7 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = SourceSenderItem> + Unpin {
+    ) -> impl Stream<Item = SourceSenderItem> + Unpin + use<> {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
         let output_id = OutputId {
@@ -268,7 +271,7 @@ impl SourceSender {
     }
 
     /// Get a mutable reference to the default output, panicking if none exists.
-    fn default_output_mut(&mut self) -> &mut Output {
+    const fn default_output_mut(&mut self) -> &mut Output {
         self.default_output.as_mut().expect("no default output")
     }
 
@@ -339,11 +342,11 @@ impl UnsentEventCount {
         }
     }
 
-    fn decr(&mut self, count: usize) {
+    const fn decr(&mut self, count: usize) {
         self.count = self.count.saturating_sub(count);
     }
 
-    fn discard(&mut self) {
+    const fn discard(&mut self) {
         self.count = 0;
     }
 }
@@ -390,7 +393,7 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(n);
+        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
         (
             Self {
                 sender: tx,

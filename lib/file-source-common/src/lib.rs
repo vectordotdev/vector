@@ -15,3 +15,5 @@ pub use self::{
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     metadata_ext::PortableFileExt,
 };
+
+pub type FilePosition = u64;

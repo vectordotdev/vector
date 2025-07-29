@@ -400,10 +400,18 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{fs, io::Write};
+    use std::{
+        fs,
+        io::{Error, Write},
+        path::Path,
+        time::Duration,
+    };
 
+    use bytes::BytesMut;
     use flate2::write::GzEncoder;
     use tempfile::tempdir;
+
+    use crate::internal_events::FileSourceInternalEvents;
 
     use super::{FingerprintStrategy, Fingerprinter};
 
@@ -462,5 +470,45 @@ mod test {
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
                 .unwrap(),
         );
+    }
+    #[derive(Clone)]
+    struct NoErrors;
+
+    impl FileSourceInternalEvents for NoErrors {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            panic!();
+        }
+
+        fn emit_file_checkpoint_write_error(&self, _: Error) {
+            panic!();
+        }
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
     }
 }

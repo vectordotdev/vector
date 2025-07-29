@@ -321,7 +321,7 @@ impl Encoder<Event> for CefSerializer {
                 continue;
             }
             let value = escape_extension(&value);
-            formatted_extensions.push(format!("{}={}", extension, value));
+            formatted_extensions.push(format!("{extension}={value}"));
         }
 
         buffer.write_fmt(format_args!(
@@ -368,7 +368,7 @@ fn escape_extension(s: &str) -> String {
 
 fn escape_special_chars(s: &str, extra_char: char) -> String {
     s.replace('\\', r#"\\"#)
-        .replace(extra_char, &format!(r#"\{}"#, extra_char))
+        .replace(extra_char, &format!(r#"\{extra_char}"#))
 }
 
 fn validate_length(field: &str, field_name: &str, max_length: usize) -> Result<String, BuildError> {

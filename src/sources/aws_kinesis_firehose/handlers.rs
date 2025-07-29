@@ -78,20 +78,21 @@ pub(super) async fn firehose(
                         events.estimated_json_encoded_size_of(),
                     ));
 
-                    let (batch, receiver) = context
-                        .acknowledgements
-                        .then(|| {
+                    let (batch, receiver) = if context.acknowledgements {
+                        {
                             let (batch, receiver) = BatchNotifier::new_with_receiver();
                             (Some(batch), Some(receiver))
-                        })
-                        .unwrap_or((None, None));
+                        }
+                    } else {
+                        (None, None)
+                    };
 
                     let now = Utc::now();
                     for event in &mut events {
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(batch.clone());
                         }
-                        if let Event::Log(ref mut log) = event {
+                        if let Event::Log(log) = event {
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),

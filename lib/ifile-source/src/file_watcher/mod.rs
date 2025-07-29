@@ -13,7 +13,7 @@ use tracing::{debug, trace, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{FilePosition, ReadFrom};
-use file_source_common::buffer::read_until_with_max_size;
+use file_source_common::buffer::{read_until_with_max_size, ReadResult};
 use file_source_common::PortableFileExt;
 mod notify_watcher;
 #[cfg(test)]
@@ -376,7 +376,10 @@ impl FileWatcher {
             &mut self.buf,
             self.max_line_bytes,
         ) {
-            Ok(Some(_)) => {
+            Ok(ReadResult {
+                successfully_read: Some(_),
+                ..
+            }) => {
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
 
@@ -386,7 +389,10 @@ impl FileWatcher {
                     bytes,
                 }))
             }
-            Ok(None) => {
+            Ok(ReadResult {
+                successfully_read: None,
+                ..
+            }) => {
                 if !self.file_findable() {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it

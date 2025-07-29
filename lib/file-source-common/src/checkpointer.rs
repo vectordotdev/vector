@@ -230,10 +230,10 @@ impl Checkpointer {
         use FileFingerprint::*;
 
         let path = match fng {
-            BytesChecksum(c) => format!("g{:x}.{}", c, pos),
-            FirstLinesChecksum(c) => format!("h{:x}.{}", c, pos),
-            DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
-            Unknown(x) => format!("{:x}.{}", x, pos),
+            BytesChecksum(c) => format!("g{c:x}.{pos}"),
+            FirstLinesChecksum(c) => format!("h{c:x}.{pos}"),
+            DevInode(dev, ino) => format!("i{dev:x}.{ino:x}.{pos}"),
+            Unknown(x) => format!("{x:x}.{pos}"),
         };
         self.directory.join(path)
     }

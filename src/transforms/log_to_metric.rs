@@ -241,7 +241,7 @@ pub enum TransformParseErrorKind {
 
 impl std::fmt::Display for TransformParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -887,7 +887,7 @@ impl FunctionTransform for LogToMetric {
                                 kind: &kind.to_string(),
                             })
                         }
-                        TransformError::MetricDetailsNotFound {} => {
+                        TransformError::MetricDetailsNotFound => {
                             emit!(MetricMetadataMetricDetailsNotFoundError {})
                         }
                         _ => {}

@@ -168,17 +168,16 @@ async fn redis_sink_channel() {
 
     let client = redis::Client::open(redis_server()).unwrap();
     debug!("Get Redis async connection.");
-    let conn = client
-        .get_async_connection()
+    let mut pubsub_conn = client
+        .get_async_pubsub()
         .await
         .expect("Failed to get Redis async connection.");
     debug!("Get Redis async connection success.");
-    let mut pubsub_conn = conn.into_pubsub();
     debug!("Subscribe channel:{}.", key);
     pubsub_conn
         .subscribe(key.clone().to_string())
         .await
-        .unwrap_or_else(|_| panic!("Failed to subscribe channel:{}.", key));
+        .unwrap_or_else(|_| panic!("Failed to subscribe channel:{key}."));
     debug!("Subscribed to channel:{}.", key);
     let mut pubsub_stream = pubsub_conn.on_message();
 
@@ -244,17 +243,16 @@ async fn redis_sink_channel_data_volume_tags() {
 
     let client = redis::Client::open(redis_server()).unwrap();
     debug!("Get Redis async connection.");
-    let conn = client
-        .get_async_connection()
+    let mut pubsub_conn = client
+        .get_async_pubsub()
         .await
         .expect("Failed to get Redis async connection.");
     debug!("Get Redis async connection success.");
-    let mut pubsub_conn = conn.into_pubsub();
     debug!("Subscribe channel:{}.", key);
     pubsub_conn
         .subscribe(key.clone().to_string())
         .await
-        .unwrap_or_else(|_| panic!("Failed to subscribe channel:{}.", key));
+        .unwrap_or_else(|_| panic!("Failed to subscribe channel:{key}."));
     debug!("Subscribed to channel:{}.", key);
     let mut pubsub_stream = pubsub_conn.on_message();
 
@@ -327,14 +325,14 @@ async fn redis_sink_metrics() {
         let metric = if i % 2 == 0 {
             // Counter metrics
             Metric::new(
-                format!("counter_{}", i),
+                format!("counter_{i}"),
                 MetricKind::Absolute,
                 MetricValue::Counter { value: i as f64 },
             )
         } else {
             // Gauge metrics
             Metric::new(
-                format!("gauge_{}", i),
+                format!("gauge_{i}"),
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: i as f64 },
             )
@@ -375,12 +373,12 @@ async fn redis_sink_metrics() {
 
         if i % 2 == 0 {
             // Counter metrics
-            assert_eq!(json["name"], format!("counter_{}", i));
+            assert_eq!(json["name"], format!("counter_{i}"));
             assert_eq!(json["kind"], "absolute");
             assert_eq!(json["counter"]["value"], i as f64);
         } else {
             // Gauge metrics
-            assert_eq!(json["name"], format!("gauge_{}", i));
+            assert_eq!(json["name"], format!("gauge_{i}"));
             assert_eq!(json["kind"], "absolute");
             assert_eq!(json["gauge"]["value"], i as f64);
         }
@@ -438,7 +436,7 @@ async fn redis_sink_traces() {
         // Verify data in Redis
         let mut conn = redis::Client::open(redis_server())
             .unwrap()
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .unwrap();
 

@@ -214,7 +214,7 @@ impl WebSocketListenerSink {
                 ));
                 return Ok(response);
             };
-            match auth.handle_auth(Some(&addr), req.headers()) {
+            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
                 Ok(_) => {
                     extra_tags.append(&mut Self::extract_extra_tags(
                         &extra_tags_config,
@@ -420,7 +420,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     }
 
                     let peers = peers.lock().expect("mutex poisoned");
-                    let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
+                    let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
                             emit!(WsListenerSendError {

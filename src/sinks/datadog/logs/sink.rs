@@ -194,13 +194,12 @@ pub fn position_reserved_attr_event_root(
         // if an existing attribute exists here already, move it so to not overwrite it.
         // yes, technically the rename path could exist, but technically that could always be the case.
         if log.contains(desired_path) {
-            let rename_attr = format!("_RESERVED_{}", meaning);
+            let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
             warn!(
                 message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
                 meaning = meaning,
                 renamed = &rename_attr,
-                internal_log_rate_limit = true,
             );
             log.rename_key(desired_path, rename_path);
         }
@@ -466,7 +465,7 @@ mod tests {
             "service",
             "status",
         ] {
-            assert!(log.contains(event_path!(attr)), "missing {}", attr);
+            assert!(log.contains(event_path!(attr)), "missing {attr}");
         }
 
         assert_eq!(

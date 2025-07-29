@@ -111,6 +111,8 @@ mod source {
         FileSourceExtendedInternalEvents, FileSourceInternalEvents,
     };
 
+    use crate::internal_events::FileLineTooBigError;
+
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
     use vector_lib::{
@@ -579,6 +581,19 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+
+        fn emit_file_line_too_long(
+            &self,
+            truncated_bytes: &bytes::BytesMut,
+            configured_limit: usize,
+            encountered_size_so_far: usize,
+        ) {
+            emit!(FileLineTooBigError {
+                truncated_bytes,
+                configured_limit,
+                encountered_size_so_far
+            });
         }
     }
 

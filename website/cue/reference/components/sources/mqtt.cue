@@ -52,34 +52,42 @@ components: sources: mqtt: {
 		notices: []
 	}
 
-	configuration: base.components.sources.mqtt.configuration
+	configuration: generated.components.sources.mqtt.configuration
 
 	installation: {
 		platform_name: null
 	}
 
-	output: logs: record: {
-		description: "An individual MQTT message."
-		fields: {
-			message: {
-				description: "The raw line from the MQTT message."
-				required:    true
-				type: string: {
-					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
+	output: {
+		logs: record: {
+			description: "An individual MQTT message."
+			fields: {
+				message: {
+					description: "The raw line from the MQTT message."
+					required:    true
+					type: string: {
+						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+						syntax: "literal"
+					}
+				}
+				timestamp: fields._current_timestamp & {
+					description: "The current time when the message has been received."
+				}
+				topic: {
+					description: "The MQTT topic that the message came from."
+					required:    true
+					type: string: {
+						examples: ["topic/logs"]
+						syntax: "literal"
+					}
 				}
 			}
-			timestamp: fields._current_timestamp & {
-				description: "The current time when the message has been received."
-			}
-			topic: {
-				description: "The MQTT topic that the message came from."
-				required:    true
-				type: string: {
-					examples: ["topic/logs"]
-					syntax: "literal"
-				}
-			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

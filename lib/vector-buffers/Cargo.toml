@@ -35,16 +35,16 @@ vector-common = { path = "../vector-common", default-features = false, features 
 
 [dev-dependencies]
 clap.workspace = true
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.6", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.12"
 hdrhistogram = "7.5.4"
 metrics-tracing-context.workspace = true
 metrics-util = { workspace = true, features = ["debugging"] }
-proptest = "1.6"
+proptest = "1.7"
 quickcheck = "1.0"
 rand.workspace = true
 serde_yaml = { version = "0.9", default-features = false }
-temp-dir = "0.1.14"
+temp-dir = "0.1.16"
 tokio-test = "0.4.4"
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }

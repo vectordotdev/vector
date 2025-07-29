@@ -7,15 +7,18 @@ use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::lookup::{owned_value_path, path};
+use vector_lib::{
+    codecs::{
+        decoding::{DeserializerConfig, FramingConfig},
+        StreamDecodingError,
+    },
+    config::DataType,
+};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
@@ -151,10 +154,7 @@ impl OutputFormat {
         emit!(DemoLogsEventProcessed);
 
         match self {
-            Self::Shuffle {
-                sequence,
-                ref lines,
-            } => Self::shuffle_generate(*sequence, lines, n),
+            Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
@@ -168,7 +168,7 @@ impl OutputFormat {
         let line = lines.choose(&mut rand::rng()).unwrap();
 
         if sequence {
-            format!("{} {}", n, line)
+            format!("{n} {line}")
         } else {
             line.into()
         }
@@ -330,7 +330,7 @@ impl SourceConfig for DemoLogsConfig {
             );
 
         vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
+            DataType::Log,
             schema_definition,
         )]
     }
@@ -360,7 +360,7 @@ mod tests {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> impl Stream<Item = Event> {
+    async fn runit(config: &str) -> impl Stream<Item = Event> + use<> {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let config: DemoLogsConfig = toml::from_str(config).unwrap();

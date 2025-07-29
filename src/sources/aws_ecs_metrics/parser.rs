@@ -126,7 +126,7 @@ fn counter(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Counter { value },
     )
@@ -144,7 +144,7 @@ fn gauge(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Gauge { value },
     )
@@ -507,14 +507,28 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
+#[derive(Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+enum StatsPayload {
+    Container(ContainerStats),
+    Empty {},
+    Null,
+}
+
 pub(super) fn parse(
     bytes: &[u8],
     namespace: Option<String>,
 ) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
-    let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
+    let parsed = serde_json::from_slice::<BTreeMap<String, StatsPayload>>(bytes)?;
 
-    for (id, container) in parsed {
+    for (id, payload) in parsed {
+        let container = match payload {
+            StatsPayload::Container(container) => container,
+            _ => continue,
+        };
+
         let mut tags = MetricTags::default();
         tags.replace("container_id".into(), id);
         if let Some(name) = container.name {
@@ -608,7 +622,9 @@ mod test {
                     "io_time_recursive": [],
                     "sectors_recursive": []
                 }
-            }
+            },
+            "123456789": {},
+            "123456789": null
         }"#;
 
         assert_event_data_eq!(
@@ -672,7 +688,9 @@ mod test {
                         "throttled_time": 0
                     }
                 }
-            }
+            },
+            "2344": {},
+            "test": null
         }"#;
 
         assert_event_data_eq!(

@@ -83,7 +83,7 @@ impl SinkConfig for PapertrailConfig {
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-        let address = format!("{}:{}", host, port);
+        let address = format!("{host}:{port}");
         let tls = Some(
             self.tls
                 .clone()
@@ -172,7 +172,7 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
         formatter
             .format(&mut buffer.writer(), Severity::LOG_INFO, message)
-            .map_err(|error| Self::Error::SerializingError(format!("{}", error).into()))?;
+            .map_err(|error| Self::Error::SerializingError(format!("{error}").into()))?;
 
         buffer.put_u8(b'\n');
 

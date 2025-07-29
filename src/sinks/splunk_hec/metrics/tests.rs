@@ -320,7 +320,7 @@ async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
-        endpoint: format!("http://{}", addr),
+        endpoint: format!("http://{addr}"),
         host_key: config_host_key(),
         index: None,
         sourcetype: None,

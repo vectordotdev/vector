@@ -1035,7 +1035,7 @@ where
 
                     return Err(e);
                 }
-            };
+            }
 
             // Fundamentally, when `try_read_record` returns `None`, there's three possible
             // scenarios:
