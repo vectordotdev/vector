@@ -11,7 +11,9 @@ use crate::event::{
     BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent,
 };
 
-use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig};
+use super::config::{
+    DataTypeConfig, ListMethod, ListOption, RedisSinkConfig, SortedSetMethod, SortedSetOption,
+};
 use crate::{
     serde::OneOrMany,
     sinks::prelude::*,
@@ -43,8 +45,10 @@ async fn redis_sink_sentinel_reaches_primary() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::RPush,
+            method: ListMethod::RPush,
         }),
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -85,8 +89,10 @@ async fn redis_sink_sentinel_rpush() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::RPush,
+            method: ListMethod::RPush,
         }),
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -158,8 +164,10 @@ async fn redis_sink_list_lpush() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::LPush,
+            method: ListMethod::LPush,
         }),
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -231,8 +239,10 @@ async fn redis_sink_list_rpush() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::RPush,
+            method: ListMethod::RPush,
         }),
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -288,6 +298,85 @@ async fn redis_sink_list_rpush() {
 }
 
 #[tokio::test]
+async fn redis_sink_sorted_set_zadd() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
+    debug!("Test events num: {}.", num_events);
+
+    let cnf = RedisSinkConfig {
+        endpoint: OneOrMany::One(redis_server()),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::SortedSet,
+        list_option: None,
+        sorted_set_option: Some(SortedSetOption {
+            method: SortedSetMethod::ZAdd,
+        }),
+        score: Some(UnsignedIntTemplate::try_from("{{ num }}").unwrap()),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        sentinel_service: None,
+        sentinel_connect: None,
+        acknowledgements: Default::default(),
+    };
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let s: String = i.to_string();
+        let mut e = LogEvent::from(s);
+        e.insert("num", i);
+        events.push(e.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events.
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
+
+    let key_exists: bool = conn.exists(key.clone().to_string()).await.unwrap();
+    debug!("Test key: {} exists: {}.", key, key_exists);
+    assert!(key_exists);
+    let zcount: usize = conn
+        .zcount(key.clone().to_string(), 0, num_events - 1)
+        .await
+        .unwrap();
+    debug!("Test key: {} count: {}.", key, zcount);
+    assert_eq!(zcount, num_events);
+
+    for i in 0..num_events {
+        let e = events.get(i).unwrap().as_log();
+        let s = serde_json::to_string(e).unwrap_or_default();
+        let payload: Vec<String> = conn.zpopmin(key.clone().to_string(), 1).await.unwrap();
+        let val = payload.into_iter().next().unwrap();
+        assert_eq!(val, s);
+    }
+}
+
+#[tokio::test]
 async fn redis_sink_channel() {
     trace_init();
 
@@ -319,6 +408,8 @@ async fn redis_sink_channel() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
         list_option: None,
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -396,6 +487,8 @@ async fn redis_sink_channel_data_volume_tags() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
         list_option: None,
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -445,8 +538,10 @@ async fn redis_sink_metrics() {
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::RPush,
+            method: ListMethod::RPush,
         }),
+        sorted_set_option: None,
+        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -548,8 +643,10 @@ async fn redis_sink_traces() {
             encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
-                method: Method::RPush,
+                method: ListMethod::RPush,
             }),
+            sorted_set_option: None,
+            score: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             sentinel_service: None,
