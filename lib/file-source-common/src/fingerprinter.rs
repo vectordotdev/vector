@@ -415,18 +415,6 @@ mod test {
 
     use super::{FingerprintStrategy, Fingerprinter};
 
-    // Used in tests
-    #[allow(dead_code)]
-    fn create_gzip_file(data: &mut [u8]) -> Vec<u8> {
-        let mut buffer = vec![];
-        let mut encoder = GzEncoder::new(&mut buffer, flate2::Compression::default());
-        encoder.write_all(data).expect("Failed to write data");
-        encoder
-            .finish()
-            .expect("Failed to finish encoding with gzip footer");
-        buffer
-    }
-
     #[test]
     fn test_checksum_fingerprint() {
         let fingerprinter = Fingerprinter {
@@ -471,6 +459,8 @@ mod test {
                 .unwrap(),
         );
     }
+
+    #[allow(dead_code)]
     #[derive(Clone)]
     struct NoErrors;
 
