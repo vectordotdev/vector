@@ -318,7 +318,7 @@ impl PingManager {
         }
     }
 
-    fn record_pong(&mut self) {
+    const fn record_pong(&mut self) {
         self.waiting_for_pong = false;
     }
 
