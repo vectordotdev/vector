@@ -97,7 +97,7 @@ pub struct WebSocketConfig {
     pub initial_message: Option<String>,
 
     /// An optional application-level ping message to send over the WebSocket connection.
-    /// If not set, a standard WebSocket ping control frame will be sent instead.
+    /// If not set, a standard WebSocket ping control frame is sent instead.
     #[configurable]
     #[serde(default)]
     pub ping_message: Option<String>,

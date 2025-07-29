@@ -637,7 +637,7 @@ generated: components: sources: websocket: configuration: {
 	ping_message: {
 		description: """
 			An optional application-level ping message to send over the WebSocket connection.
-			If not set, a standard WebSocket ping control frame will be sent instead.
+			If not set, a standard WebSocket ping control frame is sent instead.
 			"""
 		required: false
 		type: string: {}
@@ -666,8 +666,8 @@ generated: components: sources: websocket: configuration: {
 					description: "The message must contain the value as a substring."
 					required:    true
 					type: string: enum: {
-						Contains: "The message must contain the value as a substring."
-						Exact:    "The entire message must be an exact match."
+						contains: "The message must contain the value as a substring."
+						exact:    "The entire message must be an exact match."
 					}
 				}
 				value: {
