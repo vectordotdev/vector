@@ -19,9 +19,9 @@ use vector_lib::config::{LogNamespace, SourceOutput};
 /// Defines the different shapes the `pong_message` config can take.
 #[derive(Clone, Debug)]
 #[configurable_component]
-#[serde(untagged)] // Allows this enum to match different structures
+#[serde(untagged)]
 pub enum PongMessage {
-    /// For simple, backward-compatible exact matching.
+    /// For exact string matching.
     /// e.g., pong_message: "pong"
     Simple(String),
 
@@ -30,15 +30,34 @@ pub enum PongMessage {
     Advanced(PongValidation),
 }
 
+impl PongMessage {
+    pub fn matches(&self, msg: &str) -> bool {
+        match self {
+            PongMessage::Simple(expected) => msg == expected,
+            PongMessage::Advanced(validation) => validation.matches(msg),
+        }
+    }
+}
+
 /// Defines the advanced validation strategies for a pong message.
 #[derive(Clone, Debug)]
 #[configurable_component]
 #[serde(tag = "type", content = "value")]
+#[serde(rename_all = "snake_case")]
 pub enum PongValidation {
     /// The entire message must be an exact match.
     Exact(String),
     /// The message must contain the value as a substring.
     Contains(String),
+}
+
+impl PongValidation {
+    pub fn matches(&self, msg: &str) -> bool {
+        match self {
+            PongValidation::Exact(expected) => msg == expected,
+            PongValidation::Contains(sub) => msg.contains(sub),
+        }
+    }
 }
 
 /// Configuration for the `websocket` source.

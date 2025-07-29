@@ -1,10 +1,8 @@
 use crate::vector_lib::codecs::StreamDecodingError;
 use chrono::Utc;
 use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
-use std::num::NonZeroU64;
 use std::pin::Pin;
 use tokio::time;
-use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
 use tokio_util::codec::FramedRead;
 use vector_lib::{
@@ -21,7 +19,7 @@ use crate::{
         ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionEstablished,
         WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError, WsSendError, PROTOCOL,
     },
-    sources::websocket::config::{PongMessage, PongValidation, WebSocketConfig},
+    sources::websocket::config::WebSocketConfig,
     SourceSender,
 };
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
@@ -292,16 +290,10 @@ impl WebSocketSource {
     }
 
     fn is_custom_pong(&self, msg_txt: &str) -> bool {
-        if let Some(pong_config) = &self.config.pong_message {
-            return match pong_config {
-                PongMessage::Simple(expected) => msg_txt == expected,
-                PongMessage::Advanced(validation) => match validation {
-                    PongValidation::Exact(expected) => msg_txt == expected,
-                    PongValidation::Contains(substring) => msg_txt.contains(substring),
-                },
-            };
+        match self.config.pong_message.as_ref() {
+            Some(config) => config.matches(msg_txt),
+            None => false,
         }
-        false
     }
 }
 
