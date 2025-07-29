@@ -22,7 +22,7 @@ fn bench_add_fields(c: &mut Criterion) {
 
     let benchmarks: Vec<(&str, Transform)> = vec![
         ("v1", {
-            let source = format!("event['{}'] = '{}'", key, value);
+            let source = format!("event['{key}'] = '{value}'");
 
             Transform::event_task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
@@ -148,9 +148,8 @@ fn bench_field_filter(c: &mut Criterion) {
             b.iter_batched(
                 || (tx.clone(), events.clone()),
                 |(mut tx, events)| {
-                    let _ =
-                        futures::executor::block_on(tx.send_all(&mut stream::iter(events).map(Ok)))
-                            .unwrap();
+                    futures::executor::block_on(tx.send_all(&mut stream::iter(events).map(Ok)))
+                        .unwrap();
 
                     let output = futures::executor::block_on(collect_ready(&mut rx));
 
