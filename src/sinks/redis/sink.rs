@@ -38,9 +38,10 @@ impl RepairState {
     }
 
     pub(super) fn get_active_state(&self) -> Option<&ConnectionStateInner> {
-        match self {
-            Self::Active { state } => Some(state),
-            _ => None,
+        if let RepairState::Active { state } = self {
+            Some(state)
+        } else {
+            None
         }
     }
 }
