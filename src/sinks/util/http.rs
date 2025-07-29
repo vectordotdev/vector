@@ -11,11 +11,11 @@ use http::{header, HeaderValue, Request, Response, StatusCode};
 pub struct OrderedHeaderName(HeaderName);
 
 impl OrderedHeaderName {
-    pub fn new(header_name: HeaderName) -> Self {
+    pub const fn new(header_name: HeaderName) -> Self {
         Self(header_name)
     }
 
-    pub fn inner(&self) -> &HeaderName {
+    pub const fn inner(&self) -> &HeaderName {
         &self.0
     }
 }

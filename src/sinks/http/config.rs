@@ -5,7 +5,6 @@ use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
-use crate::sinks::util::http::OrderedHeaderName;
 use hyper::Body;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -30,7 +29,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig},
+            http::{http_response_retry_logic, HttpService, OrderedHeaderName, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
@@ -207,7 +206,7 @@ pub(super) fn validate_headers(
     let headers = crate::sinks::util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
-        if configures_auth && name.inner() == &AUTHORIZATION {
+        if configures_auth && name.inner() == AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
     }
@@ -289,12 +288,13 @@ impl SinkConfig for HttpSinkConfig {
 
         let converted_static_headers = static_headers
             .into_iter()
-            .map(|(k, v)| {
-                let header_name = HeaderName::from_bytes(k.as_bytes()).unwrap();
-                let header_value = HeaderValue::from_str(&v).unwrap();
-                (header_name, header_value)
+            .map(|(name, value)| -> crate::Result<_> {
+                let header_name =
+                    HeaderName::from_bytes(name.as_bytes()).map(OrderedHeaderName::from)?;
+                let header_value = HeaderValue::try_from(value)?;
+                Ok((header_name, header_value))
             })
-            .collect();
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
             self.method,

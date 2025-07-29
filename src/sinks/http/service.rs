@@ -7,13 +7,13 @@ use http::{
     header::{CONTENT_ENCODING, CONTENT_TYPE},
     HeaderName, HeaderValue, Method, Request,
 };
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 use crate::{
     http::{Auth, MaybeAuth},
     sinks::{
         util::{
-            http::{HttpRequest, HttpServiceRequestBuilder},
+            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
             UriSerde,
         },
         HTTPRequestBuilderSnafu,
@@ -28,7 +28,7 @@ use super::sink::PartitionKey;
 pub(super) struct HttpSinkRequestBuilder {
     method: HttpMethod,
     auth: Option<Auth>,
-    static_headers: IndexMap<HeaderName, HeaderValue>,
+    static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
     content_type: Option<String>,
     content_encoding: Option<String>,
 }
@@ -38,7 +38,7 @@ impl HttpSinkRequestBuilder {
     pub(super) const fn new(
         method: HttpMethod,
         auth: Option<Auth>,
-        static_headers: IndexMap<HeaderName, HeaderValue>,
+        static_headers: BTreeMap<OrderedHeaderName, HeaderValue>,
         content_type: Option<String>,
         content_encoding: Option<String>,
     ) -> Self {
@@ -82,7 +82,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for HttpSinkRequestBuilder {
 
         // Static headers from config
         for (header_name, header_value) in self.static_headers.iter() {
-            headers.insert(header_name, header_value.clone());
+            headers.insert(header_name.inner(), header_value.clone());
         }
 
         // Template headers from the partition key
