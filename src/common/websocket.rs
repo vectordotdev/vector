@@ -144,6 +144,7 @@ impl WebSocketConnector {
         }
     }
 
+    #[cfg(feature = "sinks-websocket")]
     pub(crate) async fn healthcheck(&self) -> crate::Result<()> {
         self.connect().await.map(|_| ()).map_err(Into::into)
     }
