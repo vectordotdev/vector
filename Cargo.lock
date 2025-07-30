@@ -2993,19 +2993,6 @@ checksum = "7762d17f1241643615821a8455a0b2c3e803784b058693d990b11f2dce25a0ca"
 
 [[package]]
 name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
-]
-
-[[package]]
-name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -3807,7 +3794,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion 0.6.0",
- "dashmap 6.1.0",
+ "dashmap",
  "file-source-common",
  "flate2",
  "futures 0.3.31",
@@ -3835,7 +3822,7 @@ dependencies = [
  "bytes 1.10.1",
  "chrono",
  "crc",
- "dashmap 5.5.3",
+ "dashmap",
  "flate2",
  "glob",
  "libc",
@@ -4268,7 +4255,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbe789d04bf14543f03c4b60cd494148aa79438c8440ae7d81a7778147745c3"
 dependencies = [
  "cfg-if",
- "dashmap 6.1.0",
+ "dashmap",
  "futures-sink",
  "futures-timer",
  "futures-util",
@@ -4360,7 +4347,7 @@ name = "greptimedb-ingester"
 version = "0.1.0"
 source = "git+https://github.com/GreptimeTeam/greptimedb-ingester-rust?rev=f7243393808640f5123b0d5b7b798da591a4df6e#f7243393808640f5123b0d5b7b798da591a4df6e"
 dependencies = [
- "dashmap 6.1.0",
+ "dashmap",
  "derive_builder",
  "enum_dispatch",
  "futures 0.3.31",
@@ -5308,7 +5295,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion 0.5.1",
- "dashmap 6.1.0",
+ "dashmap",
  "file-source-common",
  "flate2",
  "futures 0.3.31",
@@ -11387,7 +11374,7 @@ name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
  "criterion 0.6.0",
- "dashmap 6.1.0",
+ "dashmap",
  "mock_instant",
  "tracing 0.1.41",
  "tracing-core 0.1.33",

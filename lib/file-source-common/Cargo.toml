@@ -11,17 +11,17 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-bstr = { version = "1.6.0", default-features = false }
-bytes = { version = "1.4.0", default-features = false }
-chrono = { version = "0.4.31", default-features = false, features = ["clock", "std"] }
-crc = "3.2.1"
-dashmap = { version = "5.5.3", default-features = false }
-flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
-glob = "0.3.1"
+chrono.workspace = true
+glob.workspace = true
+tracing.workspace = true
+bstr = { version = "1.12", default-features = false }
+bytes = { version = "1.10.1", default-features = false }
+crc = "3.3.0"
 scan_fmt = "0.2.6"
+dashmap = { version = "6.1", default-features = false }
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.107", default-features = false, features = ["std"] }
-tracing = { version = "0.1.37", default-features = false }
+serde_json = { version = "1.0.140", default-features = false, features = ["std"] }
 vector-common = { path = "../vector-common", default-features = false }
 
 [dev-dependencies]

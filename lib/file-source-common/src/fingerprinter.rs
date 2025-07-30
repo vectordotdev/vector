@@ -400,15 +400,9 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{
-        fs,
-        io::{Error, Write},
-        path::Path,
-        time::Duration,
-    };
+    use std::{fs, io::Error, path::Path, time::Duration};
 
     use bytes::BytesMut;
-    use flate2::write::GzEncoder;
     use tempfile::tempdir;
 
     use crate::internal_events::FileSourceInternalEvents;

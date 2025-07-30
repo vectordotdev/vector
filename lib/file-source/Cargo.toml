@@ -11,67 +11,23 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "3.3.0"
 glob.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+crc = "3.3.0"
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 file-source-common = { path = "../file-source-common" }
-
-[dependencies.bstr]
-version = "1.12"
-default-features = false
-features = []
-
-[dependencies.bytes]
-version = "1.10.1"
-default-features = false
-features = []
-
-[dependencies.chrono]
-version = "0.4"
-default-features = false
-features = ["clock", "serde"]
-
-[dependencies.dashmap]
-version = "6.1"
-default-features = false
-features = []
-
-[dependencies.indexmap]
-version = "2.10.0"
-default-features = false
-features = ["serde"]
-
-[dependencies.flate2]
-version = "1.1"
-default-features = false
-features = ["rust_backend"]
-
-[dependencies.futures]
-version = "0.3"
-default-features = false
-features = ["executor"]
-
-[dependencies.serde]
-version = "1.0"
-default-features = false
-features = ["derive"]
-
-[dependencies.serde_json]
-version = "1.0"
-default-features = false
-features = []
-
-[dependencies.tracing]
-version = "0.1"
-default-features = false
-features = []
-
-[dependencies.tokio]
-version = "1.45.1"
-default-features = false
-features = ["full"]
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.140", default-features = false }
+indexmap = { version = "2.10.0", default-features = false, features = ["serde"] }
+bstr = { version = "1.12", default-features = false }
+bytes = { version = "1.10.1", default-features = false }
+dashmap = { version = "6.1", default-features = false }
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+futures = { version = "0.3.31", default-features = false, features = ["executor"] }
 
 [dev-dependencies]
 criterion = "0.6"
