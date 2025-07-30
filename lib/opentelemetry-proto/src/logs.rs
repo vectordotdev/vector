@@ -1,5 +1,7 @@
 use super::common::{kv_list_into_value, to_hex};
-use crate::proto::common::v1::{AnyValue as OtelAnyValueStruct, ArrayValue, KeyValue, KeyValueList};
+use crate::proto::common::v1::{
+    AnyValue as OtelAnyValueStruct, ArrayValue, KeyValue, KeyValueList,
+};
 use crate::proto::{
     common::v1::{any_value::Value as OtelAnyValueEnum, InstrumentationScope},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs, SeverityNumber},
@@ -12,7 +14,10 @@ use vector_core::{
     config::{log_schema, LegacyKey, LogNamespace},
     event::{Event, LogEvent},
 };
-use vrl::{event_path, path, value::{ObjectMap, Value}};
+use vrl::{
+    event_path, path,
+    value::{ObjectMap, Value},
+};
 
 const SOURCE_NAME: &str = "opentelemetry";
 pub const RESOURCE_KEY: &str = "resources";
@@ -238,7 +243,6 @@ impl ResourceLog {
     }
 }
 
-
 /// Converts a list of `LogEvent`s into a single `ResourceLogs` message.
 /// All logs will share the same `Resource`. They are grouped into `ScopeLogs`
 /// by `(scope.name, scope.version)`.
@@ -252,7 +256,8 @@ pub fn log_events_to_resource_logs(events: Vec<LogEvent>) -> ResourceLogs {
         let scope_name = event
             .get(event_path!("scope", "name"))
             .and_then(Value::as_str)
-            .unwrap_or("".into()).to_string();
+            .unwrap_or("".into())
+            .to_string();
         let scope_version = event
             .get(event_path!("scope", "version"))
             .and_then(Value::as_str)
@@ -311,20 +316,32 @@ fn build_log_record(event: &LogEvent) -> LogRecord {
     }
 
     // Severity fields
-    if let Some(text) = event.get(event_path!("severity_text")).and_then(Value::as_str) {
+    if let Some(text) = event
+        .get(event_path!("severity_text"))
+        .and_then(Value::as_str)
+    {
         record.severity_text = text.to_string();
     }
-    if let Some(num) = event.get(event_path!("severity_number")).and_then(Value::as_integer) {
+    if let Some(num) = event
+        .get(event_path!("severity_number"))
+        .and_then(Value::as_integer)
+    {
         record.severity_number = num as i32;
     }
 
     // Body
-    if let Some(body) = event.get(event_path!("message")).or_else(|| event.get(event_path!("body"))) {
+    if let Some(body) = event
+        .get(event_path!("message"))
+        .or_else(|| event.get(event_path!("body")))
+    {
         record.body = Some(to_any_value(body));
     }
 
     // Attributes
-    if let Some(attrs) = event.get(event_path!("attributes")).and_then(Value::as_object) {
+    if let Some(attrs) = event
+        .get(event_path!("attributes"))
+        .and_then(Value::as_object)
+    {
         record.attributes = vrl_map_to_key_value_vec(attrs);
     }
 
@@ -359,13 +376,13 @@ fn build_log_record(event: &LogEvent) -> LogRecord {
 }
 
 fn vrl_map_to_key_value_vec(object_map: &ObjectMap) -> Vec<KeyValue> {
-    object_map.iter()
-        .map(|(k, v)| {
-            KeyValue {
-                key: k.to_string(),
-                value: Some(to_any_value(v)),
-            }
-        }).collect()
+    object_map
+        .iter()
+        .map(|(k, v)| KeyValue {
+            key: k.to_string(),
+            value: Some(to_any_value(v)),
+        })
+        .collect()
 }
 
 /// Extracts a `Resource` from a `LogEvent` if a `resources` object is present.
@@ -381,16 +398,14 @@ fn extract_resource(event: &LogEvent) -> Option<Resource> {
 
 fn convert_vrl_object_map_to_kvlistvalue(object_map: &ObjectMap) -> OtelAnyValueEnum {
     OtelAnyValueEnum::KvlistValue(KeyValueList {
-            values:
-            object_map
-                .iter()
-                .map(|(k,
-                          v)| KeyValue {
-                    key: k.to_string(),
-                    value: Some(to_any_value(v)),
-                })
-                .collect(),
-        })
+        values: object_map
+            .iter()
+            .map(|(k, v)| KeyValue {
+                key: k.to_string(),
+                value: Some(to_any_value(v)),
+            })
+            .collect(),
+    })
 }
 
 /// Converts a VRL `Value` into an OTLP `AnyValue`.
@@ -405,7 +420,9 @@ fn to_any_value(value: &Value) -> OtelAnyValueStruct {
             .map(|s| OtelAnyValueEnum::StringValue(s.to_string())),
         Value::Regex(r) => Some(OtelAnyValueEnum::StringValue(r.to_string())),
         Value::Timestamp(ts) => Some(OtelAnyValueEnum::StringValue(ts.to_rfc3339())),
-        Value::Array(arr) => Some(OtelAnyValueEnum::ArrayValue(ArrayValue { values: arr.iter().map(to_any_value).collect() })),
+        Value::Array(arr) => Some(OtelAnyValueEnum::ArrayValue(ArrayValue {
+            values: arr.iter().map(to_any_value).collect(),
+        })),
         Value::Object(map) => Some(convert_vrl_object_map_to_kvlistvalue(map)),
     };
 
@@ -416,6 +433,7 @@ fn to_any_value(value: &Value) -> OtelAnyValueStruct {
 mod tests {
     use crate::logs::log_events_to_resource_logs;
     use crate::logs::DateTime;
+    use crate::proto::common::v1::any_value;
     use chrono::Utc;
     use std::collections::BTreeMap;
     use vector_core::event::LogEvent;
@@ -443,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn test_logevent_to_resource_logs() {
+    fn test_log_event_to_resource_logs() {
         let resource_logs = log_events_to_resource_logs(vec![
             make_event("s1", "1"),
             make_event("s1", "1"),
@@ -452,8 +470,6 @@ mod tests {
             make_event("s3", "1"),
         ]);
 
-        println!("{:?}", resource_logs);
-
         let scope_logs = &resource_logs.scope_logs;
         assert_eq!(scope_logs.len(), 4, "should be 4 unique scope groups");
 
@@ -461,7 +477,10 @@ mod tests {
             .iter()
             .map(|s| {
                 let scope = s.scope.as_ref().unwrap();
-                ((scope.name.clone(), scope.version.clone()), s.log_records.len())
+                (
+                    (scope.name.clone(), scope.version.clone()),
+                    s.log_records.len(),
+                )
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -469,5 +488,37 @@ mod tests {
         assert_eq!(groups.get(&group_key("s2", "1")), Some(&1));
         assert_eq!(groups.get(&group_key("s2", "2")), Some(&1));
         assert_eq!(groups.get(&group_key("s3", "1")), Some(&1));
+
+        let s1_scope = scope_logs
+            .iter()
+            .find(|s| {
+                let scope = s.scope.as_ref().unwrap();
+                scope.name == "s1" && scope.version == "1"
+            })
+            .expect("scope s1@1 should exist");
+
+        assert_eq!(s1_scope.log_records.len(), 2);
+
+        let record = &s1_scope.log_records[0];
+
+        assert_eq!(
+            record.body.as_ref().unwrap().value.as_ref().unwrap(),
+            &any_value::Value::StringValue("[X] WARN Some log".to_string())
+        );
+
+        assert_eq!(record.severity_text, "WARN");
+        assert_eq!(record.severity_number, 0);
+
+        assert_eq!(record.attributes.len(), 1);
+        assert_eq!(
+            record.attributes.iter().find(|kv| kv.key == "id").unwrap().value.as_ref().unwrap().value.as_ref().unwrap(),
+            &any_value::Value::IntValue(1)
+        );
+
+        let resource = resource_logs.resource.as_ref().unwrap();
+        assert_eq!(
+            resource.attributes.iter().find(|kv| kv.key == "service.name").unwrap().value.as_ref().unwrap().value.as_ref().unwrap(),
+            &any_value::Value::StringValue("opentelemetry-logs".to_string())
+        );
     }
 }
