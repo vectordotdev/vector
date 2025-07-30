@@ -226,7 +226,7 @@ impl Checkpointer {
     /// falls outside of the hex range used by the legacy implementation. This
     /// allows them to be differentiated by simply peeking at the first byte.
     #[cfg(test)]
-    fn encode(&self, fng: FileFingerprint, pos: u64) -> PathBuf {
+    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
         use FileFingerprint::*;
 
         let path = match fng {
@@ -245,26 +245,28 @@ impl Checkpointer {
     /// format. Because hex encoding only allows [0-9a-f], we can use any
     /// character outside of that range as a magic byte identifier for the newer
     /// formats.
-    fn decode(&self, path: &Path) -> (FileFingerprint, u64) {
+    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
         use FileFingerprint::*;
 
         let file_name = &path.file_name().unwrap().to_string_lossy();
+
         match file_name.chars().next().expect("empty file name") {
             'g' => {
-                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], u64).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], FilePosition).unwrap();
                 (BytesChecksum(c), pos)
             }
             'h' => {
-                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], u64).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
                 (FirstLinesChecksum(c), pos)
             }
             'i' => {
                 let (dev, ino, pos) =
-                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], u64).unwrap();
+                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], FilePosition)
+                        .unwrap();
                 (DevInode(dev, ino), pos)
             }
             _ => {
-                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], u64).unwrap();
+                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
                 (Unknown(c), pos)
             }
         }
