@@ -207,7 +207,6 @@ generated: components: sinks: axiom: configuration: {
 						"X-Event-Level":      "{{level}}"
 						"X-Event-Timestamp":  "{{timestamp}}"
 						"X-My-Custom-Header": "A-Value"
-						"{{header_name}}":    "{{header_value}}"
 					}]
 					options: "*": {
 						description: "An HTTP request header and its value. Both header names and values support templating with event data."

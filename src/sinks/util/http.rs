@@ -655,7 +655,6 @@ fn headers_examples() -> BTreeMap<String, String> {
         "X-My-Custom-Header" => "A-Value",
         "X-Event-Level" => "{{level}}",
         "X-Event-Timestamp" => "{{timestamp}}",
-        "{{header_name}}" => "{{header_value}}"
     }
 }
 
