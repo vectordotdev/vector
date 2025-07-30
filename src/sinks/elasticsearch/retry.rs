@@ -108,7 +108,6 @@ impl RetryPartialFunction for EsRetryClosure {
                 Box::new(new_request)
             }
             Err(request) => {
-                //leave it unmodified
                 request
             }
         }
