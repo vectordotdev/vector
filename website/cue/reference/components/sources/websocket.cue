@@ -79,7 +79,7 @@ components: sources: websocket: {
 			configuration: {
 				type:            "websocket"
 				uri:             "wss://data.example.com/stream"
-				initial_message: "SUBSCRIBE trades"
+				initial_message: "SUBSCRIBE logs"
 				auth: {
 					strategy: "basic"
 					user:     "my_user"
@@ -98,10 +98,10 @@ components: sources: websocket: {
 
 	output: {
 		logs: event: {
-			description: "An received from the WebSocket server."
+			description: "An event received from the WebSocket server."
 			fields: {
 				message: {
-					description: "The raw message payload, decoded as a string."
+					description: "The raw message payload."
 					required:    true
 					type: string: {
 						examples: ["{\"level\":\"info\",\"message\":\"foo\"}"]
