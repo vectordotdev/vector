@@ -4,9 +4,10 @@ use crate::{
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsBytesReceived, WsConnectionError, WsConnectionEstablished,
-        WsConnectionFailedError, WsConnectionShutdown, WsKind, WsMessageReceived, WsReceiveError,
-        WsSendError, PROTOCOL,
+        ConnectionOpen, OpenGauge, WebSocketBytesReceived, WebSocketConnectionError,
+        WebSocketConnectionEstablished, WebSocketConnectionFailedError,
+        WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
+        WebSocketReceiveError, WebSocketSendError, PROTOCOL,
     },
     sources::websocket::config::WebSocketConfig,
     SourceSender,
@@ -17,7 +18,7 @@ use snafu::Snafu;
 use std::pin::Pin;
 use tokio::time;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::{error::Error as WsError, Message};
+use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, Message};
 use tokio_util::codec::FramedRead;
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
 use vector_lib::{
@@ -28,15 +29,15 @@ use vector_lib::{
 
 macro_rules! fail_with_event {
     ($context:expr) => {{
-        emit!(WsConnectionFailedError {
+        emit!(WebSocketConnectionFailedError {
             error: Box::new($context.build())
         });
         return $context.fail();
     }};
 }
 
-type WsSink = Pin<Box<dyn Sink<Message, Error = WsError> + Send>>;
-type WsStream = Pin<Box<dyn Stream<Item = Result<Message, WsError>> + Send>>;
+type WebSocketSink = Pin<Box<dyn Sink<Message, Error = TungsteniteError> + Send>>;
+type WebSocketStream = Pin<Box<dyn Stream<Item = Result<Message, TungsteniteError>> + Send>>;
 
 pub(crate) struct WebSocketSourceParams {
     pub connector: WebSocketConnector,
@@ -72,7 +73,7 @@ pub enum WebSocketSourceError {
     PongTimeout,
 
     #[snafu(display("A WebSocket error occurred: {}", source))]
-    Tungstenite { source: WsError },
+    Tungstenite { source: TungsteniteError },
 }
 
 impl WebSocketSource {
@@ -103,7 +104,7 @@ impl WebSocketSource {
                     match msg_result {
                         Ok(msg) => self.handle_message(msg, &mut ping_manager, &mut out).await,
                         Err(error) => {
-                            emit!(WsReceiveError { error: &error });
+                            emit!(WebSocketReceiveError { error: &error });
                             Err(WebSocketSourceError::Tungstenite { source: error })
                         }
                     }
@@ -118,26 +119,26 @@ impl WebSocketSource {
                             code = %frame.code,
                             reason = %frame.reason
                         );
-                        emit!(WsConnectionShutdown);
+                        emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
                         warn!("Connection closed by server without a close frame.");
-                        emit!(WsConnectionShutdown);
+                        emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
                         error!("Disconnecting due to pong timeout.");
-                        emit!(WsReceiveError {
-                            error: &WsError::Io(std::io::Error::new(
+                        emit!(WebSocketReceiveError {
+                            error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
                                 "Pong timeout"
                             ))
                         });
-                        emit!(WsConnectionShutdown);
+                        emit!(WebSocketConnectionShutdown);
                         return Err(error);
                     }
                     WebSocketSourceError::Tungstenite { source: ws_err } => {
                         if is_closed(&ws_err) {
-                            emit!(WsConnectionShutdown);
+                            emit!(WebSocketConnectionShutdown);
                         }
                         error!(message = "WebSocket connection error.", error = %ws_err);
                     }
@@ -180,12 +181,14 @@ impl WebSocketSource {
                     ping_manager.record_pong();
                     debug!("Received custom pong response.");
                 } else {
-                    self.process_message(&msg_txt, WsKind::Text, out).await;
+                    self.process_message(&msg_txt, WebSocketKind::Text, out)
+                        .await;
                 }
                 Ok(())
             }
             Message::Binary(msg_bytes) => {
-                self.process_message(&msg_bytes, WsKind::Binary, out).await;
+                self.process_message(&msg_bytes, WebSocketKind::Binary, out)
+                    .await;
                 Ok(())
             }
             Message::Ping(_) => Ok(()),
@@ -197,13 +200,13 @@ impl WebSocketSource {
         }
     }
 
-    async fn process_message<T>(&self, payload: &T, kind: WsKind, out: &mut SourceSender)
+    async fn process_message<T>(&self, payload: &T, kind: WebSocketKind, out: &mut SourceSender)
     where
         T: AsRef<[u8]> + ?Sized,
     {
         let payload_bytes = payload.as_ref();
 
-        emit!(WsBytesReceived {
+        emit!(WebSocketBytesReceived {
             byte_size: payload_bytes.len(),
             url: &self.config.common.uri,
             protocol: PROTOCOL,
@@ -222,7 +225,7 @@ impl WebSocketSource {
                     let byte_size = events.estimated_json_encoded_size_of();
 
                     register!(EventsReceived).emit(CountByteSize(event_count, byte_size));
-                    emit!(WsMessageReceived {
+                    emit!(WebSocketMessageReceived {
                         count: event_count,
                         byte_size,
                         url: &self.config.common.uri,
@@ -259,8 +262,8 @@ impl WebSocketSource {
     async fn reconnect(
         &self,
         out: &mut SourceSender,
-        ws_sink: &mut WsSink,
-        ws_source: &mut WsStream,
+        ws_sink: &mut WebSocketSink,
+        ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
         info!("Reconnecting to WebSocket...");
 
@@ -277,7 +280,7 @@ impl WebSocketSource {
     async fn connect(
         &self,
         out: &mut SourceSender,
-    ) -> Result<(WsSink, WsStream), WebSocketSourceError> {
+    ) -> Result<(WebSocketSink, WebSocketStream), WebSocketSourceError> {
         let (mut ws_sink, mut ws_source) = self.try_create_sink_and_stream().await?;
 
         if self.config.initial_message.is_some() {
@@ -288,15 +291,17 @@ impl WebSocketSource {
         Ok((ws_sink, ws_source))
     }
 
-    async fn try_create_sink_and_stream(&self) -> Result<(WsSink, WsStream), WebSocketSourceError> {
+    async fn try_create_sink_and_stream(
+        &self,
+    ) -> Result<(WebSocketSink, WebSocketStream), WebSocketSourceError> {
         let connect_future = self.params.connector.connect_backoff();
         let timeout = self.config.connect_timeout_secs;
 
         let ws_stream = match time::timeout(timeout, connect_future).await {
             Ok(ws) => ws,
             Err(_) => {
-                emit!(WsConnectionError {
-                    error: WsError::Io(std::io::Error::new(
+                emit!(WebSocketConnectionError {
+                    error: TungsteniteError::Io(std::io::Error::new(
                         std::io::ErrorKind::TimedOut,
                         "Connection attempt timed out",
                     ))
@@ -305,7 +310,7 @@ impl WebSocketSource {
             }
         };
 
-        emit!(WsConnectionEstablished {});
+        emit!(WebSocketConnectionEstablished {});
         let (sink, stream) = ws_stream.split();
 
         Ok((Box::pin(sink), Box::pin(stream)))
@@ -313,8 +318,8 @@ impl WebSocketSource {
 
     async fn send_initial_message(
         &self,
-        ws_sink: &mut WsSink,
-        ws_source: &mut WsStream,
+        ws_sink: &mut WebSocketSink,
+        ws_source: &mut WebSocketStream,
         out: &mut SourceSender,
     ) -> Result<(), WebSocketSourceError> {
         let initial_message = self.config.initial_message.as_ref().unwrap();
@@ -322,7 +327,7 @@ impl WebSocketSource {
             .send(Message::Text(initial_message.clone()))
             .await
             .map_err(|error| {
-                emit!(WsSendError { error: &error });
+                emit!(WebSocketSendError { error: &error });
                 WebSocketSourceError::Tungstenite { source: error }
             })?;
 
@@ -336,17 +341,17 @@ impl WebSocketSource {
             };
 
         let message = response.map_err(|source| {
-            emit!(WsReceiveError { error: &source });
+            emit!(WebSocketReceiveError { error: &source });
             WebSocketSourceError::Tungstenite { source }
         })?;
 
         match message {
             Message::Text(txt) => {
-                self.process_message(&txt, WsKind::Text, out).await;
+                self.process_message(&txt, WebSocketKind::Text, out).await;
                 Ok(())
             }
             Message::Binary(bin) => {
-                self.process_message(&bin, WsKind::Binary, out).await;
+                self.process_message(&bin, WebSocketKind::Binary, out).await;
                 Ok(())
             }
             Message::Close(frame) => self.handle_close_frame(frame),
@@ -375,11 +380,11 @@ impl WebSocketSource {
             ),
         };
 
-        let error = WsError::Io(std::io::Error::new(
+        let error = TungsteniteError::Io(std::io::Error::new(
             std::io::ErrorKind::ConnectionAborted,
             error_message,
         ));
-        emit!(WsReceiveError { error: &error });
+        emit!(WebSocketReceiveError { error: &error });
 
         Err(specific_error)
     }
@@ -417,7 +422,7 @@ impl PingManager {
         self.waiting_for_pong = false;
     }
 
-    async fn tick(&mut self, ws_sink: &mut WsSink) -> Result<(), WebSocketSourceError> {
+    async fn tick(&mut self, ws_sink: &mut WebSocketSink) -> Result<(), WebSocketSourceError> {
         self.interval.tick().await;
 
         if self.waiting_for_pong {
@@ -425,7 +430,7 @@ impl PingManager {
         }
 
         ws_sink.send(self.message.clone()).await.map_err(|error| {
-            emit!(WsSendError { error: &error });
+            emit!(WebSocketSendError { error: &error });
             WebSocketSourceError::Tungstenite { source: error }
         })?;
 

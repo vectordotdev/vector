@@ -13,19 +13,19 @@ use tokio_tungstenite::{
     client_async_with_config,
     tungstenite::{
         client::{uri_mode, IntoClientRequest},
-        error::{Error as WsError, ProtocolError, UrlError},
-        handshake::client::Request as WsRequest,
+        error::{Error as TungsteniteError, ProtocolError, UrlError},
+        handshake::client::Request,
         protocol::WebSocketConfig,
         stream::Mode as UriMode,
     },
-    WebSocketStream as WsStream,
+    WebSocketStream,
 };
 
 use crate::{
     common::backoff::ExponentialBackoff,
     dns,
     http::Auth,
-    internal_events::{WsConnectionEstablished, WsConnectionFailedError},
+    internal_events::{WebSocketConnectionEstablished, WebSocketConnectionFailedError},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
 
@@ -34,7 +34,7 @@ use crate::{
 #[snafu(visibility(pub))]
 pub enum WebSocketError {
     #[snafu(display("Creating WebSocket client failed: {}", source))]
-    CreateFailed { source: WsError },
+    CreateFailed { source: TungsteniteError },
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: TlsError },
     #[snafu(display("Unable to resolve DNS: {}", source))]
@@ -70,11 +70,11 @@ impl WebSocketConnector {
         })
     }
 
-    fn extract_host_and_port(request: &WsRequest) -> Result<(String, u16), WsError> {
+    fn extract_host_and_port(request: &Request) -> Result<(String, u16), TungsteniteError> {
         let host = request
             .uri()
             .host()
-            .ok_or(WsError::Url(UrlError::NoHostName))?
+            .ok_or(TungsteniteError::Url(UrlError::NoHostName))?
             .to_string();
         let mode = uri_mode(request.uri())?;
         let port = request.uri().port_u16().unwrap_or(match mode {
@@ -106,7 +106,7 @@ impl WebSocketConnector {
             .context(ConnectSnafu)
     }
 
-    async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
+    async fn connect(&self) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
         let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
@@ -126,16 +126,16 @@ impl WebSocketConnector {
         Ok(ws_stream)
     }
 
-    pub(crate) async fn connect_backoff(&self) -> WsStream<MaybeTlsStream<TcpStream>> {
+    pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
         let mut backoff = Self::fresh_backoff();
         loop {
             match self.connect().await {
                 Ok(ws_stream) => {
-                    emit!(WsConnectionEstablished {});
+                    emit!(WebSocketConnectionEstablished {});
                     return ws_stream;
                 }
                 Err(error) => {
-                    emit!(WsConnectionFailedError {
+                    emit!(WebSocketConnectionFailedError {
                         error: Box::new(error)
                     });
                     time::sleep(backoff.next().unwrap()).await;
@@ -149,12 +149,12 @@ impl WebSocketConnector {
     }
 }
 
-pub(crate) const fn is_closed(error: &WsError) -> bool {
+pub(crate) const fn is_closed(error: &TungsteniteError) -> bool {
     matches!(
         error,
-        WsError::ConnectionClosed
-            | WsError::AlreadyClosed
-            | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
+        TungsteniteError::ConnectionClosed
+            | TungsteniteError::AlreadyClosed
+            | TungsteniteError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
     )
 }
 

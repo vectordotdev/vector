@@ -7,7 +7,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
-use tokio_tungstenite::tungstenite::{error::Error as WsError, protocol::Message};
+use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     emit,
@@ -21,7 +21,9 @@ use crate::{
     codecs::{Encoder, Transformer},
     common::websocket::{is_closed, PingInterval, WebSocketConnector},
     event::{Event, EventStatus, Finalizable},
-    internal_events::{ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionShutdown},
+    internal_events::{
+        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
+    },
     sinks::util::StreamSink,
     sinks::websocket::config::WebSocketSinkConfig,
 };
@@ -55,17 +57,17 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = WsError>,
-        impl Stream<Item = Result<Message, WsError>>,
+        impl Sink<Message, Error = TungsteniteError>,
+        impl Stream<Item = Result<Message, TungsteniteError>>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
     }
 
-    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), WsError> {
+    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
         if let Some(ping_timeout) = self.ping_timeout {
             if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-                return Err(WsError::Io(io::Error::new(
+                return Err(TungsteniteError::Io(io::Error::new(
                     io::ErrorKind::TimedOut,
                     "Pong not received in time",
                 )));
@@ -94,8 +96,8 @@ impl WebSocketSink {
     ) -> Result<(), ()>
     where
         I: Stream<Item = Event> + Unpin,
-        WS: Stream<Item = Result<Message, WsError>> + Unpin,
-        O: Sink<Message, Error = WsError> + Unpin,
+        WS: Stream<Item = Result<Message, TungsteniteError>> + Unpin,
+        O: Sink<Message, Error = TungsteniteError> + Unpin,
     {
         const PING: &[u8] = b"PING";
 
@@ -104,7 +106,7 @@ impl WebSocketSink {
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
-            emit!(WsConnectionError { error });
+            emit!(WebSocketConnectionError { error });
             return Err(());
         }
         let mut last_pong = Instant::now();
@@ -179,9 +181,9 @@ impl WebSocketSink {
 
             if let Err(error) = result {
                 if is_closed(&error) {
-                    emit!(WsConnectionShutdown);
+                    emit!(WebSocketConnectionShutdown);
                 } else {
-                    emit!(WsConnectionError { error });
+                    emit!(WebSocketConnectionError { error });
                 }
                 return Err(());
             }
@@ -450,7 +452,7 @@ mod tests {
                                         Ok(msg) if msg.is_text() => {
                                             Some(Ok(msg.into_text().unwrap()))
                                         }
-                                        Err(WsError::Protocol(
+                                        Err(TungsteniteError::Protocol(
                                             ProtocolError::ResetWithoutClosingHandshake,
                                         )) => None,
                                         Err(e) => Some(Err(e)),
