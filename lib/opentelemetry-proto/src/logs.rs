@@ -433,7 +433,7 @@ fn to_any_value(value: &Value) -> OtelAnyValueStruct {
 mod tests {
     use crate::logs::log_events_to_resource_logs;
     use crate::logs::DateTime;
-    use crate::proto::common::v1::any_value;
+    use crate::proto::common::v1::{any_value, AnyValue, KeyValue};
     use chrono::Utc;
     use std::collections::BTreeMap;
     use vector_core::event::LogEvent;
@@ -441,6 +441,20 @@ mod tests {
 
     fn group_key(name: &str, version: &str) -> (String, String) {
         (name.to_string(), version.to_string())
+    }
+
+    pub fn get_attribute_value(attributes: &[KeyValue], key: &str) -> any_value::Value {
+        attributes
+            .iter()
+            .find(|kv| kv.key == key)
+            .expect(&format!("Missing attribute: `{key}`"))
+            .value
+            .as_ref()
+            .expect(&format!("Attribute `{key}` has no value"))
+            .value
+            .as_ref()
+            .expect(&format!("Attribute `{key}` has empty AnyValue"))
+            .clone()
     }
 
     pub fn make_event(scope_name: &str, scope_version: &str) -> LogEvent {
@@ -511,13 +525,23 @@ mod tests {
 
         assert_eq!(record.attributes.len(), 1);
         assert_eq!(
-            record.attributes.iter().find(|kv| kv.key == "id").unwrap().value.as_ref().unwrap().value.as_ref().unwrap(),
-            &any_value::Value::IntValue(1)
+            get_attribute_value(&record.attributes, "id"),
+            any_value::Value::IntValue(1)
         );
 
         let resource = resource_logs.resource.as_ref().unwrap();
         assert_eq!(
-            resource.attributes.iter().find(|kv| kv.key == "service.name").unwrap().value.as_ref().unwrap().value.as_ref().unwrap(),
+            resource
+                .attributes
+                .iter()
+                .find(|kv| kv.key == "service.name")
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap(),
             &any_value::Value::StringValue("opentelemetry-logs".to_string())
         );
     }
