@@ -53,7 +53,7 @@ pub enum DataTypeConfig {
 #[serde(rename_all = "lowercase")]
 pub struct ListOption {
     /// The method to use for pushing messages into a `list`.
-    pub(super) method: ListMethod,
+    pub method: ListMethod,
 }
 
 /// Method for pushing messages into a `list`.
@@ -82,7 +82,7 @@ pub enum ListMethod {
 #[serde(rename_all = "lowercase")]
 pub struct SortedSetOption {
     /// The method to use for pushing messages into a `sorted set`.
-    pub(super) method: SortedSetMethod,
+    pub method: SortedSetMethod,
 }
 
 /// Method for pushing messages into a `sorted set`.
