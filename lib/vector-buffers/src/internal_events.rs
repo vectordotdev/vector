@@ -9,22 +9,40 @@ use vector_common::{
     registered_event,
 };
 
+// Maximum i64 value that can be represented exactly in f64 (2^53).
+const F64_SAFE_INT_MAX: i64 = 1_i64 << 53;
+
 static BUFFER_COUNTERS: LazyLock<DashMap<usize, (AtomicI64, AtomicI64)>> =
     LazyLock::new(DashMap::new);
 
+fn get_new_atomic_val(counter: &AtomicI64, delta: i64) -> i64 {
+    let mut new_val = 0;
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+            let updated = current.saturating_add(delta).clamp(0, i64::MAX);
+            new_val = updated;
+            Some(updated)
+        })
+        .ok();
+    new_val
+}
 #[allow(clippy::cast_precision_loss)]
+fn i64_to_f64_safe(value: i64) -> f64 {
+    let capped = value.clamp(0, F64_SAFE_INT_MAX);
+    debug_assert!(capped <= F64_SAFE_INT_MAX);
+    capped as f64
+}
+
 fn update_buffer_gauge(stage: usize, events_delta: i64, bytes_delta: i64) {
-    let entry = BUFFER_COUNTERS
+    let counters = BUFFER_COUNTERS
         .entry(stage)
         .or_insert_with(|| (AtomicI64::new(0), AtomicI64::new(0)));
 
-    let (events, bytes) = entry.value();
+    let new_events = get_new_atomic_val(&counters.0, events_delta);
+    let new_bytes = get_new_atomic_val(&counters.1, bytes_delta);
 
-    let new_events = (events.fetch_add(events_delta, Ordering::SeqCst) + events_delta).max(0);
-    let new_bytes = (bytes.fetch_add(bytes_delta, Ordering::SeqCst) + bytes_delta).max(0);
-
-    gauge!("buffer_events", "stage" => stage.to_string()).set(new_events as f64);
-    gauge!("buffer_byte_size", "stage" => stage.to_string()).set(new_bytes as f64);
+    gauge!("buffer_events", "stage" => stage.to_string()).set(i64_to_f64_safe(new_events));
+    gauge!("buffer_byte_size", "stage" => stage.to_string()).set(i64_to_f64_safe(new_bytes));
 }
 
 pub struct BufferCreated {
@@ -37,12 +55,12 @@ impl InternalEvent for BufferCreated {
     #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         if self.max_size_events != 0 {
-            gauge!("buffer_max_event_size", "stage" => self.idx.to_string())
-                .set(self.max_size_events as f64);
+            let max_events = (self.max_size_events as u64).min(F64_SAFE_INT_MAX as u64);
+            gauge!("buffer_max_event_size", "stage" => self.idx.to_string()).set(max_events as f64);
         }
         if self.max_size_bytes != 0 {
-            gauge!("buffer_max_byte_size", "stage" => self.idx.to_string())
-                .set(self.max_size_bytes as f64);
+            let max_bytes = self.max_size_bytes.min(F64_SAFE_INT_MAX as u64);
+            gauge!("buffer_max_byte_size", "stage" => self.idx.to_string()).set(max_bytes as f64);
         }
     }
 }
@@ -54,7 +72,6 @@ pub struct BufferEventsReceived {
 }
 
 impl InternalEvent for BufferEventsReceived {
-    #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!("buffer_received_events_total", "stage" => self.idx.to_string())
             .increment(self.count);
@@ -74,7 +91,6 @@ pub struct BufferEventsSent {
 }
 
 impl InternalEvent for BufferEventsSent {
-    #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!("buffer_sent_events_total", "stage" => self.idx.to_string()).increment(self.count);
         counter!("buffer_sent_bytes_total", "stage" => self.idx.to_string())
@@ -95,7 +111,6 @@ pub struct BufferEventsDropped {
 }
 
 impl InternalEvent for BufferEventsDropped {
-    #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         let intentional_str = if self.intentional { "true" } else { "false" };
         if self.intentional {
@@ -164,6 +179,10 @@ registered_event! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use metrics::{Key, Label};
+    use metrics_util::debugging::{DebugValue, DebuggingRecorder};
+    use metrics_util::{CompositeKey, MetricKind};
+    use ordered_float::OrderedFloat;
     use std::sync::Mutex;
     use std::thread;
 
@@ -182,6 +201,54 @@ mod tests {
             }
             None => (0, 0),
         }
+    }
+
+    fn assert_gauge_state(
+        stage: usize,
+        updates: &[(i64, i64)],
+        expected_events: f64,
+        expected_bytes: f64,
+    ) {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_counters();
+
+        let recorder = DebuggingRecorder::default();
+        let snapshotter = recorder.snapshotter();
+
+        metrics::with_local_recorder(&recorder, move || {
+            for (events_delta, bytes_delta) in updates {
+                update_buffer_gauge(stage, *events_delta, *bytes_delta);
+            }
+
+            let mut metrics = snapshotter.snapshot().into_vec();
+
+            let stage_label = Label::new("stage", stage.to_string());
+            let mut expected_metrics = vec![
+                (
+                    CompositeKey::new(
+                        MetricKind::Gauge,
+                        Key::from_parts("buffer_events", vec![stage_label.clone()]),
+                    ),
+                    None,
+                    None,
+                    DebugValue::Gauge(OrderedFloat(expected_events)),
+                ),
+                (
+                    CompositeKey::new(
+                        MetricKind::Gauge,
+                        Key::from_parts("buffer_byte_size", vec![stage_label]),
+                    ),
+                    None,
+                    None,
+                    DebugValue::Gauge(OrderedFloat(expected_bytes)),
+                ),
+            ];
+
+            metrics.sort_by_key(|(key, ..)| key.clone());
+            expected_metrics.sort_by_key(|(key, ..)| key.clone());
+
+            assert_eq!(metrics, expected_metrics);
+        });
     }
 
     #[test]
@@ -208,15 +275,16 @@ mod tests {
     }
 
     #[test]
-    fn test_internal_counter_can_be_negative() {
+    fn test_decrement_below_zero_clamped_to_zero() {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_counters();
 
         update_buffer_gauge(2, 5, 100);
         update_buffer_gauge(2, -10, -200);
         let (events, bytes) = get_counter_values(2);
-        assert_eq!(events, -5);
-        assert_eq!(bytes, -100);
+
+        assert_eq!(events, 0);
+        assert_eq!(bytes, 0);
     }
 
     #[test]
@@ -262,5 +330,34 @@ mod tests {
 
         assert_eq!(final_events, expected_events);
         assert_eq!(final_bytes, expected_bytes);
+    }
+
+    #[test]
+    fn test_large_values_capped_to_f64_safe_max() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_counters();
+
+        update_buffer_gauge(3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
+
+        let (events, bytes) = get_counter_values(3);
+
+        assert!(events > F64_SAFE_INT_MAX);
+        assert!(bytes > F64_SAFE_INT_MAX);
+
+        let capped_events = events.min(F64_SAFE_INT_MAX);
+        let capped_bytes = bytes.min(F64_SAFE_INT_MAX);
+
+        assert_eq!(capped_events, F64_SAFE_INT_MAX);
+        assert_eq!(capped_bytes, F64_SAFE_INT_MAX);
+    }
+
+    #[test]
+    fn test_increment_with_recorder() {
+        assert_gauge_state(0, &[(100, 2048), (200, 1024)], 300.0, 3072.0);
+    }
+
+    #[test]
+    fn test_should_not_be_negative_with_recorder() {
+        assert_gauge_state(0, &[(100, 1024), (-200, -4096)], 0.0, 0.0);
     }
 }

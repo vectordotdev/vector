@@ -12056,6 +12056,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
+ "ordered-float 4.6.0",
  "paste",
  "proptest",
  "quickcheck",
