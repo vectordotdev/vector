@@ -670,7 +670,7 @@ sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-
 sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
-sources-websocket = []
+sources-websocket = ["dep:tokio-tungstenite"]
 
 sources-vector = ["dep:prost", "dep:tonic", "protobuf-build"]
 
