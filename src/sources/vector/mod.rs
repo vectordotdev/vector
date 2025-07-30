@@ -57,7 +57,7 @@ impl proto::Service for Service {
 
         let now = Utc::now();
         for event in &mut events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     VectorConfig::NAME,

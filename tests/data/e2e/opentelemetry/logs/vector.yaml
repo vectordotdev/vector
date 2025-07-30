@@ -1,0 +1,82 @@
+sources:
+  source0:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+      keepalive:
+        max_connection_age_jitter_factor: 0.1
+        max_connection_age_secs: 300
+
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 60
+
+transforms:
+  remap_otel:
+    type: remap
+    inputs:
+      - source0.logs
+    source: |
+      . = {
+        "resourceLogs": [
+          {
+            "resource": {
+              "attributes": [
+                { "key": "service.name", "value": { "stringValue": "opentelemetry-logs" } }
+              ]
+            },
+            "scopeLogs": [
+              {
+                "scope": {
+                  "name": "log-generator"
+                },
+                "logRecords": [
+                  {
+                    "timeUnixNano": to_unix_timestamp!(.timestamp),
+                    "severityText": .severity_text,
+                    "body": { "stringValue": .message },
+                    "attributes": [
+                      { "key": "count", "value": { "intValue": get!(.attributes, ["count"]) } }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+
+sinks:
+  otel_sink:
+    inputs: [ "remap_otel" ]
+    type: opentelemetry
+    protocol:
+      type: http
+      uri: http://otel-collector-sink:5318/v1/logs
+      method: post
+      encoding:
+        codec: json
+      framing:
+        method: newline_delimited
+      batch:
+        max_events: 1
+      request:
+        headers:
+          content-type: application/json
+
+  otel_file_sink:
+    type: file
+    path: "/output/vector-file-sink.log"
+    inputs:
+      - remap_otel
+    encoding:
+      codec: json
+
+  metrics_console_sink:
+    type: console
+    inputs:
+      - internal_metrics
+    encoding:
+      codec: json

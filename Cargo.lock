@@ -8625,6 +8625,7 @@ dependencies = [
  "num-bigint",
  "percent-encoding",
  "pin-project-lite",
+ "rand 0.9.1",
  "ryu",
  "socket2 0.5.10",
  "tokio",
@@ -12370,7 +12371,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.25.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#e717f1820138a0da0394fe609fd7d9bf072f95e2"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#834e80187f508a48b06b4ea7cf0acf7dae81ebc9"
 dependencies = [
  "aes",
  "aes-siv",

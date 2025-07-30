@@ -220,7 +220,7 @@ impl TcpSource for RawTcpSource {
         let now = Utc::now();
 
         for event in events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     SocketConfig::NAME,

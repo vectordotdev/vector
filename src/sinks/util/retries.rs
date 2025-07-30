@@ -41,6 +41,9 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
         // Treat the default as the request is successful
         RetryAction::Successful
     }
+
+    /// Optional hook run when an error is determined to be retriable.
+    fn on_retriable_error(&self, _error: &Self::Error) {}
 }
 
 /// The jitter mode to use for retry backoff behavior.
@@ -169,6 +172,7 @@ where
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
+                        self.logic.on_retriable_error(expected);
                         warn!(message = "Retrying after error.", error = %expected, internal_log_rate_limit = true);
                         Some(self.build_retry())
                     } else {
