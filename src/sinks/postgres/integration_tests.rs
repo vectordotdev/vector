@@ -168,7 +168,10 @@ async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
 async fn healthcheck_passes() {
     trace_init();
     let (config, _table, _connection) = prepare_config().await;
-    let (_sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
+    let (_sink, healthcheck) = config
+        .build(SinkContext::default())
+        .await
+        .expect("sink should build successfully");
     assert!(healthcheck.await.is_ok());
 }
 
@@ -186,7 +189,10 @@ async fn healthcheck_fails_unknown_host() {
     );
     let (config, cx) = load_sink::<PostgresConfig>(&config_str).unwrap();
 
-    let (_sink, healthcheck) = config.build(cx).await.unwrap();
+    let (_sink, healthcheck) = config
+        .build(cx)
+        .await
+        .expect("sink should build successfully");
     assert!(healthcheck.await.is_err());
 }
 
@@ -205,7 +211,10 @@ async fn healthcheck_fails_timed_out() {
     );
     let (config, cx) = load_sink::<PostgresConfig>(&config_str).unwrap();
 
-    let (_sink, healthcheck) = config.build(cx).await.unwrap();
+    let (_sink, healthcheck) = config
+        .build(cx)
+        .await
+        .expect("sink should build successfully");
     assert!(healthcheck.await.is_err());
 }
 
