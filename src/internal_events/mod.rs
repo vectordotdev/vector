@@ -125,7 +125,7 @@ mod template;
 mod throttle;
 mod udp;
 mod unix;
-#[cfg(feature = "sinks-websocket")]
+#[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 mod websocket;
 #[cfg(feature = "sinks-websocket-server")]
 mod websocket_server;
