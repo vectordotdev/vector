@@ -36,7 +36,7 @@ aliases: [ "/mailing_list" ]
 
 #### Discord
 
-The Discord server is meant for community conversations and getting help from other users. 
+The Discord server is meant for community conversations and getting help from other users.
 The Vector team doesn't actively monitor the Discord channels.
 
 ### How do I contribute to Vector?
