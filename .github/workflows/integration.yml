@@ -69,7 +69,7 @@ jobs:
     if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
     strategy:
       matrix:
-        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/22379 is fixed.
+        # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
