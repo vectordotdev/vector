@@ -2643,32 +2643,6 @@ dependencies = [
 
 [[package]]
 name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap",
- "criterion-plot",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bf7af66b0989381bd0be551bd7cc91912a655a58c6918420c9527b1fd8b4679"
@@ -3254,7 +3228,7 @@ dependencies = [
 name = "dnsmsg-parser"
 version = "0.1.0"
 dependencies = [
- "criterion 0.6.0",
+ "criterion",
  "data-encoding",
  "hickory-proto",
  "snafu 0.8.6",
@@ -3793,7 +3767,7 @@ dependencies = [
  "bytes 1.10.1",
  "chrono",
  "crc",
- "criterion 0.6.0",
+ "criterion",
  "dashmap",
  "file-source-common",
  "flate2",
@@ -5294,7 +5268,7 @@ dependencies = [
  "bytes 1.10.1",
  "chrono",
  "crc",
- "criterion 0.5.1",
+ "criterion",
  "dashmap",
  "file-source-common",
  "flate2",
@@ -11373,7 +11347,7 @@ dependencies = [
 name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
- "criterion 0.6.0",
+ "criterion",
  "dashmap",
  "mock_instant",
  "tracing 0.1.41",
@@ -11937,7 +11911,7 @@ dependencies = [
  "clap",
  "colored",
  "console-subscriber",
- "criterion 0.6.0",
+ "criterion",
  "crossterm 0.29.0",
  "csv",
  "databend-client",
@@ -12123,7 +12097,7 @@ dependencies = [
  "bytes 1.10.1",
  "clap",
  "crc32fast",
- "criterion 0.6.0",
+ "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
  "derivative",
@@ -12242,7 +12216,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "chrono-tz",
- "criterion 0.6.0",
+ "criterion",
  "crossbeam-utils",
  "derivative",
  "dyn-clone",
