@@ -11,7 +11,7 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use crate::{FileFingerprint, Fingerprinter};
+use crate::{FileFingerprint, FilePosition, Fingerprinter};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
@@ -34,7 +34,7 @@ enum State {
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
     fingerprint: FileFingerprint,
-    position: u64,
+    position: FilePosition,
     modified: DateTime<Utc>,
 }
 
@@ -51,19 +51,19 @@ pub struct Checkpointer {
 /// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
-    checkpoints: DashMap<FileFingerprint, u64>,
+    checkpoints: DashMap<FileFingerprint, FilePosition>,
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
 }
 
 impl CheckpointsView {
-    pub fn update(&self, fng: FileFingerprint, pos: u64) {
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.insert(fng, pos);
         self.modified_times.insert(fng, Utc::now());
         self.removed_times.remove(&fng);
     }
 
-    pub fn get(&self, fng: FileFingerprint) -> Option<u64> {
+    pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
 
@@ -271,12 +271,12 @@ impl Checkpointer {
     }
 
     #[cfg(test)]
-    pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: u64) {
+    pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.update(fng, pos);
     }
 
     #[cfg(test)]
-    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<u64> {
+    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(fng)
     }
 
@@ -476,7 +476,7 @@ mod test {
         );
         let ignore_before = Some(Utc::now() - Duration::seconds(12));
 
-        let position: u64 = 1234;
+        let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
 
         // load and persist the checkpoints
@@ -509,7 +509,7 @@ mod test {
     #[test]
     fn test_checkpointer_expiration() {
         let fingerprint = FileFingerprint::DevInode(1, 2);
-        let position: u64 = 1234;
+        let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
         let mut chkptr = Checkpointer::new(data_dir.path());
 
@@ -532,7 +532,7 @@ mod test {
     #[test]
     fn test_checkpointer_serialization() {
         let fingerprint = FileFingerprint::DevInode(1, 2);
-        let position: u64 = 1234;
+        let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
         let mut chkptr = Checkpointer::new(data_dir.path());
 
