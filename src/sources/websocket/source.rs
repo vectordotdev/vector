@@ -269,6 +269,8 @@ impl WebSocketSource {
         *ws_sink = new_sink;
         *ws_source = new_source;
 
+        info!("Reconnected.");
+
         Ok(())
     }
 
