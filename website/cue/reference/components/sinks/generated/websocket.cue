@@ -559,7 +559,12 @@ generated: components: sinks: websocket: configuration: {
 			[ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
 			"""
 		required: false
-		type: uint: unit: "seconds"
+		type: uint: {
+			examples: [
+				30,
+			]
+			unit: "seconds"
+		}
 	}
 	ping_timeout: {
 		description: """
@@ -570,7 +575,12 @@ generated: components: sinks: websocket: configuration: {
 			[pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
 			"""
 		required: false
-		type: uint: unit: "seconds"
+		type: uint: {
+			examples: [
+				5,
+			]
+			unit: "seconds"
+		}
 	}
 	tls: {
 		description: "TLS configuration."
@@ -681,8 +691,9 @@ generated: components: sinks: websocket: configuration: {
 			The WebSocket URI to connect to.
 
 			This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+			 **Note**: Using the `wss://` protocol requires enabling `tls`.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["ws://localhost:8080", "wss://example.com/socket"]
 	}
 }

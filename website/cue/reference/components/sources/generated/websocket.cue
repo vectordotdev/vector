@@ -178,7 +178,10 @@ generated: components: sources: websocket: configuration: {
 		required:    false
 		type: uint: {
 			default: 30
-			unit:    "seconds"
+			examples: [
+				10,
+			]
+			unit: "seconds"
 		}
 	}
 	decoding: {
@@ -607,7 +610,7 @@ generated: components: sources: websocket: configuration: {
 	initial_message: {
 		description: "An optional message to send to the server upon connection."
 		required:    false
-		type: string: {}
+		type: string: examples: ["SUBSCRIBE logs"]
 	}
 	initial_message_timeout_secs: {
 		description: """
@@ -617,7 +620,10 @@ generated: components: sources: websocket: configuration: {
 		required: false
 		type: uint: {
 			default: 2
-			unit:    "seconds"
+			examples: [
+				5,
+			]
+			unit: "seconds"
 		}
 	}
 	ping_interval: {
@@ -632,7 +638,12 @@ generated: components: sources: websocket: configuration: {
 			[ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
 			"""
 		required: false
-		type: uint: unit: "seconds"
+		type: uint: {
+			examples: [
+				30,
+			]
+			unit: "seconds"
+		}
 	}
 	ping_message: {
 		description: """
@@ -651,7 +662,12 @@ generated: components: sources: websocket: configuration: {
 			[pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
 			"""
 		required: false
-		type: uint: unit: "seconds"
+		type: uint: {
+			examples: [
+				5,
+			]
+			unit: "seconds"
+		}
 	}
 	pong_message: {
 		description: """
@@ -663,7 +679,7 @@ generated: components: sources: websocket: configuration: {
 		type: {
 			object: options: {
 				type: {
-					description: "The message must contain the value as a substring."
+					description: "The matching strategy to use for the pong message."
 					required:    true
 					type: string: enum: {
 						contains: "The message must contain the value as a substring."
@@ -671,7 +687,8 @@ generated: components: sources: websocket: configuration: {
 					}
 				}
 				value: {
-					required: true
+					description: "The string value to match against."
+					required:    true
 					type: string: {}
 				}
 			}
@@ -787,8 +804,9 @@ generated: components: sources: websocket: configuration: {
 			The WebSocket URI to connect to.
 
 			This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+			 **Note**: Using the `wss://` protocol requires enabling `tls`.
 			"""
 		required: true
-		type: string: {}
+		type: string: examples: ["ws://localhost:8080", "wss://example.com/socket"]
 	}
 }

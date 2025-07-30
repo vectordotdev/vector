@@ -189,6 +189,9 @@ pub struct WebSocketCommonConfig {
     /// The WebSocket URI to connect to.
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
+    ///  **Note**: Using the `wss://` protocol requires enabling `tls`.
+    #[configurable(metadata(docs::examples = "ws://localhost:8080"))]
+    #[configurable(metadata(docs::examples = "wss://example.com/socket"))]
     pub uri: String,
 
     /// The interval, in seconds, between sending [Ping][ping]s to the remote peer.
@@ -200,6 +203,8 @@ pub struct WebSocketCommonConfig {
     ///
     /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = 30))]
     pub ping_interval: Option<NonZeroU64>,
 
     /// The number of seconds to wait for a [Pong][pong] response from the remote peer.
@@ -209,6 +214,8 @@ pub struct WebSocketCommonConfig {
     /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.
     #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::advanced))]
+    #[configurable(metadata(docs::examples = 5))]
     pub ping_timeout: Option<NonZeroU64>,
 
     /// TLS configuration.
