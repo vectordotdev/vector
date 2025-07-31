@@ -4,12 +4,12 @@ components: sources: websocket: {
 	title: "WebSocket"
 
 	classes: {
-		commonly_used:   false
-		delivery:        "best_effort"
+		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
-		development:     "beta"
-		egress_method:   "stream"
-		stateful:        false
+		development:   "beta"
+		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -28,11 +28,11 @@ components: sources: websocket: {
 				enabled: true
 			}
 			tls: {
-				enabled:              true
+				enabled:                true
 				can_verify_certificate: true
-				can_verify_hostname:  true
-				enabled_by_scheme:    true
-				enabled_default:      false
+				can_verify_hostname:    true
+				enabled_by_scheme:      true
+				enabled_default:        false
 			}
 			from: {
 				service: services.websocket
@@ -58,8 +58,8 @@ components: sources: websocket: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings:     []
-		notices:      []
+		warnings: []
+		notices: []
 	}
 
 	configuration: generated.components.sources.websocket.configuration & {
@@ -89,9 +89,9 @@ components: sources: websocket: {
 					enabled: true
 				}
 				ping_interval: 30
-				ping_timeout: 10
-				ping_message: "PING"
-				pong_message: "PONG"
+				ping_timeout:  10
+				ping_message:  "PING"
+				pong_message:  "PONG"
 			}
 		},
 	]
