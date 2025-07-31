@@ -3,14 +3,12 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::LazyLock;
 use std::time::Duration;
 
+use crate::cast_utils::{i64_to_f64_safe, u64_to_f64_safe};
 use metrics::{counter, gauge, histogram, Histogram};
 use vector_common::{
     internal_event::{error_type, InternalEvent},
     registered_event,
 };
-
-// Maximum i64 value that can be represented exactly in f64 (2^53).
-const F64_SAFE_INT_MAX: i64 = 1_i64 << 53;
 
 static BUFFER_COUNTERS: LazyLock<DashMap<usize, (AtomicI64, AtomicI64)>> =
     LazyLock::new(DashMap::new);
@@ -25,12 +23,6 @@ fn get_new_atomic_val(counter: &AtomicI64, delta: i64) -> i64 {
         })
         .ok();
     new_val
-}
-#[allow(clippy::cast_precision_loss)]
-fn i64_to_f64_safe(value: i64) -> f64 {
-    let capped = value.clamp(0, F64_SAFE_INT_MAX);
-    debug_assert!(capped <= F64_SAFE_INT_MAX);
-    capped as f64
 }
 
 fn update_buffer_gauge(stage: usize, events_delta: i64, bytes_delta: i64) {
@@ -52,15 +44,14 @@ pub struct BufferCreated {
 }
 
 impl InternalEvent for BufferCreated {
-    #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         if self.max_size_events != 0 {
-            let max_events = (self.max_size_events as u64).min(F64_SAFE_INT_MAX as u64);
-            gauge!("buffer_max_event_size", "stage" => self.idx.to_string()).set(max_events as f64);
+            gauge!("buffer_max_event_size", "stage" => self.idx.to_string())
+                .set(u64_to_f64_safe(self.max_size_events as u64));
         }
         if self.max_size_bytes != 0 {
-            let max_bytes = self.max_size_bytes.min(F64_SAFE_INT_MAX as u64);
-            gauge!("buffer_max_byte_size", "stage" => self.idx.to_string()).set(max_bytes as f64);
+            gauge!("buffer_max_byte_size", "stage" => self.idx.to_string())
+                .set(u64_to_f64_safe(self.max_size_bytes));
         }
     }
 }
@@ -179,6 +170,7 @@ registered_event! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cast_utils::F64_SAFE_INT_MAX;
     use metrics::{Key, Label};
     use metrics_util::debugging::{DebugValue, DebuggingRecorder};
     use metrics_util::{CompositeKey, MetricKind};
