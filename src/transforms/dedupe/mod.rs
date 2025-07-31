@@ -6,8 +6,9 @@ pub mod transform;
 
 #[cfg(feature = "transforms-impl-dedupe")]
 pub mod common {
-    use std::num::NonZeroUsize;
+    use std::{num::NonZeroUsize, time::Duration};
 
+    use serde_with::serde_as;
     use vector_lib::{configurable::configurable_component, lookup::lookup_v2::ConfigTargetPath};
 
     use crate::config::log_schema;
@@ -19,6 +20,21 @@ pub mod common {
     pub struct CacheConfig {
         /// Number of events to cache and use for comparing incoming events to previously seen events.
         pub num_events: NonZeroUsize,
+    }
+
+    /// Configuration for time based cache.
+    #[serde_as]
+    #[configurable_component]
+    #[derive(Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct TimedCacheConfig {
+        /// Maximum age of items in deduplication cache, before duplicates are allowed again.
+        #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+        pub max_age_ms: Duration,
+
+        /// Set to true if dropped duplicates should refresh the age timer.
+        #[serde(default = "crate::serde::default_false")]
+        pub refresh_on_drop: bool,
     }
 
     pub const fn default_cache_config() -> CacheConfig {

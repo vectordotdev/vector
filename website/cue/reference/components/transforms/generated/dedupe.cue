@@ -34,4 +34,20 @@ generated: components: transforms: dedupe: configuration: {
 			}
 		}
 	}
+	timed: {
+		description: "Configuration for time based cache."
+		required:    false
+		type: object: options: {
+			max_age_ms: {
+				description: "Maximum age of items in deduplication cache, before duplicates are allowed again."
+				required:    true
+				type: uint: unit: "milliseconds"
+			}
+			refresh_on_drop: {
+				description: "Set to true if dropped duplicates should refresh the age timer."
+				required:    false
+				type: bool: default: false
+			}
+		}
+	}
 }

@@ -13,8 +13,11 @@ use crate::{
 };
 
 use super::{
-    common::{default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig},
-    transform::Dedupe,
+    common::{
+        default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig,
+        TimedCacheConfig,
+    },
+    transform::{Dedupe, TimedDedupe},
 };
 
 /// Configuration for the `dedupe` transform.
@@ -29,6 +32,10 @@ pub struct DedupeConfig {
     #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub timed: Option<TimedCacheConfig>,
 }
 
 impl GenerateConfig for DedupeConfig {
@@ -36,6 +43,7 @@ impl GenerateConfig for DedupeConfig {
         toml::Value::try_from(Self {
             fields: None,
             cache: default_cache_config(),
+            timed: None,
         })
         .unwrap()
     }
@@ -45,10 +53,18 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::event_task(Dedupe::new(
-            self.cache.num_events,
-            fill_default_fields_match(self.fields.as_ref()),
-        )))
+        if let Some(time_config) = &self.timed {
+            Ok(Transform::event_task(TimedDedupe::new(
+                self.cache.num_events,
+                fill_default_fields_match(self.fields.as_ref()),
+                time_config.clone(),
+            )))
+        } else {
+            Ok(Transform::event_task(Dedupe::new(
+                self.cache.num_events,
+                fill_default_fields_match(self.fields.as_ref()),
+            )))
+        }
     }
 
     fn input(&self) -> Input {
@@ -71,6 +87,7 @@ impl TransformConfig for DedupeConfig {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::time::Duration;
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -79,6 +96,7 @@ mod tests {
     use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 
     use crate::config::schema::Definition;
+    use crate::transforms::dedupe::common::TimedCacheConfig;
     use crate::{
         event::{Event, LogEvent, ObjectMap, Value},
         test_util::components::assert_transform_compliance,
@@ -102,6 +120,7 @@ mod tests {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
             },
             fields: Some(FieldMatchConfig::MatchFields(fields)),
+            timed: None,
         }
     }
 
@@ -118,6 +137,7 @@ mod tests {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
             },
             fields: Some(FieldMatchConfig::IgnoreFields(fields)),
+            timed: None,
         }
     }
 
@@ -361,6 +381,74 @@ mod tests {
 
             // Third event is a dupe but gets output anyway because the first
             // event has aged out of the cache.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
+            assert_eq!(new_event, event1);
+
+            drop(tx);
+            topology.stop().await;
+            assert_eq!(out.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn dedupe_match_timed_age_out() {
+        // Construct transform with timed cache
+        let transform_config = DedupeConfig {
+            timed: Some(TimedCacheConfig {
+                max_age_ms: Duration::from_millis(100),
+                refresh_on_drop: false,
+            }),
+            ..make_match_transform_config(5, vec!["matched".into()])
+        };
+        timed_age_out(transform_config).await;
+    }
+
+    #[tokio::test]
+    async fn dedupe_ignore_timed_age_out() {
+        // Construct transform with timed cache
+        let transform_config = DedupeConfig {
+            timed: Some(TimedCacheConfig {
+                max_age_ms: Duration::from_millis(100),
+                refresh_on_drop: false,
+            }),
+            ..make_ignore_transform_config(1, vec![])
+        };
+        timed_age_out(transform_config).await;
+    }
+
+    /// Test the eviction behavior of the underlying LruCache
+    async fn timed_age_out(transform_config: DedupeConfig) {
+        assert_transform_compliance(async {
+            let (tx, rx) = mpsc::channel(1);
+            let (topology, mut out) =
+                create_topology(ReceiverStream::new(rx), transform_config).await;
+
+            let mut event1 = Event::Log(LogEvent::from("message"));
+            event1.as_mut_log().insert("matched", "some value");
+
+            // First event should always be passed through as-is.
+            tx.send(event1.clone()).await.unwrap();
+            let new_event = out.recv().await.unwrap();
+
+            event1.set_source_id(Arc::new(ComponentKey::from("in")));
+            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
+
+            // the schema definition is copied from the source for dedupe
+            event1
+                .metadata_mut()
+                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            assert_eq!(new_event, event1);
+
+            // Second time the event gets dropped because it's a dupe.
+            tx.send(event1.clone()).await.unwrap();
+
+            tokio::time::sleep(Duration::from_millis(101)).await;
+
+            // Third time the event is a dupe but enought time has passed to accept it.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
