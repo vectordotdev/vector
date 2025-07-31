@@ -229,6 +229,7 @@ Ideapad
 idn
 ifeq
 ifneq
+ifile
 imobile
 Infinix
 influxd

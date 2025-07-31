@@ -11,11 +11,9 @@ use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{
-    buffer::{read_until_with_max_size, ReadResult},
-    metadata_ext::PortableFileExt,
-    FilePosition, ReadFrom,
-};
+use crate::{FilePosition, ReadFrom};
+use file_source_common::buffer::{read_until_with_max_size, ReadResult};
+use file_source_common::PortableFileExt;
 #[cfg(test)]
 mod tests;
 

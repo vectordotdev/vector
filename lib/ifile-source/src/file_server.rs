@@ -1,9 +1,9 @@
 use std::{
-    cmp,
     collections::{BTreeMap, HashMap},
     fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
+    time::Instant,
     time::{self, Duration},
 };
 
@@ -18,19 +18,24 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::{FileWatcher, RawLineResult},
-    paths_provider::PathsProvider,
-    Checkpointer, CheckpointsView, ReadFrom,
+    file_watcher::FileWatcher, paths_provider::PathsProvider, Checkpointer, CheckpointsView,
+    FilePosition, ReadFrom,
 };
 use file_source_common::{
-    internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter,
+    internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents, FileFingerprint,
+    Fingerprinter,
 };
 
-/// `FileServer` is a Source which cooperatively schedules reads over files,
-/// converting the lines of said files into `LogLine` structures. As
-/// `FileServer` is intended to be useful across multiple operating systems with
-/// POSIX filesystem semantics `FileServer` must poll for changes. That is, no
-/// event notification is used by `FileServer`.
+/// `FileServer` is a Source which schedules reads over files,
+/// converting the lines of said files into `LogLine` structures.
+///
+/// `FileServer` uses a hybrid approach for file monitoring:
+/// 1. Active polling: For files that are actively being read
+/// 2. Passive watching: For idle files, using filesystem notifications via notify-rs/notify
+///
+/// This approach allows `FileServer` to efficiently monitor many files without
+/// holding open file handles for all of them, while still maintaining checkpoints
+/// in case files receive future writes.
 ///
 /// `FileServer` is configured on a path to watch. The files do _not_ need to
 /// exist at startup. `FileServer` will discover new files which match
@@ -47,13 +52,14 @@ where
     pub max_line_bytes: usize,
     pub line_delimiter: Bytes,
     pub data_dir: PathBuf,
-    pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
+    /// Duration after which to checkpoint files
+    pub checkpoint_interval: Duration,
 }
 
 /// `FileServer` as Source
@@ -92,11 +98,16 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
+        // We're using notify-based watching for all files
+        // This means we only need to glob once on startup to discover files
+        // that were added while Vector was stopped
+        debug!(message = "Using notify-based watching for all files");
+
         let mut fingerprint_buffer = Vec::new();
 
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
-        let mut backoff_cap: usize = 1;
+        // We no longer need backoff_cap since we use a fixed backoff
         let mut lines = Vec::new();
 
         checkpointer.read_checkpoints(self.ignore_before);
@@ -104,7 +115,9 @@ where
         let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
-        for path in self.paths_provider.paths().into_iter() {
+        // Use block_on to call the async paths method
+        let paths = self.handle.block_on(self.paths_provider.paths());
+        for path in paths.into_iter() {
             if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                 &path,
                 &mut fingerprint_buffer,
@@ -132,16 +145,19 @@ where
                 &mut fingerprint_buffer,
             );
 
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true, &mut lines);
         }
         self.emitter.emit_files_open(fp_map.len());
 
         let mut stats = TimingStats::default();
 
-        // Spawn the checkpoint writer task
+        // Spawn the checkpoint writer task with the configured interval
+        // This ensures that checkpoints are written periodically to disk
+        let checkpoint_interval = self.checkpoint_interval;
+
         let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
             checkpointer,
-            self.glob_minimum_cooldown,
+            checkpoint_interval,
             shutdown_checkpointer,
             self.emitter.clone(),
         ));
@@ -157,26 +173,53 @@ where
         // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
-            // Glob find files to follow, but not too often.
+            // Determine if we need to perform file discovery
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time {
-                // Schedule the next glob time.
-                next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
+            // Check for new files frequently to minimize the delay between when a file is discovered
+            // by the notify watcher and when it's actually processed, but not on every iteration
+            // to avoid excessive CPU usage
+            let should_discover = next_glob_time <= now_time
+                || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
 
-                if stats.started_at.elapsed() > Duration::from_secs(1) {
-                    stats.report();
+            // Report stats periodically, but only if enough time has passed since the last report
+            // This prevents excessive logging when the main loop is running frequently
+            static mut LAST_STATS_REPORT: Option<Instant> = None;
+            let now = Instant::now();
+            let should_report_stats = unsafe {
+                if let Some(last_report) = LAST_STATS_REPORT {
+                    if now.duration_since(last_report) >= Duration::from_secs(10) {
+                        LAST_STATS_REPORT = Some(now);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    LAST_STATS_REPORT = Some(now);
+                    true
                 }
+            };
 
-                if stats.started_at.elapsed() > Duration::from_secs(10) {
-                    stats = TimingStats::default();
-                }
+            if should_report_stats && stats.started_at.elapsed() > Duration::from_secs(10) {
+                stats.report();
+            }
+
+            if stats.started_at.elapsed() > Duration::from_secs(10) {
+                stats = TimingStats::default();
+            }
+
+            if should_discover {
+                // Schedule the next glob time - use a fixed interval of 1 second
+                next_glob_time = now_time.checked_add(Duration::from_secs(1)).unwrap();
 
                 // Search (glob) for files to detect major file changes.
                 let start = time::Instant::now();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
-                for path in self.paths_provider.paths().into_iter() {
+
+                // Use async paths provider
+                let paths = self.handle.block_on(self.paths_provider.paths());
+                for path in paths.into_iter() {
                     if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
                         &path,
                         &mut fingerprint_buffer,
@@ -223,7 +266,51 @@ where
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            // Immediately watch and read the new file
+                            let path_clone = path.clone();
+                            debug!(message = "Discovered new file during runtime", ?path_clone);
+                            self.watch_new_file(
+                                path,
+                                file_id,
+                                &mut fp_map,
+                                &checkpoints,
+                                false,
+                                &mut lines,
+                            );
+
+                            // Immediately read the file to avoid delay in detecting content
+                            if let Some(watcher) = fp_map.get_mut(&file_id) {
+                                debug!(
+                                    message = "Immediately reading newly discovered file",
+                                    ?path_clone
+                                );
+                                let mut bytes_read: usize = 0;
+                                while let Ok(Some(line)) = watcher.read_line() {
+                                    let sz = line.bytes.len();
+                                    trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
+                                    bytes_read += sz;
+
+                                    lines.push(Line {
+                                        text: line.bytes,
+                                        filename: watcher
+                                            .path
+                                            .to_str()
+                                            .expect("not a valid path")
+                                            .to_owned(),
+                                        file_id,
+                                        start_offset: line.offset,
+                                        end_offset: watcher.get_file_position(),
+                                    });
+                                }
+
+                                if bytes_read > 0 {
+                                    debug!(
+                                        message = "Read initial content from newly discovered file",
+                                        ?path_clone,
+                                        bytes = bytes_read
+                                    );
+                                }
+                            }
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -258,25 +345,9 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
-                if !watcher.should_read() {
-                    continue;
-                }
-
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
-                while let Ok(RawLineResult {
-                    raw_line: Some(line),
-                    discarded_for_size_and_truncated,
-                }) = watcher.read_line()
-                {
-                    discarded_for_size_and_truncated.iter().for_each(|buf| {
-                        self.emitter.emit_file_line_too_long(
-                            &buf.clone(),
-                            self.max_line_bytes,
-                            buf.len(),
-                        )
-                    });
-
+                while let Ok(Some(line)) = watcher.read_line() {
                     let sz = line.bytes.len();
                     trace!(
                         message = "Read bytes.",
@@ -329,9 +400,27 @@ where
                 }
             }
 
+            // Handle file watcher state transitions
             for (_, watcher) in &mut fp_map {
+                // Mark files as dead if they're not findable and have been missing for too long
                 if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
                     watcher.set_dead();
+                    continue;
+                }
+
+                // Only update the watcher if we've read data from the file
+                // This avoids unnecessary updates that can cause excessive logging
+                if watcher.reached_eof()
+                    && watcher.last_read_success().elapsed() < Duration::from_secs(1)
+                {
+                    // Update the notify watcher with the current position
+                    if let Err(e) = watcher.update_watcher() {
+                        debug!(
+                            message = "Failed to update watcher",
+                            ?watcher.path,
+                            error = ?e
+                        );
+                    }
                 }
             }
 
@@ -362,16 +451,9 @@ where
             stats.record("sending", start.elapsed());
 
             let start = time::Instant::now();
-            // When no lines have been read we kick the backup_cap up by twice,
-            // limited by the hard-coded cap. Else, we set the backup_cap to its
-            // minimum on the assumption that next time through there will be
-            // more lines to read promptly.
-            backoff_cap = if global_bytes_read == 0 {
-                cmp::min(2_048, backoff_cap.saturating_mul(2))
-            } else {
-                1
-            };
-            let backoff = backoff_cap.saturating_sub(global_bytes_read);
+            // Use minimal backoff to ensure we detect changes immediately
+            // 1ms is the minimum possible value to ensure immediate responsiveness
+            let backoff = 1;
 
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first
@@ -380,12 +462,23 @@ where
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {
-                    sleep(Duration::from_millis(backoff as u64)).await;
+                    // Always use a very short sleep duration to ensure responsiveness
+                    // This is especially important for notify-based watching
+                    sleep(Duration::from_millis(1)).await;
                 }
             };
             futures::pin_mut!(sleep);
             match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
+                    // Shut down all file watchers to prevent further events
+                    debug!(
+                        message = "Shutting down all file watchers",
+                        count = fp_map.len()
+                    );
+                    for (_, watcher) in fp_map.iter_mut() {
+                        watcher.shutdown();
+                    }
+
                     self.handle
                         .block_on(chans.close())
                         .expect("error closing file_server data channel.");
@@ -411,6 +504,7 @@ where
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
+        lines: &mut Vec<Line>,
     ) {
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
@@ -451,6 +545,32 @@ where
                 } else {
                     self.emitter.emit_file_added(&path);
                 }
+                // Process any lines read at startup
+                let startup_lines = watcher.take_startup_lines();
+                if !startup_lines.is_empty() {
+                    // Process all startup lines, including empty ones
+                    let line_count = startup_lines.len();
+                    if line_count > 0 {
+                        debug!(
+                            message = "Processing startup lines",
+                            line_count = line_count,
+                            ?path
+                        );
+
+                        // Add the lines to the output
+                        for line in startup_lines {
+                            let bytes_len = line.bytes.len() as u64;
+                            lines.push(Line {
+                                text: line.bytes,
+                                filename: path.to_string_lossy().into_owned(),
+                                file_id,
+                                start_offset: line.offset,
+                                end_offset: line.offset + bytes_len,
+                            });
+                        }
+                    }
+                }
+
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
@@ -567,6 +687,6 @@ pub struct Line {
     pub text: Bytes,
     pub filename: String,
     pub file_id: FileFingerprint,
-    pub start_offset: u64,
-    pub end_offset: u64,
+    pub start_offset: FilePosition,
+    pub end_offset: FilePosition,
 }

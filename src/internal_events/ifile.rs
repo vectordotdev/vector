@@ -83,6 +83,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -105,10 +106,12 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
-    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
+    use vector_lib::file_source_common::internal_events::{
+        FileSourceExtendedInternalEvents, FileSourceInternalEvents,
+    };
+
+    use crate::internal_events::FileLineTooBigError;
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -129,19 +132,19 @@ mod source {
             trace!(
                 message = "Bytes received.",
                 byte_size = %self.byte_size,
-                protocol = "file",
+                protocol = "ifile",
                 file = %self.file,
             );
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                     "file" => self.file.to_owned()
                 )
             } else {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                 )
             }
             .increment(self.byte_size as u64);
@@ -167,12 +170,12 @@ mod source {
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_events_total",
-                    "file" => self.file.to_owned(),
+                    "ifile" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
                     "component_received_event_bytes_total",
-                    "file" => self.file.to_owned(),
+                    "ifile" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
@@ -223,7 +226,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
-
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -263,6 +266,7 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -355,7 +359,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
-
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -457,7 +461,7 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
-
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -484,6 +488,7 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -492,38 +497,6 @@ mod source {
                 "stage" => error_stage::RECEIVING,
             )
             .increment(1);
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct FileLineTooBigError<'a> {
-        pub truncated_bytes: &'a BytesMut,
-        pub configured_limit: usize,
-        pub encountered_size_so_far: usize,
-    }
-
-    impl InternalEvent for FileLineTooBigError<'_> {
-        fn emit(self) {
-            error!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
-                truncated_bytes = ?self.truncated_bytes,
-                configured_limit = self.configured_limit,
-                encountered_size_so_far = self.encountered_size_so_far,
-                internal_log_rate_limit = true,
-                error_type = error_type::CONDITION_FAILED,
-                stage = error_stage::RECEIVING,
-            );
-            counter!(
-                "component_errors_total",
-                "error_code" => "reading_line_from_file",
-                "error_type" => error_type::CONDITION_FAILED,
-                "stage" => error_stage::RECEIVING,
-            )
-            .increment(1);
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "Found line that exceeds max_line_bytes; discarding.",
-            });
         }
     }
 
@@ -621,6 +594,42 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
+        }
+    }
+
+    impl FileSourceExtendedInternalEvents for FileSourceInternalEventsEmitter {
+        fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to passive watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_passive_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_passive_total")
+            }
+            .increment(1);
+        }
+
+        fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to active watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_active_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_active_total")
+            }
+            .increment(1);
         }
     }
 }
