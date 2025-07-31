@@ -112,17 +112,15 @@ impl TimedDedupe {
             self.cache
                 .put(cache_entry, now)
                 .is_some_and(|time| now.duration_since(time) < self.time_config.max_age_ms)
+        } else if self
+            .cache
+            .get(&cache_entry)
+            .is_some_and(|time| now.duration_since(*time) < self.time_config.max_age_ms)
+        {
+            true
         } else {
-            if self
-                .cache
-                .get(&cache_entry)
-                .is_some_and(|time| now.duration_since(*time) < self.time_config.max_age_ms)
-            {
-                true
-            } else {
-                self.cache.put(cache_entry, now);
-                false
-            }
+            self.cache.put(cache_entry, now);
+            false
         };
         if drop_event {
             emit!(DedupeEventsDropped { count: 1 });
