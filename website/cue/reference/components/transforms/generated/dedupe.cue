@@ -34,7 +34,7 @@ generated: components: transforms: dedupe: configuration: {
 			}
 		}
 	}
-	timed: {
+	time_settings: {
 		description: "Configuration for time based cache."
 		required:    false
 		type: object: options: {

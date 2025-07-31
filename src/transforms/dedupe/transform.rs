@@ -1,4 +1,4 @@
-use std::{future::ready, num::NonZeroUsize, pin::Pin, time::Instant};
+use std::{future::ready, num::NonZeroUsize, pin::Pin};
 
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
@@ -12,7 +12,7 @@ use crate::{
     transforms::TaskTransform,
 };
 
-use super::common::{FieldMatchConfig, TimedCacheConfig};
+use super::common::FieldMatchConfig;
 
 #[derive(Clone)]
 pub struct Dedupe {
@@ -46,7 +46,7 @@ type TypeId = u8;
 /// CacheEntries for 2 equivalent events will always contain the fields in the
 /// same order.
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum CacheEntry {
+pub(crate) enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
     Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
@@ -85,56 +85,10 @@ impl Dedupe {
     }
 }
 
-#[derive(Clone)]
-pub struct TimedDedupe {
-    fields: FieldMatchConfig,
-    cache: LruCache<CacheEntry, Instant>,
-    time_config: TimedCacheConfig,
-}
-
-impl TimedDedupe {
-    pub fn new(
-        num_entries: NonZeroUsize,
-        fields: FieldMatchConfig,
-        time_config: TimedCacheConfig,
-    ) -> Self {
-        Self {
-            fields,
-            cache: LruCache::new(num_entries),
-            time_config,
-        }
-    }
-
-    pub fn transform_one(&mut self, event: Event) -> Option<Event> {
-        let cache_entry = build_cache_entry(&event, &self.fields);
-        let now = Instant::now();
-        let drop_event = if self.time_config.refresh_on_drop {
-            self.cache
-                .put(cache_entry, now)
-                .is_some_and(|time| now.duration_since(time) < self.time_config.max_age_ms)
-        } else if self
-            .cache
-            .get(&cache_entry)
-            .is_some_and(|time| now.duration_since(*time) < self.time_config.max_age_ms)
-        {
-            true
-        } else {
-            self.cache.put(cache_entry, now);
-            false
-        };
-        if drop_event {
-            emit!(DedupeEventsDropped { count: 1 });
-            None
-        } else {
-            Some(event)
-        }
-    }
-}
-
 /// Takes in an Event and returns a CacheEntry to place into the LRU cache
 /// containing all relevant information for the fields that need matching
 /// against according to the specified FieldMatchConfig.
-fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
+pub(crate) fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     match &fields {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
@@ -172,19 +126,6 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 }
 
 impl TaskTransform<Event> for Dedupe {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
-    }
-}
-
-impl TaskTransform<Event> for TimedDedupe {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,

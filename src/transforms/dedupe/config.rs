@@ -17,7 +17,8 @@ use super::{
         default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig,
         TimedCacheConfig,
     },
-    transform::{Dedupe, TimedDedupe},
+    timed_transform::TimedDedupe,
+    transform::Dedupe,
 };
 
 /// Configuration for the `dedupe` transform.
@@ -35,7 +36,7 @@ pub struct DedupeConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub timed: Option<TimedCacheConfig>,
+    pub time_settings: Option<TimedCacheConfig>,
 }
 
 impl GenerateConfig for DedupeConfig {
@@ -43,7 +44,7 @@ impl GenerateConfig for DedupeConfig {
         toml::Value::try_from(Self {
             fields: None,
             cache: default_cache_config(),
-            timed: None,
+            time_settings: None,
         })
         .unwrap()
     }
@@ -53,7 +54,7 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        if let Some(time_config) = &self.timed {
+        if let Some(time_config) = &self.time_settings {
             Ok(Transform::event_task(TimedDedupe::new(
                 self.cache.num_events,
                 fill_default_fields_match(self.fields.as_ref()),
@@ -120,7 +121,7 @@ mod tests {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
             },
             fields: Some(FieldMatchConfig::MatchFields(fields)),
-            timed: None,
+            time_settings: None,
         }
     }
 
@@ -137,7 +138,7 @@ mod tests {
                 num_events: std::num::NonZeroUsize::new(num_events).expect("non-zero num_events"),
             },
             fields: Some(FieldMatchConfig::IgnoreFields(fields)),
-            timed: None,
+            time_settings: None,
         }
     }
 
@@ -398,7 +399,7 @@ mod tests {
     async fn dedupe_match_timed_age_out() {
         // Construct transform with timed cache
         let transform_config = DedupeConfig {
-            timed: Some(TimedCacheConfig {
+            time_settings: Some(TimedCacheConfig {
                 max_age_ms: Duration::from_millis(100),
                 refresh_on_drop: false,
             }),
@@ -411,7 +412,7 @@ mod tests {
     async fn dedupe_ignore_timed_age_out() {
         // Construct transform with timed cache
         let transform_config = DedupeConfig {
-            timed: Some(TimedCacheConfig {
+            time_settings: Some(TimedCacheConfig {
                 max_age_ms: Duration::from_millis(100),
                 refresh_on_drop: false,
             }),

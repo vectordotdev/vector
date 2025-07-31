@@ -45,7 +45,7 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::IgnoreFields(vec!["message".into()])),
                 cache: cache.clone(),
-                timed: None,
+                time_settings: None,
             },
         },
         // Modification of previous where field "message" is matched.
@@ -55,7 +55,7 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
                 cache: cache.clone(),
-                timed: None,
+                time_settings: None,
             },
         },
         // Modification of previous where deduplication with max age is used.
@@ -65,7 +65,7 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
                 cache: cache.clone(),
-                timed: Some(TimedCacheConfig {
+                time_settings: Some(TimedCacheConfig {
                     max_age_ms: Duration::from_secs(5),
                     refresh_on_drop: false,
                 }),
@@ -78,7 +78,7 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
                 cache: cache.clone(),
-                timed: Some(TimedCacheConfig {
+                time_settings: Some(TimedCacheConfig {
                     max_age_ms: Duration::from_secs(5),
                     refresh_on_drop: true,
                 }),
@@ -97,7 +97,7 @@ fn dedupe(c: &mut Criterion) {
                     "cdeab".into(),
                     "bcdea".into(),
                 ])),
-                timed: None,
+                time_settings: None,
             },
         },
         // Modification of previous where match fields do not exist in the
@@ -114,7 +114,7 @@ fn dedupe(c: &mut Criterion) {
                     "cdeab".into(),
                     "bcdea".into(),
                 ])),
-                timed: None,
+                time_settings: None,
             },
         },
     ] {
