@@ -298,7 +298,7 @@ impl FrameHandler for CommonFrameHandler {
             },
         ) {
             emit!(DnstapParseError {
-                error: format!("Dnstap protobuf decode error {:?}.", err)
+                error: format!("Dnstap protobuf decode error {err:?}.")
             });
             return None;
         }
@@ -478,7 +478,7 @@ mod integration_tests {
                         break;
                     }
                     Err(e) => {
-                        println!("Error: {}", e);
+                        println!("Error: {e}");
                         break;
                     }
                 }
@@ -632,7 +632,7 @@ mod integration_tests {
     }
 
     async fn dnstap_exec(cmd: Vec<&str>) {
-        let docker = Docker::connect_with_unix_defaults().expect("failed binding to docker socket");
+        let docker = Docker::connect_with_defaults().expect("failed binding to docker socket");
         let config = CreateExecOptions {
             cmd: Some(cmd),
             attach_stdout: Some(true),
@@ -664,7 +664,7 @@ mod integration_tests {
         dnstap_exec(vec![
             "nslookup",
             "-type=A",
-            format!("-port={}", port).as_str(),
+            format!("-port={port}").as_str(),
             "h1.example.com",
             "localhost",
         ])

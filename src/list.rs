@@ -40,22 +40,22 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Format::Text => {
             println!("Sources:");
             for name in sources {
-                println!("- {}", name);
+                println!("- {name}");
             }
 
             println!("\nTransforms:");
             for name in transforms {
-                println!("- {}", name);
+                println!("- {name}");
             }
 
             println!("\nSinks:");
             for name in sinks {
-                println!("- {}", name);
+                println!("- {name}");
             }
 
             println!("\nEnrichment tables:");
             for name in enrichment_tables {
-                println!("- {}", name);
+                println!("- {name}");
             }
         }
         Format::Json => {

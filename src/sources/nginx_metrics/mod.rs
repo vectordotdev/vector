@@ -31,7 +31,7 @@ use parser::NginxStubStatus;
 use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -39,7 +39,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }
@@ -188,7 +188,7 @@ impl NginxMetrics {
         let uri: Uri = endpoint.parse().context(HostInvalidUriSnafu)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
             (host, None) => host.to_owned(),
-            (host, Some(port)) => format!("{}:{}", host, port),
+            (host, Some(port)) => format!("{host}:{port}"),
         })
     }
 

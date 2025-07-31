@@ -743,8 +743,7 @@ pub fn build_framestream_unix_source(
     if let Some(socket_permission) = frame_handler.socket_file_mode() {
         if !(448..=511).contains(&socket_permission) {
             return Err(format!(
-                "Invalid Socket permission {:#o}. Must between 0o700 and 0o777.",
-                socket_permission
+                "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
             )
             .into());
         }

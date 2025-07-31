@@ -6,7 +6,7 @@ configuration: {
 }
 
 configuration: {
-	configuration: base.configuration.configuration
+	configuration: generated.configuration.configuration
 
 	configuration: {
 		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.

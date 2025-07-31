@@ -12,6 +12,7 @@ fn find_enrichment_table_records(
     enrichment_tables: &TableSearch,
     table: &str,
     case_sensitive: Case,
+    wildcard: Option<Value>,
     condition: &[Condition],
     index: Option<IndexHandle>,
 ) -> Resolved {
@@ -34,6 +35,7 @@ fn find_enrichment_table_records(
             case_sensitive,
             condition,
             select.as_ref().map(|select| select.as_ref()),
+            wildcard.as_ref(),
             index,
         )?
         .into_iter()
@@ -69,6 +71,11 @@ impl Function for FindEnrichmentTableRecords {
             Parameter {
                 keyword: "case_sensitive",
                 kind: kind::BOOLEAN,
+                required: false,
+            },
+            Parameter {
+                keyword: "wildcard",
+                kind: kind::BYTES,
                 required: false,
             },
         ]
@@ -112,6 +119,7 @@ impl Function for FindEnrichmentTableRecords {
         let select = arguments.optional("select");
 
         let case_sensitive = is_case_sensitive(&arguments, state)?;
+        let wildcard = arguments.optional("wildcard");
         let index = Some(
             add_index(registry, &table, case_sensitive, &condition)
                 .map_err(|err| Box::new(err) as Box<_>)?,
@@ -123,6 +131,7 @@ impl Function for FindEnrichmentTableRecords {
             index,
             select,
             case_sensitive,
+            wildcard,
             enrichment_tables: registry.as_readonly(),
         }
         .as_expr())
@@ -136,6 +145,7 @@ pub struct FindEnrichmentTableRecordsFn {
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
     case_sensitive: Case,
+    wildcard: Option<Box<dyn Expression>>,
     enrichment_tables: TableSearch,
 }
 
@@ -158,6 +168,11 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
         let table = &self.table;
         let case_sensitive = self.case_sensitive;
+        let wildcard = self
+            .wildcard
+            .as_ref()
+            .map(|array| array.resolve(ctx))
+            .transpose()?;
         let index = self.index;
         let enrichment_tables = &self.enrichment_tables;
 
@@ -166,6 +181,7 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
             enrichment_tables,
             table,
             case_sensitive,
+            wildcard,
             &condition,
             index,
         )
@@ -199,6 +215,7 @@ mod tests {
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
+            wildcard: None,
             enrichment_tables: registry.as_readonly(),
         };
 

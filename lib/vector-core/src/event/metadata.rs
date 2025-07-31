@@ -84,11 +84,11 @@ pub(super) struct Inner {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
     /// `OriginProduct`
-    origin_product: Option<u32>,
+    product: Option<u32>,
     /// `OriginCategory`
-    origin_category: Option<u32>,
+    category: Option<u32>,
     /// `OriginService`
-    origin_service: Option<u32>,
+    service: Option<u32>,
 }
 
 impl DatadogMetricOriginMetadata {
@@ -100,25 +100,25 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
-            origin_product: product,
-            origin_category: category,
-            origin_service: service,
+            product,
+            category,
+            service,
         }
     }
 
     /// Returns a reference to the `OriginProduct`.
     pub fn product(&self) -> Option<u32> {
-        self.origin_product
+        self.product
     }
 
     /// Returns a reference to the `OriginCategory`.
     pub fn category(&self) -> Option<u32> {
-        self.origin_category
+        self.category
     }
 
     /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
-        self.origin_service
+        self.service
     }
 }
 

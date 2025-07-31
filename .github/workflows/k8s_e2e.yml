@@ -40,8 +40,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   RUST_BACKTRACE: full
   TEST_LOG: vector=debug
@@ -53,11 +51,8 @@ env:
 jobs:
   changes:
     # Only evaluate files changed on pull request trigger
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
-    with:
-      base_ref: ${{ github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.pull_request.head.ref }}
     secrets: inherit
 
   build-x86_64-unknown-linux-gnu:
@@ -65,8 +60,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs: changes
-    # Run this job even if `changes` job is skipped (non- pull request trigger)
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
+    # Run this job even if `changes` job is skipped
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -75,7 +70,7 @@ jobs:
     steps:
       - name: (PR review) Set latest commit status as pending
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -83,15 +78,15 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
             ~/.cargo/registry
@@ -100,18 +95,18 @@ jobs:
 
       - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: ~/.cargo/bin/rustup target add x86_64-unknown-linux-gnu
+      - run: bash scripts/environment/prepare.sh --modules=rustup,cross
+      - run: rustup target add x86_64-unknown-linux-gnu
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: VECTOR_VERSION="$(cargo vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
 
       - name: (PR review) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         if: failure() && github.event_name == 'pull_request_review'
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -130,11 +125,11 @@ jobs:
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.k8s == 'true') }}
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/github-script@v7.0.1
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         id: set-matrix
         with:
           script: |
@@ -194,20 +189,20 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@v3
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
         id: comment-branch
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -221,7 +216,7 @@ jobs:
 
       # TODO: This job has been quite flakey. Need to investigate further and then remove the retries.
       - name: Run tests
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
@@ -232,7 +227,7 @@ jobs:
           command: make test-e2e-kubernetes
 
       - name: (PR review) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         if: failure() && github.event_name == 'pull_request_review'
         with:
           sha: ${{ github.event.review.commit_id }}
@@ -254,12 +249,12 @@ jobs:
     steps:
       - name: (PR review) Get PR branch
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@v3
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
         id: comment-branch
 
       - name: (PR review) Submit PR result as success
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}

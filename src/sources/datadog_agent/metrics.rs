@@ -189,7 +189,7 @@ fn decode_datadog_sketches(
     let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Error decoding Datadog sketch: {:?}", error),
+            format!("Error decoding Datadog sketch: {error:?}"),
         )
     })?;
 
@@ -218,7 +218,7 @@ fn decode_datadog_series_v2(
     let metrics = decode_ddseries_v2(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Error decoding Datadog sketch: {:?}", error),
+            format!("Error decoding Datadog sketch: {error:?}"),
         )
     })?;
 
@@ -413,7 +413,7 @@ fn decode_datadog_series_v1(
     let metrics: DatadogSeriesRequest = serde_json::from_slice(&body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {:?}", error),
+            format!("Error parsing JSON: {error:?}"),
         )
     })?;
 

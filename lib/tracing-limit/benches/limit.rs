@@ -1,15 +1,14 @@
 #[macro_use]
+extern crate criterion;
+#[macro_use]
 extern crate tracing;
 
-#[macro_use]
-extern crate criterion;
-
+use criterion::{BenchmarkId, Criterion};
+use std::hint::black_box;
 use std::{
     fmt,
     sync::{Mutex, MutexGuard},
 };
-
-use criterion::{black_box, BenchmarkId, Criterion};
 use tracing::{field, span, subscriber::Interest, Event, Metadata, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
@@ -96,7 +95,7 @@ struct Visitor<'a>(MutexGuard<'a, String>);
 impl field::Visit for Visitor<'_> {
     fn record_debug(&mut self, _field: &field::Field, value: &dyn fmt::Debug) {
         use std::fmt::Write;
-        _ = write!(&mut *self.0, "{:?}", value);
+        _ = write!(&mut *self.0, "{value:?}");
     }
 }
 

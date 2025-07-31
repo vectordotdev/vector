@@ -152,8 +152,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "label_key \"{}\" with label_value \"{}\"",
-                                key_template, value_template
+                                "label_key \"{key_template}\" with label_value \"{value_template}\""
                             )
                             .as_str()
                         ),
@@ -165,8 +164,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "label_value \"{}\" with label_key \"{}\"",
-                                value_template, key_template
+                                "label_value \"{value_template}\" with label_key \"{key_template}\""
                             )
                             .as_str()
                         ),
@@ -229,8 +227,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                        "structured_metadata_key \"{}\" with structured_metadata_value \"{}\"",
-                        key_template, value_template
+                        "structured_metadata_key \"{key_template}\" with structured_metadata_value \"{value_template}\""
                     )
                             .as_str()
                         ),
@@ -242,8 +239,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                        "structured_metadata_value \"{}\" with structured_metadata_key \"{}\"",
-                        value_template, key_template
+                        "structured_metadata_value \"{value_template}\" with structured_metadata_key \"{key_template}\""
                     )
                             .as_str()
                         ),

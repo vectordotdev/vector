@@ -396,7 +396,7 @@ mod tests {
             ),
         ];
         for (fmt, expected) in cases {
-            let config: String = format!(r#"timestamp_format = "{}""#, fmt);
+            let config: String = format!(r#"timestamp_format = "{fmt}""#);
             let transformer: Transformer = toml::from_str(&config).unwrap();
             let mut event = base.clone();
             transformer.transform(&mut event);

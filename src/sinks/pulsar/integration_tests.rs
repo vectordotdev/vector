@@ -75,7 +75,7 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     for line in input {
         let msg = match consumer.next().await.unwrap() {
             Ok(msg) => msg,
-            Err(error) => panic!("{:?}", error),
+            Err(error) => panic!("{error:?}"),
         };
         consumer.ack(&msg).await.unwrap();
         assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);

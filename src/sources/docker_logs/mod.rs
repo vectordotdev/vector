@@ -1,11 +1,14 @@
 use std::sync::{Arc, LazyLock};
 use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
 
+use bollard::query_parameters::{
+    EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
+};
 use bollard::{
-    container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
+    container::LogOutput,
     errors::Error as DockerError,
+    query_parameters::InspectContainerOptions,
     service::{ContainerInspectResponse, EventMessage},
-    system::EventsOptions,
     Docker,
 };
 use bytes::{Buf, Bytes};
@@ -396,7 +399,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send + use<> {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -425,11 +428,12 @@ impl DockerLogsSourceCore {
             filters.insert("image".to_owned(), include_images.clone());
         }
 
-        self.docker.events(Some(EventsOptions {
-            since: Some(self.now_timestamp),
-            until: None,
-            filters,
-        }))
+        self.docker.events(Some(
+            EventsOptionsBuilder::new()
+                .since(&self.now_timestamp.timestamp().to_string())
+                .filters(&filters)
+                .build(),
+        ))
     }
 }
 
@@ -527,11 +531,12 @@ impl DockerLogsSource {
         self.esb
             .core
             .docker
-            .list_containers(Some(ListContainersOptions {
-                all: false, // only running containers
-                filters,
-                ..Default::default()
-            }))
+            .list_containers(Some(
+                ListContainersOptionsBuilder::new()
+                    .all(false)
+                    .filters(&filters)
+                    .build(),
+            ))
             .await?
             .into_iter()
             .for_each(|container| {
@@ -736,14 +741,15 @@ impl EventStreamBuilder {
 
     async fn run_event_stream(mut self, mut info: ContainerLogInfo) {
         // Establish connection
-        let options = Some(LogsOptions::<String> {
-            follow: true,
-            stdout: true,
-            stderr: true,
-            since: info.log_since(),
-            timestamps: true,
-            ..Default::default()
-        });
+        let options = Some(
+            LogsOptionsBuilder::new()
+                .follow(true)
+                .stdout(true)
+                .stderr(true)
+                .since(info.log_since() as i32) // 2038 bug (I think)
+                .timestamps(true)
+                .build(),
+        );
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
         emit!(DockerLogsContainerWatch {
@@ -1001,8 +1007,9 @@ impl ContainerLogInfo {
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
                 match self.last_log.as_ref() {
-                    Some(&(last, gen)) => {
-                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                    Some(&(last, generation)) => {
+                        if last < timestamp || (last == timestamp && generation == self.generation)
+                        {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.
@@ -1275,7 +1282,7 @@ impl ContainerMetadata {
             name: name.as_str().trim_start_matches('/').to_owned().into(),
             name_str: name,
             image: config.image.unwrap().into(),
-            created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
+            created_at: created.with_timezone(&Utc),
         })
     }
 }

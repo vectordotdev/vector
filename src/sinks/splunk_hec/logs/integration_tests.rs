@@ -50,7 +50,7 @@ async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
 
     // https://docs.splunk.com/Documentation/Splunk/7.2.1/RESTREF/RESTsearch#search.2Fjobs
     let search_query = match index {
-        Some(index) => format!("search index={}", index),
+        Some(index) => format!("search index={index}"),
         None => "search index=*".into(),
     };
     let res = client
@@ -525,10 +525,7 @@ async fn splunk_auto_extracted_timestamp() {
         // Splunk will determine the timestamp from the *message* field in the event.
         // Thus, we expect the `timestamp` field to still be present.
         assert_eq!(
-            format!(
-                "{{\"message\":\"{}\",\"timestamp\":\"2020-03-05T00:00:00Z\"}}",
-                message
-            ),
+            format!("{{\"message\":\"{message}\",\"timestamp\":\"2020-03-05T00:00:00Z\"}}"),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(
@@ -579,7 +576,7 @@ async fn splunk_non_auto_extracted_timestamp() {
         let entry = find_entry(&message).await;
 
         assert_eq!(
-            format!("{{\"message\":\"{}\"}}", message),
+            format!("{{\"message\":\"{message}\"}}"),
             entry["_raw"].as_str().unwrap()
         );
         assert_eq!(

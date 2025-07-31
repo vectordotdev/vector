@@ -254,7 +254,7 @@ impl HttpClientContext for PrometheusScrapeContext {
             {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_instance)) => {
-                        metric.replace_tag(format!("exported_{}", tag), old_instance);
+                        metric.replace_tag(format!("exported_{tag}"), old_instance);
                         metric.replace_tag(tag.clone(), instance.clone());
                     }
                     (true, Some(_)) => {}
@@ -271,7 +271,7 @@ impl HttpClientContext for PrometheusScrapeContext {
             {
                 match (honor_label, metric.tag_value(tag)) {
                     (false, Some(old_endpoint)) => {
-                        metric.replace_tag(format!("exported_{}", tag), old_endpoint);
+                        metric.replace_tag(format!("exported_{tag}"), old_endpoint);
                         metric.replace_tag(tag.clone(), endpoint.clone());
                     }
                     (true, Some(_)) => {}
@@ -557,9 +557,8 @@ mod test {
         let dummy_endpoint = warp::path!("metrics").and(warp::query::raw()).map(|query| {
             format!(
                 r#"
-                    promhttp_metric_handler_requests_total{{query="{}"}} 100 1612411516789
-                "#,
-                query
+                    promhttp_metric_handler_requests_total{{query="{query}"}} 100 1612411516789
+                "#
             )
         });
 
@@ -715,7 +714,7 @@ mod test {
         sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()
-            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .get(format!("http://{out_addr}/metrics").parse().unwrap())
             .await
             .unwrap();
 
@@ -801,7 +800,7 @@ mod integration_tests {
             metrics
                 .iter()
                 .find(|metric| metric.name() == name)
-                .unwrap_or_else(|| panic!("Missing metric {:?}", name))
+                .unwrap_or_else(|| panic!("Missing metric {name:?}"))
         };
 
         // Sample some well-known metrics

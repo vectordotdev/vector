@@ -1,5 +1,6 @@
 use std::{
     cmp, fmt,
+    fmt::Debug,
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -8,11 +9,11 @@ use std::{
 };
 
 use async_stream::stream;
-use crossbeam_queue::ArrayQueue;
+use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
-use crate::InMemoryBufferable;
+use crate::{config::MemoryBufferSize, InMemoryBufferable};
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -54,10 +55,43 @@ impl<T> fmt::Display for TrySendError<T> {
 
 impl<T: fmt::Debug> std::error::Error for TrySendError<T> {}
 
+// Trait over common queue operations so implementation can be chosen at initialization phase
+trait QueueImpl<T>: Send + Sync + fmt::Debug {
+    fn push(&self, item: T);
+    fn pop(&self) -> Option<T>;
+}
+
+impl<T> QueueImpl<T> for ArrayQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.push(item)
+            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full."));
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.pop()
+    }
+}
+
+impl<T> QueueImpl<T> for SegQueue<T>
+where
+    T: Send + Sync + fmt::Debug,
+{
+    fn push(&self, item: T) {
+        self.push(item);
+    }
+
+    fn pop(&self) -> Option<T> {
+        self.pop()
+    }
+}
+
 #[derive(Debug)]
 struct Inner<T> {
-    data: Arc<ArrayQueue<(OwnedSemaphorePermit, T)>>,
-    limit: usize,
+    data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
+    limit: MemoryBufferSize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
 }
@@ -85,7 +119,11 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
         // We have to limit the number of permits we ask for to the overall limit since we're always
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
-        cmp::min(self.inner.limit, item.event_count()) as u32
+        let (limit, value) = match self.inner.limit {
+            MemoryBufferSize::MaxSize(max_size) => (max_size, item.allocated_bytes()),
+            MemoryBufferSize::MaxEvents(max_events) => (max_events, item.event_count()),
+        };
+        cmp::min(limit.get(), value) as u32
     }
 
     /// Gets the number of items that this channel could accept.
@@ -112,10 +150,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             return Err(SendError(item));
         };
 
-        self.inner
-            .data
-            .push((permits, item))
-            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
+        self.inner.data.push((permits, item));
         self.inner.read_waker.notify_one();
 
         trace!("Sent item.");
@@ -153,10 +188,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             }
         };
 
-        self.inner
-            .data
-            .push((permits, item))
-            .unwrap_or_else(|_| unreachable!("acquired permits but channel reported being full"));
+        self.inner.data.push((permits, item));
         self.inner.read_waker.notify_one();
 
         trace!("Attempt to send item succeeded.");
@@ -235,12 +267,22 @@ impl<T> Drop for LimitedReceiver<T> {
     }
 }
 
-pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner {
-        data: Arc::new(ArrayQueue::new(limit)),
-        limit,
-        limiter: Arc::new(Semaphore::new(limit)),
-        read_waker: Arc::new(Notify::new()),
+pub fn limited<T: InMemoryBufferable + fmt::Debug>(
+    limit: MemoryBufferSize,
+) -> (LimitedSender<T>, LimitedReceiver<T>) {
+    let inner = match limit {
+        MemoryBufferSize::MaxEvents(max_events) => Inner {
+            data: Arc::new(ArrayQueue::new(max_events.get())),
+            limit,
+            limiter: Arc::new(Semaphore::new(max_events.get())),
+            read_waker: Arc::new(Notify::new()),
+        },
+        MemoryBufferSize::MaxSize(max_size) => Inner {
+            data: Arc::new(SegQueue::new()),
+            limit,
+            limiter: Arc::new(Semaphore::new(max_size.get())),
+            read_waker: Arc::new(Notify::new()),
+        },
     };
 
     let sender = LimitedSender {
@@ -254,21 +296,25 @@ pub fn limited<T>(limit: usize) -> (LimitedSender<T>, LimitedReceiver<T>) {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use tokio_test::{assert_pending, assert_ready, task::spawn};
+    use vector_common::byte_size_of::ByteSizeOf;
 
     use super::limited;
     use crate::{
-        test::MultiEventRecord, topology::channel::limited_queue::SendError,
-        topology::test_util::Sample,
+        test::MultiEventRecord,
+        topology::{channel::limited_queue::SendError, test_util::Sample},
+        MemoryBufferSize,
     };
 
     #[tokio::test]
     async fn send_receive() {
-        let (mut tx, mut rx) = limited(2);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()));
 
         assert_eq!(2, tx.available_capacity());
 
-        let msg = Sample(42);
+        let msg = Sample::new(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -287,17 +333,58 @@ mod tests {
 
         // Now our receive should have been woken up, and should immediately be ready.
         assert!(recv.is_woken());
-        assert_eq!(Some(msg), assert_ready!(recv.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
+    }
+
+    #[test]
+    fn test_limiting_by_byte_size() {
+        let max_elements = 10;
+        let msg = Sample::new_with_heap_allocated_values(50);
+        let msg_size = msg.allocated_bytes();
+        let max_allowed_bytes = msg_size * max_elements;
+
+        // With this configuration a maximum of exactly 10 messages can fit in the channel
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxSize(
+            NonZeroUsize::new(max_allowed_bytes).unwrap(),
+        ));
+
+        assert_eq!(max_allowed_bytes, tx.available_capacity());
+
+        // Send 10 messages into the channel, filling it
+        for _ in 0..10 {
+            let msg_clone = msg.clone();
+            let mut f = spawn(async { tx.send(msg_clone).await });
+            assert_eq!(Ok(()), assert_ready!(f.poll()));
+        }
+        // With the 10th message in the channel no space should be left
+        assert_eq!(0, tx.available_capacity());
+
+        // Attemting to produce one more then the max capacity should block
+        let mut send_final = spawn({
+            let msg_clone = msg.clone();
+            async { tx.send(msg_clone).await }
+        });
+        assert_pending!(send_final.poll());
+
+        // Read all data from the channel, assert final states are as expected
+        for _ in 0..10 {
+            let mut f = spawn(async { rx.next().await });
+            let value = assert_ready!(f.poll());
+            assert_eq!(value.allocated_bytes(), msg_size);
+        }
+        // Channel should have no more data
+        let mut recv = spawn(async { rx.next().await });
+        assert_pending!(recv.poll());
     }
 
     #[test]
     fn sender_waits_for_more_capacity_when_none_available() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(1, tx.available_capacity());
 
-        let msg1 = Sample(42);
-        let msg2 = Sample(43);
+        let msg1 = Sample::new(42);
+        let msg2 = Sample::new(43);
 
         // Create our send and receive futures.
         let mut send1 = spawn(async { tx.send(msg1).await });
@@ -328,7 +415,7 @@ mod tests {
         assert_pending!(send2.poll());
 
         // Now if we receive the item, our second send should be woken up and be able to send in.
-        assert_eq!(Some(msg1), assert_ready!(recv1.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv1.poll()));
         drop(recv1);
 
         // Since the second send was already waiting for permits, the semaphore returns them
@@ -346,14 +433,14 @@ mod tests {
 
         // And the final receive to get our second send:
         assert!(recv2.is_woken());
-        assert_eq!(Some(msg2), assert_ready!(recv2.poll()));
+        assert_eq!(Some(Sample::new(43)), assert_ready!(recv2.poll()));
 
         assert_eq!(1, tx.available_capacity());
     }
 
     #[test]
     fn sender_waits_for_more_capacity_when_partial_available() {
-        let (mut tx, mut rx) = limited(7);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(7).unwrap()));
 
         assert_eq!(7, tx.available_capacity());
 
@@ -441,12 +528,12 @@ mod tests {
 
     #[test]
     fn empty_receiver_returns_none_when_last_sender_drops() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(1, tx.available_capacity());
 
         let tx2 = tx.clone();
-        let msg = Sample(42);
+        let msg = Sample::new(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -473,7 +560,7 @@ mod tests {
         drop(tx);
 
         assert!(recv.is_woken());
-        assert_eq!(Some(msg), assert_ready!(recv.poll()));
+        assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
         drop(recv);
 
         let mut recv2 = spawn(async { rx.next().await });
@@ -483,7 +570,8 @@ mod tests {
 
     #[test]
     fn receiver_returns_none_once_empty_when_last_sender_drops() {
-        let (tx, mut rx) = limited::<Sample>(1);
+        let (tx, mut rx) =
+            limited::<Sample>(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(1, tx.available_capacity());
 
@@ -512,7 +600,7 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_empty() {
-        let (mut tx, mut rx) = limited(1);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
 
         assert_eq!(1, tx.available_capacity());
 
@@ -544,7 +632,7 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_partial_capacity() {
-        let (mut tx, mut rx) = limited(2);
+        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()));
 
         assert_eq!(2, tx.available_capacity());
 
