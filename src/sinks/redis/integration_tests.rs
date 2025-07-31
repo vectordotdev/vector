@@ -13,6 +13,7 @@ use crate::event::{
 
 use super::config::{DataTypeConfig, ListOption, Method, RedisSinkConfig};
 use crate::{
+    serde::OneOrMany,
     sinks::prelude::*,
     test_util::{
         components::{
@@ -27,8 +28,48 @@ fn redis_server() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
 }
 
+fn redis_sentinel_server() -> Vec<String> {
+    vec![std::env::var("SENTINEL_URL").unwrap_or_else(|_| "redis://127.0.0.1:26379/".to_owned())]
+}
+
 #[tokio::test]
-async fn redis_sink_list_lpush() {
+async fn redis_sink_sentinel_reaches_primary() {
+    trace_init();
+
+    let cnf = RedisSinkConfig {
+        endpoint: OneOrMany::Many(redis_sentinel_server()),
+        key: Template::try_from(format!("test-{}", random_string(10)))
+            .expect("should not fail to create key template"),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::List,
+        list_option: Some(ListOption {
+            method: Method::RPush,
+        }),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        sentinel_service: Some("vector".to_owned()),
+        sentinel_connect: None,
+        acknowledgements: Default::default(),
+    };
+
+    let mut redis_connection = cnf.build_connection().await.unwrap();
+    let mut conn = redis_connection
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
+
+    assert!(redis::cmd("PING")
+        .query_async::<()>(&mut conn)
+        .await
+        .is_ok());
+}
+
+#[tokio::test]
+async fn redis_sink_sentinel_rpush() {
     trace_init();
 
     let key = Template::try_from(format!("test-{}", random_string(10)))
@@ -39,18 +80,20 @@ async fn redis_sink_list_lpush() {
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
-        endpoint: redis_server(),
+        endpoint: OneOrMany::Many(redis_sentinel_server()),
         key: key.clone(),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
         list_option: Some(ListOption {
-            method: Method::LPush,
+            method: Method::RPush,
         }),
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
             ..Default::default()
         },
+        sentinel_service: Some("vector".to_owned()),
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -65,7 +108,7 @@ async fn redis_sink_list_lpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        // let conn = cnf2.build_client().await.unwrap();
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
         sink.run(input).await
@@ -73,7 +116,87 @@ async fn redis_sink_list_lpush() {
     .await
     .expect("Running sink failed");
 
-    let mut conn = cnf.build_client().await.unwrap();
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
+
+    let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
+    debug!("Test key: {} exists: {}.", key, key_exists);
+    assert!(key_exists);
+    let llen: usize = conn.llen(key.clone().to_string()).await.unwrap();
+    debug!("Test key: {} len: {}.", key, llen);
+    assert_eq!(llen, num_events);
+
+    for i in 0..num_events {
+        let e = events.get(i).unwrap().as_log();
+        let s = serde_json::to_string(e).unwrap_or_default();
+        let payload: (String, String) = conn.blpop(key.clone().to_string(), 2000.0).await.unwrap();
+        let val = payload.1;
+        assert_eq!(val, s);
+    }
+}
+
+#[tokio::test]
+async fn redis_sink_list_lpush() {
+    trace_init();
+
+    let key = Template::try_from(format!("test-{}", random_string(10)))
+        .expect("should not fail to create key template");
+    debug!("Test key name: {}.", key);
+    let mut rng = rand::rng();
+    let num_events = rng.random_range(10000..20000);
+    debug!("Test events num: {}.", num_events);
+
+    let cnf = RedisSinkConfig {
+        endpoint: OneOrMany::One(redis_server()),
+        key: key.clone(),
+        encoding: JsonSerializerConfig::default().into(),
+        data_type: DataTypeConfig::List,
+        list_option: Some(ListOption {
+            method: Method::LPush,
+        }),
+        batch: BatchConfig::default(),
+        request: TowerRequestConfig {
+            rate_limit_num: u64::MAX,
+            ..Default::default()
+        },
+        sentinel_service: None,
+        sentinel_connect: None,
+        acknowledgements: Default::default(),
+    };
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..num_events {
+        let s: String = i.to_string();
+        let e = LogEvent::from(s);
+        events.push(e.into());
+    }
+    let input = stream::iter(events.clone().into_iter().map(Into::into));
+
+    // Publish events.
+    let cnf2 = cnf.clone();
+    assert_sink_compliance(&SINK_TAGS, async move {
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
+        sink.run(input).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
 
     let key_exists: bool = conn.exists(key.clone().to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -103,7 +226,7 @@ async fn redis_sink_list_rpush() {
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
-        endpoint: redis_server(),
+        endpoint: OneOrMany::One(redis_server()),
         key: key.clone(),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
@@ -115,6 +238,8 @@ async fn redis_sink_list_rpush() {
             rate_limit_num: u64::MAX,
             ..Default::default()
         },
+        sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -129,7 +254,7 @@ async fn redis_sink_list_rpush() {
     // Publish events.
     let cnf2 = cnf.clone();
     assert_sink_compliance(&SINK_TAGS, async move {
-        // let conn = cnf2.build_client().await.unwrap();
+        // let conn = cnf2.build_connection().await.unwrap().get_connection_manager().await.unwrap().connection;
         let cx = SinkContext::default();
         let (sink, _healthcheck) = cnf2.build(cx).await.unwrap();
         sink.run(input).await
@@ -137,7 +262,14 @@ async fn redis_sink_list_rpush() {
     .await
     .expect("Running sink failed");
 
-    let mut conn = cnf.build_client().await.unwrap();
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
 
     let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -182,7 +314,7 @@ async fn redis_sink_channel() {
     let mut pubsub_stream = pubsub_conn.on_message();
 
     let cnf = RedisSinkConfig {
-        endpoint: redis_server(),
+        endpoint: OneOrMany::One(redis_server()),
         key: key.clone(),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
@@ -192,6 +324,8 @@ async fn redis_sink_channel() {
             rate_limit_num: u64::MAX,
             ..Default::default()
         },
+        sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -257,7 +391,7 @@ async fn redis_sink_channel_data_volume_tags() {
     let mut pubsub_stream = pubsub_conn.on_message();
 
     let cnf = RedisSinkConfig {
-        endpoint: redis_server(),
+        endpoint: OneOrMany::One(redis_server()),
         key: key.clone(),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::Channel,
@@ -267,6 +401,8 @@ async fn redis_sink_channel_data_volume_tags() {
             rate_limit_num: u64::MAX,
             ..Default::default()
         },
+        sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -304,7 +440,7 @@ async fn redis_sink_metrics() {
     debug!("Test events num: {}.", num_events);
 
     let cnf = RedisSinkConfig {
-        endpoint: redis_server(),
+        endpoint: OneOrMany::One(redis_server()),
         key: key.clone(),
         encoding: JsonSerializerConfig::default().into(),
         data_type: DataTypeConfig::List,
@@ -316,6 +452,8 @@ async fn redis_sink_metrics() {
             rate_limit_num: u64::MAX,
             ..Default::default()
         },
+        sentinel_service: None,
+        sentinel_connect: None,
         acknowledgements: Default::default(),
     };
 
@@ -352,7 +490,14 @@ async fn redis_sink_metrics() {
     .expect("Running sink failed");
 
     // Verify metrics were stored correctly
-    let mut conn = cnf.build_client().await.unwrap();
+    let mut conn = cnf
+        .build_connection()
+        .await
+        .unwrap()
+        .get_connection_manager()
+        .await
+        .unwrap()
+        .connection;
 
     let key_exists: bool = conn.exists(key.to_string()).await.unwrap();
     debug!("Test key: {} exists: {}.", key, key_exists);
@@ -398,7 +543,7 @@ async fn redis_sink_traces() {
         // Setup Redis sink config
         let key = Template::try_from(format!("test-traces-{}", random_string(10))).unwrap();
         let config = RedisSinkConfig {
-            endpoint: redis_server(),
+            endpoint: OneOrMany::One(redis_server()),
             key: key.clone(),
             encoding: JsonSerializerConfig::default().into(),
             data_type: DataTypeConfig::List,
@@ -407,6 +552,8 @@ async fn redis_sink_traces() {
             }),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
+            sentinel_service: None,
+            sentinel_connect: None,
             acknowledgements: Default::default(),
         };
 

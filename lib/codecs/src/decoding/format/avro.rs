@@ -90,7 +90,7 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 #[derive(Clone, Debug)]
 pub struct AvroDeserializerOptions {
     /// The Avro schema definition.
-    /// Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+    /// **Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
     /// * `Date`
     /// * `Decimal`
     /// * `Duration`
@@ -103,7 +103,7 @@ pub struct AvroDeserializerOptions {
     ))]
     pub schema: String,
 
-    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
     /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
     pub strip_schema_id_prefix: bool,
 }

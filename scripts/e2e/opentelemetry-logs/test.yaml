@@ -1,0 +1,24 @@
+features:
+- e2e-tests-opentelemetry
+
+test: "e2e"
+
+test_filter: "opentelemetry::logs::"
+
+runner:
+  env:
+    OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
+    OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'
+    OTEL_COLLECTOR_SINK_HTTP_PORT: '5318'
+
+matrix:
+  # Determines which `otel/opentelemetry-collector-contrib` version to use
+  collector_version: [ 'latest' ]
+
+# Only trigger this integration test if relevant OTEL source/sink files change
+paths:
+  - "src/sources/opentelemetry/**"
+  - "src/sinks/opentelemetry/**"
+  - "src/internal_events/opentelemetry_*"
+  - "tests/e2e/opentelemetry/logs/**"
+  - "scripts/e2e/opentelemetry-logs/**"
