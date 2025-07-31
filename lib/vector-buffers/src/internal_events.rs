@@ -13,7 +13,7 @@ use vector_common::{
 static BUFFER_COUNTERS: LazyLock<DashMap<usize, (AtomicI64, AtomicI64)>> =
     LazyLock::new(DashMap::new);
 
-fn get_new_atomic_val(counter: &AtomicI64, delta: i64) -> i64 {
+fn update_and_get(counter: &AtomicI64, delta: i64) -> i64 {
     let mut new_val = 0;
     counter
         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
@@ -30,8 +30,8 @@ fn update_buffer_gauge(stage: usize, events_delta: i64, bytes_delta: i64) {
         .entry(stage)
         .or_insert_with(|| (AtomicI64::new(0), AtomicI64::new(0)));
 
-    let new_events = get_new_atomic_val(&counters.0, events_delta);
-    let new_bytes = get_new_atomic_val(&counters.1, bytes_delta);
+    let new_events = update_and_get(&counters.0, events_delta);
+    let new_bytes = update_and_get(&counters.1, bytes_delta);
 
     gauge!("buffer_events", "stage" => stage.to_string()).set(i64_to_f64_safe(new_events));
     gauge!("buffer_byte_size", "stage" => stage.to_string()).set(i64_to_f64_safe(new_bytes));
