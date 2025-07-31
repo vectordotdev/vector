@@ -168,7 +168,7 @@ serde = { version = "1.0.219", default-features = false, features = ["alloc", "d
 snafu = { version = "0.8.6", default-features = false, features = ["futures", "std"] }
 tempfile = "3.20.0"
 tokio = { version = "1.45.1", default-features = false, features = ["full"] }
-toml = { version = "0.8.23", default-features = false, features = ["display", "parse"] }
+toml = { version = "0.9.4", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
@@ -271,7 +271,7 @@ tower = { version = "0.5.2", default-features = false, features = ["buffer", "li
 tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-gzip", "trace"] }
 # Serde
 serde.workspace = true
-serde-toml-merge = { version = "0.3.9", default-features = false }
+serde-toml-merge = { version = "0.3.11", default-features = false }
 serde_bytes = { version = "0.11.17", default-features = false, features = ["std"], optional = true }
 serde_json.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["macros", "std"] }
