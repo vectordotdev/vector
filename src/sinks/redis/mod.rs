@@ -16,19 +16,28 @@ mod integration_tests;
 use bytes::Bytes;
 use redis::RedisError;
 use snafu::Snafu;
+use tokio::sync::watch::error::RecvError;
 
 use crate::sinks::prelude::*;
 
-use self::config::Method;
+use self::{config::Method, sink::GenerationCount};
 
 use super::util::EncodedLength;
 
 #[derive(Debug, Snafu)]
 pub(super) enum RedisSinkError {
-    #[snafu(display("Creating Redis producer failed: {}", source))]
+    #[snafu(display("Creating Redis producer failed: {source}"))]
     RedisCreateFailed { source: RedisError },
-    #[snafu(display("Error sending query: {}", source))]
-    SendError { source: RedisError },
+    #[snafu(display(
+        "Error sending query: {source}{}",
+        if let Some(gen) = generation { format!(", gen={gen}") } else { String::new() }
+    ))]
+    SendError {
+        source: RedisError,
+        generation: Option<GenerationCount>,
+    },
+    #[snafu(display("Repair channel was closed: {source}"))]
+    RepairChannelError { source: RecvError },
 }
 
 #[derive(Clone, Copy, Debug, Derivative)]
