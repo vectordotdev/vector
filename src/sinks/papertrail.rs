@@ -208,8 +208,10 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = PapertrailConfig::generate_config().to_string();
-        let mut config = PapertrailConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-            .expect("config should be valid");
+        let mut config = PapertrailConfig::deserialize(
+            toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+        )
+        .expect("config should be valid");
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 
