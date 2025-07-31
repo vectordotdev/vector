@@ -177,8 +177,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             let events_byte_size = failed_events
                                                 .iter()
                                                 .map(|x| x.log.estimated_json_encoded_size_of())
-                                                .reduce(|a, b| a + b)
-                                                .unwrap_or(JsonSize::zero());
+                                                .fold(JsonSize::zero(), |a, b| a + b);  
                                             let encode_result = match req
                                                 .elasticsearch_request_builder
                                                 .encode_events(failed_events.clone())
