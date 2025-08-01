@@ -257,15 +257,21 @@ pub(super) struct RedisSink {
     conn: RedisConnection,
     data_type: super::DataType,
     key: Template,
+    score: Option<UnsignedIntTemplate>,
     batcher_settings: BatcherSettings,
 }
 
 impl RedisSink {
     pub(super) fn new(config: &RedisSinkConfig, conn: RedisConnection) -> crate::Result<Self> {
-        let method = config.list_option.map(|option| option.method);
+        let list_method = config.list_option.map(|option| option.method);
+        let sorted_set_method = config.sorted_set_option.map(|option| option.method);
+
         let data_type = match config.data_type {
             DataTypeConfig::Channel => super::DataType::Channel,
-            DataTypeConfig::List => super::DataType::List(method.unwrap_or_default()),
+            DataTypeConfig::List => super::DataType::List(list_method.unwrap_or_default()),
+            DataTypeConfig::SortedSet => {
+                super::DataType::SortedSet(sorted_set_method.unwrap_or_default())
+            }
         };
 
         let batcher_settings = config.batch.validate()?.into_batcher_settings()?;
@@ -273,6 +279,7 @@ impl RedisSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let key = config.key.clone();
+        let score = config.score.clone();
         let request = config.request;
 
         Ok(RedisSink {
@@ -283,6 +290,7 @@ impl RedisSink {
             conn,
             data_type,
             key,
+            score,
         })
     }
 
@@ -302,7 +310,22 @@ impl RedisSink {
             })
             .ok()?;
 
-        Some(RedisEvent { event, key })
+        let score = self
+            .score
+            .as_ref()
+            .map(|template| {
+                template.render(&event).map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("score"),
+                        drop_event: true,
+                    });
+                })
+            })
+            .transpose()
+            .ok()?;
+
+        Some(RedisEvent { event, key, score })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {

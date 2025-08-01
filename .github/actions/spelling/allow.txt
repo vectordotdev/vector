@@ -461,6 +461,7 @@ Softbank
 Sogou
 solarwinds
 Soref
+sortedset
 splunk
 ssh
 staticuser
@@ -524,6 +525,7 @@ XSALSA
 yandex
 Yarvik
 Yifang
+zadd
 zeek
 zookeeper
 Zopo
