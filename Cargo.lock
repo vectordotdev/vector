@@ -2993,9 +2993,9 @@ checksum = "5c297a1c74b71ae29df00c3e22dd9534821d60eb9af5a0192823fa2acea70c2a"
 
 [[package]]
 name = "databend-client"
-version = "0.27.1"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98306030d9bd9802fa38866eb8b9254f2eeeda44094b4191623d3d73d20b02d2"
+checksum = "08e0717e89fa2d123f4fa6b0ffee9eb3ed1441b73164308bd1e45be2028389c9"
 dependencies = [
  "cookie",
  "log",
@@ -3003,6 +3003,7 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "reqwest 0.12.9",
+ "semver 1.0.26",
  "serde",
  "serde_json",
  "tokio",
@@ -7043,9 +7044,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.20.2"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 dependencies = [
  "critical-section",
  "portable-atomic",
