@@ -203,6 +203,8 @@ pub enum AwsAuthentication {
         #[configurable(metadata(docs::examples = "us-west-2"))]
         region: Option<String>,
     },
+    /// Explicitly default authentication, using the default credentials chain defined by the AWS SDK
+    Fallback(String),
 }
 
 fn default_profile() -> String {
@@ -362,6 +364,15 @@ impl AwsAuthentication {
                     proxy,
                     tls_options,
                     *imds,
+                )
+                .await?,
+            )),
+            AwsAuthentication::Fallback(_) => Ok(SharedCredentialsProvider::new(
+                default_credentials_provider(
+                    service_region.clone(),
+                    proxy,
+                    tls_options,
+                    ImdsAuthentication::default()
                 )
                 .await?,
             )),
