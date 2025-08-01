@@ -263,8 +263,11 @@ impl RunningTopology {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
+            let changed = self.config.global.diff(&new_config.global);
             error!(
-                message = "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
+                message =
+                "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file.",
+                changed_fields = ?changed
             );
             return Ok(false);
         }
