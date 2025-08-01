@@ -146,8 +146,9 @@ glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.2.0", default-features = false }
 indexmap = { version = "2.10.0", default-features = false, features = ["serde", "std"] }
-inventory = { version = "0.3" }
 indoc = { version = "2.0.6" }
+inventory = { version = "0.3" }
+itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -155,7 +156,7 @@ nom = { version = "8.0.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
 proptest = { version = "1.7" }
-proptest-derive = { version = "0.5.1" }
+proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
 prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
@@ -163,9 +164,10 @@ prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.1", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
-serde_json = { version = "1.0.140", default-features = false, features = ["raw_value", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1.0.140", default-features = false, features = ["raw_value", "std"] }
 snafu = { version = "0.8.6", default-features = false, features = ["futures", "std"] }
+socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.20.0"
 tokio = { version = "1.47.0", default-features = false, features = ["full"] }
 toml = { version = "0.9.4", default-features = false, features = ["serde", "display", "parse"] }
@@ -354,7 +356,7 @@ hyper-proxy = { version = "0.9.1", default-features = false, features = ["openss
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
-itertools = { version = "0.14.0", default-features = false, optional = false, features = ["use_alloc"] }
+itertools.workspace = true
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
@@ -383,7 +385,7 @@ rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustl
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
-socket2 = { version = "0.5.10", default-features = false }
+socket2.workspace = true
 sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
@@ -438,7 +440,7 @@ azure_storage_blobs = { version = "0.17", default-features = false, features = [
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.6.0", features = ["html_reports", "async_tokio"] }
-itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+itertools.workspace = true
 libc = "0.2.174"
 similar-asserts = "1.7.0"
 proptest.workspace = true
