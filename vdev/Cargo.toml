@@ -12,7 +12,7 @@ anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "3.0.3"
-clap_complete = "4.5.54"
+clap_complete = "4.5.55"
 confy = "1.0.0"
 directories = "6.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
