@@ -597,6 +597,7 @@ sources-logs = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
+  "sources-websocket",
 ]
 sources-metrics = [
   "dep:prost",
@@ -612,6 +613,7 @@ sources-metrics = [
   "sources-static_metrics",
   "sources-statsd",
   "sources-vector",
+  "sources-websocket",
 ]
 
 sources-amqp = ["lapin"]
@@ -670,6 +672,7 @@ sources-utils-net = ["sources-utils-net-tcp", "sources-utils-net-udp", "sources-
 sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
+sources-websocket = ["dep:tokio-tungstenite"]
 
 sources-vector = ["dep:prost", "dep:tonic", "protobuf-build"]
 
@@ -888,6 +891,7 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "webhdfs-integration-tests",
+  "websocket-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
@@ -954,6 +958,7 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
+websocket-integration-tests = ["sources-websocket", "dep:tokio-tungstenite"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
