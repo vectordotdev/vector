@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout)]
 use std::collections::HashSet;
 use std::{fs::read_dir, process::Command};
 
@@ -40,7 +41,7 @@ fn assert_no_log_lines(output: Vec<u8>) {
     let keywords = ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"];
     for line in output.lines() {
         let present = keywords.iter().any(|word| line.contains(word));
-        assert!(!present, "Log detected in output line: {:?}", line);
+        assert!(!present, "Log detected in output line: {line:?}");
     }
 }
 
@@ -50,13 +51,12 @@ fn source_config(source: &str) -> String {
 data_dir = "${{VECTOR_DATA_DIR}}"
 
 [sources.in]
-{}
+{source}
 
 [sinks.out]
     inputs = ["in"]
     type = "blackhole"
-"#,
-        source
+"#
     )
 }
 
@@ -125,9 +125,8 @@ fn validate_ignore_healthcheck() {
         validate(&format!(
             r#"
         healthchecks.enabled = false
-        {}
-        "#,
-            FAILING_HEALTHCHECK
+        {FAILING_HEALTHCHECK}
+        "#
         )),
         exitcode::OK
     );

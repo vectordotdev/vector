@@ -68,8 +68,7 @@ fn main() -> Result<()> {
             let component_name = component_schema.component_name().to_string();
             let component_schema_renderer = SchemaRenderer::new(&querier, component_schema);
             let rendered_component_schema = component_schema_renderer.render().context(format!(
-                "Failed to render the '{}' component schema.",
-                component_name
+                "Failed to render the '{component_name}' component schema."
             ))?;
             rendered_component_schemas.insert(
                 format!("{}s/base/{}", base_component_type.as_str(), component_name),

@@ -13,7 +13,7 @@ components: transforms: "remap": {
 
 	classes: {
 		commonly_used: true
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -34,7 +34,7 @@ components: transforms: "remap": {
 		notices: []
 	}
 
-	configuration: base.components.transforms.remap.configuration
+	configuration: generated.components.transforms.remap.configuration
 
 	input: {
 		logs: true

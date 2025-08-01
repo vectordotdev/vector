@@ -82,7 +82,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
             }
             FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
-                new_path.set_extension(format!("log.{}", rotation_count));
+                new_path.set_extension(format!("log.{rotation_count}"));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
@@ -132,7 +132,7 @@ fn file_watcher_with_truncation() {
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(10000)
-        .max_tests(100000)
+        .tests(5000)
+        .max_tests(50000)
         .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
 }

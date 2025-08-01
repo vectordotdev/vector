@@ -33,7 +33,7 @@ impl<const N: usize> GroupStack<N> {
     pub fn push(&mut self, group: AllocationGroupId) {
         self.current_top += 1;
         if self.current_top >= self.slots.len() {
-            panic!("tried to push new allocation group to the current stack, but hit the limit of {} entries", N);
+            panic!("tried to push new allocation group to the current stack, but hit the limit of {N} entries");
         }
         self.slots[self.current_top] = group;
     }

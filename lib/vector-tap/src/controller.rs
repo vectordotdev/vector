@@ -123,7 +123,7 @@ impl TapPayload {
         invalid_matches: Vec<String>,
     ) -> Self {
         let pattern = pattern.into();
-        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{}' matches sources {:?}", pattern, invalid_matches);
+        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{pattern}' matches sources {invalid_matches:?}");
         Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
             message,
             pattern,
@@ -138,8 +138,7 @@ impl TapPayload {
     ) -> Self {
         let pattern = pattern.into();
         let message = format!(
-            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{}' matches sinks {:?}",
-            pattern, invalid_matches
+            "[tap] Warning: sink outputs cannot be tapped. Output pattern '{pattern}' matches sinks {invalid_matches:?}"
         );
         Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
             message,

@@ -45,10 +45,10 @@ regex = { version = "1.11.1", default-features = false, features = ["std", "perf
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-serde_with = { version = "3.12.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros"] }
 smallvec = { version = "1", default-features = false, features = ["serde", "const_generics"] }
 snafu.workspace = true
-socket2 = { version = "0.5.10", default-features = false }
+socket2.workspace = true
 tokio = { version = "1.45.1", default-features = false, features = ["net"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
@@ -78,7 +78,7 @@ prost-build.workspace = true
 [dev-dependencies]
 base64 = "0.22.1"
 chrono-tz.workspace = true
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.7.0", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1"
 quickcheck_macros = "1"

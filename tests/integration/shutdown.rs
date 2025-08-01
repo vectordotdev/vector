@@ -24,7 +24,7 @@ const STARTUP_TIME: Duration = Duration::from_secs(2);
 const SHUTDOWN_TIME: Duration = Duration::from_secs(4);
 const RELOAD_TIME: Duration = Duration::from_secs(5);
 
-const STDIO_CONFIG: &'static str = r#"
+const STDIO_CONFIG: &str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
     [sources.in_console]
@@ -36,7 +36,7 @@ const STDIO_CONFIG: &'static str = r#"
         encoding.codec = "text"
 "#;
 
-const PROMETHEUS_SINK_CONFIG: &'static str = r#"
+const PROMETHEUS_SINK_CONFIG: &str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
     [sources.in]
@@ -63,13 +63,12 @@ fn source_config(source: &str) -> String {
 data_dir = "${{VECTOR_DATA_DIR}}"
 
 [sources.in]
-{}
+{source}
 
 [sinks.out]
     inputs = ["in"]
     type = "blackhole"
-"#,
-        source
+"#
     )
 }
 
@@ -98,6 +97,7 @@ fn test_timely_shutdown(cmd: Command) {
 }
 
 /// Returns stdout output
+#[allow(clippy::print_stdout)]
 fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
@@ -126,7 +126,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     // Check output
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-        println!("{}", stdout);
+        println!("{stdout}");
         panic!("Vector didn't exit successfully. Status: {}", output.status);
     }
 
@@ -305,7 +305,7 @@ fn configuration_path_recomputed() {
     // Second configuration file
     overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
     // Clean the first file so to have only the console source.
-    overwrite_file(dir.join("conf1.toml"), &"");
+    overwrite_file(dir.join("conf1.toml"), "");
 
     // Signal reload
     kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();

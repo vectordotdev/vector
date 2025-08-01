@@ -202,7 +202,7 @@ pub struct CompiledParam {
 
 #[derive(Clone)]
 pub enum CompiledQueryParameterValue {
-    SingleParam(CompiledParam),
+    SingleParam(Box<CompiledParam>),
     MultiParams(Vec<CompiledParam>),
 }
 
@@ -278,9 +278,9 @@ impl Query {
         functions: &[Box<dyn Function>],
     ) -> CompiledQueryParameterValue {
         match value {
-            QueryParameterValue::SingleParam(param) => {
-                CompiledQueryParameterValue::SingleParam(Self::compile_value(param, functions))
-            }
+            QueryParameterValue::SingleParam(param) => CompiledQueryParameterValue::SingleParam(
+                Box::new(Self::compile_value(param, functions)),
+            ),
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()
@@ -525,14 +525,14 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         for event in events {
             match event {
-                Event::Log(ref mut log) => {
+                Event::Log(log) => {
                     self.log_namespace.insert_standard_vector_source_metadata(
                         log,
                         HttpClientConfig::NAME,
                         now,
                     );
                 }
-                Event::Metric(ref mut metric) => {
+                Event::Metric(metric) => {
                     if let Some(source_type_key) = log_schema().source_type_key() {
                         metric.replace_tag(
                             source_type_key.to_string(),
@@ -540,7 +540,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                         );
                     }
                 }
-                Event::Trace(ref mut trace) => {
+                Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
                         Bytes::from(HttpClientConfig::NAME).into()
                     });

@@ -693,7 +693,7 @@ fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter_all()
         .map(|(name, value)| match value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.into(),
         })
         .collect();

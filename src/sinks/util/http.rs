@@ -6,11 +6,42 @@ use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, Sink};
 use headers::HeaderName;
 use http::{header, HeaderValue, Request, Response, StatusCode};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OrderedHeaderName(HeaderName);
+
+impl OrderedHeaderName {
+    pub const fn new(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+
+    pub const fn inner(&self) -> &HeaderName {
+        &self.0
+    }
+}
+
+impl From<HeaderName> for OrderedHeaderName {
+    fn from(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+}
+
+impl Ord for OrderedHeaderName {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.as_str().cmp(other.0.as_str())
+    }
+}
+
+impl PartialOrd for OrderedHeaderName {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 use hyper::{body, Body};
-use indexmap::IndexMap;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use std::{
+    collections::BTreeMap,
     fmt,
     future::Future,
     hash::Hash,
@@ -42,6 +73,7 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
+    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -533,7 +565,7 @@ impl RetryLogic for HttpRetryLogic {
                 format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
@@ -581,10 +613,10 @@ where
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
             _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {}", status).into())
+                RetryAction::Retry(format!("Http Status: {status}").into())
             }
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
         }
     }
 }
@@ -611,25 +643,48 @@ pub struct RequestConfig {
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value."
+        docs::additional_props_description = "An HTTP request header and its value. Both header names and values support templating with event data."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
-    pub headers: IndexMap<String, String>,
+    pub headers: BTreeMap<String, String>,
 }
 
-fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter([
-        ("Accept".to_owned(), "text/plain".to_owned()),
-        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-    ])
+fn headers_examples() -> BTreeMap<String, String> {
+    btreemap! {
+        "Accept" => "text/plain",
+        "X-My-Custom-Header" => "A-Value",
+        "X-Event-Level" => "{{level}}",
+        "X-Event-Timestamp" => "{{timestamp}}",
+    }
 }
 
 impl RequestConfig {
-    pub fn add_old_option(&mut self, headers: Option<IndexMap<String, String>>) {
+    pub fn add_old_option(&mut self, headers: Option<BTreeMap<String, String>>) {
         if let Some(headers) = headers {
             warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
             self.headers.extend(headers);
         }
+    }
+
+    pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
+        let mut static_headers = BTreeMap::new();
+        let mut template_headers = BTreeMap::new();
+
+        for (name, value) in &self.headers {
+            match Template::try_from(value.as_str()) {
+                Ok(template) if !template.is_dynamic() => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+                Ok(template) => {
+                    template_headers.insert(name.clone(), template);
+                }
+                Err(_) => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+            }
+        }
+
+        (static_headers, template_headers)
     }
 }
 
@@ -648,16 +703,16 @@ pub enum HeaderValidationError {
 }
 
 pub fn validate_headers(
-    headers: &IndexMap<String, String>,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
-    let mut validated_headers = IndexMap::new();
+    headers: &BTreeMap<String, String>,
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
+    let mut validated_headers = BTreeMap::new();
     for (name, value) in headers {
         let name = HeaderName::from_bytes(name.as_bytes())
             .with_context(|_| InvalidHeaderNameSnafu { name })?;
         let value = HeaderValue::from_bytes(value.as_bytes())
             .with_context(|_| InvalidHeaderValueSnafu { value })?;
 
-        validated_headers.insert(name, value);
+        validated_headers.insert(name.into(), value);
     }
 
     Ok(validated_headers)
@@ -919,7 +974,7 @@ mod test {
                 async move {
                     let mut body = hyper::body::aggregate(req.into_body())
                         .await
-                        .map_err(|error| format!("error: {}", error))?;
+                        .map_err(|error| format!("error: {error}"))?;
                     let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
@@ -933,14 +988,14 @@ mod test {
 
         tokio::spawn(async move {
             if let Err(error) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("Server error: {}", error);
+                eprintln!("Server error: {error}");
             }
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
-        let (body, _rest) = rx.into_future().await;
+        let (body, _rest) = StreamExt::into_future(rx).await;
         assert_eq!(body.unwrap(), "hello");
     }
 }

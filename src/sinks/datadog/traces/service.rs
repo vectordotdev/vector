@@ -46,7 +46,7 @@ impl RetryLogic for TraceApiRetry {
                 format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
