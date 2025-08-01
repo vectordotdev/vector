@@ -139,23 +139,23 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "amq-protocol"
-version = "7.2.1"
+version = "8.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f0234884b3641db74d22ccc20fc2594db5f23d7d41ade5c93d7ee33d200960c"
+checksum = "a56406d1cfd9933844a083206bf10fe3748c753bf43c64d4f4453d87181c14f6"
 dependencies = [
  "amq-protocol-tcp",
  "amq-protocol-types",
  "amq-protocol-uri",
  "cookie-factory",
- "nom 7.1.3",
+ "nom 8.0.0",
  "serde",
 ]
 
 [[package]]
 name = "amq-protocol-tcp"
-version = "7.2.1"
+version = "8.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "265dca43d9dbb3d5bbb0b3ef1b0cd9044ce3aa5d697d5b66cde974d1f6063f09"
+checksum = "c95840a64f5529882346cf7710d0c8d6b6e6fb4ecd3fed0883d1ae97c42efc14"
 dependencies = [
  "amq-protocol-uri",
  "tcp-stream",
@@ -164,21 +164,21 @@ dependencies = [
 
 [[package]]
 name = "amq-protocol-types"
-version = "7.2.1"
+version = "8.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7412353b58923fa012feb9a64ccc0c811747babee2e5a2fd63eb102dc8054c3"
+checksum = "6a7bc568496f6fd598f44bf5c7e9f8157111634a54c114cb9c087e05d282c91a"
 dependencies = [
  "cookie-factory",
- "nom 7.1.3",
+ "nom 8.0.0",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "amq-protocol-uri"
-version = "7.2.1"
+version = "8.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2be91352c805d5704784e079117d5291fd5bf2569add53c914ebce6d1a795d33"
+checksum = "a1d80bcd4af9f0fd2bad6def25c66d55130178749cc98000fd3de2b44991b5ed"
 dependencies = [
  "amq-protocol-types",
  "percent-encoding",
@@ -463,32 +463,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-global-executor"
-version = "2.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1b6f5d7df27bd294849f8eec66ecfc63d11814df7a4f5d74168a2394467b776"
-dependencies = [
- "async-channel 1.9.0",
- "async-executor",
- "async-io 1.13.0",
- "async-lock 2.8.0",
- "blocking",
- "futures-lite 1.13.0",
- "once_cell",
-]
-
-[[package]]
-name = "async-global-executor-trait"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33dd14c5a15affd2abcff50d84efd4009ada28a860f01c14f9d654f3e81b3f75"
-dependencies = [
- "async-global-executor",
- "async-trait",
- "executor-trait",
-]
-
-[[package]]
 name = "async-graphql"
 version = "7.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -691,18 +665,6 @@ dependencies = [
  "futures-lite 1.13.0",
  "rustix 0.38.40",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "async-reactor-trait"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6012d170ad00de56c9ee354aef2e358359deb1ec504254e0e5a3774771de0e"
-dependencies = [
- "async-io 1.13.0",
- "async-trait",
- "futures-core",
- "reactor-trait",
 ]
 
 [[package]]
@@ -3850,15 +3812,6 @@ dependencies = [
 
 [[package]]
 name = "flume"
-version = "0.10.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1657b4441c3403d9f7b3409e47575237dac27b1b5726df654a6ecbf92f0f7577"
-dependencies = [
- "spin 0.9.8",
-]
-
-[[package]]
-name = "flume"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
@@ -5793,22 +5746,17 @@ dependencies = [
 
 [[package]]
 name = "lapin"
-version = "2.5.3"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4273975142078ed200dedd77f09c8903dec110d0b02a0c8ad45796b39b691ea9"
+checksum = "2c5b3c44974fc4f1d1e7acd52fa6471a536b62976a7ade892d56a2694f7773e0"
 dependencies = [
  "amq-protocol",
- "async-global-executor-trait",
- "async-reactor-trait",
  "async-trait",
  "executor-trait",
- "flume 0.11.0",
+ "flume",
  "futures-core",
  "futures-io",
- "parking_lot",
- "pinky-swear",
  "reactor-trait",
- "serde",
  "tracing 0.1.41",
  "waker-fn",
 ]
@@ -7535,18 +7483,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
-name = "pinky-swear"
-version = "6.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d894b67aa7a4bf295db5e85349078c604edaa6fa5c8721e8eca3c7729a27f2ac"
-dependencies = [
- "doc-comment",
- "flume 0.10.14",
- "parking_lot",
- "tracing 0.1.41",
-]
-
-[[package]]
 name = "piper"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8587,9 +8523,9 @@ dependencies = [
 
 [[package]]
 name = "reactor-trait"
-version = "1.1.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "438a4293e4d097556730f4711998189416232f009c137389e0f961d2bc0ddc58"
+checksum = "9b2eb4ff39ed91c79034b2856a73b07bc8afd752c981bc4433bcbeff531e275a"
 dependencies = [
  "async-trait",
  "futures-core",
@@ -9067,7 +9003,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1568e15fab2d546f940ed3a21f48bbbd1c494c90c99c4481339364a497f94a9"
 dependencies = [
  "bytes 1.10.1",
- "flume 0.11.0",
+ "flume",
  "futures-util",
  "log",
  "rustls-native-certs 0.7.0",
@@ -10236,7 +10172,7 @@ checksum = "c2d12fe70b2c1b4401038055f90f151b78208de1f9f89a7dbfd41587a10c3eea"
 dependencies = [
  "atoi",
  "chrono",
- "flume 0.11.0",
+ "flume",
  "futures-channel",
  "futures-core",
  "futures-executor",
@@ -10530,9 +10466,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tcp-stream"
-version = "0.28.0"
+version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "495b0abdce3dc1f8fd27240651c9e68890c14e9d9c61527b1ce44d8a5a7bd3d5"
+checksum = "b0217559d8c5a883d66838180671a74007e785689364ebe9627d517af936eaa9"
 dependencies = [
  "cfg-if",
  "native-tls",
