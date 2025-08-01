@@ -25,4 +25,8 @@ pub mod postgres {
         std::env::var("PG_URL")
             .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
     }
+
+    pub fn pg_version() -> String {
+        std::env::var("CONFIG_VERSION").expect("Need CONFIG_VERSION to be set")
+    }
 }
