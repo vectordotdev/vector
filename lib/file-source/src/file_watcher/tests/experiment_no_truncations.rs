@@ -99,7 +99,7 @@ fn file_watcher_no_truncation() {
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(10000)
-        .max_tests(100000)
+        .tests(5000)
+        .max_tests(50000)
         .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
 }

@@ -277,7 +277,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via [base64][base64].
+    /// The username and password are concatenated and encoded using [base64][base64].
     ///
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
