@@ -4838,7 +4838,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -10039,6 +10039,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "socket2"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
+dependencies = [
+ "libc",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12017,7 +12027,7 @@ dependencies = [
  "smpl_jwt",
  "snafu 0.8.6",
  "snap",
- "socket2 0.5.10",
+ "socket2 0.6.0",
  "sqlx",
  "stream-cancel",
  "strip-ansi-escapes",
@@ -12260,7 +12270,7 @@ dependencies = [
  "similar-asserts",
  "smallvec",
  "snafu 0.8.6",
- "socket2 0.5.10",
+ "socket2 0.6.0",
  "tokio",
  "tokio-openssl",
  "tokio-stream",

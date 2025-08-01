@@ -383,7 +383,7 @@ rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustl
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
-socket2 = { version = "0.5.10", default-features = false }
+socket2 = { version = "0.6.0", default-features = false }
 sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional=true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
