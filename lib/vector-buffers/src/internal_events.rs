@@ -235,9 +235,7 @@ mod tests {
         expected_events: f64,
         expected_bytes: f64,
     ) {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
@@ -288,8 +286,7 @@ mod tests {
             for expected in &expected_metrics {
                 assert!(
                     metrics.contains(expected),
-                    "Missing expected metric: {:?}",
-                    expected
+                    "Missing expected metric: {expected:?}"
                 );
             }
         });
@@ -297,9 +294,8 @@ mod tests {
 
     #[test]
     fn test_increment() {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
         reset_counters();
 
         update_buffer_gauge("test_buffer", 0, 10, 1024);
@@ -350,9 +346,8 @@ mod tests {
 
     #[test]
     fn test_multithreaded_updates_are_correct() {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
         reset_counters();
 
         let num_threads = 10;
@@ -382,9 +377,8 @@ mod tests {
 
     #[test]
     fn test_large_values_capped_to_f64_safe_max() {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+
         reset_counters();
 
         update_buffer_gauge("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
