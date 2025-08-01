@@ -7928,17 +7928,6 @@ dependencies = [
 
 [[package]]
 name = "proptest-derive"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee1c9ac207483d5e7db4940700de86a9aae46ef90c48b57f99fe7edb8345e49"
-dependencies = [
- "proc-macro2 1.0.95",
- "quote 1.0.40",
- "syn 2.0.104",
-]
-
-[[package]]
-name = "proptest-derive"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "095a99f75c69734802359b682be8daaf8980296731f6470434ea2c652af1dd30"
@@ -11984,7 +11973,7 @@ dependencies = [
  "portpicker",
  "postgres-openssl",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-reflect",
@@ -12306,7 +12295,7 @@ name = "vector-lookup"
 version = "0.1.0"
 dependencies = [
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive",
  "serde",
  "vector-config",
  "vector-config-macros",
@@ -12485,7 +12474,7 @@ dependencies = [
  "prettydiff",
  "prettytable-rs",
  "proptest",
- "proptest-derive 0.6.0",
+ "proptest-derive",
  "prost 0.13.5",
  "prost-reflect",
  "psl",
