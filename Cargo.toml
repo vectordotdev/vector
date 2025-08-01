@@ -266,7 +266,7 @@ azure_storage = { version = "0.17", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
 
 # OpenDAL
-opendal = { version = "0.53", default-features = false, features = ["services-webhdfs"], optional = true }
+opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
