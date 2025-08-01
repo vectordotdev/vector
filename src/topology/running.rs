@@ -7,7 +7,7 @@ use std::{
 };
 
 use super::{
-    builder::{self, TopologyPieces},
+    builder::{self, reload_enrichment_tables, TopologyPieces},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
@@ -333,6 +333,11 @@ impl RunningTopology {
         error!("Failed to restore old configuration.");
 
         Err(())
+    }
+
+    /// Attempts to reload enrichment tables.
+    pub(crate) async fn reload_enrichment_tables(&self) {
+        reload_enrichment_tables(&self.config).await;
     }
 
     pub(crate) async fn run_healthchecks(

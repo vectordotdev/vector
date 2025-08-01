@@ -21,6 +21,8 @@ pub enum SignalTo {
     ReloadFromConfigBuilder(ConfigBuilder),
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
+    /// Signal to reload all enricment tables.
+    ReloadTables,
     /// Signal to shutdown process.
     Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
@@ -36,6 +38,7 @@ impl PartialEq for SignalTo {
             // TODO: This will require a lot of plumbing but ultimately we can derive equality for config builders.
             (ReloadFromConfigBuilder(_), ReloadFromConfigBuilder(_)) => true,
             (ReloadFromDisk, ReloadFromDisk) => true,
+            (ReloadTables, ReloadTables) => true,
             (Shutdown(a), Shutdown(b)) => a == b,
             (Quit, Quit) => true,
             _ => false,
