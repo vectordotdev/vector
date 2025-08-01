@@ -58,7 +58,7 @@ impl MetricData {
 
     /// Consumes this metric, returning it as an absolute metric.
     ///
-    /// The `interval_ms` is removed. If the metric was already absolute, nothing otherwise is changed.
+    /// The `interval_ms` is set to `None`. If the metric was already absolute, nothing else is changed.
     #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
