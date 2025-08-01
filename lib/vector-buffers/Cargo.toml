@@ -37,7 +37,7 @@ ordered-float = { version = "4.6.0", default-features = false }
 
 [dev-dependencies]
 clap.workspace = true
-criterion = { version = "0.6", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
 crossbeam-queue = "0.3.12"
 hdrhistogram = "7.5.4"
 metrics-tracing-context.workspace = true

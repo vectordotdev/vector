@@ -439,7 +439,7 @@ azure_identity = { version = "0.17", default-features = false, features = ["enab
 azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
 azure_storage = { version = "0.17", default-features = false }
 base64 = "0.22.1"
-criterion = { version = "0.6.0", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc = "0.2.174"
 similar-asserts = "1.7.0"
