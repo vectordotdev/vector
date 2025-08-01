@@ -297,6 +297,32 @@ impl GlobalOptions {
     pub fn timezone(&self) -> TimeZone {
         self.timezone.unwrap_or(TimeZone::Local)
     }
+
+    /// Returns a list of top-level field names that differ between two [`GlobalOptions`] values.
+    ///
+    /// This function performs a shallow comparison by serializing both configs to JSON
+    /// and comparing their top-level keys.
+    ///
+    /// Useful for logging which global fields changed during config reload attempts.
+    pub fn diff(&self, other: &Self) -> Vec<String> {
+        let serde_json::Value::Object(old_map) = serde_json::to_value(self).expect("serialize old")
+        else {
+            unreachable!()
+        };
+        let serde_json::Value::Object(new_map) =
+            serde_json::to_value(other).expect("serialize new")
+        else {
+            unreachable!()
+        };
+
+        old_map
+            .iter()
+            .filter_map(|(k, v_old)| match new_map.get(k) {
+                Some(v_new) if v_new != v_old => Some(k.clone()),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 fn conflicts<T: PartialEq>(this: Option<&T>, that: Option<&T>) -> bool {
@@ -413,6 +439,20 @@ mod tests {
                 "conflicting values for 'expire_metrics_secs' found".into()
             ])
         );
+    }
+
+    #[test]
+    fn diff_detects_changed_keys() {
+        let old = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path1")),
+            ..Default::default()
+        };
+        let new = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path2")),
+            ..Default::default()
+        };
+        let diff = old.diff(&new);
+        assert_eq!(diff, vec!["data_dir"]);
     }
 
     fn merge<P: Debug, T>(
