@@ -367,7 +367,7 @@ mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runt
 async-nats = { version = "0.33.0", default-features = false, optional = true }
 nkeys = { version = "0.4.4", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
-notify = { version = "8.0.0", default-features = false, features = ["macos_fsevent"] }
+notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
 openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
