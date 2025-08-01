@@ -30,7 +30,7 @@ flate2 = { version = "1.1", default-features = false, features = ["rust_backend"
 futures = { version = "0.3.31", default-features = false, features = ["executor"] }
 
 [dev-dependencies]
-criterion = "0.6"
+criterion = "0.7"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

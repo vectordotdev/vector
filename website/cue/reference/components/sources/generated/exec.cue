@@ -26,7 +26,7 @@ generated: components: sources: exec: configuration: {
 					schema: {
 						description: """
 																The Avro schema definition.
-																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
 																* `Date`
 																* `Decimal`
 																* `Duration`
@@ -38,7 +38,7 @@ generated: components: sources: exec: configuration: {
 					}
 					strip_schema_id_prefix: {
 						description: """
-																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
 																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
 																"""
 						required: true
@@ -64,7 +64,7 @@ generated: components: sources: exec: configuration: {
 															This codec is experimental for the following reason:
 
 															The GELF specification is more strict than the actual Graylog receiver.
-															Vector's decoder currently adheres more strictly to the GELF spec, with
+															Vector's decoder adheres more strictly to the GELF spec, with
 															the exception that some characters such as `@`  are allowed in field names.
 
 															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
@@ -134,7 +134,7 @@ generated: components: sources: exec: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -150,7 +150,7 @@ generated: components: sources: exec: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -166,7 +166,7 @@ generated: components: sources: exec: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -182,7 +182,7 @@ generated: components: sources: exec: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -224,7 +224,7 @@ generated: components: sources: exec: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -256,7 +256,7 @@ generated: components: sources: exec: configuration: {
 																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
 																to indicate system local time.
 
-																If not set, `local` will be used.
+																If not set, `local` is used.
 
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
@@ -349,7 +349,7 @@ generated: components: sources: exec: configuration: {
 																be dropped. If this option is not set, the decoder does not limit the length of messages and
 																the per-message memory is unbounded.
 
-																Note that a message can be composed of multiple chunks and this limit is applied to the whole
+																**Note**: A message can be composed of multiple chunks and this limit is applied to the whole
 																message, not to individual chunks.
 
 																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.

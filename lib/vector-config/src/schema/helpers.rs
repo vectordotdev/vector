@@ -670,7 +670,7 @@ pub(crate) fn assert_string_schema_for_map(
     }
 }
 
-/// Determines whether or not an enum schema is ambiguous based on discriminants of its variants.
+/// Determines whether an enum schema is ambiguous based on discriminants of its variants.
 ///
 /// A discriminant is the set of the named fields which are required, which may be an empty set.
 pub fn has_ambiguous_discriminants(
