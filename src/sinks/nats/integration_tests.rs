@@ -1,7 +1,8 @@
-use std::time::Duration;
-use vector_lib::codecs::TextSerializerConfig;
-
-use super::{config::NatsSinkConfig, sink::NatsSink, ConfigSnafu, NatsError};
+use super::{
+    config::{NatsHeaderConfig, NatsSinkConfig},
+    sink::NatsSink,
+    ConfigSnafu, NatsError,
+};
 use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
@@ -13,7 +14,14 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
+use async_nats::jetstream::stream::StorageType;
+use futures_util::StreamExt;
+use serde::Deserialize;
 use snafu::ResultExt;
+use std::time::Duration;
+use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
+use vector_lib::event::{EventArray, LogEvent};
+use vrl::value;
 
 fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
     NatsSinkConfig {
@@ -381,8 +389,8 @@ async fn nats_tls_jwt_auth_invalid() {
 #[tokio::test]
 async fn nats_jetstream_valid() {
     trace_init();
-
-    let subject = format!("custom.subject.test-{}", random_string(10));
+    let stream_name = format!("EVENTS_{}", random_string(10));
+    let subject = format!("events.test-{}", random_string(10));
 
     let url = std::env::var("NATS_JETSTREAM_ADDRESS")
         .unwrap_or_else(|_| String::from("nats://localhost:4222"));
@@ -393,10 +401,10 @@ async fn nats_jetstream_valid() {
 
     let js = async_nats::jetstream::new(client);
 
-    js.create_stream(async_nats::jetstream::stream::Config {
-        name: "EVENTS".into(),
+    js.get_or_create_stream(async_nats::jetstream::stream::Config {
+        name: stream_name.clone(),
         subjects: vec![subject.clone()],
-        storage: async_nats::jetstream::stream::StorageType::Memory,
+        storage: StorageType::Memory,
         ..Default::default()
     })
     .await
@@ -410,4 +418,100 @@ async fn nats_jetstream_valid() {
         r.is_ok(),
         "publish_and_check failed, expected Ok(()), got: {r:?}"
     );
+}
+
+#[derive(Debug, Deserialize)]
+struct JetstreamTestEvent {
+    id: String,
+    message: String,
+}
+
+// Check that message ids are dynamically assigned
+// and that they are correctly deduplicated at the stream level
+#[tokio::test]
+async fn nats_jetstream_message_id_valid() {
+    trace_init();
+    let stream_name = format!("EVENTS_MSG_ID_{}", random_string(10));
+    let subject = format!("events.test.msg.id-{}", random_string(10));
+
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    js.get_or_create_stream(async_nats::jetstream::stream::Config {
+        name: stream_name.clone(),
+        subjects: vec![subject.clone()],
+        storage: StorageType::Memory,
+        duplicate_window: std::time::Duration::from_secs(60),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    let mut conf = generate_sink_config(&url, &subject);
+    conf.jetstream = true;
+    conf.encoding = JsonSerializerConfig::default().into();
+
+    let header_config = NatsHeaderConfig {
+        message_id: Some(Template::try_from("{{ id }}").unwrap()),
+    };
+    conf.headers = Some(header_config);
+
+    let sink = NatsSink::new(conf.clone()).await.unwrap();
+    let sink = VectorSink::from_event_streamsink(sink);
+
+    let event_id = "123";
+
+    let event1 = LogEvent::from(value!({
+        "id": event_id,
+        "message": "first message",
+    }));
+
+    let event2 = LogEvent::from(value!({
+        "id": event_id,
+        "message": "second message",
+    }));
+
+    let event3 = LogEvent::from(value!({
+        "id": event_id,
+        "message": "third message",
+    }));
+
+    let event_array = EventArray::Logs(vec![event1, event2, event3]);
+    sink.run(futures::stream::iter(vec![event_array]).boxed())
+        .await
+        .unwrap();
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let stream = js.get_stream(&stream_name).await.unwrap();
+    let consumer = stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(format!("test-consumer-{}", random_string(5))),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut processed_messages = Vec::new();
+
+    let messages = consumer.fetch().max_messages(2).messages().await;
+    let mut stream = messages.expect("Failed to get stream");
+
+    while let Some(Ok(msg)) = stream.next().await {
+        msg.ack().await.unwrap();
+        processed_messages.push(msg);
+    }
+
+    assert_eq!(
+        processed_messages.len(),
+        1,
+        "Expected only one message due to deduplication"
+    );
+
+    let msg = &processed_messages[0];
+    let received_event: JetstreamTestEvent = serde_json::from_slice(&msg.payload).unwrap();
+    assert_eq!(received_event.id, event_id);
+    assert_eq!(received_event.message, "first message");
 }
