@@ -377,3 +377,37 @@ async fn nats_tls_jwt_auth_invalid() {
         "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
     );
 }
+
+#[tokio::test]
+async fn nats_jetstream_valid() {
+    trace_init();
+
+    let subject = format!("custom.subject.test-{}", random_string(10));
+
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+    let client = async_nats::connect(&url)
+        .await
+        .expect("Failed to connect to NATS");
+
+    let js = async_nats::jetstream::new(client);
+
+    js.create_stream(async_nats::jetstream::stream::Config {
+        name: "EVENTS".into(),
+        subjects: vec![subject.clone()],
+        storage: async_nats::jetstream::stream::StorageType::Memory,
+        ..Default::default()
+    })
+    .await
+    .expect("Failed to create JetStream stream");
+
+    let mut conf = generate_sink_config(&url, &subject);
+    conf.jetstream = true;
+
+    let r = publish_and_check(conf).await;
+    assert!(
+        r.is_ok(),
+        "publish_and_check failed, expected Ok(()), got: {r:?}"
+    );
+}
