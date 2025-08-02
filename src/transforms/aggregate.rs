@@ -6,7 +6,7 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_lib::{config::LogNamespace, event::MetricValue};
+use vector_lib::event::MetricValue;
 use vector_lib::{
     configurable::configurable_component,
     event::metric::{Metric, MetricData, MetricKind, MetricSeries},
@@ -95,9 +95,8 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
