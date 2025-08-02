@@ -1,3 +1,4 @@
+use async_nats::header;
 use bytes::Bytes;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
@@ -10,12 +11,40 @@ use crate::{
 };
 
 use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
+use async_nats::HeaderMap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NatsTowerRequestConfigDefaults;
 
 impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
     const CONCURRENCY: Concurrency = Concurrency::None;
+}
+
+/// A set of NATS headers that can be added to each message.
+#[configurable_component]
+#[serde_with::serde_as]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct NatsHeaderConfig {
+    /// A unique identifier for the message. Useful for deduplication.
+    #[configurable(metadata(docs::templateable))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(docs::examples = "{{ event_id }}"))]
+    pub(super) message_id: Option<Template>,
+}
+
+impl NatsHeaderConfig {
+    pub fn build_headers(&self, event: &Event) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+
+        if let Some(template) = &self.message_id {
+            if let Ok(value) = template.render_string(event) {
+                headers.insert(header::NATS_MESSAGE_ID, value.as_str());
+            }
+        }
+
+        headers
+    }
 }
 
 /// Configuration for the `nats` sink.
@@ -88,6 +117,11 @@ pub struct NatsSinkConfig {
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
     #[serde(default)]
     pub(super) jetstream: bool,
+
+    /// A map of NATS headers to be included in each message.
+    #[configurable(metadata(docs::templateable))]
+    #[serde(default)]
+    pub(super) headers: Option<NatsHeaderConfig>,
 }
 
 fn default_name() -> String {
@@ -106,6 +140,9 @@ impl GenerateConfig for NatsSinkConfig {
             url: "nats://127.0.0.1:4222".into(),
             request: Default::default(),
             jetstream: Default::default(),
+            headers: Some(NatsHeaderConfig {
+                message_id: Some(Template::try_from("{{ event_id }}").unwrap()),
+            }),
         })
         .unwrap()
     }
@@ -203,6 +240,7 @@ impl NatsPublisher {
     pub(super) async fn publish<S: async_nats::subject::ToSubject>(
         &self,
         subject: S,
+        headers: HeaderMap,
         payload: Bytes,
     ) -> Result<(), NatsError> {
         match self {
@@ -222,11 +260,12 @@ impl NatsPublisher {
                     .await
             }
             NatsPublisher::JetStream(jetstream) => {
-                let ack = jetstream.publish(subject, payload).await.map_err(|e| {
-                    NatsError::PublishError {
+                let ack = jetstream
+                    .publish_with_headers(subject, headers, payload)
+                    .await
+                    .map_err(|e| NatsError::PublishError {
                         source: Box::new(e),
-                    }
-                })?;
+                    })?;
                 ack.await.map(|_| ()).map_err(|e| NatsError::PublishError {
                     source: Box::new(e),
                 })
