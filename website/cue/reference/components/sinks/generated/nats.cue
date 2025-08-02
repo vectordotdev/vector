@@ -484,7 +484,28 @@ generated: components: sinks: nats: configuration: {
 			[jetstream]: https://docs.nats.io/nats-concepts/jetstream
 			"""
 		required: false
-		type: bool: default: false
+		type: object: options: {
+			enabled: {
+				required: false
+				type: bool: default: false
+			}
+			headers: {
+				description: "A map of NATS headers to be included in each message."
+				required:    false
+				type: object: options: message_id: {
+					description: """
+						A unique identifier for the message. Useful for deduplication.
+
+						Can be a template that references fields in the event, e.g., `{{ event_id }}`.
+						"""
+					required: false
+					type: string: {
+						examples: ["{{ event_id }}"]
+						syntax: "template"
+					}
+				}
+			}
+		}
 	}
 	request: {
 		description: """
