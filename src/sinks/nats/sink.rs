@@ -49,7 +49,7 @@ impl NatsSink {
         let encoder = Encoder::<()>::new(serializer);
         let request = config.request;
         let subject = config.subject;
-        let headers = config.headers;
+        let headers = config.jetstream.headers;
 
         Ok(NatsSink {
             request,

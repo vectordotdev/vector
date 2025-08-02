@@ -5,12 +5,11 @@ use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::tls::TlsEnableableConfig;
 
+use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
 use crate::{
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
-
-use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
 use async_nats::HeaderMap;
 
 #[derive(Clone, Copy, Debug)]
@@ -23,10 +22,12 @@ impl TowerRequestConfigDefaults for NatsTowerRequestConfigDefaults {
 /// A set of NATS headers that can be added to each message.
 #[configurable_component]
 #[serde_with::serde_as]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct NatsHeaderConfig {
     /// A unique identifier for the message. Useful for deduplication.
+    ///
+    /// Can be a template that references fields in the event, e.g., `{{ event_id }}`.
     #[configurable(metadata(docs::templateable))]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[configurable(metadata(docs::examples = "{{ event_id }}"))]
@@ -44,6 +45,32 @@ impl NatsHeaderConfig {
         }
 
         headers
+    }
+}
+
+/// Configuration for sending messages using NATS JetStream.
+#[configurable_component]
+#[serde_with::serde_as]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct JetStreamConfig {
+    // Whether to enable Jetstream.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// A map of NATS headers to be included in each message.
+    #[configurable(metadata(docs::templateable))]
+    #[serde(default)]
+    pub(super) headers: Option<NatsHeaderConfig>,
+}
+
+impl From<bool> for JetStreamConfig {
+    fn from(enabled: bool) -> Self {
+        Self {
+            enabled,
+            ..Default::default()
+        }
     }
 }
 
@@ -115,13 +142,13 @@ pub struct NatsSinkConfig {
     /// If set, the `subject` must belong to an existing JetStream stream.
     ///
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
-    #[serde(default)]
-    pub(super) jetstream: bool,
-
-    /// A map of NATS headers to be included in each message.
-    #[configurable(metadata(docs::templateable))]
-    #[serde(default)]
-    pub(super) headers: Option<NatsHeaderConfig>,
+    #[configurable(derived)]
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::is_default"
+    )]
+    pub(super) jetstream: JetStreamConfig,
 }
 
 fn default_name() -> String {
@@ -139,10 +166,12 @@ impl GenerateConfig for NatsSinkConfig {
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
             request: Default::default(),
-            jetstream: Default::default(),
-            headers: Some(NatsHeaderConfig {
-                message_id: Some(Template::try_from("{{ event_id }}").unwrap()),
-            }),
+            jetstream: JetStreamConfig {
+                enabled: true,
+                headers: Some(NatsHeaderConfig {
+                    message_id: Some(Template::try_from("{{ event_id }}").unwrap()),
+                }),
+            },
         })
         .unwrap()
     }
@@ -212,7 +241,7 @@ impl NatsSinkConfig {
         let options = self.create_connect_options()?;
         let connection = self.connect(options).await?;
 
-        if self.jetstream {
+        if self.jetstream.enabled {
             Ok(NatsPublisher::JetStream(async_nats::jetstream::new(
                 connection,
             )))

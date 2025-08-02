@@ -7,6 +7,7 @@ use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
+    sinks::nats::config::JetStreamConfig,
     sinks::prelude::*,
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -33,8 +34,7 @@ fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
         tls: None,
         auth: None,
         request: Default::default(),
-        jetstream: false,
-        headers: None,
+        jetstream: false.into(),
     }
 }
 
@@ -411,7 +411,10 @@ async fn nats_jetstream_valid() {
     .expect("Failed to create JetStream stream");
 
     let mut conf = generate_sink_config(&url, &subject);
-    conf.jetstream = true;
+    conf.jetstream = JetStreamConfig {
+        enabled: true,
+        ..Default::default()
+    };
 
     let r = publish_and_check(conf).await;
     assert!(
@@ -450,13 +453,16 @@ async fn nats_jetstream_message_id_valid() {
     .unwrap();
 
     let mut conf = generate_sink_config(&url, &subject);
-    conf.jetstream = true;
     conf.encoding = JsonSerializerConfig::default().into();
 
     let header_config = NatsHeaderConfig {
         message_id: Some(Template::try_from("{{ id }}").unwrap()),
     };
-    conf.headers = Some(header_config);
+
+    conf.jetstream = JetStreamConfig {
+        enabled: true,
+        headers: Some(header_config),
+    };
 
     let sink = NatsSink::new(conf.clone()).await.unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
