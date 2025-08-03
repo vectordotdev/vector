@@ -11,7 +11,6 @@ use super::Healthcheck;
 use crate::{
     common::datadog,
     http::{HttpClient, HttpError},
-    sinks::HealthcheckError,
 };
 
 #[cfg(feature = "sinks-datadog_events")]
@@ -163,7 +162,7 @@ async fn build_healthcheck_future(
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
         .body(hyper::Body::empty())
-        .unwrap();
+        .map_err(|e| HealthcheckError::BuildRequestError { error: e })?;
 
     let response = client.send(request).await?;
 
@@ -171,6 +170,15 @@ async fn build_healthcheck_future(
         StatusCode::OK => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum HealthcheckError {
+    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
+    BuildRequestError { error: ::http::Error },
+
+    #[snafu(display("Unexpected status: {}", status))]
+    UnexpectedStatus { status: ::http::StatusCode },
 }
 
 #[derive(Debug, Snafu)]
