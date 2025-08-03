@@ -304,24 +304,24 @@ impl GlobalOptions {
     /// and comparing their top-level keys.
     ///
     /// Useful for logging which global fields changed during config reload attempts.
-    pub fn diff(&self, other: &Self) -> Vec<String> {
-        let serde_json::Value::Object(old_map) = serde_json::to_value(self).expect("serialize old")
-        else {
-            unreachable!()
+    pub fn diff(&self, other: &Self) -> Result<Vec<String>, serde_json::Error> {
+        let old_value = serde_json::to_value(old)?;
+        let new_value = serde_json::to_value(new)?;
+
+        let Value::Object(old_map) = old_value else {
+            return Ok(vec![]);
         };
-        let serde_json::Value::Object(new_map) =
-            serde_json::to_value(other).expect("serialize new")
-        else {
-            unreachable!()
+        let Value::Object(new_map) = new_value else {
+            return Ok(vec![]);
         };
 
-        old_map
+        Ok(old_map
             .iter()
             .filter_map(|(k, v_old)| match new_map.get(k) {
                 Some(v_new) if v_new != v_old => Some(k.clone()),
                 _ => None,
             })
-            .collect()
+            .collect())
     }
 }
 
@@ -452,7 +452,7 @@ mod tests {
             ..Default::default()
         };
         let diff = old.diff(&new);
-        assert_eq!(diff, vec!["data_dir"]);
+        assert_eq!(diff, Ok(vec!["data_dir"]));
     }
 
     fn merge<P: Debug, T>(
