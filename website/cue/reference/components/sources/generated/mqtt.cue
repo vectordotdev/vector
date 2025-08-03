@@ -448,6 +448,16 @@ generated: components: sources: mqtt: configuration: {
 		required:    false
 		type: uint: default: 60
 	}
+	max_incoming_packet_size: {
+		description: "Max incoming packet size"
+		required:    false
+		type: uint: default: 10240
+	}
+	max_outgoing_packet_size: {
+		description: "Max outgoing packet size"
+		required:    false
+		type: uint: default: 10240
+	}
 	password: {
 		description: "MQTT password."
 		required:    false
