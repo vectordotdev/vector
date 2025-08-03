@@ -54,7 +54,6 @@ pub struct MqttCommonConfig {
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
-
 }
 
 const fn default_port() -> u16 {

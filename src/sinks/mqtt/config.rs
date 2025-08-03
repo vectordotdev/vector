@@ -148,7 +148,10 @@ impl MqttSinkConfig {
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
-        options.set_max_packet_size(self.common.max_incoming_packet_size, self.common.max_outgoing_packet_size);
+        options.set_max_packet_size(
+            self.common.max_incoming_packet_size,
+            self.common.max_outgoing_packet_size,
+        );
         options.set_clean_session(self.clean_session);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
