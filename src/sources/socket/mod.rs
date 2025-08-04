@@ -322,7 +322,7 @@ mod test {
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
-            Arc,
+            Arc, LazyLock, Mutex,
         },
         thread,
     };
@@ -382,6 +382,8 @@ mod test {
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
+
+    static ADDR_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     fn get_gelf_payload(message: &str) -> String {
         serde_json::to_string(&json!({
@@ -1325,6 +1327,8 @@ mod test {
     #[tokio::test]
     async fn multicast_udp_message() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let _guard = ADDR_LOCK.lock().unwrap();
+
             let (tx, mut rx) = SourceSender::new_test();
             // The socket address must be `IPADDR_ANY` (0.0.0.0) in order to receive multicast packets
             let socket_address = next_addr_any();
@@ -1387,6 +1391,8 @@ mod test {
     #[tokio::test]
     async fn multicast_and_unicast_udp_message() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let _guard = ADDR_LOCK.lock().unwrap();
+
             let (tx, mut rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
             let multicast_ip_address: Ipv4Addr = "224.0.0.2".parse().unwrap();
@@ -1422,6 +1428,8 @@ mod test {
     #[tokio::test]
     async fn udp_invalid_multicast_group() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
+            let _guard = ADDR_LOCK.lock().unwrap();
+
             let (tx, _rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
             let invalid_multicast_ip_address: Ipv4Addr = "192.168.0.3".parse().unwrap();
