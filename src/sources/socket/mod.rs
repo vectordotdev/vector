@@ -322,7 +322,7 @@ mod test {
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
-            Arc, LazyLock, Mutex,
+            Arc, LazyLock,
         },
         thread,
     };
@@ -331,8 +331,8 @@ mod test {
     use futures::{stream, StreamExt};
     use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
     use serde_json::json;
-    use tokio::io::AsyncReadExt;
     use tokio::net::TcpStream;
+    use tokio::{io::AsyncReadExt, sync::Mutex};
     use tokio::{
         task::JoinHandle,
         time::{timeout, Duration, Instant},
@@ -1327,7 +1327,7 @@ mod test {
     #[tokio::test]
     async fn multicast_udp_message() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let _guard = ADDR_LOCK.lock().unwrap();
+            let _guard = ADDR_LOCK.lock().await;
 
             let (tx, mut rx) = SourceSender::new_test();
             // The socket address must be `IPADDR_ANY` (0.0.0.0) in order to receive multicast packets
@@ -1391,7 +1391,7 @@ mod test {
     #[tokio::test]
     async fn multicast_and_unicast_udp_message() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
-            let _guard = ADDR_LOCK.lock().unwrap();
+            let _guard = ADDR_LOCK.lock().await;
 
             let (tx, mut rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
@@ -1428,7 +1428,7 @@ mod test {
     #[tokio::test]
     async fn udp_invalid_multicast_group() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
-            let _guard = ADDR_LOCK.lock().unwrap();
+            let _guard = ADDR_LOCK.lock().await;
 
             let (tx, _rx) = SourceSender::new_test();
             let socket_address = next_addr_any();
