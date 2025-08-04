@@ -45,6 +45,7 @@ pub fn log_schema() -> &'static LogSchema {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(default)]
+#[allow(clippy::struct_field_names)]
 pub struct LogSchema {
     /// The name of the event field to treat as the event message.
     ///

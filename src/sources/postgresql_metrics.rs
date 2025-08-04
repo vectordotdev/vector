@@ -43,8 +43,8 @@ use crate::{
 };
 
 macro_rules! tags {
-    ($tags:expr) => { $tags.clone() };
-    ($tags:expr, $($key:expr => $value:expr),*) => {
+    ($tags:expr_2021) => { $tags.clone() };
+    ($tags:expr_2021, $($key:expr_2021 => $value:expr_2021),*) => {
         {
             let mut tags = $tags.clone();
             $(
@@ -56,7 +56,7 @@ macro_rules! tags {
 }
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -64,7 +64,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }
@@ -555,7 +555,7 @@ impl PostgresqlMetrics {
         }
     }
 
-    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric>, String> {
+    async fn collect_metrics(&mut self) -> Result<impl Iterator<Item = Metric> + use<>, String> {
         let (client, client_version) = self
             .client
             .take()
@@ -995,35 +995,15 @@ mod tests {
 
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
-    use std::path::PathBuf;
-
     use super::*;
     use crate::{
         event::Event,
-        test_util::components::{assert_source_compliance, PULL_SOURCE_TAGS},
+        test_util::{
+            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            integration::postgres::{pg_socket, pg_url},
+        },
         tls, SourceSender,
     };
-
-    fn pg_host() -> String {
-        std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())
-    }
-
-    fn pg_socket() -> PathBuf {
-        std::env::var("PG_SOCKET")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                let current_dir = std::env::current_dir().unwrap();
-                current_dir
-                    .join("tests")
-                    .join("data")
-                    .join("postgresql-local-socket")
-            })
-    }
-
-    fn pg_url() -> String {
-        std::env::var("PG_URL")
-            .unwrap_or_else(|_| format!("postgres://vector:vector@{}/postgres", pg_host()))
-    }
 
     async fn test_postgresql_metrics(
         endpoint: String,

@@ -1,28 +1,38 @@
 //! Configuration for the `http` sink.
 
+#[cfg(feature = "aws-core")]
+use aws_config::meta::region::ProvideRegion;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
 use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
 use hyper::Body;
-use indexmap::IndexMap;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use vector_lib::codecs::{
     encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
 };
+#[cfg(feature = "aws-core")]
+use vector_lib::config::proxy::ProxyConfig;
 
+use super::{
+    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
+    sink::HttpSink,
+};
+#[cfg(feature = "aws-core")]
+use crate::aws::AwsAuthentication;
+#[cfg(feature = "aws-core")]
+use crate::sinks::util::http::SigV4Config;
 use crate::{
     codecs::{EncodingConfigWithFraming, SinkType},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, RequestConfig},
+            http::{http_response_retry_logic, HttpService, OrderedHeaderName, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
         },
     },
-};
-
-use super::{
-    encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
-    sink::HttpSink,
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -38,7 +48,7 @@ pub struct HttpSinkConfig {
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub uri: UriSerde,
+    pub uri: Template,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
@@ -52,7 +62,7 @@ pub struct HttpSinkConfig {
     #[configurable(metadata(
         docs::additional_props_description = "An HTTP request header and it's value."
     ))]
-    pub headers: Option<IndexMap<String, String>>,
+    pub headers: Option<BTreeMap<String, String>>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -190,13 +200,13 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
 }
 
 pub(super) fn validate_headers(
-    headers: &IndexMap<String, String>,
+    headers: &BTreeMap<String, String>,
     configures_auth: bool,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
     let headers = crate::sinks::util::http::validate_headers(headers)?;
 
     for name in headers.keys() {
-        if configures_auth && name == AUTHORIZATION {
+        if configures_auth && name.inner() == AUTHORIZATION {
             return Err("Authorization header can not be used with defined auth options".into());
         }
     }
@@ -236,7 +246,8 @@ impl SinkConfig for HttpSinkConfig {
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
 
-        let headers = validate_headers(&request.headers, self.auth.is_some())?;
+        validate_headers(&request.headers, self.auth.is_some())?;
+        let (static_headers, template_headers) = request.split_headers();
 
         let (payload_prefix, payload_suffix) =
             validate_payload_wrapper(&self.payload_prefix, &self.payload_suffix, &encoder)?;
@@ -275,16 +286,53 @@ impl SinkConfig for HttpSinkConfig {
                 .to_string()
         });
 
+        let converted_static_headers = static_headers
+            .into_iter()
+            .map(|(name, value)| -> crate::Result<_> {
+                let header_name =
+                    HeaderName::from_bytes(name.as_bytes()).map(OrderedHeaderName::from)?;
+                let header_value = HeaderValue::try_from(value)?;
+                Ok((header_name, header_value))
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+
         let http_sink_request_builder = HttpSinkRequestBuilder::new(
-            self.uri.with_default_parts(),
             self.method,
-            self.auth.choose_one(&self.uri.auth)?,
-            headers,
+            self.auth.clone(),
+            converted_static_headers,
             content_type,
             content_encoding,
         );
 
-        let service = HttpService::new(client, http_sink_request_builder);
+        let service = match &self.auth {
+            #[cfg(feature = "aws-core")]
+            Some(Auth::Aws { auth, service }) => {
+                let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
+                    .region()
+                    .await;
+                let region = (match &auth {
+                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
+                    AwsAuthentication::File { .. } => None,
+                    AwsAuthentication::Role { region, .. } => region.clone(),
+                    AwsAuthentication::Default { region, .. } => region.clone(),
+                })
+                .map_or(default_region, |r| Some(Region::new(r.to_string())))
+                .expect("Region must be specified");
+
+                HttpService::new_with_sig_v4(
+                    client,
+                    http_sink_request_builder,
+                    SigV4Config {
+                        shared_credentials_provider: auth
+                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                            .await?,
+                        region: region.clone(),
+                        service: service.clone(),
+                    },
+                )
+            }
+            _ => HttpService::new(client, http_sink_request_builder),
+        };
 
         let request_limits = self.request.tower.into_settings();
 
@@ -292,13 +340,32 @@ impl SinkConfig for HttpSinkConfig {
             .settings(request_limits, http_response_retry_logic())
             .service(service);
 
-        let sink = HttpSink::new(service, batch_settings, request_builder);
+        let sink = HttpSink::new(
+            service,
+            self.uri.clone(),
+            template_headers,
+            batch_settings,
+            request_builder,
+        );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
         Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        let mut files = Vec::new();
+        if let Some(tls) = &self.tls {
+            if let Some(crt_file) = &tls.crt_file {
+                files.push(crt_file)
+            }
+            if let Some(key_file) = &tls.key_file {
+                files.push(key_file)
+            }
+        };
+        files
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -319,9 +386,11 @@ mod tests {
             use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
             use vector_lib::config::LogNamespace;
 
+            let endpoint = "http://127.0.0.1:9000/endpoint";
+            let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
+
             let config = HttpSinkConfig {
-                uri: UriSerde::from_str("http://127.0.0.1:9000/endpoint")
-                    .expect("should never fail to parse"),
+                uri: Template::try_from(endpoint).expect("should never fail to parse"),
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
@@ -345,7 +414,7 @@ mod tests {
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(config.uri.uri.clone(), Some(config.method.into())),
+                HttpResourceConfig::from_parts(uri.uri, Some(config.method.into())),
                 config.encoding.clone(),
             );
 

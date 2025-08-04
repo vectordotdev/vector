@@ -3,8 +3,10 @@
 {{ $config := index (index site.Data.docs.components $type) $tag }}
 {{ $classes := $config.classes }}
 {{ $features := $config.features }}
-{{ $output := $config.output }}
 {{ $alias := $config.alias }}
+
+{{ $input := $config.input }}
+{{ $output := $config.output }}
 
 <div class="block space-y-1">
   {{ if eq $classes.development "beta" }}
@@ -26,6 +28,10 @@
   {{ if eq $classes.delivery "at_least_once" }}
   {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
   {{ end }}
+  
+  {{ if eq $classes.delivery "exactly_once" }}
+  {{ partial "badge.html" (dict "prefix" "delivery" "word" "exactly-once" "color" "blue" "inline" true) }}
+  {{ end }}
 
   {{ if eq $features.acknowledgements true }}
   {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
@@ -45,20 +51,39 @@
   {{ partial "badge.html" (dict "prefix" "state" "word" "stateful" "color" "indigo" "inline" true) }}
   {{ end }}
 
+  {{ with $alias }}
+  {{ partial "badge.html" (dict "prefix" "previously known as" "word" . "color" "yellow" "inline" true) }}
+  {{ end }}
+</div>
+
+<div class="w-full mt-4">
+  {{ if $input.logs }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "logs" "color" "blue" "inline" true) }}
+  {{ end }}
+  {{ if $input.metrics }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "metrics" "color" "blue" "inline" true) }}
+  {{ end }}
+  {{ if $input.traces }}
+  {{ partial "badge.html" (dict "prefix" "input" "word" "traces" "color" "blue" "inline" true) }}
+  {{ end }}
+</div>
+
+<div class="w-full mt-4">
   {{ range $k, $v := $output }}
   {{ if eq $k "logs" }}
-  {{ partial "badge.html" (dict "prefix" "output" "word" "log" "color" "yellow" "inline" true) }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "logs" "color" "yellow" "inline" true) }}
   {{ end }}
 
   {{ if eq $k "metrics" }}
   {{ partial "badge.html" (dict "prefix" "output" "word" "metrics" "color" "yellow" "inline" true) }}
   {{ end }}
-  {{ end }}
 
-  {{ with $alias }}
-  {{ partial "badge.html" (dict "prefix" "previously known as" "word" . "color" "yellow" "inline" true) }}
+  {{ if eq $k "traces" }}
+  {{ partial "badge.html" (dict "prefix" "output" "word" "traces" "color" "yellow" "inline" true) }}
+  {{ end }}
   {{ end }}
 </div>
+
 
 {{ if .Params.deprecated }}
 <div class="mt-4">

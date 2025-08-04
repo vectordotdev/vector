@@ -6,13 +6,28 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde::de;
+use serde::{de, Deserialize, Serialize};
+use vector_config_macros::Configurable;
 
 /// A type alias to better capture the semantics.
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Serialize,
+    Deserialize,
+    Configurable,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Format {
     /// TOML format is used.
     #[default]
@@ -31,7 +46,7 @@ impl FromStr for Format {
             "toml" => Ok(Format::Toml),
             "yaml" => Ok(Format::Yaml),
             "json" => Ok(Format::Json),
-            _ => Err(format!("Invalid format: {}", s)),
+            _ => Err(format!("Invalid format: {s}")),
         }
     }
 }
@@ -43,7 +58,7 @@ impl fmt::Display for Format {
             Format::Json => "json",
             Format::Yaml => "yaml",
         };
-        write!(f, "{}", format)
+        write!(f, "{format}")
     }
 }
 
@@ -148,7 +163,7 @@ mod tests {
 
         for (input, expected) in cases {
             let output = Format::from_path(std::path::PathBuf::from(input));
-            assert_eq!(expected, output.ok(), "{}", input)
+            assert_eq!(expected, output.ok(), "{input}")
         }
     }
 
@@ -164,7 +179,7 @@ mod tests {
         use crate::config::ConfigBuilder;
 
         macro_rules! concat_with_newlines {
-            ($($e:expr,)*) => { concat!( $($e, "\n"),+ ) };
+            ($($e:expr_2021,)*) => { concat!( $($e, "\n"),+ ) };
         }
 
         const SAMPLE_TOML: &str = r#"
@@ -301,23 +316,20 @@ mod tests {
                 Ok(expected) => {
                     #[allow(clippy::expect_fun_call)] // false positive
                     let output: ConfigBuilder = output.expect(&format!(
-                        "expected Ok, got Err with format {:?} and input {:?}",
-                        format, input
+                        "expected Ok, got Err with format {format:?} and input {input:?}"
                     ));
                     let output_json = serde_json::to_value(output).unwrap();
                     let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
-                    assert_eq!(expected_json, output_json, "{}", input)
+                    assert_eq!(expected_json, output_json, "{input}")
                 }
                 Err(expected) => assert_eq!(
                     expected,
                     output.expect_err(&format!(
-                        "expected Err, got Ok with format {:?} and input {:?}",
-                        format, input
+                        "expected Err, got Ok with format {format:?} and input {input:?}"
                     )),
-                    "{}",
-                    input
+                    "{input}"
                 ),
             }
         }

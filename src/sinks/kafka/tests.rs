@@ -59,11 +59,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -83,11 +87,15 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        self::sink::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config, Default::default())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -170,7 +178,7 @@ mod integration_test {
         let topic = format!("test-{}", random_string(10));
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
             compression: KafkaCompression::None,
             healthcheck_topic: None,
             encoding: TextSerializerConfig::default().into(),
@@ -181,13 +189,15 @@ mod integration_test {
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone()).await?;
+        self::sink::healthcheck(config.clone(), Default::default()).await?;
         KafkaSink::new(config)
     }
 
@@ -321,7 +331,7 @@ mod integration_test {
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
-            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
             healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
@@ -330,12 +340,14 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
-        println!("Topic name generated in test: {:?}", topic);
+        println!("Topic name generated in test: {topic:?}");
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -395,7 +407,7 @@ mod integration_test {
             || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
                 Ok((_low, high)) => ready(high > 0),
                 Err(err) => {
-                    println!("retrying due to error fetching watermarks: {}", err);
+                    println!("retrying due to error fetching watermarks: {err}");
                     ready(false)
                 }
             },

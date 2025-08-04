@@ -71,9 +71,13 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
     warp::any()
         .and(warp::header::optional::<String>("Content-Encoding"))
         .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
         .and(warp::body::bytes())
         .and_then(
-            |encoding: Option<String>, request_id: String, body: Bytes| async move {
+            |encoding: Option<String>,
+             request_id: String,
+             access_key: Option<String>,
+             body: Bytes| async move {
                 match encoding {
                     Some(s) if s == "gzip" => {
                         Ok(Box::new(MultiGzDecoder::new(body.reader())) as Box<dyn io::Read>)
@@ -90,6 +94,10 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                     serde_json::from_reader(r)
                         .context(ParseSnafu {
                             request_id: request_id.clone(),
+                        })
+                        .map(|request: FirehoseRequest| FirehoseRequest {
+                            access_key,
+                            ..request
                         })
                         .map_err(warp::reject::custom)
                 })
@@ -158,7 +166,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
-        message = format!("{:?}", err);
+        message = format!("{err:?}");
         request_id = None;
     }
 
@@ -175,4 +183,53 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     });
 
     Ok(warp::reply::with_status(json, code))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn request_construction() {
+        let parsed = warp::test::request()
+            .header(
+                "x-amzn-trace-id",
+                "Root=1-5f5fbf1c-877c68cace58bea222ddbeec",
+            )
+            .header("x-amz-firehose-protocol-version", "1.0")
+            .header(
+                "X-Amz-Firehose-Request-Id",
+                "e17265d6-97af-4938-982e-90d5614c4242",
+            )
+            .header(
+                "x-amz-firehose-source-arn",
+                "arn:aws:firehose:us-east-1:111111111111:deliverystream/test",
+            )
+            .header("x-amz-firehose-access-key", "secret123")
+            .header("user-agent", "Amazon Kinesis Data Firehose Agent/1.0")
+            .header("content-type", "application/json")
+            .header("Content-Encoding", "gzip")
+            .body({
+                let mut gz = flate2::read::GzEncoder::new(
+                    io::Cursor::new(
+                        serde_json::to_vec(&FirehoseRequest {
+                            access_key: None,
+                            request_id: "e17265d6-97af-4938-982e-90d5614c4242".to_owned(),
+                            records: Vec::new(),
+                            timestamp: Utc::now(),
+                        })
+                        .unwrap(),
+                    ),
+                    flate2::Compression::fast(),
+                );
+                let mut buffer = Vec::new();
+                io::Read::read_to_end(&mut gz, &mut buffer).unwrap();
+                buffer
+            })
+            .filter(&parse_body())
+            .await
+            .unwrap();
+
+        assert_eq!(parsed.access_key, Some("secret123".to_owned()));
+    }
 }

@@ -158,12 +158,12 @@ impl TcpConfig {
         self.max_connection_duration_secs
     }
 
-    pub fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
+    pub const fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
         self.max_connection_duration_secs = val;
         self
     }
 
-    pub fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
+    pub const fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
         self.shutdown_timeout_secs = Duration::from_secs(val);
         self
     }
@@ -173,7 +173,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_framing(&mut self, val: Option<FramingConfig>) -> &mut Self {
+    pub const fn set_framing(&mut self, val: Option<FramingConfig>) -> &mut Self {
         self.framing = val;
         self
     }
@@ -183,7 +183,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+    pub const fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
         self.log_namespace = val;
         self
     }
@@ -220,7 +220,7 @@ impl TcpSource for RawTcpSource {
         let now = Utc::now();
 
         for event in events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     SocketConfig::NAME,

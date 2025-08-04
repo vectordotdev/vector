@@ -148,7 +148,7 @@ these references as you write your VRL programs:
 VRL is designed to minimize the learning curve. These resources can help you get
 acquainted with Vector and VRL:
 
-{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
+{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/getting-started/transformation"
 >}}
 
 {{< info title="VRL playground" >}} There is an online [VRL playground](https://playground.vrl.dev),
@@ -199,14 +199,14 @@ VRL has some core concepts that you should be aware of as you dive in.
 [dedupe]: /docs/reference/configuration/transforms/dedupe
 [del]: /docs/reference/vrl/functions#del
 [errors]: /docs/reference/vrl/errors
-[events]: /docs/about/under-the-hood-architecture/data-model
+[events]: /docs/architecture/data-model
 [fail_safe]: https://en.wikipedia.org/wiki/Fail-safe
 [ffi]: https://en.wikipedia.org/wiki/Foreign_function_interface
 [filter]: /docs/reference/configuration/transforms/filter
 [log]: /docs/reference/vrl/functions#log
-[logs]: /docs/about/under-the-hood/architecture/data-model/log
+[logs]: /docs/architecture/data-model/log
 [memory_safety]: https://en.wikipedia.org/wiki/Memory_safety
-[metrics]: /docs/about/under-the-hood/architecture/data-model/metrics
+[metrics]: /docs/architecture/data-model/metrics
 [now]: /docs/reference/vrl/functions#now
 [remap]: /docs/reference/configuration/transforms/remap
 [route]: /docs/reference/configuration/transforms/route

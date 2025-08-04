@@ -4,18 +4,17 @@
 name: "PR Title Semantic Check"
 
 on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
   pull_request:
-    types:
-      - opened
-      - edited
-      - synchronize
+    types: [opened, edited, synchronize]
 
 jobs:
   main:
     name: Check Semantic PR
     runs-on: ubuntu-24.04
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -49,8 +48,10 @@ jobs:
             deployment
             deps
             dev
+            vdev
             durability
             enriching
+            enrichment tables
             enterprise
             exceptions
             external
@@ -145,7 +146,7 @@ jobs:
             gcp_pubsub source
             heroku_logs source
             host_metrics source
-            http source
+            http_client source
             http_scrape source
             internal_logs source
             internal_metrics source
@@ -168,6 +169,7 @@ jobs:
             stdin source
             syslog source
             vector source
+            websocket source
             aws_ec2_metadata transform
             dedupe transform
             filter transform
@@ -192,6 +194,7 @@ jobs:
             aws_kinesis_streams sink
             aws_s3 sink
             aws_sqs sink
+            axiom sink
             azure_blob sink
             azure_monitor_logs sink
             blackhole sink
@@ -225,6 +228,7 @@ jobs:
             new_relic_logs sink
             opentelemetry sink
             papertrail sink
+            postgres sink
             prometheus_exporter sink
             prometheus_remote_write sink
             pulsar sink
@@ -245,3 +249,6 @@ jobs:
             search website
             template website
             website
+            website deps
+
+            config provider

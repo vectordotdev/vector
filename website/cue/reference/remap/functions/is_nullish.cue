@@ -3,9 +3,16 @@ package metadata
 remap: functions: is_nullish: {
 	category: "Type"
 	description: """
-		Determines whether `value` is nullish, where nullish denotes the absence of a
-		meaningful value.
+		Determines whether `value` is nullish. Returns `true` if the specified `value` is `null`,
+		an empty string, a string containing only whitespace, or the string `"-"`. Returns `false` otherwise.
 		"""
+
+	notices: [
+		"""
+			This function behaves inconsistently: it returns `false` for empty arrays (`[]`) and objects (`{}`),
+			but `true` for empty strings (`""`) and `null`.
+			""",
+	]
 
 	arguments: [
 		{

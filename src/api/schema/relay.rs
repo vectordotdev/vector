@@ -49,7 +49,7 @@ impl Base64Cursor {
         let cursor = String::from_utf8(bytes).map_err(|_| Base64CursorError::Invalid)?;
         let index = cursor
             .split(':')
-            .last()
+            .next_back()
             .map(|s| s.parse::<usize>())
             .ok_or(Base64CursorError::Invalid)?
             .map_err(|_| Base64CursorError::Invalid)?;

@@ -14,7 +14,7 @@ Before you begin, this guide assumes the following:
 * You understand the [basic Vector concepts][concepts]
 * You understand [how to set up a basic pipeline][pipeline]
 
-[concepts]: /docs/about/concepts
+[concepts]: /docs/introduction/concepts
 [pipeline]: /docs/setup/quickstart
 {{< /requirement >}}
 
@@ -39,7 +39,7 @@ emitted by the devices, even when collecting events from those devices. This
 is where [Enrichment tables] comes in very handy. Let's assume that you have an
 IoT device that emits its status - `online`, `offline`, `transmitting`, and
 `error` states, but the device needs to emit as little payload as possible
-due to technical constraints or requirements; instead, the IoT can device can
+due to technical constraints or requirements; instead, the IoT device can
 emit integers — `1` for `online`, `2` for `offline`, etc.
 
 To enrich the IoT device's observability data, let's use a `csv` file

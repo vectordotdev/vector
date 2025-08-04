@@ -2,17 +2,23 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use crate::sinks::Healthcheck;
+use crate::sources::Source;
 use crate::{config::SinkContext, enrichment_tables::memory::Memory};
 use async_trait::async_trait;
 use futures::{future, FutureExt};
 use tokio::sync::Mutex;
-use vector_lib::config::{AcknowledgementsConfig, Input};
+use vector_lib::config::{AcknowledgementsConfig, DataType, Input, LogNamespace};
 use vector_lib::enrichment::Table;
+use vector_lib::id::ComponentKey;
+use vector_lib::schema::{self};
 use vector_lib::{configurable::configurable_component, sink::VectorSink};
+use vrl::path::OwnedTargetPath;
+use vrl::value::Kind;
 
-use crate::config::{EnrichmentTableConfig, SinkConfig};
+use crate::config::{EnrichmentTableConfig, SinkConfig, SourceConfig, SourceContext, SourceOutput};
 
 use super::internal_events::InternalMetricsConfig;
+use super::source::MemorySourceConfig;
 
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]
@@ -43,11 +49,18 @@ pub struct MemoryConfig {
     /// By default, there is no size limit.
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub max_byte_size: Option<u64>,
-
+    /// The namespace to use for logs. This overrides the global setting.
+    #[configurable(metadata(docs::hidden))]
+    #[serde(default)]
+    pub log_namespace: Option<bool>,
     /// Configuration of internal metrics
     #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
+    /// Configuration for source functionality.
+    #[configurable(derived)]
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub source_config: Option<MemorySourceConfig>,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
@@ -70,6 +83,8 @@ impl Default for MemoryConfig {
             flush_interval: None,
             memory: Arc::new(Mutex::new(None)),
             max_byte_size: None,
+            log_namespace: None,
+            source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
     }
@@ -84,7 +99,7 @@ const fn default_scan_interval() -> NonZeroU64 {
 }
 
 impl MemoryConfig {
-    async fn get_or_build_memory(&self) -> Memory {
+    pub(super) async fn get_or_build_memory(&self) -> Memory {
         let mut boxed_memory = self.memory.lock().await;
         *boxed_memory
             .get_or_insert_with(|| Box::new(Memory::new(self.clone())))
@@ -100,8 +115,24 @@ impl EnrichmentTableConfig for MemoryConfig {
         Ok(Box::new(self.get_or_build_memory().await))
     }
 
-    fn sink_config(&self) -> Option<Box<dyn SinkConfig>> {
-        Some(Box::new(self.clone()))
+    fn sink_config(
+        &self,
+        default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SinkConfig>)> {
+        Some((default_key.clone(), Box::new(self.clone())))
+    }
+
+    fn source_config(
+        &self,
+        _default_key: &ComponentKey,
+    ) -> Option<(ComponentKey, Box<dyn SourceConfig>)> {
+        let Some(source_config) = &self.source_config else {
+            return None;
+        };
+        Some((
+            source_config.source_key.clone().into(),
+            Box::new(self.clone()),
+        ))
     }
 }
 
@@ -120,6 +151,41 @@ impl SinkConfig for MemoryConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "memory_enrichment_table")]
+impl SourceConfig for MemoryConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        let memory = self.get_or_build_memory().await;
+
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
+        Ok(Box::pin(
+            memory.as_source(cx.shutdown, cx.out, log_namespace).run(),
+        ))
+    }
+
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
+        let schema_definition = match log_namespace {
+            LogNamespace::Legacy => schema::Definition::default_legacy_namespace(),
+            LogNamespace::Vector => {
+                schema::Definition::new_with_default_metadata(Kind::any_object(), [log_namespace])
+                    .with_meaning(OwnedTargetPath::event_root(), "message")
+            }
+        }
+        .with_standard_vector_source_metadata();
+
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 

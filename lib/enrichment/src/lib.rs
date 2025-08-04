@@ -26,6 +26,16 @@ pub enum Condition<'a> {
         from: chrono::DateTime<chrono::Utc>,
         to: chrono::DateTime<chrono::Utc>,
     },
+    /// The date in the field is greater than or equal to `from`.
+    FromDate {
+        field: &'a str,
+        from: chrono::DateTime<chrono::Utc>,
+    },
+    /// The date in the field is less than or equal to `to`.
+    ToDate {
+        field: &'a str,
+        to: chrono::DateTime<chrono::Utc>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +57,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String>;
 
@@ -58,6 +69,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String>;
 

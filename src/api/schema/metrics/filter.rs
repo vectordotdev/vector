@@ -303,7 +303,7 @@ pub fn component_sent_events_totals_metrics_with_outputs(
                             match m.value() {
                                 MetricValue::Counter { value }
                                     if cache
-                                        .insert(format!("{}.{}", id, output), *value)
+                                        .insert(format!("{id}.{output}"), *value)
                                         .unwrap_or(0.00)
                                         < *value =>
                                 {
@@ -349,8 +349,7 @@ pub fn component_sent_events_total_throughputs_with_outputs(
                         .iter()
                         .filter_map(|output| {
                             let m = filter_output_metric(metrics.as_ref(), output.as_ref())?;
-                            let throughput =
-                                throughput(&m, format!("{}.{}", id, output), &mut cache)?;
+                            let throughput = throughput(&m, format!("{id}.{output}"), &mut cache)?;
                             Some(OutputThroughput::new(output.clone(), throughput as i64))
                         })
                         .collect::<Vec<_>>();

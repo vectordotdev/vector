@@ -1,4 +1,47 @@
+#[cfg(feature = "aws-core")]
+use aws_credential_types::provider::SharedCredentialsProvider;
+#[cfg(feature = "aws-core")]
+use aws_types::region::Region;
+use bytes::{Buf, Bytes};
+use futures::{future::BoxFuture, Sink};
+use headers::HeaderName;
+use http::{header, HeaderValue, Request, Response, StatusCode};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OrderedHeaderName(HeaderName);
+
+impl OrderedHeaderName {
+    pub const fn new(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+
+    pub const fn inner(&self) -> &HeaderName {
+        &self.0
+    }
+}
+
+impl From<HeaderName> for OrderedHeaderName {
+    fn from(header_name: HeaderName) -> Self {
+        Self(header_name)
+    }
+}
+
+impl Ord for OrderedHeaderName {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.as_str().cmp(other.0.as_str())
+    }
+}
+
+impl PartialOrd for OrderedHeaderName {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+use hyper::{body, Body};
+use pin_project::pin_project;
+use snafu::{ResultExt, Snafu};
 use std::{
+    collections::BTreeMap,
     fmt,
     future::Future,
     hash::Hash,
@@ -8,20 +51,12 @@ use std::{
     task::{ready, Context, Poll},
     time::Duration,
 };
-
-use bytes::{Buf, Bytes};
-use futures::{future::BoxFuture, Sink};
-use headers::HeaderName;
-use http::{header, HeaderValue, Request, Response, StatusCode};
-use hyper::{body, Body};
-use indexmap::IndexMap;
-use pin_project::pin_project;
-use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
-use vector_lib::configurable::configurable_component;
-use vector_lib::stream::batcher::limiter::ItemBatchSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    configurable::configurable_component, stream::batcher::limiter::ItemBatchSize, ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
+};
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -29,11 +64,16 @@ use super::{
     uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
+
+#[cfg(feature = "aws-core")]
+use crate::aws::sign_request;
+
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
+    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -360,6 +400,14 @@ where
     }
 }
 
+#[cfg(feature = "aws-core")]
+#[derive(Clone)]
+pub struct SigV4Config {
+    pub(crate) shared_credentials_provider: SharedCredentialsProvider,
+    pub(crate) region: Region,
+    pub(crate) service: String,
+}
+
 /// @struct HttpBatchService
 ///
 /// NOTE: This has been deprecated, please do not use directly when creating new sinks.
@@ -369,6 +417,8 @@ where
 pub struct HttpBatchService<F, B = Bytes> {
     inner: HttpClient<Body>,
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
+    #[cfg(feature = "aws-core")]
+    sig_v4_config: Option<SigV4Config>,
 }
 
 impl<F, B> HttpBatchService<F, B> {
@@ -379,6 +429,21 @@ impl<F, B> HttpBatchService<F, B> {
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
+            #[cfg(feature = "aws-core")]
+            sig_v4_config: None,
+        }
+    }
+
+    #[cfg(feature = "aws-core")]
+    pub fn new_with_sig_v4(
+        inner: HttpClient,
+        request_builder: impl Fn(B) -> F + Send + Sync + 'static,
+        sig_v4_config: SigV4Config,
+    ) -> Self {
+        HttpBatchService {
+            inner,
+            request_builder: Arc::new(Box::new(request_builder)),
+            sig_v4_config: Some(sig_v4_config),
         }
     }
 }
@@ -398,12 +463,32 @@ where
 
     fn call(&mut self, body: B) -> Self::Future {
         let request_builder = Arc::clone(&self.request_builder);
+        #[cfg(feature = "aws-core")]
+        let sig_v4_config = self.sig_v4_config.clone();
         let http_client = self.inner.clone();
 
         Box::pin(async move {
             let request = request_builder(body).await.inspect_err(|error| {
                 emit!(SinkRequestBuildError { error });
             })?;
+
+            #[cfg(feature = "aws-core")]
+            let request = match sig_v4_config {
+                None => request,
+                Some(sig_v4_config) => {
+                    let mut signed_request = request;
+                    sign_request(
+                        sig_v4_config.service.as_str(),
+                        &mut signed_request,
+                        &sig_v4_config.shared_credentials_provider,
+                        Some(&sig_v4_config.region),
+                        false,
+                    )
+                    .await?;
+
+                    signed_request
+                }
+            };
             let byte_size = request.body().len();
             let request = request.map(Body::from);
             let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
@@ -440,6 +525,8 @@ impl<F, B> Clone for HttpBatchService<F, B> {
         Self {
             inner: self.inner.clone(),
             request_builder: Arc::clone(&self.request_builder),
+            #[cfg(feature = "aws-core")]
+            sig_v4_config: self.sig_v4_config.clone(),
         }
     }
 }
@@ -478,7 +565,7 @@ impl RetryLogic for HttpRetryLogic {
                 format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
@@ -526,10 +613,10 @@ where
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
             _ if status.is_server_error() => {
-                RetryAction::Retry(format!("Http Status: {}", status).into())
+                RetryAction::Retry(format!("Http Status: {status}").into())
             }
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("Http status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("Http status: {status}").into()),
         }
     }
 }
@@ -556,25 +643,48 @@ pub struct RequestConfig {
     /// Additional HTTP headers to add to every HTTP request.
     #[serde(default)]
     #[configurable(metadata(
-        docs::additional_props_description = "An HTTP request header and it's value."
+        docs::additional_props_description = "An HTTP request header and its value. Both header names and values support templating with event data."
     ))]
     #[configurable(metadata(docs::examples = "headers_examples()"))]
-    pub headers: IndexMap<String, String>,
+    pub headers: BTreeMap<String, String>,
 }
 
-fn headers_examples() -> IndexMap<String, String> {
-    IndexMap::<_, _>::from_iter([
-        ("Accept".to_owned(), "text/plain".to_owned()),
-        ("X-My-Custom-Header".to_owned(), "A-Value".to_owned()),
-    ])
+fn headers_examples() -> BTreeMap<String, String> {
+    btreemap! {
+        "Accept" => "text/plain",
+        "X-My-Custom-Header" => "A-Value",
+        "X-Event-Level" => "{{level}}",
+        "X-Event-Timestamp" => "{{timestamp}}",
+    }
 }
 
 impl RequestConfig {
-    pub fn add_old_option(&mut self, headers: Option<IndexMap<String, String>>) {
+    pub fn add_old_option(&mut self, headers: Option<BTreeMap<String, String>>) {
         if let Some(headers) = headers {
             warn!("Option `headers` has been deprecated. Use `request.headers` instead.");
             self.headers.extend(headers);
         }
+    }
+
+    pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
+        let mut static_headers = BTreeMap::new();
+        let mut template_headers = BTreeMap::new();
+
+        for (name, value) in &self.headers {
+            match Template::try_from(value.as_str()) {
+                Ok(template) if !template.is_dynamic() => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+                Ok(template) => {
+                    template_headers.insert(name.clone(), template);
+                }
+                Err(_) => {
+                    static_headers.insert(name.clone(), value.clone());
+                }
+            }
+        }
+
+        (static_headers, template_headers)
     }
 }
 
@@ -593,16 +703,16 @@ pub enum HeaderValidationError {
 }
 
 pub fn validate_headers(
-    headers: &IndexMap<String, String>,
-) -> crate::Result<IndexMap<HeaderName, HeaderValue>> {
-    let mut validated_headers = IndexMap::new();
+    headers: &BTreeMap<String, String>,
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
+    let mut validated_headers = BTreeMap::new();
     for (name, value) in headers {
         let name = HeaderName::from_bytes(name.as_bytes())
             .with_context(|_| InvalidHeaderNameSnafu { name })?;
         let value = HeaderValue::from_bytes(value.as_bytes())
             .with_context(|_| InvalidHeaderValueSnafu { value })?;
 
-        validated_headers.insert(name, value);
+        validated_headers.insert(name.into(), value);
     }
 
     Ok(validated_headers)
@@ -742,6 +852,32 @@ where
             _phantom: PhantomData,
         }
     }
+
+    #[cfg(feature = "aws-core")]
+    pub fn new_with_sig_v4(
+        http_client: HttpClient<Body>,
+        http_request_builder: B,
+        sig_v4_config: SigV4Config,
+    ) -> Self {
+        let http_request_builder = Arc::new(http_request_builder);
+
+        let batch_service = HttpBatchService::new_with_sig_v4(
+            http_client,
+            move |req: HttpRequest<T>| {
+                let request_builder = Arc::clone(&http_request_builder);
+
+                let fut: BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>> =
+                    Box::pin(async move { request_builder.build(req) });
+
+                fut
+            },
+            sig_v4_config,
+        );
+        Self {
+            batch_service,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl<B, T: Send + 'static> Service<HttpRequest<T>> for HttpService<B, T>
@@ -838,7 +974,7 @@ mod test {
                 async move {
                     let mut body = hyper::body::aggregate(req.into_body())
                         .await
-                        .map_err(|error| format!("error: {}", error))?;
+                        .map_err(|error| format!("error: {error}"))?;
                     let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
@@ -852,14 +988,14 @@ mod test {
 
         tokio::spawn(async move {
             if let Err(error) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("Server error: {}", error);
+                eprintln!("Server error: {error}");
             }
         });
 
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
-        let (body, _rest) = rx.into_future().await;
+        let (body, _rest) = StreamExt::into_future(rx).await;
         assert_eq!(body.unwrap(), "hello");
     }
 }

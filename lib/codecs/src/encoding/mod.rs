@@ -39,8 +39,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::SerializingError(error) => write!(formatter, "SerializingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::SerializingError(error) => write!(formatter, "SerializingError({error})"),
         }
     }
 }
@@ -397,7 +397,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
-            SerializerConfig::Gelf { .. } => GelfSerializerConfig::input_type(),
+            SerializerConfig::Gelf => GelfSerializerConfig::input_type(),
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -416,7 +416,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),
-            SerializerConfig::Gelf { .. } => GelfSerializerConfig::schema_requirement(),
+            SerializerConfig::Gelf => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),

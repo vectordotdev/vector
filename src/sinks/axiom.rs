@@ -139,7 +139,7 @@ impl SinkConfig for AxiomConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -267,16 +267,15 @@ mod integration_tests {
 
         let query_req = QueryRequest {
             apl: format!(
-                "['{}'] | where test_id == '{}' | order by _time desc | limit 2",
-                dataset, test_id
+                "['{dataset}'] | where test_id == '{test_id}' | order by _time desc | limit 2"
             ),
             start_time: Utc::now() - Duration::minutes(10),
             end_time: Utc::now() + Duration::minutes(10),
         };
         let query_res: QueryResponse = client
-            .post(format!("{}/v1/datasets/_apl?format=legacy", url))
+            .post(format!("{url}/v1/datasets/_apl?format=legacy"))
             .header("X-Axiom-Org-Id", org_id)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&query_req)
             .send()
             .await

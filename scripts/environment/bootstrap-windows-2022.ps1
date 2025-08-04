@@ -10,7 +10,7 @@ echo "CARGO_BUILD_JOBS=$N_JOBS" | Out-File -FilePath $env:GITHUB_ENV -Encoding u
 if ($env:RELEASE_BUILDER -ne "true")
 {
     # Ensure we have cargo-next test installed.
-    rustup run stable cargo install cargo-nextest --version 0.9.72 --locked
+    rustup run stable cargo install cargo-nextest --version 0.9.95 --locked
 }
 
 # Enable retries to avoid transient network issues.

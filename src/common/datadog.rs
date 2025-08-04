@@ -17,6 +17,8 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
 /// The datadog tags event path.
 pub const DDTAGS: &str = "ddtags";
+/// The datadog message event path.
+pub const MESSAGE: &str = "message";
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.
@@ -29,6 +31,13 @@ pub const DD_RESERVED_SEMANTIC_ATTRS: [(&str, &str); 6] = [
     (meaning::SOURCE, "ddsource"),
     (meaning::TAGS, DDTAGS),
 ];
+
+/// Returns true if the parameter `attr` is one of the reserved Datadog log attributes
+pub fn is_reserved_attribute(attr: &str) -> bool {
+    DD_RESERVED_SEMANTIC_ATTRS
+        .iter()
+        .any(|(_, attr_str)| &attr == attr_str)
+}
 
 /// DatadogSeriesMetric
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -84,7 +93,7 @@ pub struct DatadogPoint<T>(pub i64, pub T);
 ///
 /// If `endpoint` is not specified, we fallback to `site`.
 pub(crate) fn get_api_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
-    endpoint.map_or_else(|| format!("https://api.{}", site), compute_api_endpoint)
+    endpoint.map_or_else(|| format!("https://api.{site}"), compute_api_endpoint)
 }
 
 /// Computes the Datadog API endpoint from a given endpoint string.

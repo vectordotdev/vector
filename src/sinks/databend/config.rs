@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use databend_client::APIClient as DatabendAPIClient;
 use futures::future::FutureExt;
@@ -112,13 +113,13 @@ impl SinkConfig for DatabendConfig {
         let endpoint = match self.endpoint.uri.scheme().map(|s| s.as_str()) {
             Some("databend") => self.endpoint.to_string(),
             // for backward compatibility, build DSN from endpoint
-            Some("http") => format!("databend://{}/?sslmode=disable", authority),
-            Some("https") => format!("databend://{}", authority),
+            Some("http") => format!("databend://{authority}/?sslmode=disable"),
+            Some("https") => format!("databend://{authority}"),
             None => {
                 return Err("Missing scheme for Databend endpoint. Expected `databend`.".into());
             }
             Some(s) => {
-                return Err(format!("Unsupported scheme for Databend endpoint: {}", s).into());
+                return Err(format!("Unsupported scheme for Databend endpoint: {s}").into());
             }
         };
         let mut endpoint = url::Url::parse(&endpoint)?;
@@ -131,9 +132,11 @@ impl SinkConfig for DatabendConfig {
                 return Err("Bearer authentication is not supported currently".into());
             }
             None => {}
+            #[cfg(feature = "aws-core")]
+            _ => {}
         }
         if let Some(database) = &self.database {
-            endpoint.set_path(&format!("/{}", database));
+            endpoint.set_path(&format!("/{database}"));
         }
         let endpoint = endpoint.to_string();
         let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
@@ -202,8 +205,8 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
-    client.query("SELECT 1").await?;
+async fn select_one(client: Arc<DatabendAPIClient>) -> crate::Result<()> {
+    client.query_all("SELECT 1").await?;
     Ok(())
 }
 

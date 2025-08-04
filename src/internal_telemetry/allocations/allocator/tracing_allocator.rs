@@ -29,55 +29,59 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
-        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            return self.allocator.alloc(object_layout);
+        unsafe {
+            if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                return self.allocator.alloc(object_layout);
+            }
+
+            // Allocate our wrapped layout and make sure the allocation succeeded.
+            let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
+            let actual_ptr = self.allocator.alloc(actual_layout);
+            if actual_ptr.is_null() {
+                return actual_ptr;
+            }
+
+            let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
+
+            let object_size = object_layout.size();
+
+            try_with_suspended_allocation_group(
+                #[inline(always)]
+                |group_id| {
+                    group_id_ptr.write(group_id.as_raw());
+                    self.tracer.trace_allocation(object_size, group_id);
+                },
+            );
+            actual_ptr
         }
-
-        // Allocate our wrapped layout and make sure the allocation succeeded.
-        let (actual_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
-        let actual_ptr = self.allocator.alloc(actual_layout);
-        if actual_ptr.is_null() {
-            return actual_ptr;
-        }
-
-        let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
-
-        let object_size = object_layout.size();
-
-        try_with_suspended_allocation_group(
-            #[inline(always)]
-            |group_id| {
-                group_id_ptr.write(group_id.as_raw());
-                self.tracer.trace_allocation(object_size, group_id);
-            },
-        );
-        actual_ptr
     }
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
-        if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
-            self.allocator.dealloc(object_ptr, object_layout);
-            return;
+        unsafe {
+            if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+                self.allocator.dealloc(object_ptr, object_layout);
+                return;
+            }
+            // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
+            // requested layout, not the wrapped layout that was actually allocated.
+            let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
+
+            let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
+
+            // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
+            self.allocator.dealloc(object_ptr, wrapped_layout);
+
+            let object_size = object_layout.size();
+            let source_group_id = AllocationGroupId::from_raw(raw_group_id);
+
+            try_with_suspended_allocation_group(
+                #[inline(always)]
+                |_| {
+                    self.tracer.trace_deallocation(object_size, source_group_id);
+                },
+            );
         }
-        // Regenerate the wrapped layout so we know where we have to look, as the pointer we've given relates to the
-        // requested layout, not the wrapped layout that was actually allocated.
-        let (wrapped_layout, offset_to_group_id) = get_wrapped_layout(object_layout);
-
-        let raw_group_id = object_ptr.add(offset_to_group_id).cast::<u8>().read();
-
-        // Deallocate before tracking, just to make sure we're reclaiming memory as soon as possible.
-        self.allocator.dealloc(object_ptr, wrapped_layout);
-
-        let object_size = object_layout.size();
-        let source_group_id = AllocationGroupId::from_raw(raw_group_id);
-
-        try_with_suspended_allocation_group(
-            #[inline(always)]
-            |_| {
-                self.tracer.trace_deallocation(object_size, source_group_id);
-            },
-        );
     }
 }
 

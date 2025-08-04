@@ -1,56 +1,22 @@
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
-use rumqttc::{AsyncClient, EventLoop, MqttOptions};
-use snafu::{ResultExt, Snafu};
-use vector_lib::tls::TlsError;
 
+use crate::common::mqtt::MqttConnector;
 use crate::internal_events::MqttConnectionError;
 use crate::sinks::prelude::*;
 
 use super::{
-    config::{ConfigurationError, MqttQoS},
+    config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
     service::MqttService,
     MqttSinkConfig,
 };
 
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum MqttError {
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
-    #[snafu(display("TLS error: {}", source))]
-    Tls { source: TlsError },
-    #[snafu(display("MQTT configuration error: {}", source))]
-    Configuration { source: ConfigurationError },
-}
-
-#[derive(Clone)]
-pub struct MqttConnector {
-    options: MqttOptions,
-    topic: Template,
-}
-
-impl MqttConnector {
-    pub fn new(options: MqttOptions, topic: String) -> Result<Self, MqttError> {
-        let topic = Template::try_from(topic).context(TopicTemplateSnafu)?;
-        Ok(Self { options, topic })
-    }
-
-    fn connect(&self) -> (AsyncClient, EventLoop) {
-        AsyncClient::new(self.options.clone(), 1024)
-    }
-
-    pub async fn healthcheck(&self) -> crate::Result<()> {
-        // TODO: Right now there is no way to implement the healthcheck properly: https://github.com/bytebeamio/rumqtt/issues/562
-        Ok(())
-    }
-}
-
 pub struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
+    topic: Template,
     quality_of_service: MqttQoS,
     retain: bool,
 }
@@ -64,12 +30,14 @@ impl MqttSink {
     pub fn new(config: &MqttSinkConfig, connector: MqttConnector) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
+        let topic = config.topic.clone();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             transformer,
             encoder,
             connector,
+            topic,
             quality_of_service: config.quality_of_service,
             retain: config.retain,
         })
@@ -77,7 +45,6 @@ impl MqttSink {
 
     fn make_mqtt_event(&self, event: Event) -> Option<MqttEvent> {
         let topic = self
-            .connector
             .topic
             .render_string(&event)
             .map_err(|missing_keys| {

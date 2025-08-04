@@ -722,7 +722,7 @@ mod tests {
 
         let format = "%Y-%m-%d-%H-%M-%S";
         let mut template = directory.to_string_lossy().to_string();
-        template.push_str(&format!("/{}.log", format));
+        template.push_str(&format!("/{format}.log"));
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),

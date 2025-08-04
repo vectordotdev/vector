@@ -15,6 +15,7 @@ use vector_lib::internal_event::{
 };
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
+    metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
     trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
 };
 use vector_lib::tls::MaybeTlsIncomingStream;
@@ -100,7 +101,13 @@ pub(crate) fn build_warp_filter(
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
-        headers,
+        headers.clone(),
+    );
+    let metrics_filters = build_warp_metrics_filter(
+        acknowledgements,
+        out.clone(),
+        bytes_received.clone(),
+        events_received.clone(),
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
@@ -108,7 +115,12 @@ pub(crate) fn build_warp_filter(
         bytes_received,
         events_received,
     );
-    log_filters.or(trace_filters).unify().boxed()
+    log_filters
+        .or(trace_filters)
+        .unify()
+        .or(metrics_filters)
+        .unify()
+        .boxed()
 }
 
 fn enrich_events(
@@ -167,6 +179,37 @@ fn build_warp_log_filter(
         .boxed()
 }
 
+fn build_warp_metrics_filter(
+    acknowledgements: bool,
+    out: SourceSender,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
+) -> BoxedFilter<(Response,)> {
+    warp::post()
+        .and(warp::path!("v1" / "metrics"))
+        .and(warp::header::exact_ignore_case(
+            "content-type",
+            "application/x-protobuf",
+        ))
+        .and(warp::header::optional::<String>("content-encoding"))
+        .and(warp::body::bytes())
+        .and_then(move |encoding_header: Option<String>, body: Bytes| {
+            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+                bytes_received.emit(ByteSize(body.len()));
+                decode_metrics_body(body, &events_received)
+            });
+
+            handle_request(
+                events,
+                acknowledgements,
+                out.clone(),
+                super::METRICS,
+                ExportMetricsServiceResponse::default(),
+            )
+        })
+        .boxed()
+}
+
 fn build_warp_trace_filter(
     acknowledgements: bool,
     out: SourceSender,
@@ -205,7 +248,7 @@ fn decode_trace_body(
     let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -231,7 +274,7 @@ fn decode_log_body(
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -239,6 +282,31 @@ fn decode_log_body(
         .resource_logs
         .into_iter()
         .flat_map(|v| v.into_event_iter(log_namespace))
+        .collect();
+
+    events_received.emit(CountByteSize(
+        events.len(),
+        events.estimated_json_encoded_size_of(),
+    ));
+
+    Ok(events)
+}
+
+fn decode_metrics_body(
+    body: Bytes,
+    events_received: &Registered<EventsReceived>,
+) -> Result<Vec<Event>, ErrorMessage> {
+    let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::BAD_REQUEST,
+            format!("Could not decode request: {error}"),
+        )
+    })?;
+
+    let events: Vec<Event> = request
+        .resource_metrics
+        .into_iter()
+        .flat_map(|v| v.into_event_iter())
         .collect();
 
     events_received.emit(CountByteSize(
@@ -299,7 +367,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
     } else {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
+            message: format!("{err:?}"),
             ..Default::default()
         });
 

@@ -39,47 +39,55 @@ components: sources: exec: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.exec.configuration
+	configuration: generated.components.sources.exec.configuration
 
-	output: logs: line: {
-		description: "An individual event from exec."
-		fields: {
-			host:      fields._local_host
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
-			data_stream: {
-				common:      true
-				description: "The data stream from which the event originated."
-				required:    false
-				type: string: {
-					default: null
-					examples: ["stdout", "stderr"]
+	output: {
+		logs: line: {
+			description: "An individual event from exec."
+			fields: {
+				host:      fields._local_host
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+				data_stream: {
+					common:      true
+					description: "The data stream from which the event originated."
+					required:    false
+					type: string: {
+						default: null
+						examples: ["stdout", "stderr"]
+					}
 				}
-			}
-			pid: {
-				description: "The process ID of the command."
-				required:    true
-				type: uint: {
-					examples: [60085, 668]
-					unit: null
+				pid: {
+					description: "The process ID of the command."
+					required:    true
+					type: uint: {
+						examples: [60085, 668]
+						unit: null
+					}
 				}
-			}
-			command: {
-				required:    true
-				description: "The command that was run to generate this event."
-				type: array: {
-					items: type: string: {
-						examples: ["echo", "Hello World!", "ls", "-la"]
+				command: {
+					required:    true
+					description: "The command that was run to generate this event."
+					type: array: {
+						items: type: string: {
+							examples: ["echo", "Hello World!", "ls", "-la"]
+						}
+					}
+				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["exec"]
 					}
 				}
 			}
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["exec"]
-				}
-			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

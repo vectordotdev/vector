@@ -1,3 +1,4 @@
+use crate::common::mqtt::MqttCommonConfig;
 use crate::config::{SinkConfig, SinkContext};
 use crate::sinks::mqtt::config::MqttQoS;
 use crate::sinks::mqtt::MqttSinkConfig;
@@ -8,16 +9,14 @@ use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 
 fn mqtt_broker_address() -> String {
-    let result = std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into());
-    result
+    std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into())
 }
 
 fn mqtt_broker_port() -> u16 {
-    let result = std::env::var("MQTT_BROKER_PORT")
+    std::env::var("MQTT_BROKER_PORT")
         .unwrap_or_else(|_| "1883".into())
         .parse::<u16>()
-        .expect("Cannot parse as u16");
-    result
+        .expect("Cannot parse as u16")
 }
 
 #[tokio::test]
@@ -25,16 +24,21 @@ async fn mqtt_happy() {
     trace_init();
 
     let topic = "test";
-    let cnf = MqttSinkConfig {
+    let common = MqttCommonConfig {
         host: mqtt_broker_address(),
         port: mqtt_broker_port(),
+        ..Default::default()
+    };
+
+    let config = MqttSinkConfig {
+        common,
         topic: Template::try_from(topic).expect("Cannot parse the topic template"),
         quality_of_service: MqttQoS::AtLeastOnce,
         ..Default::default()
     };
 
     let cx = SinkContext::default();
-    let (sink, healthcheck) = cnf.build(cx).await.expect("Cannot build the sink");
+    let (sink, healthcheck) = config.build(cx).await.expect("Cannot build the sink");
     healthcheck.await.expect("Health check failed");
 
     // prepare consumer

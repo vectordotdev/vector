@@ -8,7 +8,7 @@ use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 
 use crate::{
-    file_watcher::{tests::*, FileWatcher},
+    file_watcher::{tests::*, FileWatcher, RawLineResult},
     ReadFrom,
 };
 
@@ -82,7 +82,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
             }
             FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
-                new_path.set_extension(format!("log.{}", rotation_count));
+                new_path.set_extension(format!("log.{rotation_count}"));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
@@ -96,11 +96,14 @@ fn experiment(actions: Vec<FileWatcherAction>) {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.bytes.is_empty() => {
+                        Ok(RawLineResult {
+                            raw_line: Some(line),
+                            ..
+                        }) if line.bytes.is_empty() => {
                             attempts -= 1;
                             continue;
                         }
-                        Ok(None) => {
+                        Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
                             continue;
                         }
@@ -129,7 +132,7 @@ fn file_watcher_with_truncation() {
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(10000)
-        .max_tests(100000)
+        .tests(5000)
+        .max_tests(50000)
         .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
 }

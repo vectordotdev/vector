@@ -22,6 +22,7 @@ use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::Event,
     internal_events::{
@@ -31,7 +32,6 @@ use crate::{
     sink_ext::VecSinkExt,
     sinks::{
         util::{
-            retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, SinkBuildError, StreamSink,
         },

@@ -66,6 +66,10 @@ components: sinks: websocket_server: {
 	}
 
 	input: {
+		description: """
+			The supported input types depend on the encoding configuration.
+			This sink accepts any input type supported by the specified encoder.
+			"""
 		logs: true
 		metrics: {
 			counter:      true
@@ -83,9 +87,21 @@ components: sinks: websocket_server: {
 		open_connections:             components.sources.internal_metrics.output.metrics.open_connections
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
 		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		websocket_messages_sent_total: {
+			description:       "Number of messages sent from the websocket server."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              components.sources.internal_metrics.output.metrics._component_tags
+		}
+		websocket_bytes_sent_total: {
+			description:       "Bytes sent from the websocket server."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              components.sources.internal_metrics.output.metrics._component_tags
+		}
 	}
 
-	configuration: base.components.sinks.websocket_server.configuration
+	configuration: generated.components.sinks.websocket_server.configuration
 
 	how_it_works: {
 		simple_configuration: {
@@ -104,7 +120,7 @@ components: sinks: websocket_server: {
 				sinks:
 					websocket_sink:
 						inputs: ["demo_logs_test"]
-						type: "websocket_listener"
+						type: "websocket_server"
 						address: "0.0.0.0:1234"
 						auth:
 							username: "test"
@@ -117,6 +133,46 @@ components: sinks: websocket_server: {
 				For clients to connect, they need to provide credentials in the Authorization header,
 				because `auth` configuration is defined (by default, no auth is required). In this case,
 				it requires Basic auth with defined username and password.
+				"""
+		}
+		custom_metric_tags: {
+			title: "Additional metrics tags"
+			body: """
+				To provide more details about connected clients, this component supports
+				defining additional custom tags to attach to metrics. Additional tags are only applied
+				to `connection_established_total`, `active_clients`, `component_errors_total`,
+				`connection_shutdown_total`, `websocket_messages_sent_total`, and
+				`websocket_bytes_sent_total`.
+
+				Example configuration:
+				```yaml
+				sinks:
+				  websocket_sink:
+					type: "websocket_server"
+					# ...
+					internal_metrics:
+					  extra_tags:
+						test_extra_tag:
+						  type: fixed
+						  value: test_value
+						user_auth:
+						  type: header
+						  name: Authorization
+						client_ip:
+						  type: ip_address
+						full_url:
+						  type: url
+						last_received_query:
+						  type: query
+						  name: last_received
+					# ...
+				```
+
+				This configuration adds a fixed tag (`test_extra_tag`) to each metric with the value,
+				`test_value`. It also puts the `Authorization` header found in connection requests
+				into the `user_auth` tag, IP address of the client under the `client_ip` tag, full
+				connection URL under the `full_url` tag and the `last_received` query parameter under
+				the `last_received_query` tag.
 				"""
 		}
 		message_buffering: {
@@ -139,12 +195,47 @@ components: sinks: websocket_server: {
 						type: websocket_server
 						inputs: ["demo_logs_test"]
 						address: "0.0.0.0:1234"
-							message_buffering:
-								max_events: 1000
-								message_id_path: "message_id"
+						message_buffering:
+							max_events: 1000
+							message_id_path: "message_id"
 						encoding:
 							codec: "json"
 				```
+				"""
+		}
+		message_buffering_ack_support: {
+			title: "Message buffering ACK support"
+			body: """
+				The `message_buffering` can be made easier for clients by enabling ACK support. This
+				changes the responsibility of tracking last received message from the clients to
+				this component.
+
+				To enable this, use `client_ack_config` configuration option for
+				`message_buffering`.
+
+				Example config:
+				```yaml
+				sinks:
+				  websocket_sink:
+					type: "websocket_server"
+					inputs: ["demo_logs_test"]
+					address: "0.0.0.0:1234"
+					message_buffering:
+						max_events: 1000
+					  message_id_path: "message_id"
+					  client_ack_config:
+						ack_decoding:
+						  codec: "json"
+					    message_id_path: "id"
+					encoding:
+					  codec: "json"
+				```
+
+				This configuration will expect clients to send messages in format `{"id": "{message_id}"}`,
+				and received message IDs will be stored in the component as the last received
+				message for that client. By default, clients are identified by their IP address, but the
+				`client_key` configuration option can be used to use different identification for
+				clients.
 				"""
 		}
 	}

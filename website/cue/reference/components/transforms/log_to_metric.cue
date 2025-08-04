@@ -24,7 +24,7 @@ components: transforms: log_to_metric: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.log_to_metric.configuration
+	configuration: generated.components.transforms.log_to_metric.configuration
 
 	input: {
 		logs:    true
@@ -37,6 +37,8 @@ components: transforms: log_to_metric: {
 		distribution: output._passthrough_distribution
 		gauge:        output._passthrough_gauge
 		set:          output._passthrough_set
+		histogram:    output._passthrough_histogram
+		summary:      output._passthrough_summary
 	}
 
 	examples: [

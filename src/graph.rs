@@ -47,6 +47,19 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Set the output format
+    ///
+    /// See https://mermaid.js.org/syntax/flowchart.html#styling-and-classes for
+    /// information on the `mermaid` format.
+    #[arg(id = "format", long, default_value = "dot")]
+    pub format: OutputFormat,
+}
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    Dot,
+    Mermaid,
 }
 
 impl Opts {
@@ -72,10 +85,7 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     if !attrs.contains_key("shape") {
         attrs.insert("shape".to_string(), default_shape.to_string());
     }
-    attrs
-        .iter()
-        .map(|(k, v)| format!("{}=\"{}\"", k, v))
-        .join(" ")
+    attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -90,12 +100,20 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Err(errs) => {
             #[allow(clippy::print_stderr)]
             for err in errs {
-                eprintln!("{}", err);
+                eprintln!("{err}");
             }
             return exitcode::CONFIG;
         }
     };
 
+    let format = opts.format;
+    match format {
+        OutputFormat::Dot => render_dot(config),
+        OutputFormat::Mermaid => render_mermaid(config),
+    }
+}
+
+fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
     for (id, source) in config.sources() {
@@ -126,8 +144,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
@@ -150,8 +167,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 )
                 .expect("write to String never fails");
             } else {
-                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
-                    .expect("write to String never fails");
+                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
             }
         }
     }
@@ -160,7 +176,49 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     #[allow(clippy::print_stdout)]
     {
-        println!("{}", dot);
+        println!("{dot}");
+    }
+
+    exitcode::OK
+}
+
+fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
+    let mut mermaid = String::from("flowchart TD;\n");
+
+    writeln!(mermaid, "\n  %% Sources").unwrap();
+    for (id, _) in config.sources() {
+        writeln!(mermaid, "  {id}[/{id}/]").unwrap();
+    }
+
+    writeln!(mermaid, "\n  %% Transforms").unwrap();
+    for (id, transform) in config.transforms() {
+        writeln!(mermaid, "  {id}{{{id}}}").unwrap();
+
+        for input in transform.inputs.iter() {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+            } else {
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+            }
+        }
+    }
+
+    writeln!(mermaid, "\n  %% Sinks").unwrap();
+    for (id, sink) in config.sinks() {
+        writeln!(mermaid, "  {id}[\\{id}\\]").unwrap();
+
+        for input in &sink.inputs {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+            } else {
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+            }
+        }
+    }
+
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{mermaid}");
     }
 
     exitcode::OK

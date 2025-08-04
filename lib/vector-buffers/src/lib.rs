@@ -17,7 +17,7 @@ extern crate tracing;
 mod buffer_usage_data;
 
 pub mod config;
-pub use config::{BufferConfig, BufferType};
+pub use config::{BufferConfig, BufferType, MemoryBufferSize};
 use encoding::Encodable;
 use vector_config::configurable_component;
 
@@ -31,6 +31,7 @@ mod internal_events;
 pub mod test;
 pub mod topology;
 
+mod cast_utils;
 pub(crate) mod variants;
 
 use std::fmt::Debug;

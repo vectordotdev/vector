@@ -140,10 +140,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         Err(conflicting_components
             .into_iter()
             .map(|(resource, components)| {
-                format!(
-                    "Resource `{}` is claimed by multiple components: {:?}",
-                    resource, components
-                )
+                format!("Resource `{resource}` is claimed by multiple components: {components:?}")
             })
             .collect())
     }
@@ -325,20 +322,29 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let source_ids = config.sources.iter().flat_map(|(key, source)| {
-        source
-            .inner
-            .outputs(config.schema.log_namespace())
-            .iter()
-            .map(|output| {
-                if let Some(port) = &output.port {
-                    ("source", OutputId::from((key, port.clone())))
-                } else {
-                    ("source", OutputId::from(key))
-                }
-            })
-            .collect::<Vec<_>>()
-    });
+    let table_sources = config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+        .collect::<Vec<_>>();
+    let source_ids = config
+        .sources
+        .iter()
+        .chain(table_sources.iter().map(|(k, s)| (k, s)))
+        .flat_map(|(key, source)| {
+            source
+                .inner
+                .outputs(config.schema.log_namespace())
+                .iter()
+                .map(|output| {
+                    if let Some(port) = &output.port {
+                        ("source", OutputId::from((key, port.clone())))
+                    } else {
+                        ("source", OutputId::from(key))
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         get_transform_output_ids(
             transform.inner.as_ref(),
@@ -352,7 +358,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     let table_sinks = config
         .enrichment_tables
         .iter()
-        .filter_map(|(key, table)| table.as_sink().map(|s| (key, s)))
+        .filter_map(|(key, table)| table.as_sink(key))
         .collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config

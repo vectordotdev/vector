@@ -48,7 +48,7 @@ components: sources: file: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.file.configuration & {
+	configuration: generated.components.sources.file.configuration & {
 		remove_after_secs: warnings: [
 			"""
 				Vector’s process must have permission to delete files.
@@ -430,5 +430,6 @@ components: sources: file: {
 		files_deleted_total:   components.sources.internal_metrics.output.metrics.files_deleted_total
 		files_resumed_total:   components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total: components.sources.internal_metrics.output.metrics.files_unwatched_total
+		open_files:            components.sources.internal_metrics.output.metrics.open_files
 	}
 }

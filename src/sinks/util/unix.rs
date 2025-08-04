@@ -25,6 +25,7 @@ use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
@@ -33,7 +34,6 @@ use crate::{
     sink_ext::VecSinkExt,
     sinks::{
         util::{
-            retries::ExponentialBackoff,
             service::net::UnixMode,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, StreamSink,
@@ -315,7 +315,7 @@ mod tests {
     };
 
     fn temp_uds_path(name: &str) -> PathBuf {
-        tempfile::tempdir().unwrap().into_path().join(name)
+        tempfile::tempdir().unwrap().keep().join(name)
     }
 
     #[tokio::test]

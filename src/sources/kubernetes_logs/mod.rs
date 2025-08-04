@@ -4,7 +4,7 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::{path::PathBuf, time::Duration};
+use std::{cmp::min, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -193,11 +193,21 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     max_line_bytes: usize,
 
+    /// The maximum number of bytes a line can contain - after merging - before being discarded.
+    ///
+    /// This protects against malformed lines or tailing incorrect files.
+    ///
+    /// Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
+    /// config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
+    /// if auto_partial_merge is true, so if this is set to be 1 MiB, for example, but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    max_merged_line_bytes: Option<usize>,
+
     /// The number of lines to read for generating the checksum.
     ///
     /// If your files share a common header that is not always a fixed size,
     ///
-    /// If the file has less than this amount of lines, it won’t be read at all.
+    /// If the file has less than this amount of lines, it won't be read at all.
     #[configurable(metadata(docs::type_unit = "lines"))]
     fingerprint_lines: usize,
 
@@ -294,6 +304,7 @@ impl Default for Config {
             max_read_bytes: default_max_read_bytes(),
             oldest_first: default_oldest_first(),
             max_line_bytes: default_max_line_bytes(),
+            max_merged_line_bytes: None,
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
@@ -553,6 +564,7 @@ struct Source {
     max_read_bytes: usize,
     oldest_first: bool,
     max_line_bytes: usize,
+    max_merged_line_bytes: Option<usize>,
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     use_apiserver_cache: bool,
@@ -573,8 +585,7 @@ impl Source {
         {
             std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
                 format!(
-                    "self_node_name config value or {} env var is not set",
-                    SELF_NODE_NAME_ENV_KEY
+                    "self_node_name config value or {SELF_NODE_NAME_ENV_KEY} env var is not set"
                 )
             })?
         } else {
@@ -600,7 +611,7 @@ impl Source {
             }
             None => ClientConfig::infer().await?,
         };
-        if let Ok(user_agent) = HeaderValue::from_str(&format!("{}/{}", PKG_NAME, PKG_VERSION)) {
+        if let Ok(user_agent) = HeaderValue::from_str(&format!("{PKG_NAME}/{PKG_VERSION}")) {
             client_config
                 .headers
                 .push((HeaderName::from_static("user-agent"), user_agent));
@@ -641,6 +652,7 @@ impl Source {
             max_read_bytes: config.max_read_bytes,
             oldest_first: config.oldest_first,
             max_line_bytes: config.max_line_bytes,
+            max_merged_line_bytes: config.max_merged_line_bytes,
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache: config.use_apiserver_cache,
@@ -676,6 +688,7 @@ impl Source {
             max_read_bytes,
             oldest_first,
             max_line_bytes,
+            max_merged_line_bytes,
             fingerprint_lines,
             glob_minimum_cooldown,
             use_apiserver_cache,
@@ -701,10 +714,12 @@ impl Source {
                 field_selector: Some(field_selector),
                 label_selector: Some(label_selector),
                 list_semantic: list_semantic.clone(),
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
         .backoff(watcher::DefaultBackoff::default());
+
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -724,6 +739,7 @@ impl Source {
             watcher::Config {
                 label_selector: Some(namespace_label_selector),
                 list_semantic: list_semantic.clone(),
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
@@ -747,6 +763,7 @@ impl Source {
             watcher::Config {
                 field_selector: Some(node_selector),
                 list_semantic,
+                page_size: get_page_size(use_apiserver_cache),
                 ..Default::default()
             },
         )
@@ -775,6 +792,14 @@ impl Source {
 
         let ignore_before = calculate_ignore_before(ignore_older_secs);
 
+        let mut resolved_max_line_bytes = max_line_bytes;
+        if auto_partial_merge {
+            resolved_max_line_bytes = min(
+                max_line_bytes,
+                max_merged_line_bytes.unwrap_or(max_line_bytes),
+            );
+        }
+
         // TODO: maybe more of the parameters have to be configurable.
 
         let checkpointer = Checkpointer::new(&data_dir);
@@ -799,7 +824,7 @@ impl Source {
             ignore_before,
             // The maximum number of bytes a line can contain before being discarded. This
             // protects against malformed lines or tailing incorrect files.
-            max_line_bytes,
+            max_line_bytes: resolved_max_line_bytes,
             // Delimiter bytes that is used to read the file line-by-line
             line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
@@ -817,7 +842,7 @@ impl Source {
                     ignored_header_bytes: 0,
                     lines: fingerprint_lines,
                 },
-                max_line_length: max_line_bytes,
+                max_line_length: resolved_max_line_bytes,
                 ignore_not_found: true,
             },
             oldest_first,
@@ -893,7 +918,7 @@ impl Source {
         let (events_count, _) = events.size_hint();
 
         let mut stream = if auto_partial_merge {
-            merge_partial_events(events, log_namespace).left_stream()
+            merge_partial_events(events, log_namespace, max_merged_line_bytes).left_stream()
         } else {
             events.right_stream()
         };
@@ -944,6 +969,15 @@ impl Source {
         }
         info!(message = "Done.");
         Ok(())
+    }
+}
+
+// Set page size to None if use_apiserver_cache is true, to make the list requests containing `resourceVersion=0`` parameters.
+fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
+    if use_apiserver_cache {
+        None
+    } else {
+        watcher::Config::default().page_size
     }
 }
 
@@ -1085,7 +1119,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
         ?self_node_name
     );
 
-    let field_selector = format!("spec.nodeName={}", self_node_name);
+    let field_selector = format!("spec.nodeName={self_node_name}");
 
     if config.extra_field_selector.is_empty() {
         return Ok(field_selector);
@@ -1099,7 +1133,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
 fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
-    Ok(format!("metadata.name={}", self_node_name))
+    Ok(format!("metadata.name={self_node_name}"))
 }
 
 // This function constructs the effective label selector to use, based on
@@ -1111,7 +1145,7 @@ fn prepare_label_selector(selector: &str) -> String {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, selector)
+    format!("{BUILT_IN},{selector}")
 }
 
 #[cfg(test)]

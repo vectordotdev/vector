@@ -83,7 +83,10 @@ pub fn basic_sink(channel_size: usize) -> (impl Stream<Item = SourceSenderItem>,
 pub fn basic_sink_with_data(
     channel_size: usize,
     data: &str,
-) -> (impl Stream<Item = SourceSenderItem>, BasicSinkConfig) {
+) -> (
+    impl Stream<Item = SourceSenderItem> + use<>,
+    BasicSinkConfig,
+) {
     let (tx, rx) = SourceSender::new_test_sender_with_buffer(channel_size);
     let sink = BasicSinkConfig::new_with_data(tx, true, data);
     (rx.into_stream(), sink)
