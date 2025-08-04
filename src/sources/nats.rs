@@ -14,6 +14,11 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
+use async_nats::jetstream::consumer::PullConsumer;
+use async_nats::jetstream::consumer::StreamError as ConsumerStreamError;
+use async_nats::jetstream::context::GetStreamError;
+
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
@@ -34,6 +39,39 @@ enum BuildError {
     Connect { source: async_nats::ConnectError },
     #[snafu(display("NATS Subscribe Error: {}", source))]
     Subscribe { source: async_nats::SubscribeError },
+    #[snafu(display("NATS stream not found: {}", source))]
+    Stream { source: GetStreamError },
+    #[snafu(display("Failed to get NATS consumer: {}", source))]
+    Consumer { source: async_nats::Error },
+    #[snafu(display("Failed to retrieve messages from NATS consumer: {}", source))]
+    Messages { source: ConsumerStreamError },
+}
+
+/// Batch settings for a JetStream pull consumer.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+struct BatchConfig {
+    /// The maximum number of messages to pull in a single batch.
+    #[serde(default)]
+    batch: usize,
+
+    /// The maximum total byte size for a batch. The pull request will be
+    /// fulfilled when either `size` or `max_bytes` is reached.
+    #[serde(default)]
+    max_bytes: usize,
+}
+
+/// JetStream-specific configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+struct JetStreamConfig {
+    /// The name of the stream to bind to.
+    stream: String,
+    /// The name of the durable consumer to pull from.
+    consumer: String,
+
+    #[configurable(derived)]
+    batch: Option<BatchConfig>,
 }
 
 /// Configuration for the `nats` source.
@@ -112,6 +150,10 @@ pub struct NatsSourceConfig {
     #[serde(default = "default_subscription_capacity")]
     #[derivative(Default(value = "default_subscription_capacity()"))]
     subscriber_capacity: usize,
+
+    /// JetStream-specific options for the source.
+    #[serde(default)]
+    jetstream: Option<JetStreamConfig>,
 }
 
 fn default_subject_key_field() -> OptionalValuePath {
@@ -139,20 +181,54 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let (connection, subscription) = create_subscription(self).await?;
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        Ok(Box::pin(nats_source(
-            self.clone(),
-            connection,
-            subscription,
-            decoder,
-            log_namespace,
-            cx.shutdown,
-            cx.out,
-        )))
+        match &self.jetstream {
+            Some(config) => {
+                let connection = self.connect().await?;
+                let js = async_nats::jetstream::new(connection.clone());
+                let stream = js.get_stream(&config.stream).await.context(StreamSnafu)?;
+                let consumer: PullConsumer = stream
+                    .get_consumer(&config.consumer)
+                    .await
+                    .context(ConsumerSnafu)?;
+
+                let batch_config = config.batch.clone().unwrap_or_default();
+
+                let messages = consumer
+                    .stream()
+                    .max_messages_per_batch(batch_config.batch)
+                    .max_bytes_per_batch(batch_config.max_bytes)
+                    .messages()
+                    .await
+                    .context(MessagesSnafu)?;
+
+                Ok(Box::pin(run_nats_jetstream(
+                    self.clone(),
+                    connection,
+                    messages,
+                    decoder,
+                    log_namespace,
+                    cx.shutdown,
+                    cx.out,
+                )))
+            }
+            None => {
+                let (connection, subscription) = create_subscription(self).await?;
+
+                Ok(Box::pin(run_nats_core(
+                    self.clone(),
+                    connection,
+                    subscription,
+                    decoder,
+                    log_namespace,
+                    cx.shutdown,
+                    cx.out,
+                )))
+            }
+        }
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -215,7 +291,78 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     }
 }
 
-async fn nats_source(
+async fn run_nats_jetstream(
+    config: NatsSourceConfig,
+    _connection: async_nats::Client,
+    stream: PullConsumerStream,
+    decoder: Decoder,
+    log_namespace: LogNamespace,
+    shutdown: ShutdownSignal,
+    mut out: SourceSender,
+) -> Result<(), ()> {
+    let events_received = register!(EventsReceived);
+    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+    let mut message_stream = stream.take_until(shutdown);
+
+    while let Some(Ok(msg)) = message_stream.next().await {
+        bytes_received.emit(ByteSize(msg.payload.len()));
+        let mut framed = FramedRead::new(msg.payload.as_ref(), decoder.clone());
+        let mut processing_succeeded = true;
+
+        while let Some(next) = framed.next().await {
+            match next {
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    let byte_size = events.estimated_json_encoded_size_of();
+                    events_received.emit(CountByteSize(count, byte_size));
+                    let now = Utc::now();
+                    let events = events.into_iter().map(|mut event| {
+                        if let Event::Log(ref mut log) = event {
+                            log_namespace.insert_standard_vector_source_metadata(
+                                log,
+                                NatsSourceConfig::NAME,
+                                now,
+                            );
+                            let legacy_subject_key_field = config
+                                .subject_key_field
+                                .path
+                                .as_ref()
+                                .map(LegacyKey::InsertIfEmpty);
+                            log_namespace.insert_source_metadata(
+                                NatsSourceConfig::NAME,
+                                log,
+                                legacy_subject_key_field,
+                                &owned_value_path!("subject"),
+                                msg.subject.as_str(),
+                            )
+                        }
+                        event
+                    });
+                    if out.send_batch(events).await.is_err() {
+                        emit!(StreamClosedError { count });
+                        processing_succeeded = false;
+                        break;
+                    }
+                }
+                Err(error) => {
+                    processing_succeeded = false;
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if processing_succeeded {
+            if let Err(err) = msg.ack().await {
+                error!(message = "Failed to acknowledge JetStream message.", %err);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn run_nats_core(
     config: NatsSourceConfig,
     // Take ownership of the connection so it doesn't get dropped.
     _connection: async_nats::Client,
