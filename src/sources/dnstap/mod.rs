@@ -290,18 +290,18 @@ impl FrameHandler for CommonFrameHandler {
                 (PathPrefix::Event, &DNSTAP_VALUE_PATHS.raw_data),
                 BASE64_STANDARD.encode(&frame),
             );
-        } else if let Err(err) = DnstapParser::parse(
+        } else { match DnstapParser::parse(
             &mut log_event,
             frame,
             DnsParserOptions {
                 lowercase_hostnames: self.lowercase_hostnames,
             },
-        ) {
+        ) { Err(err) => {
             emit!(DnstapParseError {
                 error: format!("Dnstap protobuf decode error {err:?}.")
             });
             return None;
-        }
+        } _ => {}}}
 
         if self.log_namespace == LogNamespace::Vector {
             // The timestamp is inserted by the parser which caters for the Legacy namespace.

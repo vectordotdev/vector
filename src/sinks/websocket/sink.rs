@@ -57,8 +57,8 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = TungsteniteError>,
-        impl Stream<Item = Result<Message, TungsteniteError>>,
+        impl Sink<Message, Error = TungsteniteError> + use<>,
+        impl Stream<Item = Result<Message, TungsteniteError>> + use<>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()

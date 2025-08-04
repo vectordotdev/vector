@@ -28,7 +28,7 @@ use vector_lib::{
 };
 
 macro_rules! fail_with_event {
-    ($context:expr) => {{
+    ($context:expr_2021) => {{
         emit!(WebSocketConnectionFailedError {
             error: Box::new($context.build())
         });

@@ -8,6 +8,7 @@ use vector_lib::configurable::configurable_component;
 /// Encoding configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 /// Configures how events are encoded into raw bytes.
 /// The selected encoding also determines which input types (logs, metrics, traces) are supported.
 pub struct EncodingConfig {
