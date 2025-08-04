@@ -129,7 +129,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-
+                        println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {

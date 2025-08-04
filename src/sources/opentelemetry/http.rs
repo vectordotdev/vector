@@ -1,13 +1,30 @@
 use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
-use bytes::Bytes;
+use super::OpentelemetryConfig;
+use super::{reply::protobuf, status::Status};
+use crate::codecs::Decoder as VectorDecoder;
+use crate::common::http::ErrorMessage;
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
+use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::util::add_headers;
+use crate::{
+    event::Event,
+    http::build_http_trace_layer,
+    internal_events::{EventsReceived, StreamClosedError},
+    shutdown::ShutdownSignal,
+    sources::util::decode,
+    tls::MaybeTlsSettings,
+    SourceSender,
+};
+use bytes::{Bytes, BytesMut};
 use futures_util::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
+use tokio_util::codec::Decoder;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::internal_event::{
@@ -27,23 +44,6 @@ use vector_lib::{
 use warp::{
     filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
 };
-
-use crate::common::http::ErrorMessage;
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
-use crate::sources::http_server::HttpConfigParamKind;
-use crate::sources::util::add_headers;
-use crate::{
-    event::Event,
-    http::build_http_trace_layer,
-    internal_events::{EventsReceived, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::util::decode,
-    tls::MaybeTlsSettings,
-    SourceSender,
-};
-
-use super::OpentelemetryConfig;
-use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -94,6 +94,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
+    decoder: Option<VectorDecoder>
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -102,6 +103,7 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
+        decoder
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
@@ -145,6 +147,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
+    decoder: Option<VectorDecoder>
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -157,7 +160,21 @@ fn build_warp_log_filter(
         .and(warp::body::bytes())
         .and_then(
             move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
-                let events = decode(encoding_header.as_deref(), body)
+                println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
+                let events = if let Some(mut decoder) = decoder.clone()
+                {
+                    let mut body = BytesMut::from(body);
+                    decoder.decode(&mut body).map(|result|
+                        {
+                            if let Some(result) = result {
+                                result.0.into_vec()
+                            } else {
+                                Vec::new()
+                            }
+                        }
+                    ).map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                } else {
+                    decode(encoding_header.as_deref(), body)
                     .and_then(|body| {
                         bytes_received.emit(ByteSize(body.len()));
                         decode_log_body(body, log_namespace, &events_received)
@@ -165,8 +182,10 @@ fn build_warp_log_filter(
                     .map(|mut events| {
                         enrich_events(&mut events, &headers, &headers_config, log_namespace);
                         events
-                    });
+                    })
+                };
 
+                println!("{:#?}", events);
                 handle_request(
                     events,
                     acknowledgements,

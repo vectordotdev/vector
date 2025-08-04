@@ -18,7 +18,24 @@ use vector_lib::opentelemetry::logs::{
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
 
+use self::{
+    grpc::Service,
+    http::{build_warp_filter, run_http_server},
+};
+use super::http_server::{build_param_matcher, remove_duplicates};
+use crate::codecs::DecodingConfig;
+use crate::{
+    config::{
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput,
+    },
+    http::KeepaliveConfig,
+    serde::bool_or_struct,
+    sources::{util::grpc::run_grpc_server_with_routes, Source},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+};
 use tonic::transport::server::RoutesBuilder;
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{
@@ -31,23 +48,6 @@ use vector_lib::{
     schema::Definition,
 };
 use vrl::value::{kind::Collection, Kind};
-
-use self::{
-    grpc::Service,
-    http::{build_warp_filter, run_http_server},
-};
-use crate::{
-    config::{
-        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
-    },
-    http::KeepaliveConfig,
-    serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server_with_routes, Source},
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-
-use super::http_server::{build_param_matcher, remove_duplicates};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
@@ -72,6 +72,10 @@ pub struct OpentelemetryConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     log_namespace: Option<bool>,
+
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decoding: Option<DeserializerConfig>,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -149,6 +153,7 @@ impl GenerateConfig for OpentelemetryConfig {
             http: example_http_config(),
             acknowledgements: Default::default(),
             log_namespace: None,
+            decoding: None,
         })
         .unwrap()
     }
@@ -196,6 +201,16 @@ impl SourceConfig for OpentelemetryConfig {
             .add_service(log_service)
             .add_service(metrics_service)
             .add_service(trace_service);
+
+        let decoder = if let Some(deserializer_config) = &self.decoding {
+            let decoding_config = DecodingConfig::new(FramingConfig::NewlineDelimited(Default::default()),
+                                                      deserializer_config.clone(),
+                                                      log_namespace);
+            Some(decoding_config.build()?)
+        } else {
+            None
+        };
+
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
@@ -206,11 +221,13 @@ impl SourceConfig for OpentelemetryConfig {
             error!(message = "Source future failed.", %error);
         });
 
+
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
         let bytes_received = register!(BytesReceived::from(Protocol::from(protocol)));
         let headers =
             build_param_matcher(&remove_duplicates(self.http.headers.clone(), "headers"))?;
+
         let filters = build_warp_filter(
             acknowledgements,
             log_namespace,
@@ -218,7 +235,9 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
             headers,
+            decoder,
         );
+
         let http_source = run_http_server(
             self.http.address,
             http_tls_settings,
