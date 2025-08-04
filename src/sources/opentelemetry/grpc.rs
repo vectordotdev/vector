@@ -50,8 +50,10 @@ impl TraceService for Service {
                 message_type: "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest".to_string(),
             }
         }.build().unwrap();
-        let events = deserializer.parse(bytes, self.log_namespace).unwrap().into_vec();
-
+        let events = deserializer
+            .parse(bytes, self.log_namespace)
+            .unwrap()
+            .into_vec();
 
         // let events: Vec<Event> = request
         //     .into_inner()
@@ -84,7 +86,10 @@ impl LogsService for Service {
                 message_type: "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest".to_string(),
             }
         }.build().unwrap();
-        let events = deserializer.parse(bytes, self.log_namespace).unwrap().into_vec();
+        let events = deserializer
+            .parse(bytes, self.log_namespace)
+            .unwrap()
+            .into_vec();
 
         // let events: Vec<Event> = request
         //     .into_inner()

@@ -203,9 +203,11 @@ impl SourceConfig for OpentelemetryConfig {
             .add_service(trace_service);
 
         let decoder = if let Some(deserializer_config) = &self.decoding {
-            let decoding_config = DecodingConfig::new(FramingConfig::NewlineDelimited(Default::default()),
-                                                      deserializer_config.clone(),
-                                                      log_namespace);
+            let decoding_config = DecodingConfig::new(
+                FramingConfig::NewlineDelimited(Default::default()),
+                deserializer_config.clone(),
+                log_namespace,
+            );
             Some(decoding_config.build()?)
         } else {
             None
@@ -220,7 +222,6 @@ impl SourceConfig for OpentelemetryConfig {
         .map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
-
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();

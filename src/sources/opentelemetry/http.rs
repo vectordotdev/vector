@@ -94,7 +94,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    decoder: Option<VectorDecoder>
+    decoder: Option<VectorDecoder>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -103,7 +103,7 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
-        decoder
+        decoder,
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
@@ -147,7 +147,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    decoder: Option<VectorDecoder>
+    decoder: Option<VectorDecoder>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -161,28 +161,28 @@ fn build_warp_log_filter(
         .and_then(
             move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
                 println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
-                let events = if let Some(mut decoder) = decoder.clone()
-                {
+                let events = if let Some(mut decoder) = decoder.clone() {
                     let mut body = BytesMut::from(body);
-                    decoder.decode(&mut body).map(|result|
-                        {
+                    decoder
+                        .decode(&mut body)
+                        .map(|result| {
                             if let Some(result) = result {
                                 result.0.into_vec()
                             } else {
                                 Vec::new()
                             }
-                        }
-                    ).map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                        })
+                        .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
                 } else {
                     decode(encoding_header.as_deref(), body)
-                    .and_then(|body| {
-                        bytes_received.emit(ByteSize(body.len()));
-                        decode_log_body(body, log_namespace, &events_received)
-                    })
-                    .map(|mut events| {
-                        enrich_events(&mut events, &headers, &headers_config, log_namespace);
-                        events
-                    })
+                        .and_then(|body| {
+                            bytes_received.emit(ByteSize(body.len()));
+                            decode_log_body(body, log_namespace, &events_received)
+                        })
+                        .map(|mut events| {
+                            enrich_events(&mut events, &headers, &headers_config, log_namespace);
+                            events
+                        })
                 };
 
                 println!("{:#?}", events);
