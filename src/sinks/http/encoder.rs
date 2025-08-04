@@ -92,6 +92,9 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
         let body = body.freeze();
 
+        println!("📦 Final encoded HTTP payload ({} bytes):", body.len());
+        println!("{:?}", body);
+
         write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }
 }
