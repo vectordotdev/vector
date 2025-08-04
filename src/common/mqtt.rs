@@ -41,7 +41,7 @@ pub struct MqttCommonConfig {
     #[derivative(Default(value = "default_keep_alive()"))]
     pub keep_alive: u16,
 
-    /// Max packet size
+    /// Maximum packet size
     #[serde(default = "default_max_packet_size")]
     #[derivative(Default(value = "default_max_packet_size()"))]
     pub max_packet_size: usize,
