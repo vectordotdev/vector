@@ -33,19 +33,18 @@ impl TimedDedupe {
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         let now = Instant::now();
-        let drop_event = if self.time_config.refresh_on_drop {
-            self.cache
-                .put(cache_entry, now)
-                .is_some_and(|time| now.duration_since(time) < self.time_config.max_age_ms)
-        } else if self
-            .cache
-            .get(&cache_entry)
-            .is_some_and(|time| now.duration_since(*time) < self.time_config.max_age_ms)
-        {
-            true
-        } else {
-            self.cache.put(cache_entry, now);
-            false
+        let drop_event = match self.cache.get(&cache_entry) {
+            Some(&time) => {
+                let drop = now.duration_since(time) < self.time_config.max_age_ms;
+                if self.time_config.refresh_on_drop || !drop {
+                    self.cache.put(cache_entry, now);
+                }
+                drop
+            }
+            None => {
+                self.cache.put(cache_entry, now);
+                false
+            }
         };
         if drop_event {
             emit!(DedupeEventsDropped { count: 1 });
