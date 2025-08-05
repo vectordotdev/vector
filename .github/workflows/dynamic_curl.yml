@@ -1,0 +1,61 @@
+name: Dynamic curl build (x86_64-unknown-linux-gnu)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Vector (dynamic curl)
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          cargo install cross --version 0.2.4 --force --locked
+
+      - name: Build Vector cross image
+        run: make cross-image-x86_64-unknown-linux-gnu
+
+      - name: Build with dynamic curl
+        run: |
+          cross build --release --target x86_64-unknown-linux-gnu \
+            --no-default-features \
+            --features target-x86_64-unknown-linux-gnu,rdkafka-curl-dynamic
+
+      - name: Package vector into tar.gz
+        run: |
+          cd target/x86_64-unknown-linux-gnu/release
+          tar -czf vector-dynamic-curl-x86_64-unknown-linux-gnu.tar.gz vector
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vector-dynamic-curl-x86_64-unknown-linux-gnu.tar.gz
+          path: ./target/x86_64-unknown-linux-gnu/release/vector-dynamic-curl-x86_64-unknown-linux-gnu.tar.gz
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1.1.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: dynamic-curl-${{ github.sha }}
+          release_name: Dynamic-curl build – ${{ github.sha }}
+          draft: false
+          prerelease: true
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/x86_64-unknown-linux-gnu/release/vector-dynamic-curl-x86_64-unknown-linux-gnu.tar.gz
+          asset_name: vector-dynamic-curl-x86_64-unknown-linux-gnu.tar.gz
+          asset_content_type: application/gzip
