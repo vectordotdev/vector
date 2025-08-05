@@ -49,17 +49,31 @@ enum BuildError {
 }
 
 /// Batch settings for a JetStream pull consumer.
+///
+/// By default, messages are pulled in batches of up to 200.
+/// Each pull request expires after 30 seconds if not fulfilled.
+/// There is no explicit maximum byte size per batch unless specified.
+///
+/// **Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 struct BatchConfig {
     /// The maximum number of messages to pull in a single batch.
-    #[serde(default)]
+    #[serde(default = "default_batch")]
     batch: usize,
 
     /// The maximum total byte size for a batch. The pull request will be
     /// fulfilled when either `size` or `max_bytes` is reached.
-    #[serde(default)]
+    #[serde(default = "default_max_bytes")]
     max_bytes: usize,
+}
+
+const fn default_batch() -> usize {
+    200
+}
+
+const fn default_max_bytes() -> usize {
+    0
 }
 
 /// JetStream-specific configuration.
@@ -72,7 +86,7 @@ struct JetStreamConfig {
     consumer: String,
 
     #[configurable(derived)]
-    batch: Option<BatchConfig>,
+    batch: BatchConfig,
 }
 
 /// Configuration for the `nats` source.
@@ -196,7 +210,7 @@ impl SourceConfig for NatsSourceConfig {
                     .await
                     .context(ConsumerSnafu)?;
 
-                let batch_config = config.batch.clone().unwrap_or_default();
+                let batch_config = config.batch.clone();
 
                 let messages = consumer
                     .stream()
