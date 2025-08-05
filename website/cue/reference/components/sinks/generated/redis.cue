@@ -660,21 +660,6 @@ generated: components: sinks: redis: configuration: {
 			}
 		}
 	}
-	score: {
-		description: """
-			The score to publish a message with to a `sorted set`.
-
-			Should be specified when using a sorted set data type.
-			"""
-		required: false
-		type: {
-			string: {
-				examples: ["%s", "%Y%m%d%H%M%S"]
-				syntax: "template"
-			}
-			uint: examples: ["%s", "%Y%m%d%H%M%S"]
-		}
-	}
 	sentinel_connect: {
 		description: "Controls how Redis Sentinel will connect to the servers belonging to it."
 		required:    false
@@ -746,16 +731,34 @@ generated: components: sinks: redis: configuration: {
 	sorted_set_option: {
 		description: "Sorted Set-specific options"
 		required:    false
-		type: object: options: method: {
-			description: "The method to use for pushing messages into a `sorted set`."
-			required:    true
-			type: string: enum: zadd: """
-				Use the `zadd` method.
+		type: object: options: {
+			method: {
+				description: "The method to use for pushing messages into a `sorted set`."
+				required:    true
+				type: string: enum: zadd: """
+					Use the `zadd` method.
 
-				This adds messages onto a queue with a score.
+					This adds messages onto a queue with a score.
 
-				This is the default.
-				"""
+					This is the default.
+					"""
+			}
+			score: {
+				description: """
+					The score to publish a message with to a `sorted set`.
+
+					Should be specified when using a sorted set data type.
+
+					Examples:
+					- `%s`
+					- `%Y%m%d%H%M%S`
+					"""
+				required: false
+				type: {
+					string: syntax: "template"
+					uint: {}
+				}
+			}
 		}
 	}
 }

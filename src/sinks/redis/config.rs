@@ -78,11 +78,21 @@ pub enum ListMethod {
 
 /// Sorted Set-specific options
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub struct SortedSetOption {
     /// The method to use for pushing messages into a `sorted set`.
     pub method: SortedSetMethod,
+
+    /// The score to publish a message with to a `sorted set`.
+    ///
+    /// Examples:
+    /// - `%s`
+    /// - `%Y%m%d%H%M%S`
+    // Examples added in Rustdoc as `vector-config`'s metadata doesn't handle
+    // UnsignedIntTemplate's properly yet. TODO: Improve this.
+    #[configurable(validation(length(min = 1)))]
+    pub score: Option<UnsignedIntTemplate>,
 }
 
 /// Method for pushing messages into a `sorted set`.
@@ -152,13 +162,6 @@ pub struct RedisSinkConfig {
     #[configurable(validation(length(min = 1)))]
     #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
     pub(super) key: Template,
-
-    /// The score to publish a message with to a `sorted set`.
-    ///
-    /// Should be specified when using a sorted set data type.
-    #[configurable(validation(length(min = 1)))]
-    #[configurable(metadata(docs::examples = "%s", docs::examples = "%Y%m%d%H%M%S"))]
-    pub(super) score: Option<UnsignedIntTemplate>,
 
     #[configurable(derived)]
     #[serde(default)]

@@ -264,7 +264,11 @@ pub(super) struct RedisSink {
 impl RedisSink {
     pub(super) fn new(config: &RedisSinkConfig, conn: RedisConnection) -> crate::Result<Self> {
         let list_method = config.list_option.map(|option| option.method);
-        let sorted_set_method = config.sorted_set_option.map(|option| option.method);
+        let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {
+            (Some(option.method), option.score.clone())
+        } else {
+            (None, None)
+        };
 
         let data_type = match config.data_type {
             DataTypeConfig::Channel => super::DataType::Channel,
@@ -279,7 +283,6 @@ impl RedisSink {
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let key = config.key.clone();
-        let score = config.score.clone();
         let request = config.request;
 
         Ok(RedisSink {

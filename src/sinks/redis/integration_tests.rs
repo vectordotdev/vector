@@ -48,7 +48,6 @@ async fn redis_sink_sentinel_reaches_primary() {
             method: ListMethod::RPush,
         }),
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -92,7 +91,6 @@ async fn redis_sink_sentinel_rpush() {
             method: ListMethod::RPush,
         }),
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -167,7 +165,6 @@ async fn redis_sink_list_lpush() {
             method: ListMethod::LPush,
         }),
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -242,7 +239,6 @@ async fn redis_sink_list_rpush() {
             method: ListMethod::RPush,
         }),
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -316,8 +312,8 @@ async fn redis_sink_sorted_set_zadd() {
         list_option: None,
         sorted_set_option: Some(SortedSetOption {
             method: SortedSetMethod::ZAdd,
+            score: Some(UnsignedIntTemplate::try_from("{{ num }}").unwrap()),
         }),
-        score: Some(UnsignedIntTemplate::try_from("{{ num }}").unwrap()),
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -409,7 +405,6 @@ async fn redis_sink_channel() {
         data_type: DataTypeConfig::Channel,
         list_option: None,
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -488,7 +483,6 @@ async fn redis_sink_channel_data_volume_tags() {
         data_type: DataTypeConfig::Channel,
         list_option: None,
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -541,7 +535,6 @@ async fn redis_sink_metrics() {
             method: ListMethod::RPush,
         }),
         sorted_set_option: None,
-        score: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig {
             rate_limit_num: u64::MAX,
@@ -646,7 +639,6 @@ async fn redis_sink_traces() {
                 method: ListMethod::RPush,
             }),
             sorted_set_option: None,
-            score: None,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             sentinel_service: None,
