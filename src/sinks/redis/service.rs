@@ -3,9 +3,9 @@ use std::task::{Context, Poll};
 use crate::sinks::prelude::*;
 
 use super::{
-    RedisRequest, RedisSinkError,
-    config::Method,
+    config::{ListMethod, SortedSetMethod},
     sink::{ConnectionState, RedisConnection},
+    RedisRequest, RedisSinkError,
 };
 
 #[derive(Clone)]
@@ -34,18 +34,31 @@ impl Service<RedisRequest> for RedisService {
         for kv in kvs.request {
             match self.data_type {
                 super::DataType::List(method) => match method {
-                    Method::LPush => {
+                    ListMethod::LPush => {
                         if count > 1 {
                             pipe.atomic().lpush(kv.key, kv.value.as_ref());
                         } else {
                             pipe.lpush(kv.key, kv.value.as_ref());
                         }
                     }
-                    Method::RPush => {
+                    ListMethod::RPush => {
                         if count > 1 {
                             pipe.atomic().rpush(kv.key, kv.value.as_ref());
                         } else {
                             pipe.rpush(kv.key, kv.value.as_ref());
+                        }
+                    }
+                },
+                super::DataType::SortedSet(method) => match method {
+                    SortedSetMethod::ZAdd => {
+                        if count > 1 {
+                            pipe.atomic().zadd(
+                                kv.key,
+                                kv.value.as_ref(),
+                                kv.score.unwrap_or(0) as f64,
+                            );
+                        } else {
+                            pipe.zadd(kv.key, kv.value.as_ref(), kv.score.unwrap_or(0) as f64);
                         }
                     }
                 },
