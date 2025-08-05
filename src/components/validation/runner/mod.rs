@@ -10,15 +10,15 @@ use tokio::{
     runtime::Builder,
     select,
     sync::{
-        mpsc::{self, Receiver, Sender},
         Mutex,
+        mpsc::{self, Receiver, Sender},
     },
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
 
 use vector_lib::{
-    codecs::encoding, config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, codecs::encoding, config::LogNamespace, event::Event,
 };
 
 use crate::{
@@ -30,9 +30,9 @@ use crate::{
 };
 
 use super::{
-    encode_test_event, sync::{Configuring, TaskCoordinator}, ComponentType, TestCaseExpectation, TestEvent,
-    ValidationConfiguration,
-    Validator,
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
+    encode_test_event,
+    sync::{Configuring, TaskCoordinator},
 };
 
 pub use self::config::TopologyBuilder;
