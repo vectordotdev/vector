@@ -150,7 +150,7 @@ impl WebSocketSink {
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
-                    let res = match self.encoder.encode(event, &mut bytes) {
+                    match self.encoder.encode(event, &mut bytes) {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
@@ -172,9 +172,7 @@ impl WebSocketSink {
                             finalizers.update_status(EventStatus::Errored);
                             Ok(())
                         }
-                    };
-
-                    res
+                    }
                 },
                 else => break,
             };

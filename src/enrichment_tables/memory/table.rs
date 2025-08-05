@@ -1,3 +1,5 @@
+#![allow(unsafe_op_in_unsafe_fn)]  // TODO review ShallowCopy usage code and fix properly.
+
 use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
@@ -30,6 +32,7 @@ use vector_lib::sink::StreamSink;
 use vrl::value::{KeyString, ObjectMap, Value};
 
 use super::source::MemorySource;
+
 
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
