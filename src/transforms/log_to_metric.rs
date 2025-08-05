@@ -858,8 +858,7 @@ impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
         let mut buffer = Vec::with_capacity(self.metrics.len());
-        if self.all_metrics
-        {
+        if self.all_metrics {
             match to_metrics(&event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
@@ -1815,7 +1814,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_gauge() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "gauge": {
@@ -1849,7 +1851,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "histogram": {
@@ -1923,7 +1928,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_histogram() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "distribution": {
@@ -1979,7 +1987,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_summary() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "distribution": {
@@ -2035,7 +2046,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "summary": {
@@ -2093,7 +2107,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_counter() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "counter": {
@@ -2127,7 +2144,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_set() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "set": {
@@ -2163,7 +2183,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_all_metrics_optional_namespace() {
-        let config = LogToMetricConfig { metrics: None, all_metrics: Some(true) };
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "counter": {
