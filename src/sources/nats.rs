@@ -5,7 +5,8 @@ use tokio_util::codec::FramedRead;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle as _, Protocol,
+    ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
+    InternalEventHandle as _, Protocol,
 };
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vector_lib::{
@@ -291,6 +292,87 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
     }
 }
 
+/// The outcome of processing a single NATS message.
+enum ProcessingStatus {
+    /// The message payload was fully decoded and sent downstream.
+    Success,
+    /// A non-recoverable error occurred while decoding the payload.
+    Failed,
+    /// The downstream channel is closed, and the source should shut down.
+    ChannelClosed,
+}
+
+/// Processes a single NATS message, sending decoded events downstream.
+///
+/// This function contains the common logic for both Core and JetStream NATS.
+async fn process_message(
+    msg: &async_nats::Message,
+    config: &NatsSourceConfig,
+    decoder: &Decoder,
+    log_namespace: LogNamespace,
+    out: &mut SourceSender,
+    events_received: &EventsReceivedHandle,
+) -> ProcessingStatus {
+    let mut framed = FramedRead::new(msg.payload.as_ref(), decoder.clone());
+    let mut success = true;
+
+    while let Some(next) = framed.next().await {
+        match next {
+            Ok((events, _byte_size)) => {
+                let count = events.len();
+                if count == 0 {
+                    continue;
+                }
+
+                let byte_size = events.estimated_json_encoded_size_of();
+                events_received.emit(CountByteSize(count, byte_size));
+                let now = Utc::now();
+                let events = events.into_iter().map(|mut event| {
+                    if let Event::Log(ref mut log) = event {
+                        log_namespace.insert_standard_vector_source_metadata(
+                            log,
+                            NatsSourceConfig::NAME,
+                            now,
+                        );
+                        let legacy_subject_key_field = config
+                            .subject_key_field
+                            .path
+                            .as_ref()
+                            .map(LegacyKey::InsertIfEmpty);
+                        log_namespace.insert_source_metadata(
+                            NatsSourceConfig::NAME,
+                            log,
+                            legacy_subject_key_field,
+                            &owned_value_path!("subject"),
+                            msg.subject.as_str(),
+                        );
+                    }
+                    event
+                });
+
+                if out.send_batch(events).await.is_err() {
+                    emit!(StreamClosedError { count });
+                    return ProcessingStatus::ChannelClosed;
+                }
+            }
+            Err(error) => {
+                success = false;
+                // Error is logged by `crate::codecs::Decoder`, no further
+                // handling is needed here.
+                if !error.can_continue() {
+                    break;
+                }
+            }
+        }
+    }
+
+    if success {
+        ProcessingStatus::Success
+    } else {
+        ProcessingStatus::Failed
+    }
+}
+
 async fn run_nats_jetstream(
     config: NatsSourceConfig,
     _connection: async_nats::Client,
@@ -306,56 +388,30 @@ async fn run_nats_jetstream(
 
     while let Some(Ok(msg)) = message_stream.next().await {
         bytes_received.emit(ByteSize(msg.payload.len()));
-        let mut framed = FramedRead::new(msg.payload.as_ref(), decoder.clone());
-        let mut processing_succeeded = true;
 
-        while let Some(next) = framed.next().await {
-            match next {
-                Ok((events, _byte_size)) => {
-                    let count = events.len();
-                    let byte_size = events.estimated_json_encoded_size_of();
-                    events_received.emit(CountByteSize(count, byte_size));
-                    let now = Utc::now();
-                    let events = events.into_iter().map(|mut event| {
-                        if let Event::Log(ref mut log) = event {
-                            log_namespace.insert_standard_vector_source_metadata(
-                                log,
-                                NatsSourceConfig::NAME,
-                                now,
-                            );
-                            let legacy_subject_key_field = config
-                                .subject_key_field
-                                .path
-                                .as_ref()
-                                .map(LegacyKey::InsertIfEmpty);
-                            log_namespace.insert_source_metadata(
-                                NatsSourceConfig::NAME,
-                                log,
-                                legacy_subject_key_field,
-                                &owned_value_path!("subject"),
-                                msg.subject.as_str(),
-                            )
-                        }
-                        event
-                    });
-                    if out.send_batch(events).await.is_err() {
-                        emit!(StreamClosedError { count });
-                        processing_succeeded = false;
-                        break;
-                    }
-                }
-                Err(error) => {
-                    processing_succeeded = false;
-                    if !error.can_continue() {
-                        break;
-                    }
+        let status = process_message(
+            &msg,
+            &config,
+            &decoder,
+            log_namespace,
+            &mut out,
+            &events_received,
+        )
+        .await;
+
+        match status {
+            ProcessingStatus::Success => {
+                // Message processed successfully, acknowledge it.
+                if let Err(err) = msg.ack().await {
+                    error!(message = "Failed to acknowledge JetStream message.", %err);
                 }
             }
-        }
-
-        if processing_succeeded {
-            if let Err(err) = msg.ack().await {
-                error!(message = "Failed to acknowledge JetStream message.", %err);
+            ProcessingStatus::Failed => {
+                // Do not acknowledge on failure; the message will be redelivered.
+            }
+            ProcessingStatus::ChannelClosed => {
+                // Downstream channel is closed, shut down the source.
+                return Err(());
             }
         }
     }
@@ -364,7 +420,6 @@ async fn run_nats_jetstream(
 
 async fn run_nats_core(
     config: NatsSourceConfig,
-    // Take ownership of the connection so it doesn't get dropped.
     _connection: async_nats::Client,
     subscriber: async_nats::Subscriber,
     decoder: Decoder,
@@ -373,57 +428,25 @@ async fn run_nats_core(
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
+    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
     let stream = subscriber.take_until(shutdown);
     pin_mut!(stream);
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
+
     while let Some(msg) = stream.next().await {
         bytes_received.emit(ByteSize(msg.payload.len()));
-        let mut stream = FramedRead::new(msg.payload.as_ref(), decoder.clone());
-        while let Some(next) = stream.next().await {
-            match next {
-                Ok((events, _byte_size)) => {
-                    let count = events.len();
-                    let byte_size = events.estimated_json_encoded_size_of();
-                    events_received.emit(CountByteSize(count, byte_size));
+        let status = process_message(
+            &msg,
+            &config,
+            &decoder,
+            log_namespace,
+            &mut out,
+            &events_received,
+        )
+        .await;
 
-                    let now = Utc::now();
-
-                    let events = events.into_iter().map(|mut event| {
-                        if let Event::Log(ref mut log) = event {
-                            log_namespace.insert_standard_vector_source_metadata(
-                                log,
-                                NatsSourceConfig::NAME,
-                                now,
-                            );
-
-                            let legacy_subject_key_field = config
-                                .subject_key_field
-                                .path
-                                .as_ref()
-                                .map(LegacyKey::InsertIfEmpty);
-                            log_namespace.insert_source_metadata(
-                                NatsSourceConfig::NAME,
-                                log,
-                                legacy_subject_key_field,
-                                &owned_value_path!("subject"),
-                                msg.subject.as_str(),
-                            )
-                        }
-                        event
-                    });
-
-                    out.send_batch(events).await.map_err(|_| {
-                        emit!(StreamClosedError { count });
-                    })?;
-                }
-                Err(error) => {
-                    // Error is logged by `crate::codecs`, no further
-                    // handling is needed here.
-                    if !error.can_continue() {
-                        break;
-                    }
-                }
-            }
+        if let ProcessingStatus::ChannelClosed = status {
+            // Downstream channel is closed, shut down the source.
+            return Err(());
         }
     }
     Ok(())
@@ -553,7 +576,7 @@ mod integration_tests {
             )
             .build()
             .unwrap();
-            tokio::spawn(nats_source(
+            tokio::spawn(run_nats_core(
                 conf.clone(),
                 nc,
                 sub,
