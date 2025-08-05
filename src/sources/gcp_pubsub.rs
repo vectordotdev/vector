@@ -4,16 +4,16 @@ use std::{error::Error as _, future::Future, pin::Pin, task::Context, task::Poll
 
 use chrono::DateTime;
 use derivative::Derivative;
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt, stream, stream::FuturesUnordered};
+use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
-    Code, Request, Status,
-    metadata::MetadataValue,
-    transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
+    metadata::MetadataValue, transport::{Certificate, ClientTlsConfig, Endpoint, Identity}, Code,
+    Request,
+    Status,
 };
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
@@ -24,14 +24,13 @@ use vector_lib::internal_event::{
 use vector_lib::lookup::owned_value_path;
 use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vrl::path;
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
-    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
-    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
         GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
@@ -40,6 +39,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util,
     tls::{TlsConfig, TlsSettings},
+    SourceSender,
 };
 
 const MIN_ACK_DEADLINE_SECS: u64 = 10;
@@ -834,20 +834,20 @@ mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
     use std::sync::LazyLock;
 
-    use base64::prelude::{BASE64_STANDARD, Engine as _};
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
-    use serde_json::{Value, json};
+    use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
     use vrl::btreemap;
 
     use super::*;
     use crate::config::{ComponentKey, ProxyConfig};
-    use crate::test_util::components::{SOURCE_TAGS, assert_source_compliance};
+    use crate::test_util::components::{assert_source_compliance, SOURCE_TAGS};
     use crate::test_util::{self, components, random_string};
-    use crate::{SourceSender, event::EventStatus, gcp, http::HttpClient, shutdown};
+    use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
@@ -1038,7 +1038,7 @@ mod integration_tests {
             &self,
             status: EventStatus,
         ) -> (
-            impl Stream<Item = Event> + Unpin,
+            impl Stream<Item=Event> + Unpin + use < >,
             shutdown::SourceShutdownCoordinator,
         ) {
             let (tx, rx) = SourceSender::new_test_finalize(status);

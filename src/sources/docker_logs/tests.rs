@@ -39,7 +39,7 @@ mod integration_tests {
         },
         secret::ContainerCreateBody,
     };
-    use futures::{FutureExt, stream::TryStreamExt};
+    use futures::{stream::TryStreamExt, FutureExt};
     use itertools::Itertools as _;
     use similar_asserts::assert_eq;
     use vrl::value;
@@ -47,13 +47,13 @@ mod integration_tests {
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
-        SourceSender,
         event::Event,
         test_util::{
             collect_n, collect_ready,
-            components::{SOURCE_TAGS, assert_source_compliance},
+            components::{assert_source_compliance, SOURCE_TAGS},
             trace_init,
         },
+        SourceSender,
     };
 
     /// None if docker is not present on the system
@@ -61,7 +61,7 @@ mod integration_tests {
         names: &[&str],
         label: L,
         log_namespace: Option<bool>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item=Event> + use < L > {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
