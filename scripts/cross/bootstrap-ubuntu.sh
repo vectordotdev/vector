@@ -18,14 +18,6 @@ EOF
 
 wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
 
-apt-get update
-
-# needed by onig_sys
-apt-get install -y \
-      libclang1-9 \
-      llvm-9 \
-      unzip
-
 # aws-lc-rs dependencies
 apt-get update
 apt-get install -y \
@@ -39,7 +31,9 @@ apt-get install -y \
   cmake \
   libssl-dev \
   libclang-dev \
-  libsasl2-dev
+  libsasl2-dev \
+  llvm \
+  unzip
 
 # Required by the `rdkafka-sys` Rust dependency
 ZLIB_VERSION=1.3.1
