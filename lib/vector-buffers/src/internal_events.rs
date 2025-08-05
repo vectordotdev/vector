@@ -235,7 +235,9 @@ mod tests {
         expected_events: f64,
         expected_bytes: f64,
     ) {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
@@ -294,7 +296,9 @@ mod tests {
 
     #[test]
     fn test_increment() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
@@ -346,7 +350,9 @@ mod tests {
 
     #[test]
     fn test_multithreaded_updates_are_correct() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
@@ -377,7 +383,9 @@ mod tests {
 
     #[test]
     fn test_large_values_capped_to_f64_safe_max() {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
