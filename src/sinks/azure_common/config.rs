@@ -180,7 +180,9 @@ pub fn build_client(
             .container_client(container_name);
         }
         (None, None) => {
-            return Err("Either `connection_string` or `storage_account` has to be provided".into());
+            return Err(
+                "Either `connection_string` or `storage_account` has to be provided".into(),
+            );
         }
         (Some(_), Some(_)) => {
             return Err(
