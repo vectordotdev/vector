@@ -10,15 +10,15 @@ use tokio::{
     runtime::Builder,
     select,
     sync::{
-        Mutex,
         mpsc::{self, Receiver, Sender},
+        Mutex,
     },
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
 
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::encoding, config::LogNamespace, event::Event,
+    codecs::encoding, config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -30,9 +30,9 @@ use crate::{
 };
 
 use super::{
-    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
-    encode_test_event,
-    sync::{Configuring, TaskCoordinator},
+    encode_test_event, sync::{Configuring, TaskCoordinator}, ComponentType, TestCaseExpectation, TestEvent,
+    ValidationConfiguration,
+    Validator,
 };
 
 pub use self::config::TopologyBuilder;
@@ -588,7 +588,7 @@ fn spawn_input_driver(
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
             if component_type != ComponentType::Source {
-                if let Event::Log(ref mut log) = input_event.get_event() {
+                if let Event::Log(log) = input_event.get_event() {
                     log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
                 }
             }
