@@ -311,7 +311,7 @@ async fn redis_sink_sorted_set_zadd() {
         data_type: DataTypeConfig::SortedSet,
         list_option: None,
         sorted_set_option: Some(SortedSetOption {
-            method: SortedSetMethod::ZAdd,
+            method: Some(SortedSetMethod::ZAdd),
             score: Some(UnsignedIntTemplate::try_from("{{ num }}").unwrap()),
         }),
         batch: BatchConfig::default(),
