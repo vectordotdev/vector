@@ -48,12 +48,13 @@ pub struct LogToMetricConfig {
     /// A list of metrics to generate.
     pub metrics: Option<Vec<MetricConfig>>,
 
-    /// Setting this flag changes the behavior of this transformation.<br />
-    /// <p>Notably the `metrics` field will be ignored.</p>
-    /// <p>All incoming events will be processed and if possible they will be converted to log events.
-    /// Otherwise, only items specified in the 'metrics' field will be processed.</p>
-    /// <pre class="chroma"><code class="language-toml" data-lang="toml">use serde_json::json;
-    /// let json_event = json!({
+    /// Setting this flag changes the behavior of this transformation.
+    /// Notably the `metrics` field will be ignored.
+    /// All incoming events will be processed and if possible they will be converted to log events.
+    /// Otherwise, only items specified in the `metrics` field will be processed.
+    ///
+    /// Example:
+    /// <pre class="chroma"><code class="language-toml" data-lang="toml">{
     ///     "counter": {
     ///         "value": 10.0
     ///     },
@@ -63,10 +64,10 @@ pub struct LogToMetricConfig {
     ///         "env": "test_env",
     ///         "host": "localhost"
     ///     }
-    /// });
+    /// }
     /// </code></pre>
     ///
-    /// This is an example JSON representation of a counter with the following properties:
+    /// This is a JSON representation of a counter with the following properties:
     ///
     /// - `counter`: An object with a single property `value` representing the counter value, in this case, `10.0`).
     /// - `kind`: A string indicating the kind of counter, in this case, "incremental".
