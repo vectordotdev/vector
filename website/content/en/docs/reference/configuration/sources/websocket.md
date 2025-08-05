@@ -1,9 +1,9 @@
 ---
 title: WebSocket
-description: Deliver observability event data to a websocket listener
-component_kind: sink
+description: Receive events from a [WebSocket](https://en.wikipedia.org/wiki/WebSocket) server.
+component_kind: source
 layout: component
-tags: ["websocket", "component", "sink"]
+tags: ["websocket", "component", "source"]
 ---
 
 {{/*
