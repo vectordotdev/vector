@@ -82,7 +82,7 @@ pub enum ListMethod {
 #[serde(rename_all = "lowercase")]
 pub struct SortedSetOption {
     /// The method to use for pushing messages into a `sorted set`.
-    pub method: SortedSetMethod,
+    pub method: Option<SortedSetMethod>,
 
     /// The score to publish a message with to a `sorted set`.
     ///

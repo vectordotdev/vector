@@ -734,7 +734,7 @@ generated: components: sinks: redis: configuration: {
 		type: object: options: {
 			method: {
 				description: "The method to use for pushing messages into a `sorted set`."
-				required:    true
+				required:    false
 				type: string: enum: zadd: """
 					Use the `zadd` method.
 
@@ -746,8 +746,6 @@ generated: components: sinks: redis: configuration: {
 			score: {
 				description: """
 					The score to publish a message with to a `sorted set`.
-
-					Should be specified when using a sorted set data type.
 
 					Examples:
 					- `%s`

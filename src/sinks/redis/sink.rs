@@ -265,7 +265,7 @@ impl RedisSink {
     pub(super) fn new(config: &RedisSinkConfig, conn: RedisConnection) -> crate::Result<Self> {
         let list_method = config.list_option.map(|option| option.method);
         let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {
-            (Some(option.method), option.score.clone())
+            (option.method, option.score.clone())
         } else {
             (None, None)
         };
