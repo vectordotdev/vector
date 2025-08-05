@@ -730,10 +730,12 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 				type: object: {
 					examples: [{
 						Accept:               "text/plain"
+						"X-Event-Level":      "{{level}}"
+						"X-Event-Timestamp":  "{{timestamp}}"
 						"X-My-Custom-Header": "A-Value"
 					}]
 					options: "*": {
-						description: "An HTTP request header and it's value."
+						description: "An HTTP request header and its value. Both header names and values support templating with event data."
 						required:    true
 						type: string: {}
 					}
