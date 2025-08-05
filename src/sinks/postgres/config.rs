@@ -10,16 +10,16 @@ use super::{
     service::{PostgresRetryLogic, PostgresService},
     sink::PostgresSink,
 };
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
+use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 
 use crate::{
     config::{Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
             TowerRequestConfig, UriSerde,
         },
-        Healthcheck,
     },
 };
 

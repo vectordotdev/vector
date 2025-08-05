@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use metrics::counter;
 use vector_lib::{
-    internal_event::{error_stage, error_type, InternalEvent},
+    internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 

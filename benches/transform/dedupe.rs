@@ -1,10 +1,10 @@
 use core::fmt;
 use std::{num::NonZeroUsize, time::Duration};
 
-use crate::common::{consume, FixedLogStream};
+use crate::common::{FixedLogStream, consume};
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use vector::transforms::dedupe::common::{CacheConfig, FieldMatchConfig};
 use vector::transforms::dedupe::config::DedupeConfig;

@@ -1,14 +1,14 @@
 use std::time::Duration;
 use vector_lib::codecs::TextSerializerConfig;
 
-use super::{config::NatsSinkConfig, sink::NatsSink, ConfigSnafu, NatsError};
+use super::{ConfigSnafu, NatsError, config::NatsSinkConfig, sink::NatsSink};
 use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
     sinks::prelude::*,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
     },
     tls::TlsEnableableConfig,

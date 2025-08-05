@@ -2,8 +2,8 @@ use std::{
     convert::Infallible,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -14,20 +14,20 @@ use futures::{
 use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
 use crate::{
     codecs::{TimestampFormat, Transformer},
-    config::{log_schema, SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, log_schema},
     sinks::{
         clickhouse::config::ClickhouseConfig,
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };

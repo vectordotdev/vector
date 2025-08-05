@@ -1,18 +1,18 @@
 use crate::{
+    Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     http::{Auth, HttpClient, HttpError},
     sinks::{
+        HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
         util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
-        HTTPRequestBuilderSnafu, HealthcheckError,
     },
-    Error,
 };
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request, StatusCode,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use hyper::Body;
 use snafu::ResultExt;

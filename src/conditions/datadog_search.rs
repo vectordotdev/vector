@@ -5,7 +5,7 @@ use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
 use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
-use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
+use vrl::datadog_filter::{Filter, Matcher, Resolver, Run, build_matcher};
 use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
 
 use super::{Condition, Conditional, ConditionalConfig};

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
 fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     let ellipsis: &str = "[...]";

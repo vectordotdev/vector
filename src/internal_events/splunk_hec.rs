@@ -11,7 +11,7 @@ mod sink {
     use serde_json::Error;
     use vector_lib::internal_event::InternalEvent;
     use vector_lib::internal_event::{
-        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+        ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type,
     };
 
     use crate::{

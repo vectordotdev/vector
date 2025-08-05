@@ -3,15 +3,15 @@ mod http;
 
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use vector_lib::{
     codecs::{
+        BytesEncoder,
         decoding::{self, DeserializerConfig},
         encoding::{
             self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
             TextSerializerConfig,
         },
-        BytesEncoder,
     },
     config::LogNamespace,
 };
@@ -19,13 +19,13 @@ use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
-pub use self::event::{encode_test_event, TestEvent};
+pub use self::event::{TestEvent, encode_test_event};
 pub use self::http::HttpResourceConfig;
 use self::http::HttpResourceOutputContext;
 
 use super::{
-    sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
+    sync::{Configuring, TaskCoordinator},
 };
 
 /// The codec used by the external resource.

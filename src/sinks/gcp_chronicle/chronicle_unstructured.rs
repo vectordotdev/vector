@@ -19,10 +19,10 @@ use tower::{Service, ServiceBuilder};
 use vector_lib::configurable::configurable_component;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
-    config::{telemetry, AcknowledgementsConfig, Input},
+    EstimatedJsonEncodedSizeOf,
+    config::{AcknowledgementsConfig, Input, telemetry},
     event::{Event, EventFinalizers, Finalizable},
     sink::VectorSink,
-    EstimatedJsonEncodedSizeOf,
 };
 use vrl::value::Kind;
 
@@ -34,22 +34,22 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
+        Healthcheck,
         gcp_chronicle::{
             compression::ChronicleCompression,
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
         },
         gcs_common::{
-            config::{healthcheck_response, GcsRetryLogic},
+            config::{GcsRetryLogic, healthcheck_response},
             service::GcsResponse,
         },
         util::{
-            encoding::{as_tracked_write, Encoder},
+            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
         },
-        Healthcheck,
     },
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
@@ -678,8 +678,8 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            SINK_TAGS,
+            COMPONENT_ERROR_TAGS, SINK_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_sink_error,
         },
         random_events_with_stream, random_string, trace_init,
     };

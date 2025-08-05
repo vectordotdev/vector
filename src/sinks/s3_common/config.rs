@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
+    Client as S3Client,
     operation::put_object::PutObjectError,
     types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
-    Client as S3Client,
 };
 use aws_smithy_runtime_api::{
     client::{orchestrator::HttpResponse, result::SdkError},
@@ -15,11 +15,11 @@ use vector_lib::configurable::configurable_component;
 
 use super::service::{S3Response, S3Service};
 use crate::{
-    aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client, is_retriable_error},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
-    sinks::{util::retries::RetryLogic, Healthcheck},
+    sinks::{Healthcheck, util::retries::RetryLogic},
     tls::TlsConfig,
 };
 

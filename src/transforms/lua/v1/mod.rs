@@ -1,6 +1,6 @@
 use std::{future::ready, pin::Pin};
 
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use mlua::ExternalError;
 use mlua::FromLua;
 use ordered_float::NotNan;

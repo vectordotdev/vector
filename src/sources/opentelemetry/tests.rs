@@ -2,17 +2,17 @@ use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
+        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
     },
-    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
+    sources::opentelemetry::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
         self,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         next_addr,
     },
-    SourceSender,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -24,8 +24,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tonic::Request;
 use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::metrics_service_client::MetricsServiceClient;
 use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+use vector_lib::opentelemetry::proto::collector::metrics::v1::metrics_service_client::MetricsServiceClient;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value::StringValue;
 use vector_lib::opentelemetry::proto::metrics::v1::exponential_histogram_data_point::Buckets;
 use vector_lib::opentelemetry::proto::metrics::v1::metric::Data;
@@ -37,8 +37,8 @@ use vector_lib::opentelemetry::proto::metrics::v1::{
 };
 use vector_lib::opentelemetry::proto::resource::v1::Resource;
 use vector_lib::opentelemetry::proto::{
-    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
+    collector::logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value},
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     resource::v1::Resource as OtelResource,
 };
@@ -126,10 +126,11 @@ async fn receive_grpc_logs_vector_namespace() {
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
+        assert!(
+            meta.get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp()
+        );
         assert_eq!(
             meta.get(path!("opentelemetry", "resources")).unwrap(),
             &value!({res_key: "res_val"})

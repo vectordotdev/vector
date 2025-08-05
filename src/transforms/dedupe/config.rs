@@ -1,5 +1,5 @@
 use vector_lib::{
-    config::{clone_input_definitions, LogNamespace},
+    config::{LogNamespace, clone_input_definitions},
     configurable::configurable_component,
 };
 
@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    common::{default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig},
+    common::{CacheConfig, FieldMatchConfig, default_cache_config, fill_default_fields_match},
     transform::Dedupe,
 };
 

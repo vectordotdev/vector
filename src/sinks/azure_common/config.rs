@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use azure_core::{error::HttpError, RetryOptions};
+use azure_core::{RetryOptions, error::HttpError};
 use azure_identity::{AutoRefreshingTokenCredential, DefaultAzureCredential};
-use azure_storage::{prelude::*, CloudLocation, ConnectionString};
+use azure_storage::{CloudLocation, ConnectionString, prelude::*};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
@@ -16,7 +16,7 @@ use vector_lib::{
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    sinks::{util::retries::RetryLogic, Healthcheck},
+    sinks::{Healthcheck, util::retries::RetryLogic},
 };
 
 #[derive(Debug, Clone)]
@@ -180,13 +180,13 @@ pub fn build_client(
             .container_client(container_name);
         }
         (None, None) => {
-            return Err("Either `connection_string` or `storage_account` has to be provided".into())
+            return Err("Either `connection_string` or `storage_account` has to be provided".into());
         }
         (Some(_), Some(_)) => {
             return Err(
                 "`connection_string` and `storage_account` can't be provided at the same time"
                     .into(),
-            )
+            );
         }
     }
     Ok(std::sync::Arc::new(client))

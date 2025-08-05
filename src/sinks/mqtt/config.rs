@@ -13,7 +13,7 @@ use crate::{
         TlsSnafu,
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    sinks::{mqtt::sink::MqttSink, prelude::*, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     tls::MaybeTlsSettings,
 };
 

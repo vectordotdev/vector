@@ -11,7 +11,7 @@ use vector_lib::{
 
 use crate::dns;
 
-use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
+use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
 
 /// TCP configuration.
 #[configurable_component]

@@ -12,16 +12,16 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
+        Healthcheck,
         splunk_hec::common::{
+            EndpointTarget, SplunkHecDefaultBatchSettings,
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, config_host_key, create_client,
             service::{HecService, HttpRequestBuilder},
-            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig, http::HttpRetryLogic,
         },
-        Healthcheck,
     },
     template::Template,
     tls::TlsConfig,

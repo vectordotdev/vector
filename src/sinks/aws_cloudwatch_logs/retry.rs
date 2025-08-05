@@ -91,7 +91,9 @@ mod test {
             .message("Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal")
             .build();
 
-        let body = SdkBody::from("{\"__type\":\"ThrottlingException\",\"message\":\"Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal\"}");
+        let body = SdkBody::from(
+            "{\"__type\":\"ThrottlingException\",\"message\":\"Rate exceeded for logStreamName log-test-1.us-east-1.compute.internal\"}",
+        );
 
         let raw = HttpResponse::new(StatusCode::try_from(400_u16).unwrap(), body);
 

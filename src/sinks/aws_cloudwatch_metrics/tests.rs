@@ -1,5 +1,5 @@
 use aws_smithy_types::DateTime;
-use chrono::{offset::TimeZone, Timelike, Utc};
+use chrono::{Timelike, Utc, offset::TimeZone};
 use similar_asserts::assert_eq;
 use vector_lib::metric_tags;
 
@@ -101,10 +101,12 @@ async fn encode_events_absolute_gauge() {
 
     assert_eq!(
         svc().await.encode_events(events),
-        vec![MetricDatum::builder()
-            .metric_name("temperature")
-            .value(10.0)
-            .build()]
+        vec![
+            MetricDatum::builder()
+                .metric_name("temperature")
+                .value(10.0)
+                .build()
+        ]
     );
 }
 
@@ -121,11 +123,13 @@ async fn encode_events_distribution() {
 
     assert_eq!(
         svc().await.encode_events(events),
-        vec![MetricDatum::builder()
-            .metric_name("latency")
-            .set_values(Some(vec![11.0, 12.0]))
-            .set_counts(Some(vec![100.0, 50.0]))
-            .build()]
+        vec![
+            MetricDatum::builder()
+                .metric_name("latency")
+                .set_values(Some(vec![11.0, 12.0]))
+                .set_counts(Some(vec![100.0, 50.0]))
+                .build()
+        ]
     );
 }
 
@@ -141,9 +145,11 @@ async fn encode_events_set() {
 
     assert_eq!(
         svc().await.encode_events(events),
-        vec![MetricDatum::builder()
-            .metric_name("users")
-            .value(2.0)
-            .build()]
+        vec![
+            MetricDatum::builder()
+                .metric_name("users")
+                .value(2.0)
+                .build()
+        ]
     );
 }

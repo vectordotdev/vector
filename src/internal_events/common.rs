@@ -3,7 +3,7 @@ use std::time::Instant;
 use metrics::{counter, histogram};
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {

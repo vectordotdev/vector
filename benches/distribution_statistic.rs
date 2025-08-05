@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rand::distr::Distribution;
 use rand::{distr::Uniform, seq::SliceRandom};
 use vector::{event::metric::Sample, sinks::util::statistic::DistributionStatistic};

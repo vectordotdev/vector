@@ -12,12 +12,12 @@ use tokio_util::codec::Decoder as _;
 use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use vector_lib::{
     codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
         StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
     },
     config::DataType,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 use warp::http::{HeaderMap, StatusCode};
 
 use vector_lib::configurable::configurable_component;
@@ -28,27 +28,30 @@ use vector_lib::{
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
-        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput, log_schema,
     },
     event::{Event, LogEvent},
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
-        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
+        http_server::{HttpConfigParamKind, build_param_matcher, remove_duplicates},
         util::{
-            http::{add_query_parameters, HttpMethod},
             HttpSource,
+            http::{HttpMethod, add_query_parameters},
         },
     },
     tls::TlsEnableableConfig,
 };
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source("heroku_logs", "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."))]
+#[configurable_component(source(
+    "heroku_logs",
+    "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."
+))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The socket address to listen for connections on.
@@ -430,24 +433,24 @@ mod tests {
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
     use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
         schema::Definition,
     };
-    use vrl::value::{kind::Collection, Kind};
+    use vrl::value::{Kind, kind::Collection};
 
     use super::LogplexConfig;
     use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
-        config::{log_schema, SourceConfig, SourceContext},
+        SourceSender,
+        config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
             next_addr, random_string, spawn_collect_n, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]

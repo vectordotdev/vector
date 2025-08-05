@@ -10,8 +10,8 @@ use crate::{
             service::ElasticsearchRequest,
         },
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };
