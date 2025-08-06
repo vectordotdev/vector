@@ -169,6 +169,7 @@ jobs:
             stdin source
             syslog source
             vector source
+            websocket source
             aws_ec2_metadata transform
             dedupe transform
             filter transform

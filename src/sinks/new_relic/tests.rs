@@ -29,8 +29,10 @@ async fn sink() -> (VectorSink, Event) {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = NewRelicConfig::generate_config().to_string();
-    let mut config = NewRelicConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-        .expect("config should be valid");
+    let mut config = NewRelicConfig::deserialize(
+        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+    )
+    .expect("config should be valid");
     config.override_uri = Some(mock_endpoint);
 
     let context = SinkContext::default();
