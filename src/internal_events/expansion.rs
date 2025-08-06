@@ -27,7 +27,7 @@ impl InternalEvent for PairExpansionError<'_> {
                 "error_type" => error_type::PARSER_FAILED,
                 "stage" => error_stage::PROCESSING,
             )
-                .increment(1);
+            .increment(1);
 
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
