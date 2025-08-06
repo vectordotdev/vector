@@ -50,8 +50,6 @@ pub struct BufferEventsReceived {
     pub idx: usize,
     pub count: u64,
     pub byte_size: u64,
-    pub total_count: u64,
-    pub total_byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsReceived {
@@ -74,13 +72,13 @@ impl InternalEvent for BufferEventsReceived {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(u64_to_f64_safe(self.count));
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(u64_to_f64_safe(self.byte_size));
     }
 }
 
@@ -89,8 +87,6 @@ pub struct BufferEventsSent {
     pub idx: usize,
     pub count: u64,
     pub byte_size: u64,
-    pub total_count: u64,
-    pub total_byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsSent {
@@ -111,13 +107,13 @@ impl InternalEvent for BufferEventsSent {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(u64_to_f64_safe(self.count));
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(u64_to_f64_safe(self.byte_size));
     }
 }
 
@@ -126,8 +122,6 @@ pub struct BufferEventsDropped {
     pub idx: usize,
     pub count: u64,
     pub byte_size: u64,
-    pub total_count: u64,
-    pub total_byte_size: u64,
     pub intentional: bool,
     pub reason: &'static str,
 }
@@ -168,13 +162,13 @@ impl InternalEvent for BufferEventsDropped {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(u64_to_f64_safe(self.count));
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(u64_to_f64_safe(self.byte_size));
     }
 }
 

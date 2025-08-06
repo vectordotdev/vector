@@ -27,8 +27,6 @@ fn update_counter(counter: &AtomicU64, delta: u64) {
 struct CategorySnapshot {
     event_count: u64,
     event_byte_size: u64,
-    total_count: u64,
-    total_byte_size: u64,
 }
 
 impl CategorySnapshot {
@@ -48,8 +46,6 @@ impl CategorySnapshot {
 struct CategoryMetrics {
     event_count: AtomicU64,
     event_byte_size: AtomicU64,
-    total_count: AtomicU64,
-    total_byte_size: AtomicU64,
 }
 
 impl CategoryMetrics {
@@ -57,8 +53,6 @@ impl CategoryMetrics {
     fn increment(&self, event_count: u64, event_byte_size: u64) {
         update_counter(&self.event_count, event_count);
         update_counter(&self.event_byte_size, event_byte_size);
-        update_counter(&self.total_count, event_count);
-        update_counter(&self.total_byte_size, event_byte_size);
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -68,9 +62,6 @@ impl CategoryMetrics {
         self.event_count.store(event_count, Ordering::Release);
         self.event_byte_size
             .store(event_byte_size, Ordering::Release);
-        self.total_count.store(event_count, Ordering::Release);
-        self.total_byte_size
-            .store(event_byte_size, Ordering::Release);
     }
 
     /// Gets a snapshot of the event count and event byte size.
@@ -78,8 +69,6 @@ impl CategoryMetrics {
         CategorySnapshot {
             event_count: self.event_count.load(Ordering::Acquire),
             event_byte_size: self.event_byte_size.load(Ordering::Acquire),
-            total_count: self.total_count.load(Ordering::Acquire),
-            total_byte_size: self.total_byte_size.load(Ordering::Acquire),
         }
     }
 
@@ -93,8 +82,6 @@ impl CategoryMetrics {
         CategorySnapshot {
             event_count: self.event_count.swap(0, Ordering::AcqRel),
             event_byte_size: self.event_byte_size.swap(0, Ordering::AcqRel),
-            total_count: self.total_count.swap(0, Ordering::AcqRel),
-            total_byte_size: self.total_byte_size.swap(0, Ordering::AcqRel),
         }
     }
 }
@@ -291,8 +278,6 @@ impl BufferUsage {
                             idx: stage.idx,
                             count: received.event_count,
                             byte_size: received.event_byte_size,
-                            total_count: received.total_count,
-                            total_byte_size: received.total_byte_size,
                         });
                     }
 
@@ -303,8 +288,6 @@ impl BufferUsage {
                             idx: stage.idx,
                             count: sent.event_count,
                             byte_size: sent.event_byte_size,
-                            total_count: sent.total_count,
-                            total_byte_size: sent.total_byte_size,
                         });
                     }
 
@@ -317,8 +300,6 @@ impl BufferUsage {
                             reason: "corrupted_events",
                             count: dropped.event_count,
                             byte_size: dropped.event_byte_size,
-                            total_count: dropped.total_count,
-                            total_byte_size: dropped.total_byte_size,
                         });
                     }
 
@@ -331,8 +312,6 @@ impl BufferUsage {
                             reason: "drop_newest",
                             count: dropped_intentional.event_count,
                             byte_size: dropped_intentional.event_byte_size,
-                            total_count: dropped_intentional.total_count,
-                            total_byte_size: dropped_intentional.total_byte_size,
                         });
                     }
                 }
