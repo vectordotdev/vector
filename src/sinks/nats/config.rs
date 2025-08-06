@@ -54,7 +54,7 @@ impl NatsHeaderConfig {
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct JetStreamConfig {
-    // Whether to enable Jetstream.
+    /// Whether to enable Jetstream.
     #[configurable(derived)]
     #[serde(default)]
     pub enabled: bool,
