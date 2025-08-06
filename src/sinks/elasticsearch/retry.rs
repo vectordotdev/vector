@@ -7,7 +7,7 @@ use crate::{
     http::HttpError,
     sinks::{
         elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
-        util::retries::{RetryAction, RetryLogic, RetryPartialFunction},
+        util::retries::{RetryAction, RetryLogic},
     },
 };
 use http::StatusCode;
@@ -92,34 +92,19 @@ pub struct ElasticsearchRetryLogic {
     pub retry_partial: bool,
 }
 
-// construct a closure by EsRetryClosure { closure: Box::new(|req: ElasticsearchRequest| { new_req }) }
-struct EsRetryClosure {
-    closure: Box<dyn Fn(ElasticsearchRequest) -> ElasticsearchRequest + Send + Sync>,
-}
-
-impl RetryPartialFunction for EsRetryClosure {
-    fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any> {
-        match request.downcast::<ElasticsearchRequest>() {
-            Ok(request) => {
-                let new_request = (self.closure)(*request);
-                Box::new(new_request)
-            }
-            Err(request) => {
-                request
-            }
-        }
-    }
-}
-
 impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
+    type Request = ElasticsearchRequest;
     type Response = ElasticsearchResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &ElasticsearchResponse) -> RetryAction {
+    fn should_retry_response(
+        &self,
+        response: &ElasticsearchResponse,
+    ) -> RetryAction<ElasticsearchRequest> {
         let status = response.http_response.status();
 
         match status {
@@ -162,8 +147,8 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             || status.is_server_error()
                                     })
                                 {
-                                    return RetryAction::RetryPartial(Box::new(EsRetryClosure {
-                                        closure: Box::new(move |req: ElasticsearchRequest| {
+                                    return RetryAction::RetryPartial(Box::new(
+                                        move |req: ElasticsearchRequest| {
                                             let mut failed_events: Vec<ProcessedEvent> = req
                                                 .original_events
                                                 .clone()
@@ -177,7 +162,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                             let events_byte_size = failed_events
                                                 .iter()
                                                 .map(|x| x.log.estimated_json_encoded_size_of())
-                                                .fold(JsonSize::zero(), |a, b| a + b);  
+                                                .fold(JsonSize::zero(), |a, b| a + b);
                                             let encode_result = match req
                                                 .elasticsearch_request_builder
                                                 .encode_events(failed_events.clone())
@@ -198,8 +183,8 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 elasticsearch_request_builder: req
                                                     .elasticsearch_request_builder,
                                             }
-                                        }),
-                                    }));
+                                        },
+                                    ));
                                 }
                             }
 
