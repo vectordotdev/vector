@@ -276,7 +276,13 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<Strin
         .read_to_string(&mut source_string)
         .map_err(|e| vec![e.to_string()])?;
 
-    let mut vars = std::env::vars().collect::<HashMap<_, _>>();
+    let mut vars: HashMap<String, String> = std::env::vars_os()
+        .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
+            (Ok(k), Ok(v)) => Some((k, v)),
+            _ => None,
+        })
+        .collect();
+
     if !vars.contains_key("HOSTNAME") {
         if let Ok(hostname) = crate::get_hostname() {
             vars.insert("HOSTNAME".into(), hostname);
