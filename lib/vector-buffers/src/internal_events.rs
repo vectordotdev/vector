@@ -41,10 +41,7 @@ fn update_buffer_counters(
     (new_events, new_bytes)
 }
 
-fn emit_buffer_gauge(buffer_id: &str, stage: usize, events_delta: i64, bytes_delta: i64) {
-    let (new_events, new_bytes) =
-        update_buffer_counters(buffer_id, stage, events_delta, bytes_delta);
-
+fn emit_buffer_gauge(buffer_id: &str, stage: usize, new_events: i64, new_bytes: i64) {
     gauge!("buffer_events",
         "buffer_id" => buffer_id.to_string(),
         "stage" => stage.to_string()
@@ -100,7 +97,10 @@ impl InternalEvent for BufferEventsReceived {
 
         let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
         let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
-        emit_buffer_gauge(&self.buffer_id, self.idx, count_delta, bytes_delta);
+
+        let (new_events, new_bytes) =
+            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+        emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
 
@@ -126,7 +126,10 @@ impl InternalEvent for BufferEventsSent {
 
         let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
         let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
-        emit_buffer_gauge(&self.buffer_id, self.idx, -count_delta, -bytes_delta);
+
+        let (new_events, new_bytes) =
+            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+        emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
 
@@ -172,7 +175,9 @@ impl InternalEvent for BufferEventsDropped {
         let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
         let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
 
-        emit_buffer_gauge(&self.buffer_id, self.idx, -count_delta, -bytes_delta);
+        let (new_events, new_bytes) =
+            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+        emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
 
@@ -258,7 +263,9 @@ mod tests {
 
         metrics::with_local_recorder(&recorder, move || {
             for (events_delta, bytes_delta) in updates {
-                emit_buffer_gauge(buffer_id, stage, *events_delta, *bytes_delta);
+                let (new_events, new_bytes) =
+                    update_buffer_counters(buffer_id, stage, *events_delta, *bytes_delta);
+                emit_buffer_gauge(buffer_id, stage, new_events, new_bytes);
             }
 
             let metrics = snapshotter.snapshot().into_vec();
@@ -314,8 +321,9 @@ mod tests {
 
         reset_counters();
 
-        emit_buffer_gauge("test_buffer", 0, 10, 1024);
+        update_buffer_counters("test_buffer", 0, 10, 1024);
         let (events, bytes) = get_counter_values("test_buffer", 0);
+
         assert_eq!(events, 10);
         assert_eq!(bytes, 1024);
     }
@@ -325,9 +333,10 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_counters();
 
-        emit_buffer_gauge("test_buffer", 1, 100, 2048);
-        emit_buffer_gauge("test_buffer", 1, -50, -1024);
+        update_buffer_counters("test_buffer", 1, 100, 2048);
+        update_buffer_counters("test_buffer", 1, -50, -1024);
         let (events, bytes) = get_counter_values("test_buffer", 1);
+
         assert_eq!(events, 50);
         assert_eq!(bytes, 1024);
     }
@@ -337,8 +346,8 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_counters();
 
-        emit_buffer_gauge("test_buffer", 2, 5, 100);
-        emit_buffer_gauge("test_buffer", 2, -10, -200);
+        update_buffer_counters("test_buffer", 2, 5, 100);
+        update_buffer_counters("test_buffer", 2, -10, -200);
         let (events, bytes) = get_counter_values("test_buffer", 2);
 
         assert_eq!(events, 0);
@@ -350,8 +359,8 @@ mod tests {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_counters();
 
-        emit_buffer_gauge("test_buffer", 0, 10, 100);
-        emit_buffer_gauge("test_buffer", 1, 20, 200);
+        update_buffer_counters("test_buffer", 0, 10, 100);
+        update_buffer_counters("test_buffer", 1, 20, 200);
         let (events0, bytes0) = get_counter_values("test_buffer", 0);
         let (events1, bytes1) = get_counter_values("test_buffer", 1);
         assert_eq!(events0, 10);
@@ -375,7 +384,7 @@ mod tests {
         for _ in 0..num_threads {
             let handle = thread::spawn(move || {
                 for _ in 0..increments_per_thread {
-                    emit_buffer_gauge("test_buffer", 0, 1, 10);
+                    update_buffer_counters("test_buffer", 0, 1, 10);
                 }
             });
             handles.push(handle);
@@ -401,7 +410,7 @@ mod tests {
 
         reset_counters();
 
-        emit_buffer_gauge("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
+        update_buffer_counters("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
 
         let (events, bytes) = get_counter_values("test_buffer", 3);
 
