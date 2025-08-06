@@ -531,7 +531,7 @@ mod test {
                                         continue;
                                     }
                                 }
-                                Poll::Ready(Err(error)) => panic!("{}", error),
+                                Poll::Ready(Err(error)) => panic!("{error}"),
                                 Poll::Pending => Poll::Pending,
                             };
                         }
