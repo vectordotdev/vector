@@ -1,12 +1,11 @@
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, LazyLock,
+        Arc,
     },
     time::Duration,
 };
 
-use dashmap::DashMap;
 use tokio::time::interval;
 use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
@@ -16,47 +15,26 @@ use crate::{
     spawn_named,
 };
 
-static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicU64, AtomicU64)>> =
-    LazyLock::new(DashMap::new);
-
-fn update_buffer_counters(
-    buffer_id: &str,
-    stage: usize,
-    events_delta: u64,
-    bytes_delta: u64,
-) -> (u64, u64) {
-    fn update_and_get(counter: &AtomicU64, delta: u64) -> u64 {
-        let mut new_val = 0;
-        counter
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-                let updated = current.saturating_add(delta);
-                new_val = updated;
-                Some(updated)
-            })
-            .ok();
-        new_val
-    }
-
-    let counters = BUFFER_COUNTERS
-        .entry((buffer_id.to_string(), stage))
-        .or_insert_with(|| (AtomicU64::new(0), AtomicU64::new(0)));
-
-    let new_events = update_and_get(&counters.0, events_delta);
-    let new_bytes = update_and_get(&counters.1, bytes_delta);
-
-    (new_events, new_bytes)
+fn update_counter(counter: &AtomicU64, delta: u64) {
+    counter
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            Some(current.saturating_add(delta))
+        })
+        .ok();
 }
 
 /// Snapshot of category metrics.
 struct CategorySnapshot {
-    delta_count: u64,
-    delta_byte_size: u64,
+    event_count: u64,
+    event_byte_size: u64,
+    total_count: u64,
+    total_byte_size: u64,
 }
 
 impl CategorySnapshot {
     /// Returns `true` if any of the values are non-zero.
     fn has_updates(&self) -> bool {
-        self.delta_count > 0 || self.delta_byte_size > 0
+        self.event_count > 0 || self.event_byte_size > 0
     }
 }
 
@@ -68,32 +46,41 @@ impl CategorySnapshot {
 /// both number of events, and their size as measured by the buffer.
 #[derive(Debug, Default)]
 struct CategoryMetrics {
-    delta_count: AtomicU64,
-    delta_byte_size: AtomicU64,
+    event_count: AtomicU64,
+    event_byte_size: AtomicU64,
+    total_count: AtomicU64,
+    total_byte_size: AtomicU64,
 }
 
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        self.delta_count.fetch_add(event_count, Ordering::Relaxed);
-        self.delta_byte_size
+        self.event_count.fetch_add(event_count, Ordering::Relaxed);
+        self.event_byte_size
             .fetch_add(event_byte_size, Ordering::Relaxed);
+        update_counter(&self.total_count, event_count);
+        update_counter(&self.total_byte_size, event_byte_size);
     }
 
     /// Sets the event count and event byte size to the given amount.
     ///
     /// Most updates are meant to be incremental, so this should be used sparingly.
     fn set(&self, event_count: u64, event_byte_size: u64) {
-        self.delta_count.store(event_count, Ordering::Release);
-        self.delta_byte_size
+        self.event_count.store(event_count, Ordering::Release);
+        self.event_byte_size
+            .store(event_byte_size, Ordering::Release);
+        self.total_count.store(event_count, Ordering::Release);
+        self.total_byte_size
             .store(event_byte_size, Ordering::Release);
     }
 
     /// Gets a snapshot of the event count and event byte size.
     fn get(&self) -> CategorySnapshot {
         CategorySnapshot {
-            delta_count: self.delta_count.load(Ordering::Acquire),
-            delta_byte_size: self.delta_byte_size.load(Ordering::Acquire),
+            event_count: self.event_count.load(Ordering::Acquire),
+            event_byte_size: self.event_byte_size.load(Ordering::Acquire),
+            total_count: self.total_count.load(Ordering::Acquire),
+            total_byte_size: self.total_byte_size.load(Ordering::Acquire),
         }
     }
 
@@ -105,8 +92,10 @@ impl CategoryMetrics {
     /// track the last seen values.
     fn consume(&self) -> CategorySnapshot {
         CategorySnapshot {
-            delta_count: self.delta_count.swap(0, Ordering::AcqRel),
-            delta_byte_size: self.delta_byte_size.swap(0, Ordering::AcqRel),
+            event_count: self.event_count.swap(0, Ordering::AcqRel),
+            event_byte_size: self.event_byte_size.swap(0, Ordering::AcqRel),
+            total_count: self.total_count.swap(0, Ordering::AcqRel),
+            total_byte_size: self.total_byte_size.swap(0, Ordering::AcqRel),
         }
     }
 }
@@ -200,17 +189,17 @@ impl BufferUsageData {
         let max_size = self.max_size.get();
 
         BufferUsageSnapshot {
-            received_event_count: received.delta_count,
-            received_byte_size: received.delta_byte_size,
-            sent_event_count: sent.delta_count,
-            sent_byte_size: sent.delta_byte_size,
-            dropped_event_count: dropped.delta_count,
-            dropped_event_byte_size: dropped.delta_byte_size,
-            dropped_event_count_intentional: dropped_intentional.delta_count,
-            dropped_event_byte_size_intentional: dropped_intentional.delta_byte_size,
-            max_size_bytes: max_size.delta_byte_size,
+            received_event_count: received.event_count,
+            received_byte_size: received.event_byte_size,
+            sent_event_count: sent.event_count,
+            sent_byte_size: sent.event_byte_size,
+            dropped_event_count: dropped.event_count,
+            dropped_event_byte_size: dropped.event_byte_size,
+            dropped_event_count_intentional: dropped_intentional.event_count,
+            dropped_event_byte_size_intentional: dropped_intentional.event_byte_size,
+            max_size_bytes: max_size.event_byte_size,
             max_size_events: max_size
-                .delta_count
+                .event_count
                 .try_into()
                 .expect("should never be bigger than `usize`"),
         }
@@ -288,86 +277,62 @@ impl BufferUsage {
                     let max_size = stage.max_size.get();
                     emit(BufferCreated {
                         idx: stage.idx,
-                        max_size_bytes: max_size.delta_byte_size,
+                        max_size_bytes: max_size.event_byte_size,
                         max_size_events: max_size
-                            .delta_count
+                            .event_count
                             .try_into()
                             .expect("should never be bigger than `usize`"),
                     });
 
                     let received = stage.received.consume();
                     if received.has_updates() {
-                        let (total_count, total_byte_size) = update_buffer_counters(
-                            &buffer_id,
-                            stage.idx,
-                            received.delta_count,
-                            received.delta_byte_size,
-                        );
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: received.delta_count,
-                            delta_byte_size: received.delta_byte_size,
-                            total_count,
-                            total_byte_size,
+                            delta_count: received.event_count,
+                            delta_byte_size: received.event_byte_size,
+                            total_count: received.total_count,
+                            total_byte_size: received.total_byte_size,
                         });
                     }
 
                     let sent = stage.sent.consume();
                     if sent.has_updates() {
-                        let (total_count, total_byte_size) = update_buffer_counters(
-                            &buffer_id,
-                            stage.idx,
-                            received.delta_count,
-                            received.delta_byte_size,
-                        );
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: sent.delta_count,
-                            delta_byte_size: sent.delta_byte_size,
-                            total_count,
-                            total_byte_size,
+                            delta_count: sent.event_count,
+                            delta_byte_size: sent.event_byte_size,
+                            total_count: sent.total_count,
+                            total_byte_size: sent.total_byte_size,
                         });
                     }
 
                     let dropped = stage.dropped.consume();
                     if dropped.has_updates() {
-                        let (total_count, total_byte_size) = update_buffer_counters(
-                            &buffer_id,
-                            stage.idx,
-                            received.delta_count,
-                            received.delta_byte_size,
-                        );
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
-                            delta_count: dropped.delta_count,
-                            delta_byte_size: dropped.delta_byte_size,
-                            total_count,
-                            total_byte_size,
+                            delta_count: dropped.event_count,
+                            delta_byte_size: dropped.event_byte_size,
+                            total_count: dropped.total_count,
+                            total_byte_size: dropped.total_byte_size,
                         });
                     }
 
                     let dropped_intentional = stage.dropped_intentional.consume();
                     if dropped_intentional.has_updates() {
-                        let (total_count, total_byte_size) = update_buffer_counters(
-                            &buffer_id,
-                            stage.idx,
-                            received.delta_count,
-                            received.delta_byte_size,
-                        );
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
-                            delta_count: dropped_intentional.delta_count,
-                            delta_byte_size: dropped_intentional.delta_byte_size,
-                            total_count,
-                            total_byte_size,
+                            delta_count: dropped_intentional.event_count,
+                            delta_byte_size: dropped_intentional.event_byte_size,
+                            total_count: dropped_intentional.total_count,
+                            total_byte_size: dropped_intentional.total_byte_size,
                         });
                     }
                 }
@@ -380,111 +345,35 @@ impl BufferUsage {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::Arc, thread};
+
     use super::*;
-    use crate::cast_utils::F64_SAFE_INT_MAX;
-    use std::sync::Mutex;
-    use std::thread;
-
-    static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-
-    fn reset_counters() {
-        BUFFER_COUNTERS.clear();
-    }
-
-    fn get_counter_values(buffer_id: &str, stage: usize) -> (u64, u64) {
-        match BUFFER_COUNTERS.get(&(buffer_id.to_string(), stage)) {
-            Some(counters) => {
-                let events = counters.0.load(Ordering::Relaxed);
-                let bytes = counters.1.load(Ordering::Relaxed);
-                (events, bytes)
-            }
-            None => (0, 0),
-        }
-    }
 
     #[test]
-    fn test_increment() {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+    fn multithreaded_updates_are_correct() {
+        const NUM_THREADS: u64 = 16;
+        const INCREMENTS_PER_THREAD: u64 = 100_000;
+        const EXPECTED_COUNT: u64 = NUM_THREADS * INCREMENTS_PER_THREAD;
 
-        reset_counters();
+        let counter = Arc::new(AtomicU64::new(0));
 
-        update_buffer_counters("test_buffer", 0, 10, 1024);
-        let (events, bytes) = get_counter_values("test_buffer", 0);
-
-        assert_eq!(events, 10);
-        assert_eq!(bytes, 1024);
-    }
-
-    #[test]
-    fn test_multiple_stages_are_independent() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_counters();
-
-        update_buffer_counters("test_buffer", 0, 10, 100);
-        update_buffer_counters("test_buffer", 1, 20, 200);
-        let (events0, bytes0) = get_counter_values("test_buffer", 0);
-        let (events1, bytes1) = get_counter_values("test_buffer", 1);
-        assert_eq!(events0, 10);
-        assert_eq!(bytes0, 100);
-        assert_eq!(events1, 20);
-        assert_eq!(bytes1, 200);
-    }
-
-    #[test]
-    fn test_multithreaded_updates_are_correct() {
-        const NUM_THREADS: u64 = 10;
-        const INCREMENTS_PER_THREAD: u64 = 1000;
-        const EXPECTED_EVENTS: u64 = NUM_THREADS * INCREMENTS_PER_THREAD;
-        const EXPECTED_BYTES: u64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
-
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-        reset_counters();
-
-        let mut handles = vec![];
-
-        for _ in 0..NUM_THREADS {
-            let handle = thread::spawn(move || {
-                for _ in 0..INCREMENTS_PER_THREAD {
-                    update_buffer_counters("test_buffer", 0, 1, 10);
-                }
-            });
-            handles.push(handle);
-        }
+        let handles: Vec<_> = (0..NUM_THREADS)
+            .map(|_| {
+                let counter = Arc::clone(&counter);
+                thread::spawn(move || {
+                    for _ in 0..INCREMENTS_PER_THREAD {
+                        update_counter(&counter, 1);
+                    }
+                })
+            })
+            .collect();
 
         for handle in handles {
             handle.join().unwrap();
         }
 
-        let (final_events, final_bytes) = get_counter_values("test_buffer", 0);
+        let final_count = counter.load(Ordering::Relaxed);
 
-        assert_eq!(final_events, EXPECTED_EVENTS);
-        assert_eq!(final_bytes, EXPECTED_BYTES);
-    }
-
-    #[test]
-    fn test_large_values_capped_to_f64_safe_max() {
-        let _guard = TEST_LOCK
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-
-        reset_counters();
-
-        update_buffer_counters("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
-
-        let (events, bytes) = get_counter_values("test_buffer", 3);
-
-        assert!(events > F64_SAFE_INT_MAX);
-        assert!(bytes > F64_SAFE_INT_MAX);
-
-        let capped_events = events.min(F64_SAFE_INT_MAX);
-        let capped_bytes = bytes.min(F64_SAFE_INT_MAX);
-
-        assert_eq!(capped_events, F64_SAFE_INT_MAX);
-        assert_eq!(capped_bytes, F64_SAFE_INT_MAX);
+        assert_eq!(final_count, EXPECTED_COUNT);
     }
 }
