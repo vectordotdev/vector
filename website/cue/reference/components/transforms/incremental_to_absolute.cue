@@ -47,7 +47,7 @@ components: transforms: incremental_to_absolute: {
 
 	examples: [
 		{
-			title: "Aggregate over 5 seconds"
+			title: "Convert incremental metrics to absolute"
 			input: [
 				{
 					metric: {
@@ -58,7 +58,7 @@ components: transforms: incremental_to_absolute: {
 							host: "my.host.com"
 						}
 						counter: {
-							value: 1
+							value: 1.1
 						}
 					}
 				},
@@ -71,39 +71,13 @@ components: transforms: incremental_to_absolute: {
 							host: "my.host.com"
 						}
 						counter: {
-							value: 1
-						}
-					}
-				},
-				{
-					metric: {
-						kind:      "incremental"
-						name:      "counter.1"
-						timestamp: "2021-07-12T07:58:46.223543Z"
-						tags: {
-							host: "my.host.com"
-						}
-						counter: {
-							value: 1
-						}
-					}
-				},
-				{
-					metric: {
-						kind:      "incremental"
-						name:      "counter.1"
-						timestamp: "2021-07-12T07:58:58.223543Z"
-						tags: {
-							host: "my.host.com"
-						}
-						counter: {
-							value: 1
+							value: 1.1
 						}
 					}
 				},
 			]
 			configuration: {
-				expire_metrics_secs: 10
+				cache: time_to_live: 10
 			}
 			output: [
 				{
@@ -115,7 +89,7 @@ components: transforms: incremental_to_absolute: {
 							host: "my.host.com"
 						}
 						counter: {
-							value: 1
+							value: 1.1
 						}
 					}
 				},
@@ -128,33 +102,7 @@ components: transforms: incremental_to_absolute: {
 							host: "my.host.com"
 						}
 						counter: {
-							value: 2
-						}
-					}
-				},
-				{
-					metric: {
-						kind:      "absolute"
-						name:      "counter.1"
-						timestamp: "2021-07-12T07:58:46.223543Z"
-						tags: {
-							host: "my.host.com"
-						}
-						counter: {
-							value: 3
-						}
-					}
-				},
-				{
-					metric: {
-						kind:      "absolute"
-						name:      "counter.1"
-						timestamp: "2021-07-12T07:58:58.223543Z"
-						tags: {
-							host: "my.host.com"
-						}
-						counter: {
-							value: 1
+							value: 2.2
 						}
 					}
 				},
