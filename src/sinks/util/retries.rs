@@ -165,14 +165,13 @@ where
 
                 RetryAction::RetryPartial(rebuild_request_fn) => {
                     if self.remaining_attempts == 0 {
-                        warn!(
+                        error!(
                             message =
                                 "OK/retry response but retries exhausted; dropping the request.",
                             internal_log_rate_limit = true,
                         );
                         return None;
                     }
-                    // here to modify the request Req, delete those successful requests from it.
                     let output = rebuild_request_fn.modify_request(Box::new(req.clone()));
                     if let Ok(output) = output.downcast::<Req>() {
                         *req = *output;
@@ -193,7 +192,7 @@ where
                 }
 
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "OK/Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
                     None
                 }
 
