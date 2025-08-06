@@ -1,29 +1,29 @@
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::LazyLock;
 use std::time::Duration;
 
-use crate::cast_utils::{i64_to_f64_safe, u64_to_f64_safe};
+use crate::cast_utils::u64_to_f64_safe;
 use metrics::{counter, gauge, histogram, Histogram};
 use vector_common::{
     internal_event::{error_type, InternalEvent},
     registered_event,
 };
 
-static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicI64, AtomicI64)>> =
+static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicU64, AtomicU64)>> =
     LazyLock::new(DashMap::new);
 
 fn update_buffer_counters(
     buffer_id: &str,
     stage: usize,
-    events_delta: i64,
-    bytes_delta: i64,
-) -> (i64, i64) {
-    fn update_and_get(counter: &AtomicI64, delta: i64) -> i64 {
+    events_delta: u64,
+    bytes_delta: u64,
+) -> (u64, u64) {
+    fn update_and_get(counter: &AtomicU64, delta: u64) -> u64 {
         let mut new_val = 0;
         counter
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-                let updated = current.saturating_add(delta).clamp(0, i64::MAX);
+                let updated = current.saturating_add(delta);
                 new_val = updated;
                 Some(updated)
             })
@@ -33,7 +33,7 @@ fn update_buffer_counters(
 
     let counters = BUFFER_COUNTERS
         .entry((buffer_id.to_string(), stage))
-        .or_insert_with(|| (AtomicI64::new(0), AtomicI64::new(0)));
+        .or_insert_with(|| (AtomicU64::new(0), AtomicU64::new(0)));
 
     let new_events = update_and_get(&counters.0, events_delta);
     let new_bytes = update_and_get(&counters.1, bytes_delta);
@@ -41,18 +41,18 @@ fn update_buffer_counters(
     (new_events, new_bytes)
 }
 
-fn emit_buffer_gauge(buffer_id: &str, stage: usize, new_events: i64, new_bytes: i64) {
+fn emit_buffer_gauge(buffer_id: &str, stage: usize, new_events: u64, new_bytes: u64) {
     gauge!("buffer_events",
         "buffer_id" => buffer_id.to_string(),
         "stage" => stage.to_string()
     )
-    .set(i64_to_f64_safe(new_events));
+    .set(u64_to_f64_safe(new_events));
 
     gauge!("buffer_byte_size",
         "buffer_id" => buffer_id.to_string(),
         "stage" => stage.to_string()
     )
-    .set(i64_to_f64_safe(new_bytes));
+    .set(u64_to_f64_safe(new_bytes));
 }
 
 pub struct BufferCreated {
@@ -95,11 +95,8 @@ impl InternalEvent for BufferEventsReceived {
         )
         .increment(self.byte_size);
 
-        let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
-        let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
-
         let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
@@ -124,11 +121,8 @@ impl InternalEvent for BufferEventsSent {
             "stage" => self.idx.to_string())
         .increment(self.byte_size);
 
-        let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
-        let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
-
         let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
@@ -172,11 +166,8 @@ impl InternalEvent for BufferEventsDropped {
         )
         .increment(self.count);
 
-        let count_delta = i64::try_from(self.count).unwrap_or(i64::MAX);
-        let bytes_delta = i64::try_from(self.byte_size).unwrap_or(i64::MAX);
-
         let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, count_delta, bytes_delta);
+            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
@@ -234,7 +225,7 @@ mod tests {
         BUFFER_COUNTERS.clear();
     }
 
-    fn get_counter_values(buffer_id: &str, stage: usize) -> (i64, i64) {
+    fn get_counter_values(buffer_id: &str, stage: usize) -> (u64, u64) {
         match BUFFER_COUNTERS.get(&(buffer_id.to_string(), stage)) {
             Some(counters) => {
                 let events = counters.0.load(Ordering::Relaxed);
@@ -248,7 +239,7 @@ mod tests {
     fn assert_gauge_state(
         buffer_id: &str,
         stage: usize,
-        updates: &[(i64, i64)],
+        updates: &[(u64, u64)],
         expected_events: f64,
         expected_bytes: f64,
     ) {
@@ -329,32 +320,6 @@ mod tests {
     }
 
     #[test]
-    fn test_increment_and_decrement() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_counters();
-
-        update_buffer_counters("test_buffer", 1, 100, 2048);
-        update_buffer_counters("test_buffer", 1, -50, -1024);
-        let (events, bytes) = get_counter_values("test_buffer", 1);
-
-        assert_eq!(events, 50);
-        assert_eq!(bytes, 1024);
-    }
-
-    #[test]
-    fn test_decrement_below_zero_clamped_to_zero() {
-        let _guard = TEST_LOCK.lock().unwrap();
-        reset_counters();
-
-        update_buffer_counters("test_buffer", 2, 5, 100);
-        update_buffer_counters("test_buffer", 2, -10, -200);
-        let (events, bytes) = get_counter_values("test_buffer", 2);
-
-        assert_eq!(events, 0);
-        assert_eq!(bytes, 0);
-    }
-
-    #[test]
     fn test_multiple_stages_are_independent() {
         let _guard = TEST_LOCK.lock().unwrap();
         reset_counters();
@@ -371,19 +336,22 @@ mod tests {
 
     #[test]
     fn test_multithreaded_updates_are_correct() {
+        const NUM_THREADS: u64 = 10;
+        const INCREMENTS_PER_THREAD: u64 = 1000;
+        const EXPECTED_EVENTS: u64 = NUM_THREADS * INCREMENTS_PER_THREAD;
+        const EXPECTED_BYTES: u64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
+
         let _guard = TEST_LOCK
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         reset_counters();
 
-        let num_threads = 10;
-        let increments_per_thread = 1000;
         let mut handles = vec![];
 
-        for _ in 0..num_threads {
+        for _ in 0..NUM_THREADS {
             let handle = thread::spawn(move || {
-                for _ in 0..increments_per_thread {
+                for _ in 0..INCREMENTS_PER_THREAD {
                     update_buffer_counters("test_buffer", 0, 1, 10);
                 }
             });
@@ -395,11 +363,9 @@ mod tests {
         }
 
         let (final_events, final_bytes) = get_counter_values("test_buffer", 0);
-        let expected_events = i64::from(num_threads * increments_per_thread);
-        let expected_bytes = i64::from(num_threads * increments_per_thread * 10);
 
-        assert_eq!(final_events, expected_events);
-        assert_eq!(final_bytes, expected_bytes);
+        assert_eq!(final_events, EXPECTED_EVENTS);
+        assert_eq!(final_bytes, EXPECTED_BYTES);
     }
 
     #[test]
@@ -427,11 +393,6 @@ mod tests {
     #[test]
     fn test_increment_with_recorder() {
         assert_gauge_state("test_buffer", 0, &[(100, 2048), (200, 1024)], 300.0, 3072.0);
-    }
-
-    #[test]
-    fn test_should_not_be_negative_with_recorder() {
-        assert_gauge_state("test_buffer", 1, &[(100, 1024), (-200, -4096)], 0.0, 0.0);
     }
 
     #[test]
