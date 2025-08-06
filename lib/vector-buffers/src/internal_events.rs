@@ -13,19 +13,19 @@ use vector_common::{
 static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicI64, AtomicI64)>> =
     LazyLock::new(DashMap::new);
 
-fn update_and_get(counter: &AtomicI64, delta: i64) -> i64 {
-    let mut new_val = 0;
-    counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            let updated = current.saturating_add(delta).clamp(0, i64::MAX);
-            new_val = updated;
-            Some(updated)
-        })
-        .ok();
-    new_val
-}
-
 fn update_buffer_gauge(buffer_id: &str, stage: usize, events_delta: i64, bytes_delta: i64) {
+    fn update_and_get(counter: &AtomicI64, delta: i64) -> i64 {
+        let mut new_val = 0;
+        counter
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                let updated = current.saturating_add(delta).clamp(0, i64::MAX);
+                new_val = updated;
+                Some(updated)
+            })
+            .ok();
+        new_val
+    }
+
     let counters = BUFFER_COUNTERS
         .entry((buffer_id.to_string(), stage))
         .or_insert_with(|| (AtomicI64::new(0), AtomicI64::new(0)));
