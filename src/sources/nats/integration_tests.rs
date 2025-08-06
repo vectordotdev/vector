@@ -2,9 +2,7 @@
 #[cfg(test)]
 mod integration_tests {
     #![allow(clippy::print_stdout)]
-    use crate::config::SourceConfig;
-    use crate::config::SourceContext;
-    use crate::sources::nats::config::JetStreamConfig;
+    use crate::config::{SourceConfig, SourceContext};
     use crate::{
         codecs::DecodingConfig,
         config::LogNamespace,
@@ -15,7 +13,7 @@ mod integration_tests {
         serde::{default_decoding, default_framing_message_based},
         shutdown::ShutdownSignal,
         sources::nats::{
-            config::{default_subject_key_field, BuildError, NatsSourceConfig},
+            config::{default_subject_key_field, BuildError, JetStreamConfig, NatsSourceConfig},
             source::{create_subscription, run_nats_core},
         },
         test_util::{

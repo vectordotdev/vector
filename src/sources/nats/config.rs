@@ -1,23 +1,26 @@
-use crate::sources::nats::source::{create_subscription, run_nats_core, run_nats_jetstream};
-use crate::sources::Source;
-use snafu::{ResultExt, Snafu};
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
-use vrl::value::Kind;
-
-use async_nats::jetstream::consumer::PullConsumer;
-use async_nats::jetstream::consumer::StreamError as ConsumerStreamError;
-use async_nats::jetstream::context::GetStreamError;
-
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
+    sources::{
+        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
+        Source,
+    },
     tls::TlsEnableableConfig,
 };
+use async_nats::jetstream::{
+    consumer::{PullConsumer, StreamError as ConsumerStreamError},
+    context::GetStreamError,
+};
+use snafu::{ResultExt, Snafu};
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path},
+};
+use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
