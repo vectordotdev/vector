@@ -506,4 +506,62 @@ mod tests {
             );
         });
     }
+
+    #[test]
+    fn buffer_usage_gauge_clamps_to_zero() {
+        let recorder = DebuggingRecorder::default();
+        let snapshotter = recorder.snapshotter();
+        let buffer_id = "test_buffer_clamp";
+        let stage_idx = 0;
+
+        metrics::with_local_recorder(&recorder, || {
+            let mut usage = BufferUsage::from_span(Span::current());
+            let handle = usage.add_stage(stage_idx);
+
+            handle.increment_received_event_count_and_byte_size(100, 1000);
+            handle.increment_sent_event_count_and_byte_size(120, 1200); // More sent than received
+            handle.increment_dropped_event_count_and_byte_size(10, 100, false);
+
+            // calculation:
+            // events: 100 - 120 - 10 = -30
+            // bytes: 1000 - 1200 - 100 = -300
+
+            BufferUsage::report_metrics(&usage.stages, buffer_id);
+
+            let metrics = snapshotter.snapshot().into_vec();
+
+            let events_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_events",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+            let bytes_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_byte_size",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+
+            let events_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &events_key)
+                .unwrap();
+            let bytes_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &bytes_key)
+                .unwrap();
+
+            assert_eq!(events_gauge.3, DebugValue::Gauge(OrderedFloat(0.0)));
+            assert_eq!(bytes_gauge.3, DebugValue::Gauge(OrderedFloat(0.0)));
+        });
+    }
 }
