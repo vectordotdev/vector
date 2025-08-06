@@ -6,7 +6,7 @@ use crate::sinks::prelude::*;
 
 use super::{
     config::{NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
-    request_builder::{NatsEncoder, NatsRequest, NatsRequestBuilder},
+    request_builder::{NatsEncoder, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError,
 };
@@ -105,7 +105,6 @@ pub(super) struct NatsRetryLogic;
 
 impl RetryLogic for NatsRetryLogic {
     type Error = NatsError;
-    type Request = NatsRequest;
     type Response = NatsResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {

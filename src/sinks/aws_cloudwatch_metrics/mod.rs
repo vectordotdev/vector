@@ -201,7 +201,6 @@ struct CloudWatchMetricsRetryLogic;
 
 impl RetryLogic for CloudWatchMetricsRetryLogic {
     type Error = SdkError<PutMetricDataError>;
-    type Request = PartitionInnerBuffer<Vec<Metric>, String>;
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

@@ -14,20 +14,23 @@ use vector_lib::configurable::configurable_component;
 
 use crate::Error;
 
-pub enum RetryAction<Request = ()> {
+pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
     Retry(Cow<'static, str>),
     /// Indicate that a portion of this request should be retried with a generic function
-    RetryPartial(Box<dyn FnOnce(Request) -> Request + Send + Sync>),
+    RetryPartial(Box<dyn RetryPartialFunction>),
     /// Indicate that this request should not be retried with a reason
     DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
 }
 
+pub trait RetryPartialFunction {
+    fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any>;
+}
+
 pub trait RetryLogic: Clone + Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
-    type Request;
     type Response;
 
     /// When the Service call returns an `Err` response, this function allows
@@ -40,7 +43,7 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     /// of a sink returns a transport protocol layer success but error data in the
     /// response body. For example, an HTTP 200 status, but the body of the response
     /// contains a list of errors encountered while processing.
-    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
+    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
         // Treat the default as the request is successful
         RetryAction::Successful
     }
@@ -137,8 +140,8 @@ impl<L: RetryLogic> FibonacciRetryPolicy<L> {
 
 impl<Req, Res, L> Policy<Req, Res, Error> for FibonacciRetryPolicy<L>
 where
-    Req: Clone + Send + 'static,
-    L: RetryLogic<Request = Req, Response = Res>,
+    Req: Clone + 'static,
+    L: RetryLogic<Response = Res>,
 {
     type Future = RetryPolicyFuture;
 
@@ -159,7 +162,8 @@ where
                     warn!(message = "Retrying after response.", reason = %reason, internal_log_rate_limit = true);
                     Some(self.build_retry())
                 }
-                RetryAction::RetryPartial(modify_request) => {
+
+                RetryAction::RetryPartial(rebuild_request_fn) => {
                     if self.remaining_attempts == 0 {
                         warn!(
                             message =
@@ -169,13 +173,25 @@ where
                         return None;
                     }
                     // here to modify the request Req, delete those successful requests from it.
-                    *req = modify_request(req.clone());
-                    error!(
-                        message = "OK/retrying partial after response.",
-                        internal_log_rate_limit = true
-                    );
-                    Some(self.build_retry())
+                    let output = rebuild_request_fn.modify_request(Box::new(req.clone()));
+                    if let Ok(output) = output.downcast::<Req>() {
+                        *req = *output;
+                        error!(
+                            message = "OK/retrying partial after response.",
+                            internal_log_rate_limit = true
+                        );
+                        Some(self.build_retry())
+                    } else {
+                        // unlikely to go here.
+                        error!(
+                            message =
+                                "OK/retry response but invalid request; dropping the request.",
+                            internal_log_rate_limit = true,
+                        );
+                        None
+                    }
                 }
+
                 RetryAction::DontRetry(reason) => {
                     error!(message = "OK/Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
                     None
@@ -237,7 +253,7 @@ impl Future for RetryPolicyFuture {
     }
 }
 
-impl<Request> RetryAction<Request> {
+impl RetryAction {
     pub const fn is_retryable(&self) -> bool {
         matches!(self, RetryAction::Retry(_) | RetryAction::RetryPartial(_))
     }
@@ -504,7 +520,6 @@ mod tests {
 
     impl RetryLogic for SvcRetryLogic {
         type Error = Error;
-        type Request = &'static str;
         type Response = &'static str;
 
         fn is_retriable_error(&self, error: &Self::Error) -> bool {

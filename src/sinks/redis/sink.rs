@@ -18,7 +18,7 @@ use super::{
     config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
-    RedisEvent, RedisRequest, RepairChannelSnafu,
+    RedisEvent, RepairChannelSnafu,
 };
 
 pub(super) type GenerationCount = u64;
@@ -351,7 +351,6 @@ pub(super) struct RedisRetryLogic {
 
 impl RetryLogic for RedisRetryLogic {
     type Error = RedisSinkError;
-    type Request = RedisRequest;
     type Response = RedisResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -371,7 +370,7 @@ impl RetryLogic for RedisRetryLogic {
         }
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         if response.is_successful() {
             RetryAction::Successful
         } else {

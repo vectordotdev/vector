@@ -239,19 +239,18 @@ pub(super) async fn http_healthcheck(
 /// GreptimeDB HTTP retry logic.
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBHttpRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
+    inner: HttpRetryLogic,
 }
 
 impl RetryLogic for GreptimeDBHttpRetryLogic {
     type Error = HttpError;
-    type Request = HttpRequest<PartitionKey>;
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         self.inner.should_retry_response(&response.http_response)
     }
 }

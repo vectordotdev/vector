@@ -21,7 +21,6 @@ pub struct PostgresRetryLogic;
 
 impl RetryLogic for PostgresRetryLogic {
     type Error = PostgresServiceError;
-    type Request = PostgresRequest;
     type Response = PostgresResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

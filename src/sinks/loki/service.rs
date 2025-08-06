@@ -15,7 +15,6 @@ pub struct LokiRetryLogic;
 
 impl RetryLogic for LokiRetryLogic {
     type Error = LokiError;
-    type Request = LokiRequest;
     type Response = LokiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

@@ -29,7 +29,6 @@ pub struct LogApiRetry;
 
 impl RetryLogic for LogApiRetry {
     type Error = DatadogApiError;
-    type Request = LogApiRequest;
     type Response = LogApiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

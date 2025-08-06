@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use hyper::Body;
@@ -140,37 +138,19 @@ pub fn healthcheck_response(
     }
 }
 
-pub struct GcsRetryLogic<Request> {
-    request: PhantomData<Request>,
-}
-
-impl<Request> Default for GcsRetryLogic<Request> {
-    fn default() -> Self {
-        Self {
-            request: PhantomData,
-        }
-    }
-}
-
-impl<Request> Clone for GcsRetryLogic<Request> {
-    fn clone(&self) -> Self {
-        Self {
-            request: PhantomData,
-        }
-    }
-}
+#[derive(Clone)]
+pub struct GcsRetryLogic;
 
 // This is a clone of HttpRetryLogic for the Body type, should get merged
-impl<Request: Clone + Send + Sync + 'static> RetryLogic for GcsRetryLogic<Request> {
+impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
-    type Request = Request;
     type Response = GcsResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.inner.status();
 
         match status {

@@ -9,34 +9,28 @@ use crate::aws::is_retriable_error;
 use crate::sinks::{aws_cloudwatch_logs::service::CloudwatchError, util::retries::RetryLogic};
 
 #[derive(Debug)]
-pub struct CloudwatchRetryLogic<Request, Response> {
-    request: PhantomData<Request>,
-    response: PhantomData<Response>,
+pub struct CloudwatchRetryLogic<T> {
+    phantom: PhantomData<T>,
 }
-impl<Request, Response> CloudwatchRetryLogic<Request, Response> {
-    pub const fn new() -> CloudwatchRetryLogic<Request, Response> {
+impl<T> CloudwatchRetryLogic<T> {
+    pub const fn new() -> CloudwatchRetryLogic<T> {
         CloudwatchRetryLogic {
-            request: PhantomData,
-            response: PhantomData,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<Request, Response> Clone for CloudwatchRetryLogic<Request, Response> {
+impl<T> Clone for CloudwatchRetryLogic<T> {
     fn clone(&self) -> Self {
         CloudwatchRetryLogic {
-            request: PhantomData,
-            response: PhantomData,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<Request: Send + Sync + 'static, Response: Send + Sync + 'static> RetryLogic
-    for CloudwatchRetryLogic<Request, Response>
-{
+impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     type Error = CloudwatchError;
-    type Request = Request;
-    type Response = Response;
+    type Response = T;
 
     // TODO this match may not be necessary given the logic in `is_retriable_error()`
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
@@ -90,7 +84,7 @@ mod test {
 
     #[test]
     fn test_throttle_retry() {
-        let retry_logic: CloudwatchRetryLogic<(), ()> = CloudwatchRetryLogic::new();
+        let retry_logic: CloudwatchRetryLogic<()> = CloudwatchRetryLogic::new();
 
         let meta_err = aws_smithy_types::error::ErrorMetadata::builder()
             .code("ThrottlingException")

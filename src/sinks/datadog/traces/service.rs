@@ -23,14 +23,13 @@ pub struct TraceApiRetry;
 
 impl RetryLogic for TraceApiRetry {
     type Error = HttpError;
-    type Request = TraceApiRequest;
     type Response = TraceApiResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status_code;
         match status {
             // Use the same status code/retry policy as the Trace agent, additionally retrying

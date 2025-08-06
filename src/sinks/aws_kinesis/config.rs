@@ -99,7 +99,7 @@ where
     R: Send + 'static,
     RR: Record + Record<T = R> + Clone + Send + Sync + Unpin + 'static,
     E: Send + 'static,
-    RT: RetryLogic<Request = BatchKinesisRequest<RR>, Response = KinesisResponse> + Default,
+    RT: RetryLogic<Response = KinesisResponse> + Default,
 {
     let request_limits = config.request.into_settings();
 

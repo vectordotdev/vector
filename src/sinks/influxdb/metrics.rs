@@ -167,7 +167,7 @@ impl InfluxDbSvc {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic::default(),
+                HttpRetryLogic,
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
