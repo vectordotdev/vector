@@ -191,17 +191,17 @@ impl SourceConfig for NatsSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        match &self.jetstream {
-            Some(config) => {
+        match self.mode() {
+            NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
                 let js = async_nats::jetstream::new(connection.clone());
-                let stream = js.get_stream(&config.stream).await.context(StreamSnafu)?;
+                let stream = js.get_stream(&js_config.stream).await.context(StreamSnafu)?;
                 let consumer: PullConsumer = stream
-                    .get_consumer(&config.consumer)
+                    .get_consumer(&js_config.consumer)
                     .await
                     .context(ConsumerSnafu)?;
 
-                let batch_config = config.batch.clone();
+                let batch_config = js_config.batch.clone();
 
                 let messages = consumer
                     .stream()
@@ -221,7 +221,7 @@ impl SourceConfig for NatsSourceConfig {
                     cx.out,
                 )))
             }
-            None => {
+            NatsMode::Core => {
                 let (connection, subscription) = create_subscription(self).await?;
 
                 Ok(Box::pin(run_nats_core(
@@ -267,12 +267,24 @@ impl SourceConfig for NatsSourceConfig {
     }
 }
 
+enum NatsMode<'a> {
+    JetStream(&'a JetStreamConfig),
+    Core,
+}
+
 impl NatsSourceConfig {
     pub async fn connect(&self) -> Result<async_nats::Client, BuildError> {
         let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
 
         let server_addrs = self.parse_server_addresses()?;
         options.connect(server_addrs).await.context(ConnectSnafu)
+    }
+
+    fn mode(&self) -> NatsMode {
+        match &self.jetstream {
+            Some(config) => NatsMode::JetStream(config),
+            None => NatsMode::Core,
+        }
     }
 
     fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, BuildError> {
