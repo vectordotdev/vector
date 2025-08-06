@@ -23,8 +23,10 @@ async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = HoneycombConfig::generate_config().to_string();
-    let mut config = HoneycombConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-        .expect("config should be valid");
+    let mut config = HoneycombConfig::deserialize(
+        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+    )
+    .expect("config should be valid");
     config.endpoint = mock_endpoint.to_string();
 
     let context = SinkContext::default();

@@ -37,9 +37,9 @@ use crate::{
     codecs::{Encoder, Transformer},
     common::http::server_auth::HttpServerAuthMatcher,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
-        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerMessageSent,
-        WsListenerSendError,
+        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
+        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
+        WebSocketListenerMessageSent, WebSocketListenerSendError,
     },
     sinks::{
         prelude::*,
@@ -266,7 +266,7 @@ impl WebSocketListenerSink {
             .await
             .map_err(|err| {
                 debug!("Error during websocket handshake: {}", err);
-                emit!(WsListenerConnectionFailedError {
+                emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
                 })
@@ -283,7 +283,7 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WsListenerSendError {
+                        emit!(WebSocketListenerSendError {
                             error: Box::new(error)
                         });
                     }
@@ -293,7 +293,7 @@ impl WebSocketListenerSink {
             debug!("WebSocket connection established: {}", addr);
 
             peers.insert(addr, tx);
-            emit!(WsListenerConnectionEstablished {
+            emit!(WebSocketListenerConnectionEstablished {
                 client_count: peers.len(),
                 extra_tags: extra_tags.clone()
             });
@@ -322,7 +322,7 @@ impl WebSocketListenerSink {
         });
         let forward_data_to_client = rx
             .map(|message| {
-                emit!(WsListenerMessageSent {
+                emit!(WebSocketListenerMessageSent {
                     message_size: message.len(),
                     extra_tags: extra_tags.clone()
                 });
@@ -336,7 +336,7 @@ impl WebSocketListenerSink {
             .factor_first()
             .0
         {
-            emit!(WsListenerSendError {
+            emit!(WebSocketListenerSendError {
                 error: Box::new(error)
             })
         }
@@ -345,7 +345,7 @@ impl WebSocketListenerSink {
             let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
-            emit!(WsListenerConnectionShutdown {
+            emit!(WebSocketListenerConnectionShutdown {
                 client_count: peers.len(),
                 extra_tags: extra_tags.clone()
             });
@@ -423,7 +423,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WsListenerSendError {
+                            emit!(WebSocketListenerSendError {
                                 error: Box::new(error)
                             });
                         } else {

@@ -260,7 +260,7 @@ pub enum DeserializerConfig {
     /// This codec is experimental for the following reason:
     ///
     /// The GELF specification is more strict than the actual Graylog receiver.
-    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// Vector's decoder adheres more strictly to the GELF spec, with
     /// the exception that some characters such as `@`  are allowed in field names.
     ///
     /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
