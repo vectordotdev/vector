@@ -269,7 +269,7 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
     ) -> TowerPartitionSink<S, B, RL, K>
     where
-        RL: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Request = <B as Batch>::Output, Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -294,7 +294,7 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
     ) -> TowerBatchedSink<S, B, RL>
     where
-        RL: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Request = <B as Batch>::Output, Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -537,7 +537,7 @@ mod tests {
         let svc = {
             let sent_requests = Arc::clone(&sent_requests);
             let delay = Arc::new(AtomicBool::new(true));
-            tower::service_fn(move |req: PartitionInnerBuffer<_, _>| {
+            tower::service_fn(move |req: PartitionInnerBuffer<Vec<usize>, Vec<usize>>| {
                 let (req, _) = req.into_parts();
                 if delay.swap(false, AcqRel) {
                     // Error on first request
@@ -582,13 +582,14 @@ mod tests {
 
     impl RetryLogic for RetryAlways {
         type Error = std::io::Error;
+        type Request = PartitionInnerBuffer<Vec<usize>, Vec<usize>>;
         type Response = ();
 
         fn is_retriable_error(&self, _: &Self::Error) -> bool {
             true
         }
 
-        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
             // Treat the default as the request is successful
             RetryAction::Successful
         }
