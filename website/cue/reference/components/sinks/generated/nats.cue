@@ -487,7 +487,7 @@ generated: components: sinks: nats: configuration: {
 		type: object: options: {
 			enabled: {
 				description: "Whether to enable Jetstream."
-				required: false
+				required:    false
 				type: bool: default: false
 			}
 			headers: {
