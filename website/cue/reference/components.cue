@@ -205,7 +205,7 @@ components: {
 			sanitize?:        				#FeaturesSanitize
 			shape?:           				#FeaturesShape
 			window?:          				#FeaturesWindow
-			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
+			incremental_to_absolute?:		#FeaturesIncrementalToAbsolute
 		}
 
 		if Args.kind == "sink" {
