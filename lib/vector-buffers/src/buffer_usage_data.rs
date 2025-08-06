@@ -1,11 +1,12 @@
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
+        Arc, LazyLock,
     },
     time::Duration,
 };
 
+use dashmap::DashMap;
 use tokio::time::interval;
 use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
@@ -14,6 +15,40 @@ use crate::{
     internal_events::{BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent},
     spawn_named,
 };
+
+static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicI64, AtomicI64)>> =
+    LazyLock::new(DashMap::new);
+
+fn update_and_get(counter: &AtomicI64, delta: i64) -> u64 {
+    let mut new_val = 0;
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+            new_val = current.saturating_add(delta).clamp(0, i64::MAX);
+            Some(new_val)
+        })
+        .ok();
+    // This will never be negative due to the `clamp` above
+    #[expect(clippy::cast_sign_loss)]
+    {
+        new_val as u64
+    }
+}
+
+fn update_buffer_counters(
+    buffer_id: &str,
+    stage: usize,
+    events_delta: i64,
+    bytes_delta: i64,
+) -> (u64, u64) {
+    let counters = BUFFER_COUNTERS
+        .entry((buffer_id.to_string(), stage))
+        .or_default();
+
+    let new_events = update_and_get(&counters.0, events_delta);
+    let new_bytes = update_and_get(&counters.1, bytes_delta);
+
+    (new_events, new_bytes)
+}
 
 /// Snapshot of category metrics.
 struct CategorySnapshot {
@@ -265,26 +300,42 @@ impl BufferUsage {
 
                     let received = stage.received.consume();
                     if received.has_updates() {
+                        let count = i64::try_from(received.event_count).unwrap_or(i64::MAX);
+                        let bytes = i64::try_from(received.event_byte_size).unwrap_or(i64::MAX);
+                        let (total_count, total_byte_size) =
+                            update_buffer_counters(&buffer_id, stage.idx, count, bytes);
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: received.event_count,
                             byte_size: received.event_byte_size,
+                            total_count,
+                            total_byte_size,
                         });
                     }
 
                     let sent = stage.sent.consume();
                     if sent.has_updates() {
+                        let count = i64::try_from(sent.event_count).unwrap_or(i64::MAX);
+                        let bytes = i64::try_from(sent.event_byte_size).unwrap_or(i64::MAX);
+                        let (total_count, total_byte_size) =
+                            update_buffer_counters(&buffer_id, stage.idx, -count, -bytes);
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: sent.event_count,
                             byte_size: sent.event_byte_size,
+                            total_count,
+                            total_byte_size,
                         });
                     }
 
                     let dropped = stage.dropped.consume();
                     if dropped.has_updates() {
+                        let count = i64::try_from(dropped.event_count).unwrap_or(i64::MAX);
+                        let bytes = i64::try_from(dropped.event_byte_size).unwrap_or(i64::MAX);
+                        let (total_count, total_byte_size) =
+                            update_buffer_counters(&buffer_id, stage.idx, -count, -bytes);
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
@@ -292,11 +343,19 @@ impl BufferUsage {
                             reason: "corrupted_events",
                             count: dropped.event_count,
                             byte_size: dropped.event_byte_size,
+                            total_count,
+                            total_byte_size,
                         });
                     }
 
                     let dropped_intentional = stage.dropped_intentional.consume();
                     if dropped_intentional.has_updates() {
+                        let count =
+                            i64::try_from(dropped_intentional.event_count).unwrap_or(i64::MAX);
+                        let bytes =
+                            i64::try_from(dropped_intentional.event_byte_size).unwrap_or(i64::MAX);
+                        let (total_count, total_byte_size) =
+                            update_buffer_counters(&buffer_id, stage.idx, -count, -bytes);
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
@@ -304,6 +363,8 @@ impl BufferUsage {
                             reason: "drop_newest",
                             count: dropped_intentional.event_count,
                             byte_size: dropped_intentional.event_byte_size,
+                            total_count,
+                            total_byte_size,
                         });
                     }
                 }
@@ -311,5 +372,116 @@ impl BufferUsage {
         };
 
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cast_utils::F64_SAFE_INT_MAX;
+    use std::sync::Mutex;
+    use std::thread;
+
+    static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+    fn reset_counters() {
+        BUFFER_COUNTERS.clear();
+    }
+
+    fn get_counter_values(buffer_id: &str, stage: usize) -> (i64, i64) {
+        match BUFFER_COUNTERS.get(&(buffer_id.to_string(), stage)) {
+            Some(counters) => {
+                let events = counters.0.load(Ordering::Relaxed);
+                let bytes = counters.1.load(Ordering::Relaxed);
+                (events, bytes)
+            }
+            None => (0, 0),
+        }
+    }
+
+    #[test]
+    fn test_increment() {
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        reset_counters();
+
+        update_buffer_counters("test_buffer", 0, 10, 1024);
+        let (events, bytes) = get_counter_values("test_buffer", 0);
+
+        assert_eq!(events, 10);
+        assert_eq!(bytes, 1024);
+    }
+
+    #[test]
+    fn test_multiple_stages_are_independent() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_counters();
+
+        update_buffer_counters("test_buffer", 0, 10, 100);
+        update_buffer_counters("test_buffer", 1, 20, 200);
+        let (events0, bytes0) = get_counter_values("test_buffer", 0);
+        let (events1, bytes1) = get_counter_values("test_buffer", 1);
+        assert_eq!(events0, 10);
+        assert_eq!(bytes0, 100);
+        assert_eq!(events1, 20);
+        assert_eq!(bytes1, 200);
+    }
+
+    #[test]
+    fn test_multithreaded_updates_are_correct() {
+        const NUM_THREADS: i64 = 10;
+        const INCREMENTS_PER_THREAD: i64 = 1000;
+        const EXPECTED_EVENTS: i64 = NUM_THREADS * INCREMENTS_PER_THREAD;
+        const EXPECTED_BYTES: i64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
+
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        reset_counters();
+
+        let mut handles = vec![];
+
+        for _ in 0..NUM_THREADS {
+            let handle = thread::spawn(move || {
+                for _ in 0..INCREMENTS_PER_THREAD {
+                    update_buffer_counters("test_buffer", 0, 1, 10);
+                }
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let (final_events, final_bytes) = get_counter_values("test_buffer", 0);
+
+        assert_eq!(final_events, EXPECTED_EVENTS);
+        assert_eq!(final_bytes, EXPECTED_BYTES);
+    }
+
+    #[test]
+    fn test_large_values_capped_to_f64_safe_max() {
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        reset_counters();
+
+        update_buffer_counters("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
+
+        let (events, bytes) = get_counter_values("test_buffer", 3);
+
+        assert!(events > F64_SAFE_INT_MAX);
+        assert!(bytes > F64_SAFE_INT_MAX);
+
+        let capped_events = events.min(F64_SAFE_INT_MAX);
+        let capped_bytes = bytes.min(F64_SAFE_INT_MAX);
+
+        assert_eq!(capped_events, F64_SAFE_INT_MAX);
+        assert_eq!(capped_bytes, F64_SAFE_INT_MAX);
     }
 }
