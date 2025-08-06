@@ -7,20 +7,6 @@ use vector_common::{
     registered_event,
 };
 
-fn emit_buffer_gauge(buffer_id: &str, stage: usize, new_events: u64, new_bytes: u64) {
-    gauge!("buffer_events",
-        "buffer_id" => buffer_id.to_string(),
-        "stage" => stage.to_string()
-    )
-    .set(u64_to_f64_safe(new_events));
-
-    gauge!("buffer_byte_size",
-        "buffer_id" => buffer_id.to_string(),
-        "stage" => stage.to_string()
-    )
-    .set(u64_to_f64_safe(new_bytes));
-}
-
 pub struct BufferCreated {
     pub idx: usize,
     pub max_size_events: usize,
@@ -62,13 +48,16 @@ impl InternalEvent for BufferEventsReceived {
             "stage" => self.idx.to_string()
         )
         .increment(self.delta_byte_size);
-
-        emit_buffer_gauge(
-            &self.buffer_id,
-            self.idx,
-            self.total_count,
-            self.total_byte_size,
-        );
+        gauge!("buffer_events",
+               "buffer_id" => self.buffer_id.clone(),
+               "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_count));
+        gauge!("buffer_byte_size",
+            "buffer_id" => self.buffer_id,
+            "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_byte_size));
     }
 }
 
@@ -88,18 +77,20 @@ impl InternalEvent for BufferEventsSent {
             "stage" => self.idx.to_string()
         )
         .increment(self.delta_count);
-
         counter!("buffer_sent_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string())
         .increment(self.delta_byte_size);
-
-        emit_buffer_gauge(
-            &self.buffer_id,
-            self.idx,
-            self.total_count,
-            self.total_byte_size,
-        );
+        gauge!("buffer_events",
+               "buffer_id" => self.buffer_id.clone(),
+               "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_count));
+        gauge!("buffer_byte_size",
+            "buffer_id" => self.buffer_id,
+            "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_byte_size));
     }
 }
 
@@ -145,13 +136,16 @@ impl InternalEvent for BufferEventsDropped {
             "intentional" => intentional_str,
         )
         .increment(self.delta_count);
-
-        emit_buffer_gauge(
-            &self.buffer_id,
-            self.idx,
-            self.total_count,
-            self.total_byte_size,
-        );
+        gauge!("buffer_events",
+               "buffer_id" => self.buffer_id.clone(),
+               "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_count));
+        gauge!("buffer_byte_size",
+            "buffer_id" => self.buffer_id,
+            "stage" => self.idx.to_string()
+        )
+        .set(u64_to_f64_safe(self.total_byte_size));
     }
 }
 
