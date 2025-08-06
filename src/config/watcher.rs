@@ -134,8 +134,8 @@ pub fn spawn_thread<'a>(
                             });
                         } else {
                             _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
-                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                        });
+                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
+                            });
                         }
                     } else {
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
