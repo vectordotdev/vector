@@ -1766,8 +1766,8 @@ mod test {
 
         join_handles.push(tokio::spawn(async move {
             future::ready({
-                let events = collect_n(rx, total_events as usize).await;
-                assert_eq!(total_events as usize, events.len(), "Missed events");
+                let events = collect_n(rx, total_events).await;
+                assert_eq!(total_events, events.len(), "Missed events");
             })
             .await;
         }));
