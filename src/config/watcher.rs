@@ -1,5 +1,5 @@
-use crate::config::ComponentConfig;
-use std::collections::HashSet;
+use crate::config::{ComponentConfig, WatchedComponentType};
+use std::collections::HashMap;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
@@ -61,7 +61,7 @@ impl Watcher {
     }
 }
 
-/// Sends a ReloadFromDisk on config_path changes.
+/// Sends a ReloadFromDisk or ReloadTables on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
@@ -103,7 +103,7 @@ pub fn spawn_thread<'a>(
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
-                    let component_keys: HashSet<_> = component_configs
+                    let changed_components: HashMap<_, _> = component_configs
                         .clone()
                         .into_iter()
                         .flat_map(|p| p.contains(&event.paths))
@@ -119,9 +119,21 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
-                    if !component_keys.is_empty() {
-                        info!("Component {:?} configuration changed.", component_keys);
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
+                    if !changed_components.is_empty() {
+                        info!(
+                            "Component {:?} configuration changed.",
+                            changed_components.keys()
+                        );
+                        if changed_components
+                            .iter()
+                            .all(|(_, t)| *t == WatchedComponentType::EnrichmentTable)
+                        {
+                            info!("Only enrichment tables have changed.",);
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadTables).map_err(|error| {
+                                error!(message = "Unable to reload enrichment tables.", cause = %error)
+                            });
+                        }
+                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
                             error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
                         });
                     } else {
@@ -149,81 +161,6 @@ pub fn spawn_thread<'a>(
             info!("Speculating that configuration files have changed.");
             _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk).map_err(|error| {
                 error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
-            });
-        }
-    });
-
-    Ok(())
-}
-
-/// Sends a ReloadTables on enrichment table file changes.
-pub fn spawn_thread_for_enrichment(
-    watcher_conf: WatcherConfig,
-    signal_tx: crate::signal::SignalTx,
-    table_configs: Vec<ComponentConfig>,
-    delay: impl Into<Option<Duration>>,
-) -> Result<(), Error> {
-    let enrichment_table_paths: Vec<_> = table_configs
-        .clone()
-        .into_iter()
-        .flat_map(|p| p.config_paths.clone())
-        .collect();
-
-    let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
-
-    // Create watcher now so not to miss any changes happening between
-    // returning from this function and the thread starting.
-    let mut watcher = Some(create_watcher(&watcher_conf, &enrichment_table_paths)?);
-
-    info!("Watching enrichment tables files.");
-
-    thread::spawn(move || loop {
-        if let Some((mut watcher, receiver)) = watcher.take() {
-            while let Ok(Ok(event)) = receiver.recv() {
-                if matches!(
-                    event.kind,
-                    EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
-                ) {
-                    debug!(message = "Enrichment table file change detected.", event = ?event);
-
-                    // Consume events until delay amount of time has passed since the latest event.
-                    while receiver.recv_timeout(delay).is_ok() {}
-
-                    debug!(message = "Consumed file change events for delay.", delay = ?delay);
-
-                    // We need to read paths to resolve any inode changes that may have happened.
-                    // And we need to do it before raising sighup to avoid missing any change.
-                    if let Err(error) = watcher.add_paths(&enrichment_table_paths) {
-                        error!(message = "Failed to read files to watch for enrichment table changes.", %error);
-                        break;
-                    }
-
-                    debug!(message = "Reloaded enrichment table paths.");
-
-                    info!("Enrichment table file changed.");
-                    _ = signal_tx.send(crate::signal::SignalTo::ReloadTables)
-                            .map_err(|error| {
-                                error!(message = "Unable to reload enrichment tables. Restart Vector to reload them.", cause = %error)
-                            });
-                } else {
-                    debug!(message = "Ignoring event.", event = ?event)
-                }
-            }
-        }
-
-        thread::sleep(RETRY_TIMEOUT);
-
-        watcher = create_watcher(&watcher_conf, &enrichment_table_paths)
-            .map_err(|error| error!(message = "Failed to create file watcher.", %error))
-            .ok();
-
-        if watcher.is_some() {
-            // Config files could have changed while we weren't watching,
-            // so for a good measure raise SIGHUP and let reload logic
-            // determine if anything changed.
-            info!("Speculating that enrichment tables files have changed.");
-            _ = signal_tx.send(crate::signal::SignalTo::ReloadTables).map_err(|error| {
-                error!(message = "Unable to reload enrichment tables. Restart Vector to reload them.", cause = %error)
             });
         }
     });
@@ -262,7 +199,7 @@ mod tests {
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{fs::File, io::Write, time::Duration};
+    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
 
     async fn test_signal(
@@ -296,8 +233,11 @@ mod tests {
             .iter()
             .map(|file| File::create(file).unwrap())
             .collect();
-        let component_config =
-            ComponentConfig::new(component_file_path.clone(), http_component.clone());
+        let component_config = ComponentConfig::new(
+            component_file_path.clone(),
+            http_component.clone(),
+            WatchedComponentType::Sink,
+        );
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
         spawn_thread(

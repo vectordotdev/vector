@@ -13,7 +13,6 @@ use tokio::runtime::{self, Runtime};
 use tokio::sync::{broadcast::error::RecvError, MutexGuard};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
@@ -28,6 +27,7 @@ use crate::{
     },
     trace,
 };
+use crate::{config::WatchedComponentType, extra_context::ExtraContext};
 
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -77,19 +77,9 @@ impl ApplicationConfig {
             None
         };
 
-        let enrichment_watcher_conf = if opts.watch_enrichment_tables {
-            Some(watcher_config(
-                opts.watch_enrichment_tables_method,
-                opts.watch_enrichment_tables_poll_interval_seconds,
-            ))
-        } else {
-            None
-        };
-
         let config = load_configs(
             &config_paths,
             watcher_conf,
-            enrichment_watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
@@ -524,7 +514,6 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
 pub async fn load_configs(
     config_paths: &[ConfigPath],
     watcher_conf: Option<config::watcher::WatcherConfig>,
-    enrichment_watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
     graceful_shutdown_duration: Option<Duration>,
@@ -555,15 +544,31 @@ pub async fn load_configs(
     if let Some(watcher_conf) = watcher_conf {
         for (name, transform) in config.transforms() {
             let files = transform.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                WatchedComponentType::Transform,
+            );
             watched_component_paths.push(component_config);
         }
 
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                WatchedComponentType::Sink,
+            );
+            watched_component_paths.push(component_config);
+        }
+
+        for (name, table) in config.enrichment_tables() {
+            let files = table.inner.files_to_watch();
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                WatchedComponentType::EnrichmentTable,
+            );
             watched_component_paths.push(component_config);
         }
 
@@ -586,33 +591,6 @@ pub async fn load_configs(
         )
         .map_err(|error| {
             error!(message = "Unable to start config watcher.", %error);
-            exitcode::CONFIG
-        })?;
-    }
-
-    if let Some(enrichment_watcher_conf) = enrichment_watcher_conf {
-        let mut watched_table_paths = Vec::new();
-        for (name, table) in config.enrichment_tables() {
-            let files = table.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
-            watched_table_paths.push(component_config);
-        }
-
-        info!(
-            message = "Starting enrichment table watcher.",
-            paths = ?watched_table_paths
-        );
-
-        // Start listening for enrichment table changes.
-        config::watcher::spawn_thread_for_enrichment(
-            enrichment_watcher_conf,
-            signal_handler.clone_tx(),
-            watched_table_paths,
-            None,
-        )
-        .map_err(|error| {
-            error!(message = "Unable to start enrichment table watcher.", %error);
             exitcode::CONFIG
         })?;
     }

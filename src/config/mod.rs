@@ -78,13 +78,25 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum WatchedComponentType {
+    Transform,
+    Sink,
+    EnrichmentTable,
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ComponentConfig {
     pub config_paths: Vec<PathBuf>,
     pub component_key: ComponentKey,
+    pub component_type: WatchedComponentType,
 }
 
 impl ComponentConfig {
-    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub fn new(
+        config_paths: Vec<PathBuf>,
+        component_key: ComponentKey,
+        component_type: WatchedComponentType,
+    ) -> Self {
         let canonicalized_paths = config_paths
             .into_iter()
             .filter_map(|p| fs::canonicalize(p).ok())
@@ -93,12 +105,16 @@ impl ComponentConfig {
         Self {
             config_paths: canonicalized_paths,
             component_key,
+            component_type,
         }
     }
 
-    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<ComponentKey> {
+    pub fn contains(
+        &self,
+        config_paths: &[PathBuf],
+    ) -> Option<(ComponentKey, WatchedComponentType)> {
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
-            return Some(self.component_key.clone());
+            return Some((self.component_key.clone(), self.component_type.clone()));
         }
         None
     }
