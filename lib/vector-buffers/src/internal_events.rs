@@ -1,11 +1,21 @@
 use std::time::Duration;
 
-use crate::cast_utils::u64_to_f64_safe;
 use metrics::{counter, gauge, histogram, Histogram};
 use vector_common::{
     internal_event::{error_type, InternalEvent},
     registered_event,
 };
+
+// Maximum integer value that can be represented exactly in f64 (2^53).
+const F64_SAFE_INT_MAX: u64 = 1_u64 << 53;
+
+fn u64_to_f64_safe(value: u64) -> f64 {
+    let capped = value.min(F64_SAFE_INT_MAX);
+    #[allow(clippy::cast_precision_loss)]
+    {
+        capped as f64
+    }
+}
 
 pub struct BufferCreated {
     pub idx: usize,
