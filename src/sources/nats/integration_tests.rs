@@ -2,9 +2,9 @@
 #[cfg(test)]
 mod integration_tests {
     #![allow(clippy::print_stdout)]
-    use bytes::Bytes;
-    use vector_lib::config::log_schema;
-
+    use crate::config::SourceConfig;
+    use crate::config::SourceContext;
+    use crate::sources::nats::config::JetStreamConfig;
     use crate::{
         codecs::DecodingConfig,
         config::LogNamespace,
@@ -26,6 +26,9 @@ mod integration_tests {
         tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
+    use async_nats::jetstream::stream::StorageType;
+    use bytes::Bytes;
+    use vector_lib::config::log_schema;
 
     fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
         NatsSourceConfig {
@@ -36,6 +39,61 @@ mod integration_tests {
             subject_key_field: default_subject_key_field(),
             ..Default::default()
         }
+    }
+
+    /// Test runner for JetStream sources.
+    /// This function sets up the required JetStream stream and consumer,
+    /// publishes a message, and then runs the source to ensure it receives the message.
+    async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> {
+        let js_config = conf.jetstream.clone().unwrap();
+        let subject = conf.subject.clone();
+        let msg = "my jetstream message";
+
+        // Connect to NATS and set up the JetStream stream and consumer.
+        let client = async_nats::connect(conf.url.clone())
+            .await
+            .expect("Failed to connect to NATS");
+        let js = async_nats::jetstream::new(client.clone());
+
+        js.get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: js_config.stream.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .expect("Failed to create stream");
+
+        let stream = js.get_stream(js_config.stream).await.unwrap();
+        stream
+            .create_consumer(async_nats::jetstream::consumer::pull::Config {
+                durable_name: Some(js_config.consumer),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        // Publish a message for the source to consume.
+        js.publish(subject, msg.as_bytes().into()).await.unwrap();
+
+        // Run the source and verify it receives the event.
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
+            let (tx, rx) = SourceSender::new_test();
+            let cx = SourceContext::new_test(tx, None);
+            let source = conf.build(cx).await.unwrap();
+
+            tokio::spawn(source);
+
+            collect_n(rx, 1).await
+        })
+        .await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            msg.into()
+        );
+
+        Ok(())
     }
 
     async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
@@ -381,5 +439,88 @@ mod integration_tests {
             matches!(r, Err(BuildError::Connect { .. })),
             "publish_and_check failed for bad URLs, expected BuildError::Connect, got: {r:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn nats_jetstream_valid() {
+        let subject = format!("test-js-{}", random_string(10));
+        let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+            .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+        let mut conf = generate_source_config(&url, &subject);
+        conf.jetstream = Some(JetStreamConfig {
+            stream: format!("S_{}", subject.replace('.', "_")),
+            consumer: format!("C_{}", subject.replace('.', "_")),
+            ..Default::default()
+        });
+
+        let result = run_jetstream_test(conf).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn nats_jetstream_stream_not_found() {
+        let subject = format!("test-js-no-stream-{}", random_string(10));
+        let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+            .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+        let mut conf = generate_source_config(&url, &subject);
+        conf.jetstream = Some(JetStreamConfig {
+            stream: "nonexistent-stream".to_string(),
+            consumer: "nonexistent-consumer".to_string(),
+            ..Default::default()
+        });
+
+        let (tx, _rx) = SourceSender::new_test();
+        let cx = SourceContext::new_test(tx, None);
+        let result = conf.build(cx).await;
+
+        match result {
+            Ok(_) => panic!("Test failed: expected an error but got Ok"),
+            Err(err) => {
+                let build_err = err.downcast_ref::<BuildError>().unwrap();
+                assert!(matches!(build_err, BuildError::Stream { .. }));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn nats_jetstream_consumer_not_found() {
+        let subject = format!("test-js-no-consumer-{}", random_string(10));
+        let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+            .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+        let stream_name = format!("S_{}", subject.replace('.', "_"));
+
+        // Setup: Create the stream but NOT the consumer.
+        let client = async_nats::connect(&url).await.unwrap();
+        let js = async_nats::jetstream::new(client);
+        js.get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let mut conf = generate_source_config(&url, &subject);
+        conf.jetstream = Some(JetStreamConfig {
+            stream: stream_name,
+            consumer: "nonexistent-consumer".to_string(),
+            ..Default::default()
+        });
+
+        let (tx, _rx) = SourceSender::new_test();
+        let cx = SourceContext::new_test(tx, None);
+        let result = conf.build(cx).await;
+
+        match result {
+            Ok(_) => panic!("Test failed: expected an error but got Ok"),
+            Err(err) => {
+                let build_err = err.downcast_ref::<BuildError>().unwrap();
+                assert!(matches!(build_err, BuildError::Consumer { .. }));
+            }
+        }
     }
 }

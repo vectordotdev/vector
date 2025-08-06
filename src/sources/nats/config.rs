@@ -45,7 +45,7 @@ pub enum BuildError {
 /// **Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-struct BatchConfig {
+pub struct BatchConfig {
     /// The maximum number of messages to pull in a single batch.
     #[serde(default = "default_batch")]
     batch: usize,
