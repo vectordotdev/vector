@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
@@ -38,14 +38,31 @@ impl CategorySnapshot {
 struct CategoryMetrics {
     event_count: AtomicU64,
     event_byte_size: AtomicU64,
+    total_event_count: AtomicI64,
+    total_event_byte_size: AtomicI64,
 }
 
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
-    fn increment(&self, event_count: u64, event_byte_size: u64) {
+    fn increment(&self, event_count: u64, event_byte_size: u64, is_addition: bool) {
         self.event_count.fetch_add(event_count, Ordering::Relaxed);
         self.event_byte_size
             .fetch_add(event_byte_size, Ordering::Relaxed);
+
+        let event_delta = i64::try_from(event_count).unwrap_or(i64::MAX);
+        let byte_delta = i64::try_from(event_byte_size).unwrap_or(i64::MAX);
+
+        if is_addition {
+            self.total_event_count
+                .fetch_add(event_delta, Ordering::Relaxed);
+            self.total_event_byte_size
+                .fetch_add(byte_delta, Ordering::Relaxed);
+        } else {
+            self.total_event_count
+                .fetch_sub(event_delta, Ordering::Relaxed);
+            self.total_event_byte_size
+                .fetch_sub(byte_delta, Ordering::Relaxed);
+        }
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -117,14 +134,14 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.received.increment(count, byte_size);
+        self.state.received.increment(count, byte_size, true);
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.sent.increment(count, byte_size);
+        self.state.sent.increment(count, byte_size, false);
     }
 
     /// Increment the number of dropped events (and their total size) for this buffer component.
@@ -135,9 +152,9 @@ impl BufferUsageHandle {
         intentional: bool,
     ) {
         if intentional {
-            self.state.dropped_intentional.increment(count, byte_size);
+            self.state.dropped_intentional.increment(count, byte_size, false);
         } else {
-            self.state.dropped.increment(count, byte_size);
+            self.state.dropped.increment(count, byte_size, false);
         }
     }
 }
@@ -311,5 +328,75 @@ impl BufferUsage {
         };
 
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn category_metrics_increment_addition() {
+        let metrics = CategoryMetrics::default();
+        metrics.increment(10, 1024, true);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 10);
+        assert_eq!(snapshot.event_byte_size, 1024);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), 10);
+        assert_eq!(
+            metrics.total_event_byte_size.load(Ordering::Relaxed),
+            1024
+        );
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 0);
+        assert_eq!(snapshot.event_byte_size, 0);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), 10);
+        assert_eq!(
+            metrics.total_event_byte_size.load(Ordering::Relaxed),
+            1024
+        );
+    }
+
+    #[test]
+    fn category_metrics_increment_subtraction() {
+        let metrics = CategoryMetrics::default();
+        metrics.increment(5, 512, false);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 5);
+        assert_eq!(snapshot.event_byte_size, 512);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), -5);
+        assert_eq!(
+            metrics.total_event_byte_size.load(Ordering::Relaxed),
+            -512
+        );
+    }
+
+    #[test]
+    fn category_metrics_increment_mixed() {
+        let metrics = CategoryMetrics::default();
+        metrics.increment(100, 1000, true); // +100
+        metrics.increment(20, 200, false); // -20
+        metrics.increment(10, 100, false); // -10
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 130);
+        assert_eq!(snapshot.event_byte_size, 1300);
+
+        let expected_events = 100 - 20 - 10;
+        let expected_bytes = 1000 - 200 - 100;
+        assert_eq!(
+            metrics.total_event_count.load(Ordering::Relaxed),
+            expected_events
+        );
+        assert_eq!(
+            metrics.total_event_byte_size.load(Ordering::Relaxed),
+            expected_bytes
+        );
     }
 }
