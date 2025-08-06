@@ -276,6 +276,7 @@ impl BufferUsage {
                 for stage in &stages {
                     let max_size = stage.max_size.get();
                     emit(BufferCreated {
+                        buffer_id: buffer_id.clone(),
                         idx: stage.idx,
                         max_size_bytes: max_size.event_byte_size,
                         max_size_events: max_size

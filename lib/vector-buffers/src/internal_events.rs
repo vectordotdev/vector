@@ -18,6 +18,7 @@ fn u64_to_f64_safe(value: u64) -> f64 {
 }
 
 pub struct BufferCreated {
+    pub buffer_id: String,
     pub idx: usize,
     pub max_size_events: usize,
     pub max_size_bytes: u64,
@@ -26,12 +27,20 @@ pub struct BufferCreated {
 impl InternalEvent for BufferCreated {
     fn emit(self) {
         if self.max_size_events != 0 {
-            gauge!("buffer_max_event_size", "stage" => self.idx.to_string())
-                .set(u64_to_f64_safe(self.max_size_events as u64));
+            gauge!(
+                "buffer_max_event_size",
+                "buffer_id" => self.buffer_id.clone(),
+                "stage" => self.idx.to_string(),
+            )
+            .set(u64_to_f64_safe(self.max_size_events as u64));
         }
         if self.max_size_bytes != 0 {
-            gauge!("buffer_max_byte_size", "stage" => self.idx.to_string())
-                .set(u64_to_f64_safe(self.max_size_bytes));
+            gauge!(
+                "buffer_max_byte_size",
+                "buffer_id" => self.buffer_id,
+                "stage" => self.idx.to_string(),
+            )
+            .set(u64_to_f64_safe(self.max_size_bytes));
         }
     }
 }
