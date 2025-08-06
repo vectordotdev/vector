@@ -453,7 +453,7 @@ pub fn build_framestream_tcp_source(
 
         let request_limiter = RequestLimiter::new(
             MAX_IN_FLIGHT_EVENTS_TARGET,
-            frame_handler.max_frame_handling_tasks(),
+            frame_handler.max_frame_handling_tasks() as usize,
         );
 
         listener
