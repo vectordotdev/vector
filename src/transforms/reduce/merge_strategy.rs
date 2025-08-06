@@ -69,12 +69,8 @@ impl ReduceValueMerger for DiscardMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, self.v);
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, self.v.clone());
         Ok(())
     }
 }
@@ -99,12 +95,8 @@ impl ReduceValueMerger for RetainMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, self.v);
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, self.v.clone());
         Ok(())
     }
 }
@@ -143,12 +135,8 @@ impl ReduceValueMerger for ConcatMerger {
         }
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Bytes(self.v.into()));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Bytes(self.v.clone().into()));
         Ok(())
     }
 }
@@ -174,12 +162,8 @@ impl ReduceValueMerger for ConcatArrayMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -201,12 +185,8 @@ impl ReduceValueMerger for ArrayMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -237,12 +217,8 @@ impl ReduceValueMerger for LongestArrayMerger {
         }
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -273,12 +249,8 @@ impl ReduceValueMerger for ShortestArrayMerger {
         }
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Array(self.v.clone()));
         Ok(())
     }
 }
@@ -322,12 +294,8 @@ impl ReduceValueMerger for FlatUniqueMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
-        v.insert(path, Value::Array(self.v.into_iter().collect()));
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(path, Value::Array(self.v.clone().into_iter().collect()));
         Ok(())
     }
 }
@@ -360,11 +328,7 @@ impl ReduceValueMerger for TimestampWindowMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
         v.insert(
             format!("{path}_end").as_str(),
             Value::Timestamp(self.latest),
@@ -428,11 +392,7 @@ impl ReduceValueMerger for AddNumbersMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(path, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(path, Value::Integer(i)),
@@ -491,11 +451,7 @@ impl ReduceValueMerger for MaxNumberMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(path, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(path, Value::Integer(i)),
@@ -554,11 +510,7 @@ impl ReduceValueMerger for MinNumberMerger {
         Ok(())
     }
 
-    fn insert_into(
-        self: Box<Self>,
-        path: &OwnedTargetPath,
-        v: &mut LogEvent,
-    ) -> Result<(), String> {
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(path, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(path, Value::Integer(i)),
@@ -569,8 +521,7 @@ impl ReduceValueMerger for MinNumberMerger {
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
     fn add(&mut self, v: Value) -> Result<(), String>;
-    fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
-        -> Result<(), String>;
+    fn insert_into(&self, path: &OwnedTargetPath, v: &mut LogEvent) -> Result<(), String>;
 }
 
 dyn_clone::clone_trait_object!(ReduceValueMerger);
