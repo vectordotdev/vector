@@ -31,7 +31,7 @@ impl InternalEvent for PairExpansionError<'_> {
 
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: 1,
-                reason: "Failed to expand pair.",
+                reason: &message,
             });
         } else {
             warn!(
