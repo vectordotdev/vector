@@ -289,8 +289,8 @@ impl BufferUsage {
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: received.event_count,
-                            delta_byte_size: received.event_byte_size,
+                            count: received.event_count,
+                            byte_size: received.event_byte_size,
                             total_count: received.total_count,
                             total_byte_size: received.total_byte_size,
                         });
@@ -301,8 +301,8 @@ impl BufferUsage {
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: sent.event_count,
-                            delta_byte_size: sent.event_byte_size,
+                            count: sent.event_count,
+                            byte_size: sent.event_byte_size,
                             total_count: sent.total_count,
                             total_byte_size: sent.total_byte_size,
                         });
@@ -315,8 +315,8 @@ impl BufferUsage {
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
-                            delta_count: dropped.event_count,
-                            delta_byte_size: dropped.event_byte_size,
+                            count: dropped.event_count,
+                            byte_size: dropped.event_byte_size,
                             total_count: dropped.total_count,
                             total_byte_size: dropped.total_byte_size,
                         });
@@ -329,8 +329,8 @@ impl BufferUsage {
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
-                            delta_count: dropped_intentional.event_count,
-                            delta_byte_size: dropped_intentional.event_byte_size,
+                            count: dropped_intentional.event_count,
+                            byte_size: dropped_intentional.event_byte_size,
                             total_count: dropped_intentional.total_count,
                             total_byte_size: dropped_intentional.total_byte_size,
                         });

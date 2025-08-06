@@ -39,8 +39,8 @@ impl InternalEvent for BufferCreated {
 pub struct BufferEventsReceived {
     pub buffer_id: String,
     pub idx: usize,
-    pub delta_count: u64,
-    pub delta_byte_size: u64,
+    pub count: u64,
+    pub byte_size: u64,
     pub total_count: u64,
     pub total_byte_size: u64,
 }
@@ -51,13 +51,13 @@ impl InternalEvent for BufferEventsReceived {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.delta_count);
+        .increment(self.count);
 
         counter!("buffer_received_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.delta_byte_size);
+        .increment(self.byte_size);
         gauge!("buffer_events",
                "buffer_id" => self.buffer_id.clone(),
                "stage" => self.idx.to_string()
@@ -74,8 +74,8 @@ impl InternalEvent for BufferEventsReceived {
 pub struct BufferEventsSent {
     pub buffer_id: String,
     pub idx: usize,
-    pub delta_count: u64,
-    pub delta_byte_size: u64,
+    pub count: u64,
+    pub byte_size: u64,
     pub total_count: u64,
     pub total_byte_size: u64,
 }
@@ -86,11 +86,11 @@ impl InternalEvent for BufferEventsSent {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.delta_count);
+        .increment(self.count);
         counter!("buffer_sent_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string())
-        .increment(self.delta_byte_size);
+        .increment(self.byte_size);
         gauge!("buffer_events",
                "buffer_id" => self.buffer_id.clone(),
                "stage" => self.idx.to_string()
@@ -107,8 +107,8 @@ impl InternalEvent for BufferEventsSent {
 pub struct BufferEventsDropped {
     pub buffer_id: String,
     pub idx: usize,
-    pub delta_count: u64,
-    pub delta_byte_size: u64,
+    pub count: u64,
+    pub byte_size: u64,
     pub total_count: u64,
     pub total_byte_size: u64,
     pub intentional: bool,
@@ -121,8 +121,8 @@ impl InternalEvent for BufferEventsDropped {
         if self.intentional {
             debug!(
                 message = "Events dropped.",
-                count = %self.delta_count,
-                byte_size = %self.delta_byte_size,
+                count = %self.count,
+                byte_size = %self.byte_size,
                 intentional = %intentional_str,
                 reason = %self.reason,
                 buffer_id = %self.buffer_id,
@@ -131,8 +131,8 @@ impl InternalEvent for BufferEventsDropped {
         } else {
             error!(
                 message = "Events dropped.",
-                count = %self.delta_count,
-                byte_size = %self.delta_byte_size,
+                count = %self.count,
+                byte_size = %self.byte_size,
                 intentional = %intentional_str,
                 reason = %self.reason,
                 buffer_id = %self.buffer_id,
@@ -145,7 +145,7 @@ impl InternalEvent for BufferEventsDropped {
             "buffer_id" => self.buffer_id.clone(),
             "intentional" => intentional_str,
         )
-        .increment(self.delta_count);
+        .increment(self.count);
         gauge!("buffer_events",
                "buffer_id" => self.buffer_id.clone(),
                "stage" => self.idx.to_string()
