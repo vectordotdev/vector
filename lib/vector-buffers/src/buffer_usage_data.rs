@@ -268,8 +268,8 @@ impl BufferUsage {
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            count: received.event_count,
-                            byte_size: received.event_byte_size,
+                            delta_count: received.event_count,
+                            delta_byte_size: received.event_byte_size,
                         });
                     }
 
@@ -278,8 +278,8 @@ impl BufferUsage {
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            count: sent.event_count,
-                            byte_size: sent.event_byte_size,
+                            delta_count: sent.event_count,
+                            delta_byte_size: sent.event_byte_size,
                         });
                     }
 
@@ -290,8 +290,8 @@ impl BufferUsage {
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
-                            count: dropped.event_count,
-                            byte_size: dropped.event_byte_size,
+                            delta_count: dropped.event_count,
+                            delta_byte_size: dropped.event_byte_size,
                         });
                     }
 
@@ -302,8 +302,8 @@ impl BufferUsage {
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
-                            count: dropped_intentional.event_count,
-                            byte_size: dropped_intentional.event_byte_size,
+                            delta_count: dropped_intentional.event_count,
+                            delta_byte_size: dropped_intentional.event_byte_size,
                         });
                     }
                 }

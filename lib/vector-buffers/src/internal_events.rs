@@ -77,8 +77,8 @@ impl InternalEvent for BufferCreated {
 pub struct BufferEventsReceived {
     pub buffer_id: String,
     pub idx: usize,
-    pub count: u64,
-    pub byte_size: u64,
+    pub delta_count: u64,
+    pub delta_byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsReceived {
@@ -87,16 +87,20 @@ impl InternalEvent for BufferEventsReceived {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.count);
+        .increment(self.delta_count);
 
         counter!("buffer_received_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.byte_size);
+        .increment(self.delta_byte_size);
 
-        let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
+        let (new_events, new_bytes) = update_buffer_counters(
+            &self.buffer_id,
+            self.idx,
+            self.delta_count,
+            self.delta_byte_size,
+        );
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
@@ -104,8 +108,8 @@ impl InternalEvent for BufferEventsReceived {
 pub struct BufferEventsSent {
     pub buffer_id: String,
     pub idx: usize,
-    pub count: u64,
-    pub byte_size: u64,
+    pub delta_count: u64,
+    pub delta_byte_size: u64,
 }
 
 impl InternalEvent for BufferEventsSent {
@@ -114,15 +118,19 @@ impl InternalEvent for BufferEventsSent {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .increment(self.count);
+        .increment(self.delta_count);
 
         counter!("buffer_sent_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string())
-        .increment(self.byte_size);
+        .increment(self.delta_byte_size);
 
-        let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
+        let (new_events, new_bytes) = update_buffer_counters(
+            &self.buffer_id,
+            self.idx,
+            self.delta_count,
+            self.delta_byte_size,
+        );
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
@@ -130,8 +138,8 @@ impl InternalEvent for BufferEventsSent {
 pub struct BufferEventsDropped {
     pub buffer_id: String,
     pub idx: usize,
-    pub count: u64,
-    pub byte_size: u64,
+    pub delta_count: u64,
+    pub delta_byte_size: u64,
     pub intentional: bool,
     pub reason: &'static str,
 }
@@ -142,7 +150,7 @@ impl InternalEvent for BufferEventsDropped {
         if self.intentional {
             debug!(
                 message = "Events dropped.",
-                count = %self.count,
+                count = %self.delta_count,
                 intentional = %intentional_str,
                 reason = %self.reason,
                 buffer_id = %self.buffer_id,
@@ -151,7 +159,7 @@ impl InternalEvent for BufferEventsDropped {
         } else {
             error!(
                 message = "Events dropped.",
-                count = %self.count,
+                count = %self.delta_count,
                 intentional = %intentional_str,
                 reason = %self.reason,
                 buffer_id = %self.buffer_id,
@@ -164,10 +172,14 @@ impl InternalEvent for BufferEventsDropped {
             "buffer_id" => self.buffer_id.clone(),
             "intentional" => intentional_str,
         )
-        .increment(self.count);
+        .increment(self.delta_count);
 
-        let (new_events, new_bytes) =
-            update_buffer_counters(&self.buffer_id, self.idx, self.count, self.byte_size);
+        let (new_events, new_bytes) = update_buffer_counters(
+            &self.buffer_id,
+            self.idx,
+            self.delta_count,
+            self.delta_byte_size,
+        );
         emit_buffer_gauge(&self.buffer_id, self.idx, new_events, new_bytes);
     }
 }
