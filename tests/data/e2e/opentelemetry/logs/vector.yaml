@@ -68,7 +68,7 @@ sinks:
 
   otel_file_sink:
     type: file
-    path: "/tmp/vector-file-sink.log"
+    path: "/output/vector-file-sink.log"
     inputs:
       - remap_otel
     encoding:

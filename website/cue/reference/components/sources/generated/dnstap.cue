@@ -216,7 +216,7 @@ generated: components: sources: dnstap: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.
