@@ -200,6 +200,7 @@ jobs:
             blackhole sink
             clickhouse sink
             console sink
+            datadog_common sink
             datadog_archives sink
             datadog_events sink
             datadog_logs sink
