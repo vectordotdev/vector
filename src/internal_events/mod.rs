@@ -140,6 +140,11 @@ mod window;
 mod file;
 mod windows;
 
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+mod expansion;
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+pub use self::expansion::*;
+
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
