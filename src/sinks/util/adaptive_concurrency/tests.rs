@@ -321,6 +321,7 @@ enum Error {
 struct TestRetryLogic;
 
 impl RetryLogic for TestRetryLogic {
+    type Request = Vec<Event>;
     type Response = Response;
     type Error = Error;
 

@@ -561,7 +561,7 @@ mod tests {
         );
         sink.ordered();
 
-        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
+        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, vec![0]));
         sink.sink_map_err(drop)
             .send_all(
                 &mut stream::iter(input)
