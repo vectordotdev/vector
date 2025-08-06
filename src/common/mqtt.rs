@@ -41,6 +41,11 @@ pub struct MqttCommonConfig {
     #[derivative(Default(value = "default_keep_alive()"))]
     pub keep_alive: u16,
 
+    /// Maximum packet size
+    #[serde(default = "default_max_packet_size")]
+    #[derivative(Default(value = "default_max_packet_size()"))]
+    pub max_packet_size: usize,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
@@ -52,6 +57,10 @@ const fn default_port() -> u16 {
 
 const fn default_keep_alive() -> u16 {
     60
+}
+
+const fn default_max_packet_size() -> usize {
+    10 * 1024
 }
 
 /// MQTT Error Types
