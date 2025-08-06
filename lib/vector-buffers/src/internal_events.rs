@@ -47,23 +47,27 @@ pub struct BufferEventsReceived {
 
 impl InternalEvent for BufferEventsReceived {
     fn emit(self) {
-        counter!("buffer_received_events_total",
+        counter!(
+            "buffer_received_events_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.count);
 
-        counter!("buffer_received_bytes_total",
+        counter!(
+            "buffer_received_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
-        gauge!("buffer_events",
-               "buffer_id" => self.buffer_id.clone(),
-               "stage" => self.idx.to_string()
+        gauge!(
+            "buffer_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
         )
         .set(u64_to_f64_safe(self.total_count));
-        gauge!("buffer_byte_size",
+        gauge!(
+            "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
@@ -82,21 +86,25 @@ pub struct BufferEventsSent {
 
 impl InternalEvent for BufferEventsSent {
     fn emit(self) {
-        counter!("buffer_sent_events_total",
+        counter!(
+            "buffer_sent_events_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .increment(self.count);
-        counter!("buffer_sent_bytes_total",
+        counter!(
+            "buffer_sent_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string())
         .increment(self.byte_size);
-        gauge!("buffer_events",
-               "buffer_id" => self.buffer_id.clone(),
-               "stage" => self.idx.to_string()
+        gauge!(
+            "buffer_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
         )
         .set(u64_to_f64_safe(self.total_count));
-        gauge!("buffer_byte_size",
+        gauge!(
+            "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
@@ -146,12 +154,14 @@ impl InternalEvent for BufferEventsDropped {
             "intentional" => intentional_str,
         )
         .increment(self.count);
-        gauge!("buffer_events",
-               "buffer_id" => self.buffer_id.clone(),
-               "stage" => self.idx.to_string()
+        gauge!(
+            "buffer_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
         )
         .set(u64_to_f64_safe(self.total_count));
-        gauge!("buffer_byte_size",
+        gauge!(
+            "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
