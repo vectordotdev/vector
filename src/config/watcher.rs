@@ -132,10 +132,11 @@ pub fn spawn_thread<'a>(
                             _ = signal_tx.send(crate::signal::SignalTo::ReloadTables).map_err(|error| {
                                 error!(message = "Unable to reload enrichment tables.", cause = %error)
                             });
-                        }
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
+                        } else {
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
                             error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
                         });
+                        }
                     } else {
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
                             .map_err(|error| {
