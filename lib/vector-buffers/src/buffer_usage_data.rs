@@ -49,14 +49,14 @@ fn update_buffer_counters(
 
 /// Snapshot of category metrics.
 struct CategorySnapshot {
-    event_count: u64,
-    event_byte_size: u64,
+    delta_count: u64,
+    delta_byte_size: u64,
 }
 
 impl CategorySnapshot {
     /// Returns `true` if any of the values are non-zero.
     fn has_updates(&self) -> bool {
-        self.event_count > 0 || self.event_byte_size > 0
+        self.delta_count > 0 || self.delta_byte_size > 0
     }
 }
 
@@ -68,15 +68,15 @@ impl CategorySnapshot {
 /// both number of events, and their size as measured by the buffer.
 #[derive(Debug, Default)]
 struct CategoryMetrics {
-    event_count: AtomicU64,
-    event_byte_size: AtomicU64,
+    delta_count: AtomicU64,
+    delta_byte_size: AtomicU64,
 }
 
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.fetch_add(event_count, Ordering::Relaxed);
-        self.event_byte_size
+        self.delta_count.fetch_add(event_count, Ordering::Relaxed);
+        self.delta_byte_size
             .fetch_add(event_byte_size, Ordering::Relaxed);
     }
 
@@ -84,16 +84,16 @@ impl CategoryMetrics {
     ///
     /// Most updates are meant to be incremental, so this should be used sparingly.
     fn set(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.store(event_count, Ordering::Release);
-        self.event_byte_size
+        self.delta_count.store(event_count, Ordering::Release);
+        self.delta_byte_size
             .store(event_byte_size, Ordering::Release);
     }
 
     /// Gets a snapshot of the event count and event byte size.
     fn get(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.load(Ordering::Acquire),
-            event_byte_size: self.event_byte_size.load(Ordering::Acquire),
+            delta_count: self.delta_count.load(Ordering::Acquire),
+            delta_byte_size: self.delta_byte_size.load(Ordering::Acquire),
         }
     }
 
@@ -105,8 +105,8 @@ impl CategoryMetrics {
     /// track the last seen values.
     fn consume(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.swap(0, Ordering::AcqRel),
-            event_byte_size: self.event_byte_size.swap(0, Ordering::AcqRel),
+            delta_count: self.delta_count.swap(0, Ordering::AcqRel),
+            delta_byte_size: self.delta_byte_size.swap(0, Ordering::AcqRel),
         }
     }
 }
@@ -200,17 +200,17 @@ impl BufferUsageData {
         let max_size = self.max_size.get();
 
         BufferUsageSnapshot {
-            received_event_count: received.event_count,
-            received_byte_size: received.event_byte_size,
-            sent_event_count: sent.event_count,
-            sent_byte_size: sent.event_byte_size,
-            dropped_event_count: dropped.event_count,
-            dropped_event_byte_size: dropped.event_byte_size,
-            dropped_event_count_intentional: dropped_intentional.event_count,
-            dropped_event_byte_size_intentional: dropped_intentional.event_byte_size,
-            max_size_bytes: max_size.event_byte_size,
+            received_event_count: received.delta_count,
+            received_byte_size: received.delta_byte_size,
+            sent_event_count: sent.delta_count,
+            sent_byte_size: sent.delta_byte_size,
+            dropped_event_count: dropped.delta_count,
+            dropped_event_byte_size: dropped.delta_byte_size,
+            dropped_event_count_intentional: dropped_intentional.delta_count,
+            dropped_event_byte_size_intentional: dropped_intentional.delta_byte_size,
+            max_size_bytes: max_size.delta_byte_size,
             max_size_events: max_size
-                .event_count
+                .delta_count
                 .try_into()
                 .expect("should never be bigger than `usize`"),
         }
@@ -288,9 +288,9 @@ impl BufferUsage {
                     let max_size = stage.max_size.get();
                     emit(BufferCreated {
                         idx: stage.idx,
-                        max_size_bytes: max_size.event_byte_size,
+                        max_size_bytes: max_size.delta_byte_size,
                         max_size_events: max_size
-                            .event_count
+                            .delta_count
                             .try_into()
                             .expect("should never be bigger than `usize`"),
                     });
@@ -300,14 +300,14 @@ impl BufferUsage {
                         let (total_count, total_byte_size) = update_buffer_counters(
                             &buffer_id,
                             stage.idx,
-                            received.event_count,
-                            received.event_byte_size,
+                            received.delta_count,
+                            received.delta_byte_size,
                         );
                         emit(BufferEventsReceived {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: received.event_count,
-                            delta_byte_size: received.event_byte_size,
+                            delta_count: received.delta_count,
+                            delta_byte_size: received.delta_byte_size,
                             total_count,
                             total_byte_size,
                         });
@@ -318,14 +318,14 @@ impl BufferUsage {
                         let (total_count, total_byte_size) = update_buffer_counters(
                             &buffer_id,
                             stage.idx,
-                            received.event_count,
-                            received.event_byte_size,
+                            received.delta_count,
+                            received.delta_byte_size,
                         );
                         emit(BufferEventsSent {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
-                            delta_count: sent.event_count,
-                            delta_byte_size: sent.event_byte_size,
+                            delta_count: sent.delta_count,
+                            delta_byte_size: sent.delta_byte_size,
                             total_count,
                             total_byte_size,
                         });
@@ -336,16 +336,16 @@ impl BufferUsage {
                         let (total_count, total_byte_size) = update_buffer_counters(
                             &buffer_id,
                             stage.idx,
-                            received.event_count,
-                            received.event_byte_size,
+                            received.delta_count,
+                            received.delta_byte_size,
                         );
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
-                            delta_count: dropped.event_count,
-                            delta_byte_size: dropped.event_byte_size,
+                            delta_count: dropped.delta_count,
+                            delta_byte_size: dropped.delta_byte_size,
                             total_count,
                             total_byte_size,
                         });
@@ -356,16 +356,16 @@ impl BufferUsage {
                         let (total_count, total_byte_size) = update_buffer_counters(
                             &buffer_id,
                             stage.idx,
-                            received.event_count,
-                            received.event_byte_size,
+                            received.delta_count,
+                            received.delta_byte_size,
                         );
                         emit(BufferEventsDropped {
                             buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
-                            delta_count: dropped_intentional.event_count,
-                            delta_byte_size: dropped_intentional.event_byte_size,
+                            delta_count: dropped_intentional.delta_count,
+                            delta_byte_size: dropped_intentional.delta_byte_size,
                             total_count,
                             total_byte_size,
                         });
