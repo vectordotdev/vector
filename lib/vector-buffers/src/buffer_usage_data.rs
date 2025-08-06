@@ -46,7 +46,11 @@ struct CategoryMetrics {
 
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
-    fn increment(&self, event_count: u64, event_byte_size: u64, is_addition: bool) {
+    /// is_addition: true: This is for events being received.
+    /// It tells the function to fetch_add the values to the permanent gauge totals. This increases the buffer size.
+    /// is_addition: false: This is for events being sent or dropped.
+    /// It tells the function to fetch_sub the values from the permanent gauge totals. This decreases the buffer size.
+    fn record_usage(&self, event_count: u64, event_byte_size: u64, is_addition: bool) {
         self.event_count.fetch_add(event_count, Ordering::Relaxed);
         self.event_byte_size
             .fetch_add(event_byte_size, Ordering::Relaxed);
@@ -136,14 +140,14 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.received.increment(count, byte_size, true);
+        self.state.received.record_usage(count, byte_size, true);
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.sent.increment(count, byte_size, false);
+        self.state.sent.record_usage(count, byte_size, false);
     }
 
     /// Increment the number of dropped events (and their total size) for this buffer component.
@@ -156,9 +160,9 @@ impl BufferUsageHandle {
         if intentional {
             self.state
                 .dropped_intentional
-                .increment(count, byte_size, false);
+                .record_usage(count, byte_size, false);
         } else {
-            self.state.dropped.increment(count, byte_size, false);
+            self.state.dropped.record_usage(count, byte_size, false);
         }
     }
 }
@@ -388,7 +392,7 @@ mod tests {
     #[test]
     fn category_metrics_increment_addition() {
         let metrics = CategoryMetrics::default();
-        metrics.increment(10, 1024, true);
+        metrics.record_usage(10, 1024, true);
 
         let snapshot = metrics.consume();
         assert_eq!(snapshot.event_count, 10);
@@ -408,7 +412,7 @@ mod tests {
     #[test]
     fn category_metrics_increment_subtraction() {
         let metrics = CategoryMetrics::default();
-        metrics.increment(5, 512, false);
+        metrics.record_usage(5, 512, false);
 
         let snapshot = metrics.consume();
         assert_eq!(snapshot.event_count, 5);
@@ -421,9 +425,9 @@ mod tests {
     #[test]
     fn category_metrics_increment_mixed() {
         let metrics = CategoryMetrics::default();
-        metrics.increment(100, 1000, true);
-        metrics.increment(20, 200, false);
-        metrics.increment(10, 100, false);
+        metrics.record_usage(100, 1000, true);
+        metrics.record_usage(20, 200, false);
+        metrics.record_usage(10, 100, false);
 
         let snapshot = metrics.consume();
         assert_eq!(snapshot.event_count, 130);
