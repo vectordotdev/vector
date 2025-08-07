@@ -76,7 +76,7 @@ impl Default for BatchConfig {
     }
 }
 
-/// JetStream-specific configuration.
+/// Configuration for NATS JetStream..
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct JetStreamConfig {
