@@ -18,7 +18,7 @@ pub enum RetryAction<Request = ()> {
     /// Indicate that this request should be retried with a reason
     Retry(Cow<'static, str>),
     /// Indicate that a portion of this request should be retried with a generic function
-    RetryPartial(Box<dyn FnOnce(Request) -> Request + Send + Sync>),
+    RetryPartial(Box<dyn Fn(Request) -> Request + Send + Sync>),
     /// Indicate that this request should not be retried with a reason
     DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
