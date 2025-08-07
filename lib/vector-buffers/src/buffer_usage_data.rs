@@ -242,10 +242,8 @@ impl BufferUsage {
     /// The `buffer_id` should be a unique name -- ideally the `component_id` of the sink using this buffer -- but is
     /// not used for anything other than reporting, and so has no _requirement_ to be unique.
     pub fn install(self, buffer_id: &str) {
-        let buffer_id = buffer_id.to_string();
         let span = self.span;
         let stages = self.stages;
-        let task_name = format!("buffer usage reporter ({buffer_id})");
 
         let task = async move {
             let mut interval = interval(Duration::from_secs(2));
@@ -266,7 +264,6 @@ impl BufferUsage {
                     let received = stage.received.consume();
                     if received.has_updates() {
                         emit(BufferEventsReceived {
-                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: received.event_count,
                             byte_size: received.event_byte_size,
@@ -276,7 +273,6 @@ impl BufferUsage {
                     let sent = stage.sent.consume();
                     if sent.has_updates() {
                         emit(BufferEventsSent {
-                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: sent.event_count,
                             byte_size: sent.event_byte_size,
@@ -286,7 +282,6 @@ impl BufferUsage {
                     let dropped = stage.dropped.consume();
                     if dropped.has_updates() {
                         emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
@@ -298,7 +293,6 @@ impl BufferUsage {
                     let dropped_intentional = stage.dropped_intentional.consume();
                     if dropped_intentional.has_updates() {
                         emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
@@ -310,6 +304,7 @@ impl BufferUsage {
             }
         };
 
+        let task_name = format!("buffer usage reporter ({buffer_id})");
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
     }
 }
