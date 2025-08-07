@@ -5,9 +5,9 @@ use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::tls::TlsEnableableConfig;
 
-use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
+use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
-    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
 use async_nats::HeaderMap;
