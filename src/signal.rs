@@ -22,7 +22,7 @@ pub enum SignalTo {
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
     /// Signal to reload all enricment tables.
-    ReloadTables,
+    ReloadEnrichmentTables,
     /// Signal to shutdown process.
     Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
