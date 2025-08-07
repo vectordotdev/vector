@@ -89,14 +89,14 @@ pub enum ComponentType {
 pub struct ComponentConfig {
     pub config_paths: Vec<PathBuf>,
     pub component_key: ComponentKey,
-    pub component_type: WatchedComponentType,
+    pub component_type: ComponentType,
 }
 
 impl ComponentConfig {
     pub fn new(
         config_paths: Vec<PathBuf>,
         component_key: ComponentKey,
-        component_type: WatchedComponentType,
+        component_type: ComponentType,
     ) -> Self {
         let canonicalized_paths = config_paths
             .into_iter()
@@ -110,10 +110,7 @@ impl ComponentConfig {
         }
     }
 
-    pub fn contains(
-        &self,
-        config_paths: &[PathBuf],
-    ) -> Option<(ComponentKey, WatchedComponentType)> {
+    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<(ComponentKey, ComponentType)> {
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
             return Some((self.component_key.clone(), self.component_type.clone()));
         }

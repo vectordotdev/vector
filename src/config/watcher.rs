@@ -1,4 +1,4 @@
-use crate::config::{ComponentConfig, WatchedComponentType};
+use crate::config::{ComponentConfig, ComponentType};
 use std::collections::HashMap;
 use std::{
     path::{Path, PathBuf},
@@ -61,7 +61,7 @@ impl Watcher {
     }
 }
 
-/// Sends a ReloadFromDisk or ReloadTables on config_path changes.
+/// Sends a ReloadFromDisk or ReloadEnrichmentTables on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
@@ -126,10 +126,10 @@ pub fn spawn_thread<'a>(
                         );
                         if changed_components
                             .iter()
-                            .all(|(_, t)| *t == WatchedComponentType::EnrichmentTable)
+                            .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                         {
                             info!("Only enrichment tables have changed.",);
-                            _ = signal_tx.send(crate::signal::SignalTo::ReloadTables).map_err(|error| {
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
                                 error!(message = "Unable to reload enrichment tables.", cause = %error)
                             });
                         } else {
@@ -237,7 +237,7 @@ mod tests {
         let component_config = ComponentConfig::new(
             component_file_path.clone(),
             http_component.clone(),
-            WatchedComponentType::Sink,
+            ComponentType::Sink,
         );
 
         let (signal_tx, signal_rx) = broadcast::channel(128);

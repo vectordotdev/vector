@@ -27,7 +27,7 @@ use crate::{
     },
     trace,
 };
-use crate::{config::WatchedComponentType, extra_context::ExtraContext};
+use crate::{config::ComponentType, extra_context::ExtraContext};
 
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -379,7 +379,7 @@ async fn handle_signal(
 
             reload_config_from_result(topology_controller, new_config).await
         }
-        Ok(SignalTo::ReloadTables) => {
+        Ok(SignalTo::ReloadEnrichmentTables) => {
             let topology_controller = topology_controller.lock().await;
 
             topology_controller
@@ -547,7 +547,7 @@ pub async fn load_configs(
             let component_config = ComponentConfig::new(
                 files.into_iter().cloned().collect(),
                 name.clone(),
-                WatchedComponentType::Transform,
+                ComponentType::Transform,
             );
             watched_component_paths.push(component_config);
         }
@@ -557,7 +557,7 @@ pub async fn load_configs(
             let component_config = ComponentConfig::new(
                 files.into_iter().cloned().collect(),
                 name.clone(),
-                WatchedComponentType::Sink,
+                ComponentType::Sink,
             );
             watched_component_paths.push(component_config);
         }
@@ -567,7 +567,7 @@ pub async fn load_configs(
             let component_config = ComponentConfig::new(
                 files.into_iter().cloned().collect(),
                 name.clone(),
-                WatchedComponentType::EnrichmentTable,
+                ComponentType::EnrichmentTable,
             );
             watched_component_paths.push(component_config);
         }
