@@ -439,9 +439,8 @@ impl PingManager {
     }
 }
 
-#[cfg(feature = "websocket-integration-tests")]
 #[cfg(test)]
-mod integration_test {
+mod tests {
     use crate::test_util::components::run_and_assert_source_error;
     use crate::{
         common::websocket::WebSocketCommonConfig,
