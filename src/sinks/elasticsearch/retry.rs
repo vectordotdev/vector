@@ -1,13 +1,19 @@
-use http::StatusCode;
-use serde::Deserialize;
-
+use crate::sinks::{
+    elasticsearch::encoder::ProcessedEvent,
+    util::{metadata::RequestMetadataBuilder, request_builder::RequestBuilder},
+};
 use crate::{
+    event::Finalizable,
     http::HttpError,
     sinks::{
-        elasticsearch::service::ElasticsearchResponse,
-        util::retries::{RetryAction, RetryLogic},
+        elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
+        util::retries::{RetryAction, RetryLogic, RetryPartialFunction},
     },
 };
+use http::StatusCode;
+use serde::Deserialize;
+use vector_lib::json_size::JsonSize;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -86,6 +92,23 @@ pub struct ElasticsearchRetryLogic {
     pub retry_partial: bool,
 }
 
+// construct a closure by EsRetryClosure { closure: Box::new(|req: ElasticsearchRequest| { new_req }) }
+struct EsRetryClosure {
+    closure: Box<dyn Fn(ElasticsearchRequest) -> ElasticsearchRequest + Send + Sync>,
+}
+
+impl RetryPartialFunction for EsRetryClosure {
+    fn modify_request(&self, request: Box<dyn std::any::Any>) -> Box<dyn std::any::Any> {
+        match request.downcast::<ElasticsearchRequest>() {
+            Ok(request) => {
+                let new_request = (self.closure)(*request);
+                Box::new(new_request)
+            }
+            Err(request) => request,
+        }
+    }
+}
+
 impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
     type Response = ElasticsearchResponse;
@@ -124,21 +147,57 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                 // We will retry if there exists at least one item that
                                 // failed with a retriable error.
                                 // Those are backpressure and server errors.
-                                if let Some((status, error)) =
+                                let status_codes: Vec<bool> = resp
+                                    .iter_status()
+                                    .map(|(status, _)| {
+                                        status == StatusCode::TOO_MANY_REQUESTS
+                                            || status.is_server_error()
+                                    })
+                                    .collect();
+                                if let Some((_status, _error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
                                             || status.is_server_error()
                                     })
                                 {
-                                    let msg = if let Some(error) = error {
-                                        format!(
-                                            "partial error, status: {}, error type: {}, reason: {}",
-                                            status, error.err_type, error.reason
-                                        )
-                                    } else {
-                                        format!("partial error, status: {status}")
-                                    };
-                                    return RetryAction::Retry(msg.into());
+                                    return RetryAction::RetryPartial(Box::new(EsRetryClosure {
+                                        closure: Box::new(move |req: ElasticsearchRequest| {
+                                            let mut failed_events: Vec<ProcessedEvent> = req
+                                                .original_events
+                                                .clone()
+                                                .into_iter()
+                                                .zip(status_codes.iter())
+                                                .filter(|(_, &flag)| flag)
+                                                .map(|(item, _)| item)
+                                                .collect();
+                                            let finalizers = failed_events.take_finalizers();
+                                            let batch_size = failed_events.len();
+                                            let events_byte_size = failed_events
+                                                .iter()
+                                                .map(|x| x.log.estimated_json_encoded_size_of())
+                                                .fold(JsonSize::zero(), |a, b| a + b);
+                                            let encode_result = match req
+                                                .elasticsearch_request_builder
+                                                .encode_events(failed_events.clone())
+                                            {
+                                                Ok(s) => s,
+                                                Err(_) => return req,
+                                            };
+                                            let metadata_builder =
+                                                RequestMetadataBuilder::from_events(&failed_events);
+                                            let metadata = metadata_builder.build(&encode_result);
+                                            ElasticsearchRequest {
+                                                payload: encode_result.into_payload(),
+                                                finalizers,
+                                                batch_size,
+                                                events_byte_size,
+                                                metadata,
+                                                original_events: failed_events,
+                                                elasticsearch_request_builder: req
+                                                    .elasticsearch_request_builder,
+                                            }
+                                        }),
+                                    }));
                                 }
                             }
 
@@ -201,7 +260,7 @@ mod tests {
                 event_status: EventStatus::Errored,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
-            RetryAction::Retry(_)
+            RetryAction::RetryPartial(_)
         ));
     }
 
