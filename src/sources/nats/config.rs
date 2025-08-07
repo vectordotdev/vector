@@ -47,7 +47,7 @@ pub enum BuildError {
 ///
 /// **Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct BatchConfig {
     /// The maximum number of messages to pull in a single batch.
     #[serde(default = "default_batch")]
@@ -67,6 +67,15 @@ const fn default_max_bytes() -> usize {
     0
 }
 
+impl Default for BatchConfig {
+    fn default() -> Self {
+        Self {
+            batch: default_batch(),
+            max_bytes: default_max_bytes(),
+        }
+    }
+}
+
 /// JetStream-specific configuration.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
@@ -76,8 +85,9 @@ pub struct JetStreamConfig {
     /// The name of the durable consumer to pull from.
     pub consumer: String,
 
+    #[serde(default)]
     #[configurable(derived)]
-    pub batch: BatchConfig,
+    pub batch_config: BatchConfig,
 }
 
 /// Configuration for the `nats` source.
@@ -195,13 +205,16 @@ impl SourceConfig for NatsSourceConfig {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
                 let js = async_nats::jetstream::new(connection.clone());
-                let stream = js.get_stream(&js_config.stream).await.context(StreamSnafu)?;
+                let stream = js
+                    .get_stream(&js_config.stream)
+                    .await
+                    .context(StreamSnafu)?;
                 let consumer: PullConsumer = stream
                     .get_consumer(&js_config.consumer)
                     .await
                     .context(ConsumerSnafu)?;
 
-                let batch_config = js_config.batch.clone();
+                let batch_config = js_config.batch_config.clone();
 
                 let messages = consumer
                     .stream()
