@@ -266,7 +266,11 @@ enum TransformError {
         error: ParseFloatError,
     },
     TemplateRenderingError(TemplateRenderingError),
-    PairExpansionError,
+    PairExpansionError {
+        key: String,
+        value: String,
+        error: serde_json::Error,
+    },
 }
 
 fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
@@ -333,7 +337,7 @@ fn render_tag_into(
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
-    let key_s = match render_template(key_template, event) {
+    let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
             emit!(crate::internal_events::TemplateRenderingError {
@@ -347,12 +351,12 @@ fn render_tag_into(
     };
     match value_template {
         None => {
-            result.insert(key_s, TagValue::Bare);
+            result.insert(key, TagValue::Bare);
         }
         Some(template) => match render_template(template, event) {
-            Ok(value_s) => {
-                let expanded_pairs = pair_expansion(&key_s, &value_s, static_tags, dynamic_tags)
-                    .map_err(|_| TransformError::PairExpansionError)?;
+            Ok(value) => {
+                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags)
+                    .map_err(|error| TransformError::PairExpansionError { key, value, error })?;
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
@@ -886,6 +890,14 @@ impl FunctionTransform for LogToMetric {
                         TransformError::MetricDetailsNotFound => {
                             emit!(MetricMetadataMetricDetailsNotFoundError {})
                         }
+                        TransformError::PairExpansionError { key, value, error } => {
+                            emit!(crate::internal_events::PairExpansionError {
+                                key: &key,
+                                value: &value,
+                                drop_event: true,
+                                error
+                            })
+                        }
                         _ => {}
                     };
                 }
@@ -919,6 +931,14 @@ impl FunctionTransform for LogToMetric {
                                     error,
                                     drop_event: true,
                                     field: None,
+                                })
+                            }
+                            TransformError::PairExpansionError { key, value, error } => {
+                                emit!(crate::internal_events::PairExpansionError {
+                                    key: &key,
+                                    value: &value,
+                                    drop_event: true,
+                                    error
                                 })
                             }
                             _ => {}
