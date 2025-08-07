@@ -253,3 +253,4 @@ jobs:
             website deps
 
             config provider
+            opentelemetry lib
