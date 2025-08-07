@@ -262,8 +262,9 @@ impl SourceConfig for NatsSourceConfig {
         )]
     }
 
+    // Acknowledgment is only possible with Jetstream.
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
