@@ -304,14 +304,21 @@ impl GlobalOptions {
     /// and comparing their top-level keys.
     ///
     /// Useful for logging which global fields changed during config reload attempts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`serde_json::Error`] if either of the [`GlobalOptions`] values
+    /// cannot be serialized into a JSON object. This is unlikely under normal usage,
+    /// but may occur if serialization fails due to unexpected data structures or changes
+    /// in the type definition.
     pub fn diff(&self, other: &Self) -> Result<Vec<String>, serde_json::Error> {
-        let old_value = serde_json::to_value(old)?;
-        let new_value = serde_json::to_value(new)?;
+        let old_value = serde_json::to_value(self)?;
+        let new_value = serde_json::to_value(other)?;
 
-        let Value::Object(old_map) = old_value else {
+        let serde_json::Value::Object(old_map) = old_value else {
             return Ok(vec![]);
         };
-        let Value::Object(new_map) = new_value else {
+        let serde_json::Value::Object(new_map) = new_value else {
             return Ok(vec![]);
         };
 
@@ -451,8 +458,7 @@ mod tests {
             data_dir: Some(std::path::PathBuf::from("/path2")),
             ..Default::default()
         };
-        let diff = old.diff(&new);
-        assert_eq!(diff, Ok(vec!["data_dir"]));
+        assert_eq!(old.diff(&new), Ok(vec!["data_dir".to_string()]));
     }
 
     fn merge<P: Debug, T>(
