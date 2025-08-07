@@ -90,6 +90,8 @@ pub mod statsd;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
+#[cfg(feature = "sources-websocket")]
+pub mod websocket;
 
 pub mod util;
 

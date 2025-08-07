@@ -62,7 +62,7 @@ pub struct DnstapConfig {
     pub multithreaded: Option<bool>,
 
     /// Maximum number of frames that can be processed concurrently.
-    pub max_frame_handling_tasks: Option<u32>,
+    pub max_frame_handling_tasks: Option<usize>,
 
     /// Whether to downcase all DNSTAP hostnames received for consistency
     #[serde(default = "crate::serde::default_false")]
@@ -222,7 +222,7 @@ struct CommonFrameHandler {
     content_type: String,
     raw_data_only: bool,
     multithreaded: bool,
-    max_frame_handling_tasks: u32,
+    max_frame_handling_tasks: usize,
     host_key: Option<OwnedValuePath>,
     timestamp_key: Option<OwnedValuePath>,
     source_type_key: Option<OwnedValuePath>,
@@ -327,7 +327,7 @@ impl FrameHandler for CommonFrameHandler {
         self.multithreaded
     }
 
-    fn max_frame_handling_tasks(&self) -> u32 {
+    fn max_frame_handling_tasks(&self) -> usize {
         self.max_frame_handling_tasks
     }
 

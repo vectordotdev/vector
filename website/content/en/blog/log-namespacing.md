@@ -10,6 +10,10 @@ badges:
 tags: []
 ---
 
+{{< info >}}
+Please visit our [log namespace guide](/guides/level-up/log_namespace/) for more details.
+{{< /info >}}
+
 The Vector team has been hard at work improving the data model of events in Vector. These
 changes are now available for beta testing for those who want to try it out and give feedback.
 This is an opt-in feature. Nothing should change unless you specifically enable it.
@@ -166,5 +170,3 @@ be used.
 [global log schema]: /docs/reference/configuration/global-options/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
 [remap]: /docs/reference/configuration/transforms/remap/
-
-[//]: # ([global config]: /docs/reference/configuration/global-options/#schema.log_namespace) TODO FIX

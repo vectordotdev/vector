@@ -59,7 +59,7 @@ transforms:
     inputs:
       - vector_logs
     source: |
-      .timestamp = to_unix_timestamp!(to_timestamp!(.timestamp))
+      .timestamp = to_unix_timestamp!(.timestamp)
 
 sinks:
   database:

@@ -73,7 +73,7 @@ default-features = false
 features = ["full"]
 
 [dev-dependencies]
-criterion = "0.6"
+criterion = "0.7"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

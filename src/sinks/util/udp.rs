@@ -18,14 +18,12 @@ use super::{
 };
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::Event,
     internal_events::{UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError},
     net,
-    sinks::{
-        util::{retries::ExponentialBackoff, StreamSink},
-        Healthcheck, VectorSink,
-    },
+    sinks::{util::StreamSink, Healthcheck, VectorSink},
 };
 
 #[derive(Debug, Snafu)]

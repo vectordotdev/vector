@@ -46,13 +46,15 @@ const ORIGIN_SERVICE_VALUE: u32 = 3;
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
     /// A list of metrics to generate.
-    pub metrics: Vec<MetricConfig>,
-    /// Setting this flag changes the behavior of this transformation.<br />
-    /// <p>Notably the `metrics` field will be ignored.</p>
-    /// <p>All incoming events will be processed and if possible they will be converted to log events.
-    /// Otherwise, only items specified in the 'metrics' field will be processed.</p>
-    /// <pre class="chroma"><code class="language-toml" data-lang="toml">use serde_json::json;
-    /// let json_event = json!({
+    pub metrics: Option<Vec<MetricConfig>>,
+
+    /// Setting this flag changes the behavior of this transformation.
+    /// Notably the `metrics` field will be ignored.
+    /// All incoming events will be processed and if possible they will be converted to log events.
+    /// Otherwise, only items specified in the `metrics` field will be processed.
+    ///
+    /// Example:
+    /// <pre class="chroma"><code class="language-toml" data-lang="toml">{
     ///     "counter": {
     ///         "value": 10.0
     ///     },
@@ -62,10 +64,10 @@ pub struct LogToMetricConfig {
     ///         "env": "test_env",
     ///         "host": "localhost"
     ///     }
-    /// });
+    /// }
     /// </code></pre>
     ///
-    /// This is an example JSON representation of a counter with the following properties:
+    /// This is a JSON representation of a counter with the following properties:
     ///
     /// - `counter`: An object with a single property `value` representing the counter value, in this case, `10.0`).
     /// - `kind`: A string indicating the kind of counter, in this case, "incremental".
@@ -173,13 +175,14 @@ const fn default_kind() -> MetricKind {
 
 #[derive(Debug, Clone)]
 pub struct LogToMetric {
-    config: LogToMetricConfig,
+    pub metrics: Vec<MetricConfig>,
+    pub all_metrics: bool,
 }
 
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            metrics: vec![MetricConfig {
+            metrics: Some(vec![MetricConfig {
                 field: "field_name".try_into().expect("Fixed template"),
                 name: None,
                 namespace: None,
@@ -188,7 +191,7 @@ impl GenerateConfig for LogToMetricConfig {
                     increment_by_value: false,
                     kind: MetricKind::Incremental,
                 }),
-            }],
+            }]),
             all_metrics: Some(true),
         })
         .unwrap()
@@ -199,7 +202,10 @@ impl GenerateConfig for LogToMetricConfig {
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(LogToMetric::new(self.clone())))
+        Ok(Transform::function(LogToMetric {
+            metrics: self.metrics.clone().unwrap_or_default(),
+            all_metrics: self.all_metrics.unwrap_or_default(),
+        }))
     }
 
     fn input(&self) -> Input {
@@ -218,12 +224,6 @@ impl TransformConfig for LogToMetricConfig {
 
     fn enable_concurrency(&self) -> bool {
         true
-    }
-}
-
-impl LogToMetric {
-    pub const fn new(config: LogToMetricConfig) -> Self {
-        LogToMetric { config }
     }
 }
 
@@ -266,7 +266,11 @@ enum TransformError {
         error: ParseFloatError,
     },
     TemplateRenderingError(TemplateRenderingError),
-    PairExpansionError,
+    PairExpansionError {
+        key: String,
+        value: String,
+        error: serde_json::Error,
+    },
 }
 
 fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
@@ -333,7 +337,7 @@ fn render_tag_into(
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
-    let key_s = match render_template(key_template, event) {
+    let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
             emit!(crate::internal_events::TemplateRenderingError {
@@ -347,12 +351,12 @@ fn render_tag_into(
     };
     match value_template {
         None => {
-            result.insert(key_s, TagValue::Bare);
+            result.insert(key, TagValue::Bare);
         }
         Some(template) => match render_template(template, event) {
-            Ok(value_s) => {
-                let expanded_pairs = pair_expansion(&key_s, &value_s, static_tags, dynamic_tags)
-                    .map_err(|_| TransformError::PairExpansionError)?;
+            Ok(value) => {
+                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags)
+                    .map_err(|error| TransformError::PairExpansionError { key, value, error })?;
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
@@ -858,12 +862,8 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         // Metrics are "all or none" for a specific log. If a single fails, none are produced.
-        let mut buffer = Vec::with_capacity(self.config.metrics.len());
-        if self
-            .config
-            .all_metrics
-            .is_some_and(|all_metrics| all_metrics)
-        {
+        let mut buffer = Vec::with_capacity(self.metrics.len());
+        if self.all_metrics {
             match to_metrics(&event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
@@ -890,12 +890,20 @@ impl FunctionTransform for LogToMetric {
                         TransformError::MetricDetailsNotFound => {
                             emit!(MetricMetadataMetricDetailsNotFoundError {})
                         }
+                        TransformError::PairExpansionError { key, value, error } => {
+                            emit!(crate::internal_events::PairExpansionError {
+                                key: &key,
+                                value: &value,
+                                drop_event: true,
+                                error
+                            })
+                        }
                         _ => {}
                     };
                 }
             }
         } else {
-            for config in self.config.metrics.iter() {
+            for config in self.metrics.iter() {
                 match to_metric_with_config(config, &event) {
                     Ok(metric) => {
                         buffer.push(Event::Metric(metric));
@@ -923,6 +931,14 @@ impl FunctionTransform for LogToMetric {
                                     error,
                                     drop_event: true,
                                     field: None,
+                                })
+                            }
+                            TransformError::PairExpansionError { key, value, error } => {
+                                emit!(crate::internal_events::PairExpansionError {
+                                    key: &key,
+                                    value: &value,
+                                    drop_event: true,
+                                    error
                                 })
                             }
                             _ => {}
@@ -1819,12 +1835,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_gauge() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "gauge": {
@@ -1858,12 +1872,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_histogram() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "histogram": {
@@ -1937,12 +1949,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_histogram() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "distribution": {
@@ -1998,12 +2008,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_distribution_summary() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "distribution": {
@@ -2059,12 +2067,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_summary() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "summary": {
@@ -2122,12 +2128,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_counter() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "counter": {
@@ -2161,12 +2165,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_set() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "set": {
@@ -2202,12 +2204,10 @@ mod tests {
 
     #[tokio::test]
     async fn transform_all_metrics_optional_namespace() {
-        let config = parse_yaml_config(
-            r"
-            metrics: []
-            all_metrics: true
-            ",
-        );
+        let config = LogToMetricConfig {
+            metrics: None,
+            all_metrics: Some(true),
+        };
 
         let json_str = r#"{
           "counter": {

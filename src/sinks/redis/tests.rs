@@ -24,6 +24,7 @@ fn redis_log_event_json() {
     let result = encode_event(
         evt.into(),
         "key".to_string(),
+        None,
         &Default::default(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
@@ -42,6 +43,7 @@ fn redis_log_event_text() {
     let event = encode_event(
         evt.into(),
         "key".to_string(),
+        None,
         &Default::default(),
         &mut Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         &mut byte_size,
@@ -61,6 +63,7 @@ fn redis_log_encode_event() {
     let result = encode_event(
         evt.into(),
         "key".to_string(),
+        None,
         &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
@@ -84,6 +87,7 @@ fn redis_metric_encode_event() {
     let result = encode_event(
         metric.into(),
         "metrics.counter".to_string(),
+        None,
         &Default::default(),
         &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         &mut byte_size,
@@ -96,4 +100,25 @@ fn redis_metric_encode_event() {
     assert_eq!(json["name"], "test_counter");
     assert_eq!(json["kind"], "absolute");
     assert_eq!(json["counter"]["value"], 42.0);
+}
+
+#[test]
+fn redis_log_scoring() {
+    let msg = "hello_world";
+    let mut evt = LogEvent::from(msg);
+    let mut byte_size = GroupedCountByteSize::new_untagged();
+    evt.insert("key", "value");
+
+    let result = encode_event(
+        evt.into(),
+        "key".to_string(),
+        Some(64),
+        &Default::default(),
+        &mut Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+        &mut byte_size,
+    )
+    .unwrap()
+    .score;
+
+    assert_eq!(result, Some(64));
 }

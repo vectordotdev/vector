@@ -15,10 +15,11 @@ use std::{
 use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
 
 use crate::{
+    common::backoff::ExponentialBackoff,
     internal_events::{
         SocketOutgoingConnectionError, TcpSocketConnectionEstablished, UdpSendIncompleteError,
     },
-    sinks::{util::retries::ExponentialBackoff, Healthcheck},
+    sinks::Healthcheck,
 };
 
 #[cfg(unix)]

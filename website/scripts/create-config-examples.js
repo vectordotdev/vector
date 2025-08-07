@@ -158,22 +158,22 @@ const setExampleValue = (exampleConfig, paramName, param) => {
   });
 }
 
-// Assemble the "common" params for an example config
-const makeCommonParams = (configuration) => {
-  var common = {};
+// Assemble the "minimal" params for an example config
+const makeMinimalParams = (configuration) => {
+  var minimal = {};
 
   for (const paramName in configuration) {
     if (paramName != "type") {
       const param = configuration[paramName];
 
-      // Restrict to common params only
-      if (param.common || param.required) {
-        setExampleValue(common, paramName, param);
+      // Restrict to minimal params only
+      if (param.minimal || param.required) {
+        setExampleValue(minimal, paramName, param);
       }
     }
   }
 
-  return common;
+  return minimal;
 }
 
 // Assemble the "advanced" params for an example config
@@ -282,30 +282,30 @@ const main = () => {
         const component = componentsOfKind[componentType];
         const configuration = component.configuration;
 
-        const commonParams = Object.makeExampleParams(
+        const minimalParams = Object.makeExampleParams(
           configuration,
-          p => p.required || p.common,
-          p => p.required || p.common,
+            p => p.required || p.minimal,
+            p => p.required || p.minimal,
         );
         const advancedParams = Object.makeExampleParams(
           configuration,
           _ => true,
-          p => p.required || p.common || p.relevant_when,
+            p => p.required || p.minimal || p.relevant_when,
         );
         const useCaseExamples = makeUseCaseExamples(component);
 
         const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
 
-        let commonExampleConfig, advancedExampleConfig;
+        let minimalExampleConfig, advancedExampleConfig;
 
         // Sinks and transforms are treated differently because they need an `inputs` field
         if (['sinks', 'transforms'].includes(kind)) {
-          commonExampleConfig = {
+          minimalExampleConfig = {
             [kind]: {
               [keyName]: {
                 "type": componentType,
                 inputs: ['my-source-or-transform-id'],
-                ...commonParams,
+                ...minimalParams,
               }
             }
           };
@@ -320,11 +320,11 @@ const main = () => {
             }
           };
         } else {
-          commonExampleConfig = {
+          minimalExampleConfig = {
             [kind]: {
               [keyName]: {
                 "type": componentType,
-                ...commonParams,
+                ...minimalParams,
               }
             }
           };
@@ -342,10 +342,10 @@ const main = () => {
         docs['components'][kind][componentType]['examples'] = useCaseExamples;
 
         docs['components'][kind][componentType]['example_configs'] = {
-          common: {
-            toml: toToml(commonExampleConfig),
-            yaml: toYaml(commonExampleConfig),
-            json: toJson(commonExampleConfig),
+          minimal: {
+            toml: toToml(minimalExampleConfig),
+            yaml: toYaml(minimalExampleConfig),
+            json: toJson(minimalExampleConfig),
           },
           advanced: {
             toml: toToml(advancedExampleConfig),

@@ -395,6 +395,11 @@ generated: components: sinks: mqtt: configuration: {
 		required:    false
 		type: uint: default: 60
 	}
+	max_packet_size: {
+		description: "Maximum packet size"
+		required:    false
+		type: uint: default: 10240
+	}
 	password: {
 		description: "MQTT password."
 		required:    false

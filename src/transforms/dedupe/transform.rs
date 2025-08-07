@@ -46,7 +46,7 @@ type TypeId = u8;
 /// CacheEntries for 2 equivalent events will always contain the fields in the
 /// same order.
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum CacheEntry {
+pub(crate) enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
     Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
@@ -88,7 +88,7 @@ impl Dedupe {
 /// Takes in an Event and returns a CacheEntry to place into the LRU cache
 /// containing all relevant information for the fields that need matching
 /// against according to the specified FieldMatchConfig.
-fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
+pub(crate) fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     match &fields {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();

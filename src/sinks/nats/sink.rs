@@ -5,7 +5,7 @@ use snafu::ResultExt;
 use crate::sinks::prelude::*;
 
 use super::{
-    config::{NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
+    config::{NatsHeaderConfig, NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
     request_builder::{NatsEncoder, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError,
@@ -22,6 +22,7 @@ pub(super) struct NatsSink {
     encoder: Encoder<()>,
     publisher: Arc<NatsPublisher>,
     subject: Template,
+    headers: Option<NatsHeaderConfig>,
 }
 
 impl NatsSink {
@@ -48,6 +49,7 @@ impl NatsSink {
         let encoder = Encoder::<()>::new(serializer);
         let request = config.request;
         let subject = config.subject;
+        let headers = config.jetstream.headers;
 
         Ok(NatsSink {
             request,
@@ -55,6 +57,7 @@ impl NatsSink {
             encoder,
             publisher,
             subject,
+            headers,
         })
     }
 
@@ -66,6 +69,7 @@ impl NatsSink {
                 encoder: self.encoder.clone(),
                 transformer: self.transformer.clone(),
             },
+            headers: self.headers.clone(),
         };
 
         let service = ServiceBuilder::new()
