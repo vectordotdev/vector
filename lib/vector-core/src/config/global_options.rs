@@ -458,7 +458,7 @@ mod tests {
             data_dir: Some(std::path::PathBuf::from("/path2")),
             ..Default::default()
         };
-        assert_eq!(old.diff(&new), Ok(vec!["data_dir".to_string()]));
+        assert_eq!(old.diff(&new).expect("diff failed"), vec!["data_dir".to_string()]);
     }
 
     fn merge<P: Debug, T>(
