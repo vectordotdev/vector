@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::FutureExt;
-use http::{response::Parts, Uri};
+use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::configurable::configurable_component;
@@ -14,18 +14,18 @@ use crate::http::QueryParameters;
 use crate::sources::util::http::HttpMethod;
 use crate::sources::util::http_client::{default_timeout, warn_if_interval_too_low};
 use crate::{
+    Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::Auth,
     internal_events::PrometheusParseError,
     sources::{
         self,
         util::http_client::{
-            build_url, call, default_interval, GenericHttpClientInputs, HttpClientBuilder,
-            HttpClientContext,
+            GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
+            default_interval,
         },
     },
     tls::{TlsConfig, TlsSettings},
-    Result,
 };
 
 // pulled up, and split over multiple lines, because the long lines trip up rustfmt such that it
@@ -321,23 +321,22 @@ impl HttpClientContext for PrometheusScrapeContext {
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
     use hyper::{
-        service::{make_service_fn, service_fn},
         Body, Client, Response, Server,
+        service::{make_service_fn, service_fn},
     };
     use similar_asserts::assert_eq;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
     use warp::Filter;
 
     use super::*;
     use crate::{
-        config,
+        Error, config,
         http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
-            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr, start_topology, trace_init, wait_for_tcp,
         },
-        Error,
     };
 
     #[test]
@@ -725,7 +724,9 @@ mod test {
             .lines()
             .collect::<Vec<_>>();
 
-        assert_eq!(lines, vec![
+        assert_eq!(
+            lines,
+            vec![
                 "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
                 "# TYPE vector_http_request_duration_seconds histogram",
                 "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
@@ -752,8 +753,8 @@ mod test {
                 "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.99\"} 76656 1612411516789",
                 "vector_rpc_duration_seconds_sum{code=\"200\"} 17560473 1612411516789",
                 "vector_rpc_duration_seconds_count{code=\"200\"} 2693 1612411516789",
-                ],
-            );
+            ],
+        );
 
         topology.stop().await;
     }
@@ -766,7 +767,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{MetricKind, MetricValue},
-        test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        test_util::components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
     };
 
     #[tokio::test]

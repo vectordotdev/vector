@@ -7,8 +7,8 @@ use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_lib::api_client::{
-    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
+    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
 };
 
 use super::state::{self, OutputMetrics};

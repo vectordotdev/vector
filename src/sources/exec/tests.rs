@@ -84,10 +84,11 @@ fn test_scheduled_handle_event_vector_namespace() {
         meta.get(path!("vector", "source_type")).unwrap(),
         &value!("exec")
     );
-    assert!(meta
-        .get(path!("vector", "ingest_timestamp"))
-        .unwrap()
-        .is_timestamp());
+    assert!(
+        meta.get(path!("vector", "ingest_timestamp"))
+            .unwrap()
+            .is_timestamp()
+    );
 }
 
 #[test]
@@ -160,10 +161,11 @@ fn test_streaming_create_event_vector_namespace() {
         meta.get(path!("vector", "source_type")).unwrap(),
         &value!("exec")
     );
-    assert!(meta
-        .get(path!("vector", "ingest_timestamp"))
-        .unwrap()
-        .is_timestamp());
+    assert!(
+        meta.get(path!("vector", "ingest_timestamp"))
+            .unwrap()
+            .is_timestamp()
+    );
 }
 
 #[test]

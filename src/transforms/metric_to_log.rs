@@ -1,20 +1,20 @@
 use chrono::Utc;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use vector_lib::TimeZone;
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{event_path, owned_value_path, path, PathPrefix};
-use vector_lib::TimeZone;
+use vector_lib::lookup::{PathPrefix, event_path, owned_value_path, path};
 use vrl::path::OwnedValuePath;
-use vrl::value::kind::Collection;
 use vrl::value::Kind;
+use vrl::value::kind::Collection;
 
 use crate::config::OutputId;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, TransformConfig, TransformContext,
-        TransformOutput,
+        DataType, GenerateConfig, Input, TransformConfig, TransformContext, TransformOutput,
+        log_schema,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -347,7 +347,7 @@ impl FunctionTransform for MetricToLog {
 mod tests {
     use std::sync::Arc;
 
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
@@ -358,8 +358,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
         KeyString, Metric, Value,
+        metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
     };
     use crate::test_util::{components::assert_transform_compliance, random_string};
     use crate::transforms::test::create_topology;

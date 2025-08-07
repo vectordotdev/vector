@@ -1,8 +1,8 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, SamplingMode, Throughput};
+use criterion::{BatchSize, Criterion, SamplingMode, Throughput, criterion_group, criterion_main};
 use indoc::indoc;
 use vector::{
     config,
-    test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
+    test_util::{CountReceiver, next_addr, runtime, send_lines, start_topology, wait_for_tcp},
 };
 
 criterion_group!(

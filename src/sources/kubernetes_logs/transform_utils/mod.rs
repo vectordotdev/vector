@@ -1,4 +1,4 @@
-use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::config::{LogNamespace, log_schema};
 use vrl::owned_value_path;
 use vrl::path::OwnedTargetPath;
 

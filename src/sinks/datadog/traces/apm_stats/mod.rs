@@ -14,7 +14,7 @@ pub use self::aggregation::Aggregator;
 pub use self::flusher::flush_apm_stats_thread;
 
 pub(crate) use super::config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration};
-pub(crate) use super::request_builder::{build_request, DDTracesMetadata, RequestBuilderError};
+pub(crate) use super::request_builder::{DDTracesMetadata, RequestBuilderError, build_request};
 pub(crate) use super::sink::PartitionKey;
 
 mod aggregation;

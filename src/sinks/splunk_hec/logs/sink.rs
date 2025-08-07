@@ -7,15 +7,15 @@ use crate::{
     sinks::{
         prelude::*,
         splunk_hec::common::{
-            render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
-            SOURCETYPE_FIELD, SOURCE_FIELD,
+            EndpointTarget, INDEX_FIELD, SOURCE_FIELD, SOURCETYPE_FIELD, render_template_string,
+            request::HecRequest,
         },
         util::processed_event::ProcessedEvent,
     },
 };
 use vector_lib::{
-    config::{log_schema, LogNamespace},
-    lookup::{event_path, lookup_v2::OptionalTargetPath, OwnedValuePath, PathPrefix},
+    config::{LogNamespace, log_schema},
+    lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
     schema::meaning,
 };
 use vrl::path::OwnedTargetPath;

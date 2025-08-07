@@ -1,13 +1,12 @@
 use crate::sinks::{
     greptimedb::{
-        default_dbname,
+        GreptimeDBDefaultBatchSettings, default_dbname,
         metrics::{
             request::GreptimeDBGrpcRetryLogic,
             request_builder::RequestBuilderOptions,
-            service::{healthcheck, GreptimeDBGrpcService},
+            service::{GreptimeDBGrpcService, healthcheck},
             sink,
         },
-        GreptimeDBDefaultBatchSettings,
     },
     prelude::*,
 };
@@ -31,7 +30,9 @@ impl GenerateConfig for GreptimeDBConfig {
 #[typetag::serde(name = "greptimedb")]
 impl SinkConfig for GreptimeDBConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        warn!("DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead.");
+        warn!(
+            "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
+        );
         self.0.build(cx).await
     }
 

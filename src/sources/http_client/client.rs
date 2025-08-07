@@ -4,7 +4,7 @@
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
-use http::{response::Parts, Uri};
+use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use std::{collections::HashMap, time::Duration};
@@ -22,25 +22,24 @@ use crate::{
     sources::util::{
         http::HttpMethod,
         http_client::{
-            build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
-            GenericHttpClientInputs, HttpClientBuilder,
+            GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
+            default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
 };
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
-use vector_lib::config::{log_schema, LogNamespace, SourceOutput};
+use vector_lib::config::{LogNamespace, SourceOutput, log_schema};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    compile_vrl,
+    TimeZone, compile_vrl,
     event::{Event, LogEvent, VrlTarget},
-    TimeZone,
 };
 use vrl::{
-    compiler::{runtime::Runtime, CompileConfig, Function, Program},
+    compiler::{CompileConfig, Function, Program, runtime::Runtime},
     prelude::TypeState,
 };
 

@@ -7,7 +7,7 @@ use crate::{event::Event, internal_events::DedupeEventsDropped, transforms::Task
 
 use super::{
     common::{FieldMatchConfig, TimedCacheConfig},
-    transform::{build_cache_entry, CacheEntry},
+    transform::{CacheEntry, build_cache_entry},
 };
 
 #[derive(Clone)]

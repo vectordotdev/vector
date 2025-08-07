@@ -5,18 +5,18 @@ use std::str::FromStr;
 
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_TYPE},
     HeaderName, HeaderValue, Method, Request,
+    header::{CONTENT_ENCODING, CONTENT_TYPE},
 };
 
 use crate::{
     http::{Auth, MaybeAuth},
     sinks::{
-        util::{
-            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
-            UriSerde,
-        },
         HTTPRequestBuilderSnafu,
+        util::{
+            UriSerde,
+            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
+        },
     },
 };
 use snafu::ResultExt;

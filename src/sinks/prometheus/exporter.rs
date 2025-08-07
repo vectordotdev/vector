@@ -1,22 +1,22 @@
 use std::{
     convert::Infallible,
     hash::Hash,
-    mem::{discriminant, Discriminant},
+    mem::{Discriminant, discriminant},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
-use base64::prelude::{Engine as _, BASE64_STANDARD};
-use futures::{future, stream::BoxStream, FutureExt, StreamExt};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
+use futures::{FutureExt, StreamExt, future, stream::BoxStream};
 use hyper::{
+    Body, Method, Request, Response, Server, StatusCode,
     body::HttpBody,
     header::HeaderValue,
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode,
 };
-use indexmap::{map::Entry, IndexMap};
+use indexmap::{IndexMap, map::Entry};
 use serde_with::serde_as;
 use snafu::Snafu;
 use stream_cancel::{Trigger, Tripwire};
@@ -25,25 +25,25 @@ use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
     },
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
         Event, EventStatus, Finalizable,
+        metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
     },
-    http::{build_http_trace_layer, Auth},
+    http::{Auth, build_http_trace_layer},
     internal_events::PrometheusNormalizationError,
     sinks::{
-        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
+        util::{StreamSink, statistic::validate_quantiles},
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -621,7 +621,7 @@ mod tests {
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
             next_addr, random_string, trace_init,
         },
         tls::MaybeTlsSettings,
@@ -951,9 +951,11 @@ mod tests {
         assert!(result.status().is_success());
 
         if encoding.is_some() {
-            assert!(result
-                .headers()
-                .contains_key(http::header::CONTENT_ENCODING));
+            assert!(
+                result
+                    .headers()
+                    .contains_key(http::header::CONTENT_ENCODING)
+            );
         }
 
         let body = result.into_body();
@@ -1462,7 +1464,7 @@ mod integration_tests {
         config::ProxyConfig,
         http::HttpClient,
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
             trace_init,
         },
     };

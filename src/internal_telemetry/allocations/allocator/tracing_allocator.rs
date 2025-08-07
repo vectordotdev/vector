@@ -6,7 +6,7 @@ use std::{
 use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
 
 use super::{
-    token::{try_with_suspended_allocation_group, AllocationGroupId},
+    token::{AllocationGroupId, try_with_suspended_allocation_group},
     tracer::Tracer,
 };
 

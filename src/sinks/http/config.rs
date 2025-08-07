@@ -4,13 +4,13 @@
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-use http::{header::AUTHORIZATION, HeaderName, HeaderValue, Method, Request, StatusCode};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use vector_lib::codecs::{
-    encoding::{Framer, Serializer},
     CharacterDelimitedEncoder,
+    encoding::{Framer, Serializer},
 };
 #[cfg(feature = "aws-core")]
 use vector_lib::config::proxy::ProxyConfig;
@@ -29,8 +29,8 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService, OrderedHeaderName, RequestConfig},
             RealtimeSizeBasedDefaultBatchSettings, UriSerde,
+            http::{HttpService, OrderedHeaderName, RequestConfig, http_response_retry_logic},
         },
     },
 };

@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 
 use vector_lib::event::{
-    metric::{Bucket, MetricData, MetricSeries, Sample},
     Event, EventMetadata, Metric, MetricValue, StatisticKind,
+    metric::{Bucket, MetricData, MetricSeries, Sample},
 };
 
 use crate::event::MetricKind;

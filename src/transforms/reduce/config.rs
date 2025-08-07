@@ -4,25 +4,25 @@ use std::time::Duration;
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
-use vrl::path::{parse_target_path, PathPrefix};
+use vrl::path::{PathPrefix, parse_target_path};
 use vrl::prelude::{Collection, KeyString, Kind};
 
 use vector_lib::configurable::configurable_component;
 
 use crate::conditions::AnyCondition;
 use crate::config::{
-    schema, DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
+    DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext, TransformOutput,
+    schema,
 };
 use crate::schema::Definition;
 use crate::transforms::reduce::merge_strategy::MergeStrategy;
-use crate::transforms::{reduce::transform::Reduce, Transform};
+use crate::transforms::{Transform, reduce::transform::Reduce};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
 #[configurable_component(transform(
-"reduce",
-"Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]

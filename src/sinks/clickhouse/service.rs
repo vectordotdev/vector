@@ -5,19 +5,19 @@ use super::sink::PartitionKey;
 use crate::{
     http::{Auth, HttpError},
     sinks::{
+        HTTPRequestBuilderSnafu, UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
             http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
-        HTTPRequestBuilderSnafu, UriParseSnafu,
     },
 };
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 
@@ -215,11 +215,14 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -232,10 +235,13 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -248,11 +254,14 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -265,10 +274,13 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -288,13 +300,16 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
                                      async_insert=1&\
                                      wait_for_async_insert=1&\
                                      wait_for_async_insert_timeout=500&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
     }
 
     #[test]

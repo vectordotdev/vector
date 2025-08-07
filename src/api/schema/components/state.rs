@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, LazyLock, RwLock},
 };
 
-use super::{sink, source, transform, Component};
+use super::{Component, sink, source, transform};
 use crate::config::{ComponentKey, OutputId};
 
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";

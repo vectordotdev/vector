@@ -5,8 +5,8 @@ use std::{hash::Hash, sync::Arc, time::Duration};
 use futures::StreamExt;
 use futures_util::Stream;
 use kube::{
-    runtime::{reflector::store, watcher},
     Resource,
+    runtime::{reflector::store, watcher},
 };
 use tokio::pin;
 use tokio_util::time::DelayQueue;
@@ -132,12 +132,12 @@ mod tests {
     use futures_util::SinkExt;
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use kube::runtime::{
-        reflector::{store, ObjectRef},
+        reflector::{ObjectRef, store},
         watcher,
     };
 
-    use super::custom_reflector;
     use super::MetaCache;
+    use super::custom_reflector;
 
     #[tokio::test]
     async fn applied_should_add_object() {

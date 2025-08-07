@@ -17,8 +17,8 @@ use crate::{
             service::{S3Metadata, S3Request},
         },
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };

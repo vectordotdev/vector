@@ -3,13 +3,13 @@ use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf, sync::L
 
 use bytes::Bytes;
 use chrono::{
-    format::{strftime::StrftimeItems, Item},
     FixedOffset, Utc,
+    format::{Item, strftime::StrftimeItems},
 };
 use regex::Regex;
 use snafu::Snafu;
 use vector_lib::configurable::{
-    configurable_component, ConfigurableNumber, ConfigurableString, NumberClass,
+    ConfigurableNumber, ConfigurableString, NumberClass, configurable_component,
 };
 use vector_lib::lookup::lookup_v2::parse_target_path;
 
@@ -26,7 +26,10 @@ static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}
 pub enum TemplateParseError {
     #[snafu(display("Invalid strftime item"))]
     StrftimeError,
-    #[snafu(display("Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)", path))]
+    #[snafu(display(
+        "Invalid field path in template {:?} (see https://vector.dev/docs/reference/configuration/template-syntax/)",
+        path
+    ))]
     InvalidPathSyntax { path: String },
     #[snafu(display("Invalid numeric template"))]
     InvalidNumericTemplate { template: String },
@@ -616,7 +619,7 @@ mod tests {
     use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
     use vector_lib::config::LogNamespace;
-    use vector_lib::lookup::{metadata_path, PathPrefix};
+    use vector_lib::lookup::{PathPrefix, metadata_path};
     use vector_lib::metric_tags;
     use vrl::event_path;
 
@@ -655,12 +658,16 @@ mod tests {
     fn is_dynamic() {
         assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
         assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}")
-            .unwrap()
-            .is_dynamic());
-        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
-            .unwrap()
-            .is_dynamic());
+        assert!(
+            Template::try_from("/kube-demo/{{ foo }}")
+                .unwrap()
+                .is_dynamic()
+        );
+        assert!(
+            Template::try_from("/kube-demo/{{ foo }}/%F")
+                .unwrap()
+                .is_dynamic()
+        );
     }
 
     #[test]

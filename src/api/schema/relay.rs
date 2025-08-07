@@ -1,10 +1,10 @@
 use std::convert::Infallible;
 
 use async_graphql::{
-    connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result, SimpleObject,
+    connection::{self, Connection, CursorType, Edge, EmptyFields},
 };
-use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
+use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine as _};
 
 /// Base64 invalid states, used by `Base64Cursor`.
 pub enum Base64CursorError {

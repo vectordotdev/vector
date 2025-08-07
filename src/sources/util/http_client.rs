@@ -9,8 +9,8 @@
 //!     context.
 
 use bytes::Bytes;
-use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
-use http::{response::Parts, Uri};
+use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use http::{Uri, response::Parts};
 use hyper::{Body, Request};
 use std::time::Duration;
 use std::{collections::HashMap, future::ready};
@@ -19,6 +19,7 @@ use vector_lib::json_size::JsonSize;
 
 use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
+    SourceSender,
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
@@ -26,10 +27,9 @@ use crate::{
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
-    SourceSender,
 };
 use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {

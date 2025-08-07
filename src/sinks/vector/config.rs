@@ -7,9 +7,9 @@ use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
 use super::{
+    VectorSinkError,
     service::{VectorResponse, VectorService},
     sink::VectorSink,
-    VectorSinkError,
 };
 use crate::{
     config::{
@@ -19,11 +19,11 @@ use crate::{
     http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
-        util::{
-            retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
-            ServiceBuilderExt, TowerRequestConfig,
-        },
         Healthcheck, VectorSink as VectorSinkType,
+        util::{
+            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
+            TowerRequestConfig, retries::RetryLogic,
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };

@@ -5,8 +5,8 @@ use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::{
-    healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
-    NewRelicSinkError,
+    NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink, NewRelicSinkError,
+    healthcheck,
 };
 
 use crate::{http::HttpClient, sinks::prelude::*};

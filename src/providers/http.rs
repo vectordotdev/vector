@@ -8,7 +8,7 @@ use url::Url;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{self, provider::ProviderConfig, Format, ProxyConfig},
+    config::{self, Format, ProxyConfig, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},

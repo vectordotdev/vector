@@ -2,10 +2,10 @@ use vector_lib::config::LogNamespace;
 
 use crate::{
     components::validation::{
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
         component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,

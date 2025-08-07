@@ -570,7 +570,7 @@ impl ReduceValueMerger for MinNumberMerger {
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
     fn add(&mut self, v: Value) -> Result<(), String>;
     fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
-        -> Result<(), String>;
+    -> Result<(), String>;
 }
 
 dyn_clone::clone_trait_object!(ReduceValueMerger);

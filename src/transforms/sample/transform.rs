@@ -9,8 +9,8 @@ use crate::{
     template::Template,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::OwnedTargetPath;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 
 /// Exists only for backwards compatability purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms

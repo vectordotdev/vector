@@ -7,7 +7,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{net, sinks::util::unix::UnixEither};
 
-use super::{net_error::*, ConnectorType, NetError, NetworkConnector};
+use super::{ConnectorType, NetError, NetworkConnector, net_error::*};
 
 /// Unix socket modes.
 #[configurable_component]

@@ -3,8 +3,8 @@ use chrono::Utc;
 use greptimedb_ingester::{api::v1::*, helpers::values::*};
 use vector_lib::{
     event::{
-        metric::{Bucket, MetricSketch, Quantile, Sample},
         Metric, MetricValue,
+        metric::{Bucket, MetricSketch, Quantile, Sample},
     },
     metrics::AgentDDSketch,
 };

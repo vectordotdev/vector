@@ -1,7 +1,7 @@
 use std::{any::TypeId, marker::PhantomData, ptr::addr_of};
 
 use tracing::{Dispatch, Id, Subscriber};
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 use super::AllocationGroupToken;
 

@@ -3,9 +3,9 @@ use std::task::{Context, Poll};
 use crate::sinks::prelude::*;
 
 use super::{
+    RedisRequest, RedisSinkError,
     config::{ListMethod, SortedSetMethod},
     sink::{ConnectionState, RedisConnection},
-    RedisRequest, RedisSinkError,
 };
 
 #[derive(Clone)]

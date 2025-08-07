@@ -5,7 +5,7 @@ use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::telemetry};
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 

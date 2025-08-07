@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
-use criterion::{criterion_group, BatchSize, Criterion, Throughput};
-use futures::{stream, SinkExt, Stream, StreamExt};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group};
+use futures::{SinkExt, Stream, StreamExt, stream};
 use indoc::indoc;
 use transforms::lua::v2::LuaConfig;
 use vector::{

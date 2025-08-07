@@ -1,13 +1,14 @@
 use std::{error::Error, future::Future, time::Duration};
 
 use futures::{
-    future::{select, Either},
-    pin_mut, FutureExt, Sink,
+    FutureExt, Sink,
+    future::{Either, select},
+    pin_mut,
 };
 use tokio::task::spawn_blocking;
 use vector_lib::file_source::{
-    paths_provider::PathsProvider, Checkpointer, FileServer, FileServerShutdown,
-    FileSourceInternalEvents, Line,
+    Checkpointer, FileServer, FileServerShutdown, FileSourceInternalEvents, Line,
+    paths_provider::PathsProvider,
 };
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]

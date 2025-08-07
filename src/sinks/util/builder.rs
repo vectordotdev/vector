@@ -1,4 +1,4 @@
-use futures_util::{stream::Map, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, stream::Map};
 use pin_project::pin_project;
 use std::time::Duration;
 use std::{
@@ -14,17 +14,17 @@ use std::{
 use tower::Service;
 use tracing::Span;
 use vector_lib::stream::{
-    batcher::{config::BatchConfig, Batcher},
     ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
+    batcher::{Batcher, config::BatchConfig},
 };
 use vector_lib::{
+    ByteSizeOf,
     event::{Finalizable, Metric},
     partition::Partitioner,
-    ByteSizeOf,
 };
 
 use super::{
-    buffer::metrics::MetricNormalize, IncrementalRequestBuilder, Normalizer, RequestBuilder,
+    IncrementalRequestBuilder, Normalizer, RequestBuilder, buffer::metrics::MetricNormalize,
 };
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}

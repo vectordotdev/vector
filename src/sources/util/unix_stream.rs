@@ -10,13 +10,14 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
-use tracing::{field, Instrument};
+use tracing::{Instrument, field};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use super::AfterReadExt;
 use crate::{
+    SourceSender,
     async_read::VecAsyncReadExt,
     event::Event,
     internal_events::{
@@ -24,10 +25,9 @@ use crate::{
         UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
+    sources::Source,
     sources::util::change_socket_permissions,
     sources::util::unix::UNNAMED_SOCKET_HOST,
-    sources::Source,
-    SourceSender,
 };
 
 /// Returns a `Source` object corresponding to a Unix domain stream socket.

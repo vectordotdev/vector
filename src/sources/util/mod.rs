@@ -52,6 +52,8 @@ pub use wrappers::{AfterRead, AfterReadExt};
 
 #[cfg(feature = "sources-http_server")]
 pub use self::body_decoding::Encoding;
+#[cfg(feature = "sources-utils-http-prelude")]
+pub use self::http::HttpSource;
 #[cfg(feature = "sources-utils-http-headers")]
 pub use self::http::add_headers;
 #[cfg(feature = "sources-utils-http-query")]
@@ -62,8 +64,6 @@ pub use self::http::add_query_parameters;
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decode;
-#[cfg(feature = "sources-utils-http-prelude")]
-pub use self::http::HttpSource;
 #[cfg(any(
     feature = "sources-aws_sqs",
     feature = "sources-gcp_pubsub",

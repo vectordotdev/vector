@@ -1,6 +1,6 @@
-use serde_json::value::{to_raw_value, RawValue, Value};
+use serde_json::value::{RawValue, Value, to_raw_value};
 
-use super::super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
+use super::super::batch::{Batch, BatchSize, PushResult, err_event_too_large};
 
 pub type BoxedRawValue = Box<RawValue>;
 

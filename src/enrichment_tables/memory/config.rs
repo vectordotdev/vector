@@ -5,7 +5,7 @@ use crate::sinks::Healthcheck;
 use crate::sources::Source;
 use crate::{config::SinkContext, enrichment_tables::memory::Memory};
 use async_trait::async_trait;
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use tokio::sync::Mutex;
 use vector_lib::config::{AcknowledgementsConfig, DataType, Input, LogNamespace};
 use vector_lib::enrichment::Table;

@@ -7,7 +7,7 @@ use std::io;
 
 use crate::sinks::{
     prelude::*,
-    util::encoding::{write_all, Encoder as SinkEncoder},
+    util::encoding::{Encoder as SinkEncoder, write_all},
 };
 
 pub(super) struct HoneycombEncoder {

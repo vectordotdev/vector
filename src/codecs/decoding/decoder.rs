@@ -1,8 +1,8 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 use vector_lib::codecs::decoding::{
-    format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer,
-    NewlineDelimitedDecoder,
+    BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer, NewlineDelimitedDecoder,
+    format::Deserializer as _,
 };
 use vector_lib::config::LogNamespace;
 
@@ -103,11 +103,11 @@ impl tokio_util::codec::Decoder for Decoder {
 mod tests {
     use super::Decoder;
     use bytes::Bytes;
-    use futures::{stream, StreamExt};
+    use futures::{StreamExt, stream};
     use tokio_util::{codec::FramedRead, io::StreamReader};
     use vector_lib::codecs::{
-        decoding::{Deserializer, Framer},
         JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+        decoding::{Deserializer, Framer},
     };
     use vrl::value::Value;
 

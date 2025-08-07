@@ -1,7 +1,7 @@
 use serde::Serialize;
 use vector_lib::{
-    event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
 };
 use vector_lib::{
     internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,

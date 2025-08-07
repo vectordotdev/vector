@@ -5,11 +5,11 @@ use bollard::query_parameters::{
     EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
 };
 use bollard::{
+    Docker,
     container::LogOutput,
     errors::Error as DockerError,
     query_parameters::InspectContainerOptions,
     service::{ContainerInspectResponse, EventMessage},
-    Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
@@ -24,16 +24,17 @@ use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_lib::lookup::{
-    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+    OwnedValuePath, PathPrefix, lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path,
 };
 use vrl::event_path;
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
-    docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
+    SourceSender,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
+    docker::{DockerTlsConfig, docker},
+    event::{self, EstimatedJsonEncodedSizeOf, LogEvent, Value, merge_state::LogEventMergeState},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -42,7 +43,6 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[cfg(test)]

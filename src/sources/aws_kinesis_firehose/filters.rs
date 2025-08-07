@@ -6,18 +6,17 @@ use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
 use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::{BytesReceived, Protocol};
-use warp::{http::StatusCode, Filter};
+use warp::{Filter, http::StatusCode};
 
 use super::{
+    Compression,
     errors::{ParseSnafu, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
-    Compression,
 };
 use crate::{
-    codecs,
+    SourceSender, codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
-    SourceSender,
 };
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose

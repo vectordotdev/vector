@@ -8,19 +8,19 @@ use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::json_size::JsonSize;
 use vector_lib::lookup::path;
-use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey};
 use vrl::core::Value;
-use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
+use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
 use crate::common::datadog::DDTAGS;
 use crate::common::http::ErrorMessage;
 use crate::{
+    SourceSender,
     event::Event,
     internal_events::DatadogAgentJsonParseError,
     sources::datadog_agent::{
-        handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
+        ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, handle_request,
     },
-    SourceSender,
 };
 
 pub(crate) fn build_warp_filter(
@@ -229,7 +229,9 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
         .collect();
 
     if ddtags.is_empty() && !ddtags_str.is_empty() {
-        warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
+        warn!(
+            message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed."
+        )
     }
 
     ddtags.into()

@@ -10,7 +10,7 @@ use crate::sinks::util::Compression;
 use crate::{
     codecs::{Encoder, Transformer},
     sinks::util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, RequestBuilder,
+        RequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
     },
 };
 

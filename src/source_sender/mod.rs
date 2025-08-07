@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc, time::Instant
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use metrics::{histogram, Histogram};
+use metrics::{Histogram, histogram};
 use tracing::Span;
 use vector_lib::buffers::EventCount;
 use vector_lib::buffers::{
@@ -12,17 +12,17 @@ use vector_lib::buffers::{
 };
 use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(any(test, feature = "test-utils"))]
-use vector_lib::event::{into_event_stream, EventStatus};
+use vector_lib::event::{EventStatus, into_event_stream};
 use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
 use vector_lib::json_size::JsonSize;
 use vector_lib::{
-    config::{log_schema, SourceOutput},
-    event::{array, Event, EventArray, EventContainer, EventRef},
-    internal_event::{
-        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
-    },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::{SourceOutput, log_schema},
+    event::{Event, EventArray, EventContainer, EventRef, array},
+    internal_event::{
+        self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered,
+    },
 };
 use vrl::value::Value;
 
@@ -531,7 +531,7 @@ const fn get_timestamp_millis(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Duration};
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
     use tokio::time::timeout;
     use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
     use vrl::event_path;

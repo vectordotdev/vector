@@ -3,8 +3,8 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
     time::Duration,
@@ -17,7 +17,7 @@ use rand_distr::num_traits::ToPrimitive;
 use self::allocator::Tracer;
 
 pub(crate) use self::allocator::{
-    without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
+    AllocationGroupId, AllocationLayer, GroupedTraceableAllocator, without_allocation_tracing,
 };
 
 const NUM_GROUPS: usize = 256;
@@ -203,6 +203,9 @@ pub fn acquire_allocation_group_id(
         }
     }
 
-    warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    warn!(
+        "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",
+        NUM_GROUPS, component_id
+    );
     AllocationGroupId::ROOT
 }

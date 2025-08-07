@@ -1,12 +1,12 @@
-use chrono::{offset::TimeZone, Timelike, Utc};
+use chrono::{Timelike, Utc, offset::TimeZone};
 use rand::seq::SliceRandom;
 use vector_lib::metric_tags;
 
 use super::*;
 use crate::{
-    event::{metric::StatisticKind, Event, MetricKind},
+    event::{Event, MetricKind, metric::StatisticKind},
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_string,
     },
 };

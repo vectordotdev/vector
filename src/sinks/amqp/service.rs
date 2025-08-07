@@ -3,7 +3,7 @@
 use crate::sinks::prelude::*;
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use lapin::{options::BasicPublishOptions, BasicProperties};
+use lapin::{BasicProperties, options::BasicPublishOptions};
 use snafu::Snafu;
 use std::task::{Context, Poll};
 

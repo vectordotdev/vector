@@ -212,7 +212,10 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+        assert_eq!(
+            reason,
+            "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]"
+        );
     }
 
     #[test]
@@ -222,6 +225,9 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
+        assert_eq!(
+            reason,
+            "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value"
+        );
     }
 }

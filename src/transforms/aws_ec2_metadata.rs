@@ -4,20 +4,20 @@ use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{body::to_bytes as body_to_bytes, Body};
+use http::{Request, StatusCode, Uri, uri::PathAndQuery};
+use hyper::{Body, body::to_bytes as body_to_bytes};
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::OwnedTargetPath;
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
 use vector_lib::lookup::owned_value_path;
-use vector_lib::lookup::OwnedTargetPath;
-use vrl::value::kind::Collection;
 use vrl::value::Kind;
+use vrl::value::kind::Collection;
 
 use crate::config::OutputId;
 use crate::{
@@ -744,11 +744,11 @@ mod integration_tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use vector_lib::lookup::{event_path, PathPrefix};
+    use vector_lib::lookup::{PathPrefix, event_path};
 
     use super::*;
     use crate::{
-        event::{metric, LogEvent, Metric},
+        event::{LogEvent, Metric, metric},
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };

@@ -5,8 +5,8 @@ use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
 use super::{
-    filter_output_metric, OutputThroughput, ReceivedBytesTotal, ReceivedEventsTotal,
-    SentBytesTotal, SentEventsTotal,
+    OutputThroughput, ReceivedBytesTotal, ReceivedEventsTotal, SentBytesTotal, SentEventsTotal,
+    filter_output_metric,
 };
 use crate::{
     config::ComponentKey,
@@ -27,11 +27,7 @@ pub fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option
     Some(iter.fold(
         m.clone(),
         |mut m1, m2| {
-            if m1.update(m2) {
-                m1
-            } else {
-                m2.clone()
-            }
+            if m1.update(m2) { m1 } else { m2.clone() }
         },
     ))
 }

@@ -1,7 +1,7 @@
 use async_graphql::{Object, SimpleObject, Subscription};
 use chrono::{DateTime, Utc};
 use tokio::time::Duration;
-use tokio_stream::{wrappers::IntervalStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt, wrappers::IntervalStream};
 
 #[derive(SimpleObject)]
 pub struct Heartbeat {

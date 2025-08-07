@@ -2,11 +2,11 @@ use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
-use super::{sink, source, state, Component};
+use super::{Component, sink, source, state};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, outputs_by_component_key, IntoTransformMetrics, Output},
+        metrics::{self, IntoTransformMetrics, Output, outputs_by_component_key},
         sort,
     },
     config::{ComponentKey, Inputs, OutputId},

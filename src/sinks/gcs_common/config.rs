@@ -8,9 +8,9 @@ use crate::{
     gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
+        Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
-        Healthcheck, HealthcheckError,
     },
 };
 

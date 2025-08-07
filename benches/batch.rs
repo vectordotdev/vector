@@ -1,13 +1,13 @@
 use std::{convert::Infallible, time::Duration};
 
 use bytes::{BufMut, Bytes, BytesMut};
-use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
-use futures::{future, stream, SinkExt, StreamExt};
+use criterion::{Criterion, SamplingMode, Throughput, criterion_group};
+use futures::{SinkExt, StreamExt, future, stream};
 use vector::{
     sinks::util::{
-        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
         BatchSink, Buffer, Compression, EncodedEvent, Merged, Partition, PartitionBatchSink,
         SinkBatchSettings,
+        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     },
     test_util::{random_lines, runtime},
 };

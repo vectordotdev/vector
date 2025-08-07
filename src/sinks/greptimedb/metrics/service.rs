@@ -4,8 +4,8 @@ use crate::sinks::{
     prelude::*,
 };
 use greptimedb_ingester::{
-    api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*, Client, ClientBuilder,
-    Compression, Database, Error as GreptimeError,
+    Client, ClientBuilder, Compression, Database, Error as GreptimeError,
+    api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*,
 };
 use std::{sync::Arc, task::Poll};
 use vector_lib::sensitive_string::SensitiveString;
@@ -50,7 +50,9 @@ fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption>
         || tls_config.verify_certificate.is_some()
         || tls_config.verify_hostname.is_some()
     {
-        warn!(message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment.");
+        warn!(
+            message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+        );
     }
 
     Ok(ClientTlsOption {

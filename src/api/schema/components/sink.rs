@@ -2,7 +2,7 @@ use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
-use super::{source, state, transform, Component};
+use super::{Component, source, state, transform};
 use crate::{
     api::schema::{
         filter,

@@ -1,9 +1,9 @@
 use std::{convert::Infallible, future::Future};
 
-use http::{uri::Scheme, Request, Response, Uri};
+use http::{Request, Response, Uri, uri::Scheme};
 use hyper::{
-    service::{make_service_fn, service_fn},
     Body, Server,
+    service::{make_service_fn, service_fn},
 };
 
 use super::{next_addr, wait_for_tcp};

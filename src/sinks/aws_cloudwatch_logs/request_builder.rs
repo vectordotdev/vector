@@ -5,8 +5,8 @@ use chrono::Utc;
 use tokio_util::codec::Encoder as _;
 use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_lib::{
-    event::{EventFinalizers, Finalizable},
     ByteSizeOf,
+    event::{EventFinalizers, Finalizable},
 };
 
 use super::TemplateRenderingError;

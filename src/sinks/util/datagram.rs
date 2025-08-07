@@ -2,15 +2,15 @@
 use std::path::PathBuf;
 
 use bytes::BytesMut;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use futures_util::stream::Peekable;
 use tokio::net::UdpSocket;
 #[cfg(unix)]
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::internal_event::RegisterInternalEvent;
 use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     codecs::Transformer,

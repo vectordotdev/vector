@@ -2,12 +2,12 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
-use serde::{de, Deserialize};
+use serde::{Deserialize, de};
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::event::EventMetadata;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vector_lib::schema::{meaning, Definition};
+use vector_lib::schema::{Definition, meaning};
 use vector_lib::{
     config::log_schema,
     event::{Event, LogEvent, Value},
@@ -26,7 +26,7 @@ use crate::{
             common::EndpointTarget,
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
-        util::{encoding::Encoder as _, test::build_test_server, Compression},
+        util::{Compression, encoding::Encoder as _, test::build_test_server},
     },
     template::Template,
     test_util::next_addr,

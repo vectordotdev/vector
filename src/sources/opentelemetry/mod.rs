@@ -10,9 +10,9 @@ mod status;
 
 use std::net::SocketAddr;
 
-use futures::{future::join, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, future::join};
 use tonic::codec::CompressionEncoding;
-use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
 use vector_lib::opentelemetry::logs::{
     ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
@@ -27,10 +27,10 @@ use vector_lib::opentelemetry::proto::collector::{
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use vector_lib::{
-    config::{log_schema, LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, log_schema},
     schema::Definition,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use self::{
     grpc::Service,
@@ -43,7 +43,7 @@ use crate::{
     },
     http::KeepaliveConfig,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server_with_routes, Source},
+    sources::{Source, util::grpc::run_grpc_server_with_routes},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 

@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{
+    StreamExt,
     channel::mpsc::{Receiver, TryRecvError},
     stream::Stream,
-    StreamExt,
 };
 use hyper::StatusCode;
 use indoc::indoc;

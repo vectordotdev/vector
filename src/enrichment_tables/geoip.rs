@@ -7,8 +7,8 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use maxminddb::{
-    geoip2::{AnonymousIp, City, ConnectionType, Isp},
     Reader,
+    geoip2::{AnonymousIp, City, ConnectionType, Isp},
 };
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;

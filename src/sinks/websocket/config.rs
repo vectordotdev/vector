@@ -7,7 +7,7 @@ use crate::{
     codecs::EncodingConfig,
     common::websocket::{ConnectSnafu, WebSocketConnector, WebSocketError},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{websocket::sink::WebSocketSink, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, websocket::sink::WebSocketSink},
     tls::MaybeTlsSettings,
 };
 

@@ -9,17 +9,16 @@ use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
 use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{
+    EndpointTarget,
     request::HecRequest,
     service::{HttpRequestBuilder, MetadataFields},
-    EndpointTarget,
 };
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
-        self,
-        util::{http::HttpBatchService, SinkBatchSettings},
-        UriParseSnafu,
+        self, UriParseSnafu,
+        util::{SinkBatchSettings, http::HttpBatchService},
     },
     template::Template,
     tls::{TlsConfig, TlsSettings},
@@ -172,15 +171,14 @@ mod tests {
     use http::{HeaderValue, Uri};
     use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
-        matchers::{header, method, path},
         Mock, MockServer, ResponseTemplate,
+        matchers::{header, method, path},
     };
 
     use crate::sinks::{
         splunk_hec::common::{
-            build_healthcheck, build_uri, create_client,
+            EndpointTarget, HOST_FIELD, SOURCE_FIELD, build_healthcheck, build_uri, create_client,
             service::{HttpRequestBuilder, MetadataFields},
-            EndpointTarget, HOST_FIELD, SOURCE_FIELD,
         },
         util::Compression,
     };

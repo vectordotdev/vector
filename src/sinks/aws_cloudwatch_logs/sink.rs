@@ -2,7 +2,7 @@ use std::fmt;
 
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::{StreamExt, future, stream::BoxStream};
 use tower::Service;
 use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_lib::stream::{BatcherSettings, DriverResponse};
@@ -12,8 +12,8 @@ use crate::{
     event::{Event, EventFinalizers, Finalizable},
     sinks::{
         aws_cloudwatch_logs::{
-            request_builder::{CloudwatchRequest, CloudwatchRequestBuilder},
             CloudwatchKey,
+            request_builder::{CloudwatchRequest, CloudwatchRequestBuilder},
         },
         util::SinkBuilderExt,
     },

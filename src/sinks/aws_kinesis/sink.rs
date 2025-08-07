@@ -8,7 +8,7 @@ use crate::{
     internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
     sinks::{
         prelude::*,
-        util::{processed_event::ProcessedEvent, StreamSink},
+        util::{StreamSink, processed_event::ProcessedEvent},
     },
 };
 

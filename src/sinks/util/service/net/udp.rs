@@ -7,7 +7,7 @@ use vector_lib::configurable::configurable_component;
 
 use crate::{dns, net};
 
-use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
+use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
 
 /// UDP configuration.
 #[configurable_component]

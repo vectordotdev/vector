@@ -7,18 +7,17 @@ use vector_lib::configurable::{component::GenerateConfig, configurable_component
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{
-    aws::{create_client, is_retriable_error, ClientBuilder},
+    aws::{ClientBuilder, create_client, is_retriable_error},
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        util::{retries::RetryLogic, BatchConfig, SinkBatchSettings},
         Healthcheck, VectorSink,
+        util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
     },
 };
 
 use super::{
-    build_sink,
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
     record::{KinesisStreamClient, KinesisStreamRecord},
-    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig,
 };
 
 #[allow(clippy::large_enum_variant)]

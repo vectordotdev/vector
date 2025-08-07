@@ -2,13 +2,13 @@ use std::{fmt, time::Duration};
 
 use bytes::BytesMut;
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::{
-    decoding::{Deserializer, Framer},
     BytesDeserializer, CharacterDelimitedDecoder,
+    decoding::{Deserializer, Framer},
 };
 
 #[derive(Debug)]

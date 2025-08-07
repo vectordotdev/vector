@@ -4,7 +4,7 @@ use std::{convert::Infallible, net::SocketAddr};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
-use hyper::{service::make_service_fn, Server};
+use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
@@ -20,12 +20,12 @@ use vector_lib::opentelemetry::proto::collector::{
 };
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
-    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
-    filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
+    Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
 };
 
 use crate::common::http::ErrorMessage;
@@ -33,13 +33,13 @@ use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::sources::http_server::HttpConfigParamKind;
 use crate::sources::util::add_headers;
 use crate::{
+    SourceSender,
     event::Event,
     http::build_http_trace_layer,
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::decode,
     tls::MaybeTlsSettings,
-    SourceSender,
 };
 
 use super::OpentelemetryConfig;

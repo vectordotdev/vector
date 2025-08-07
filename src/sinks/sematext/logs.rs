@@ -11,12 +11,12 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
+        Healthcheck, VectorSink,
         elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            StreamSink, TowerRequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
+            TowerRequestConfig, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
 };

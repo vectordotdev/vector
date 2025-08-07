@@ -8,9 +8,9 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
-            service::TowerRequestConfigDefaults,
             BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            http::{HttpService, http_response_retry_logic},
+            service::TowerRequestConfigDefaults,
         },
     },
 };

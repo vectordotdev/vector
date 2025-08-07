@@ -9,7 +9,7 @@ use crate::{
     gcp::GcpAuthConfig,
     sinks::{prelude::*, util::test::build_test_server},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
         next_addr,
     },

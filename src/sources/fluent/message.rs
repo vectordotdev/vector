@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, convert::TryInto};
 
-use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc, serde::ts_seconds};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use vector_lib::event::{KeyString, ObjectMap, Value};

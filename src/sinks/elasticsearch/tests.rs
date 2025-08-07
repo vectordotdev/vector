@@ -10,8 +10,8 @@ use crate::{
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
-            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode, VersionType,
+            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion, ElasticsearchCommon,
+            ElasticsearchConfig, ElasticsearchMode, VersionType, sink::process_log,
         },
         util::encoding::Encoder,
     },
@@ -366,10 +366,12 @@ async fn handle_metrics() {
         encoded_lines.first().unwrap(),
         r#"{"create":{"_type":"_doc","_index":"vector"}}"#
     );
-    assert!(encoded_lines
-        .get(1)
-        .unwrap()
-        .starts_with(r#"{"gauge":{"value":42.0},"kind":"absolute","name":"cpu","timestamp""#));
+    assert!(
+        encoded_lines
+            .get(1)
+            .unwrap()
+            .starts_with(r#"{"gauge":{"value":42.0},"kind":"absolute","name":"cpu","timestamp""#)
+    );
 }
 
 #[tokio::test]

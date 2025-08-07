@@ -2,21 +2,21 @@ use http::Uri;
 use std::collections::HashMap;
 use tokio::time::Duration;
 use vector_lib::config::LogNamespace;
-use warp::{http::HeaderMap, Filter};
+use warp::{Filter, http::HeaderMap};
 
 use crate::components::validation::prelude::*;
 use crate::http::{ParamType, ParameterValue, QueryParameterValue};
 use crate::sources::util::http::HttpMethod;
 use crate::{serde::default_decoding, serde::default_framing_message_based};
+use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use vector_lib::codecs::decoding::{
     CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
 };
-use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use vector_lib::event::Event;
 
 use super::HttpClientConfig;
 use crate::test_util::{
-    components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+    components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
     next_addr, test_generate_config, wait_for_tcp,
 };
 

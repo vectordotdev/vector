@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::{
     sinks::prelude::*,
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };

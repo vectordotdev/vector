@@ -37,7 +37,7 @@ pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessa
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
                         format!("Unsupported encoding {encoding}"),
-                    ))
+                    ));
                 }
             }
         }

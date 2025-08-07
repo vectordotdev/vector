@@ -1,12 +1,12 @@
 use bytes::{Buf, Bytes};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{channel::mpsc, stream, FutureExt, SinkExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
 use futures_util::StreamExt;
 use http::request::Parts;
 use hyper::{
+    Body, Request, Response, Server, StatusCode,
     body::HttpBody,
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server, StatusCode,
 };
 use serde::Deserialize;
 use std::{
@@ -16,8 +16,8 @@ use std::{
 use stream_cancel::{Trigger, Tripwire};
 
 use crate::{
-    config::{SinkConfig, SinkContext},
     Error,
+    config::{SinkConfig, SinkContext},
 };
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>

@@ -10,7 +10,7 @@ fn main() -> ExitCode {
     #[cfg(feature = "allocation-tracing")]
     {
         use crate::vector::internal_telemetry::allocations::{
-            init_allocation_tracing, REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS,
+            REPORTING_INTERVAL_MS, TRACK_ALLOCATIONS, init_allocation_tracing,
         };
         use std::sync::atomic::Ordering;
         let opts = vector::cli::Opts::get_matches()

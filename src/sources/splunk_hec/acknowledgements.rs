@@ -2,8 +2,8 @@ use std::{
     collections::HashMap,
     num::NonZeroU64,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc, Mutex, RwLock,
+        atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -311,10 +311,12 @@ mod tests {
         }
         // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
-        assert!(channel
-            .get_acks_status(&expected_ack_ids)
-            .values()
-            .all(|&status| status == result));
+        assert!(
+            channel
+                .get_acks_status(&expected_ack_ids)
+                .values()
+                .all(|&status| status == result)
+        );
     }
 
     #[tokio::test]
@@ -330,15 +332,19 @@ mod tests {
         }
         // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
-        assert!(channel
-            .get_acks_status(&expected_ack_ids)
-            .values()
-            .all(|status| *status));
+        assert!(
+            channel
+                .get_acks_status(&expected_ack_ids)
+                .values()
+                .all(|status| *status)
+        );
         // Subsequent queries for the same ackId's should result in false
-        assert!(channel
-            .get_acks_status(&expected_ack_ids)
-            .values()
-            .all(|status| !*status));
+        assert!(
+            channel
+                .get_acks_status(&expected_ack_ids)
+                .values()
+                .all(|status| !*status)
+        );
     }
 
     #[tokio::test]
@@ -359,15 +365,19 @@ mod tests {
         // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
         // The first 10 pending ack ids are dropped
-        assert!(channel
-            .get_acks_status(&dropped_pending_ack_ids)
-            .values()
-            .all(|status| !*status));
+        assert!(
+            channel
+                .get_acks_status(&dropped_pending_ack_ids)
+                .values()
+                .all(|status| !*status)
+        );
         // The second 10 pending ack ids can be queried
-        assert!(channel
-            .get_acks_status(&expected_ack_ids)
-            .values()
-            .all(|status| *status));
+        assert!(
+            channel
+                .get_acks_status(&expected_ack_ids)
+                .values()
+                .all(|status| *status)
+        );
     }
 
     #[tokio::test]
@@ -399,18 +409,22 @@ mod tests {
             sleep(time::Duration::from_millis(100)).await;
         }
         sleep(time::Duration::from_secs(1)).await;
-        assert!(idx_ack
-            .get_acks_status_from_channel(channel.clone(), &dropped_pending_ack_ids)
-            .await
-            .unwrap()
-            .values()
-            .all(|status| !*status));
-        assert!(idx_ack
-            .get_acks_status_from_channel(channel, &expected_ack_ids)
-            .await
-            .unwrap()
-            .values()
-            .all(|status| *status));
+        assert!(
+            idx_ack
+                .get_acks_status_from_channel(channel.clone(), &dropped_pending_ack_ids)
+                .await
+                .unwrap()
+                .values()
+                .all(|status| !*status)
+        );
+        assert!(
+            idx_ack
+                .get_acks_status_from_channel(channel, &expected_ack_ids)
+                .await
+                .unwrap()
+                .values()
+                .all(|status| *status)
+        );
     }
 
     #[tokio::test]
@@ -431,10 +445,12 @@ mod tests {
             .unwrap();
 
         let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
-        assert!(idx_ack
-            .get_ack_id_from_channel(channel.clone(), batch_rx)
-            .await
-            .is_err());
+        assert!(
+            idx_ack
+                .get_ack_id_from_channel(channel.clone(), batch_rx)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -481,10 +497,12 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(idx_ack
-            .create_or_get_channel(String::from("channel-id-2"))
-            .await
-            .is_err());
+        assert!(
+            idx_ack
+                .create_or_get_channel(String::from("channel-id-2"))
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -504,10 +522,12 @@ mod tests {
             .unwrap();
         // Allow channel to expire and free up the max channel limit of 1
         sleep(time::Duration::from_secs(3)).await;
-        assert!(idx_ack
-            .create_or_get_channel(String::from("channel-id-2"))
-            .await
-            .is_ok());
+        assert!(
+            idx_ack
+                .create_or_get_channel(String::from("channel-id-2"))
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -534,11 +554,13 @@ mod tests {
             );
         }
         sleep(time::Duration::from_secs(2)).await;
-        assert!(idx_ack
-            .get_acks_status_from_channel(channel.clone(), &expected_ack_ids)
-            .await
-            .unwrap()
-            .values()
-            .all(|status| *status));
+        assert!(
+            idx_ack
+                .get_acks_status_from_channel(channel.clone(), &expected_ack_ids)
+                .await
+                .unwrap()
+                .values()
+                .all(|status| *status)
+        );
     }
 }
