@@ -6,6 +6,17 @@ releases: "0.49.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.49.0`!
+
+		Release highlights:
+
+		- A `websocket` source was introduced. A WebSocket source in Vector enables ingestion of real-time data from services that expose WebSocket APIs.
+    - The `http` sink's `uri` and `request.headers` config fields now support templating, enabling dynamic construction based on event data.
+    - The `--watch-config` flag now also watches for changes in enrichment table files.
+    - Fixed a race condition that could cause negative values in the `vector_buffer_byte_size` and `vector_buffer_events` gauges.
+		"""
+
 	changelog: [
 		{
 			type: "enhancement"
