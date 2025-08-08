@@ -140,73 +140,72 @@ releases: "0.49.0": {
 		{
 			type: "fix"
 			description: """
-				Prevent panic on non-UTF8 environment variables.
+				Fixed an issue that could cause a panic when reading environment variables containing non-UTF8 data. Such variables are now handled gracefully.
 				"""
 			contributors: ["kurochan"]
 		},
 		{
 			type: "fix"
 			description: """
-				Prevents a panic when DD_API_KEY contains newline characters.
+				Prevented a panic when `DD_API_KEY` value contains newline characters. Such values are now handled gracefully.
 				"""
 			contributors: ["kurochan"]
 		},
 		{
 			type: "feat"
 			description: """
-				Added an option to set max packet size for MQTT source and sink.
+				Added a `max_packet_size` option to set max packet size for the `mqtt` source and sink.
 				"""
 			contributors: ["simplepad"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds a new `websocket` source.
+				Added a new `websocket` source.
 				"""
 			contributors: ["benjamin-awd"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds support for `max_bytes` for memory buffers
+				Added the `max_size` configuration option for memory buffers.
 				"""
 			contributors: ["graphcareful"]
 		},
 		{
 			type: "fix"
 			description: """
-				Batches encoded using newline delimited framing now end with a trailing newline.
+				Batches encoded using newline-delimited framing now include a trailing newline at the end.
 				"""
 			contributors: ["jszwedko"]
 		},
 		{
 			type: "feat"
 			description: """
-				The `request_retry_partial` behavior for the `elasticsearch` was changed. Now only the failed retriable requests in a bulk will be retried (instead of all requests in the bulk).
+				The `request_retry_partial` behavior for the `elasticsearch` sink was changed. Now only the failed retriable requests in a bulk will be retried (instead of all requests in the bulk).
 				"""
 			contributors: ["Serendo"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed a potential hang in the internal concurrent map, this issue could hang vector when shutting it down.
+				Fixed a potential hang in Vector core caused by the internal concurrent map. This issue could prevent Vector from shutting down cleanly.
 				"""
 			contributors: ["jorgehermo9"]
 		},
 		{
 			type: "feat"
 			description: """
-				- Add a TTL-based cache for metrics sets
-				- Add `expire_metrics_secs` config for Prometheus remote write sink which uses the TTL-based cache
-				- This fixes an issue where incremental metrics are preserved for the lifetime of Vector's runtime, which causes
-				  indefinite memory growth
+				- Added a TTL-based cache for metric sets.
+				- Introduced the `expire_metrics_secs` configuration to the Prometheus remote write sink, leveraging the new TTL-based cache.
+				- This resolves an issue where incremental metrics were retained for the entire lifetime of Vector, leading to unbounded memory growth.
 				"""
 			contributors: ["GreyLilac09"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed a `log_to_metric` config bug, now `all_metrics` can be specified without the need to also set a `metrics` field.
+				Fixed a `log_to_metric` configuration bug where the `all_metrics` field could not be used without also specifying `metrics`. It can now be set independently.
 				"""
 			contributors: ["pront"]
 		},
@@ -227,21 +226,21 @@ releases: "0.49.0": {
 		{
 			type: "feat"
 			description: """
-				Adds support for Redis Sentinel in the Redis sink.
+				Adds support for Redis Sentinel in the `redis` sink.
 				"""
 			contributors: ["5Dev24"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds support for the Redis ZADD command in the Redis sink.
+				Adds support for the Redis ZADD command in the `redis` sink.
 				"""
 			contributors: ["5Dev24"]
 		},
 		{
 			type: "enhancement"
 			description: """
-				Allow strftime items in UnsignedIntTemplate.
+				The `UnsignedIntTemplate` now supports `strftime` formatting. For example, this `%Y%m%d%H` template will evaluate timestamps to a number.
 				"""
 			contributors: ["5Dev24"]
 		},
