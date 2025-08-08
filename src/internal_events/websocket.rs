@@ -199,6 +199,7 @@ impl InternalEvent for WebSocketReceiveError<'_> {
             error_code = "websocket_receive_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -228,6 +229,7 @@ impl InternalEvent for WebSocketSendError<'_> {
             error_code = "websocket_send_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

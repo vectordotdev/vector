@@ -94,7 +94,7 @@ impl WebSocketSource {
         loop {
             let result = tokio::select! {
                 _ = cx.shutdown.clone() => {
-                    info!("Received shutdown signal.");
+                    info!("Received shutdown signal.", internal_log_rate_limit = true);
                     break;
                 },
 
@@ -117,16 +117,17 @@ impl WebSocketSource {
                         warn!(
                             message = "Connection closed by server.",
                             code = %frame.code,
-                            reason = %frame.reason
+                            reason = %frame.reason,
+                            internal_log_rate_limit = true
                         );
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
-                        warn!("Connection closed by server without a close frame.");
+                        warn!("Connection closed by server without a close frame.", internal_log_rate_limit = true);
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
-                        error!("Disconnecting due to pong timeout.");
+                        error!("Disconnecting due to pong timeout.", internal_log_rate_limit = true);
                         emit!(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
@@ -140,7 +141,7 @@ impl WebSocketSource {
                         if is_closed(&ws_err) {
                             emit!(WebSocketConnectionShutdown);
                         }
-                        error!(message = "WebSocket connection error.", error = %ws_err);
+                        error!(message = "WebSocket connection error.", error = %ws_err, internal_log_rate_limit = true);
                     }
                     // These errors should only happen during `connect` or `reconnect`,
                     // not in the main loop's result.
@@ -194,7 +195,7 @@ impl WebSocketSource {
             Message::Ping(_) => Ok(()),
             Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
-                warn!("Unsupported message type received: frame.");
+                warn!("Unsupported message type received: frame.", internal_log_rate_limit = true);
                 Ok(())
             }
         }
@@ -241,7 +242,7 @@ impl WebSocketSource {
                     });
 
                     if let Err(error) = out.send_batch(events_with_meta).await {
-                        error!(message = "Error sending events.", %error);
+                        error!(message = "Error sending events.", %error, internal_log_rate_limit = true);
                     }
                 }
                 Err(error) => {
@@ -265,14 +266,14 @@ impl WebSocketSource {
         ws_sink: &mut WebSocketSink,
         ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
-        info!("Reconnecting to WebSocket...");
+        info!("Reconnecting to WebSocket...", internal_log_rate_limit = true);
 
         let (new_sink, new_source) = self.connect(out).await?;
 
         *ws_sink = new_sink;
         *ws_source = new_source;
 
-        info!("Reconnected.");
+        info!("Reconnected to Websocket.", internal_log_rate_limit = true);
 
         Ok(())
     }
