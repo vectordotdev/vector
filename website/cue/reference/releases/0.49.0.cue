@@ -23,22 +23,21 @@ releases: "0.49.0": {
 		{
 			type: "enhancement"
 			description: """
-				Extends retry logic in AWS sink by allowing users to configure the sink to retry specific or all failed request attempts.
+				Extends retry logic in `aws_s3` sink by allowing users to configure which requests to retry.
 				"""
 			contributors: ["jchap-pnnl", "jhbigler-pnnl"]
 		},
 		{
 			type: "feat"
 			description: """
-				`http` sink's uri config is now templateable, allowing to use fields from events
-				to build the uri.
+				The `http` sink's `uri` config is now templateable, allowing for dynamic URI building based on event fields.
 				"""
 			contributors: ["jorgehermo9"]
 		},
 		{
 			type: "enhancement"
 			description: """
-				The `http` sink now supports templated header values.
+				The `http` sink `request.headers` configuration now supports templated values.
 				"""
 			contributors: ["notchairmk"]
 		},
@@ -52,7 +51,7 @@ releases: "0.49.0": {
 		{
 			type: "feat"
 			description: """
-				Add a `query_settings` and `async_insert_settings` option in the `clickhouse` sink, which allows users to configure asynchronous inserts.
+				Added a `query_settings` and `async_insert_settings` option in the `clickhouse` sink, which allows users to configure asynchronous inserts.
 				"""
 			contributors: ["pm5"]
 		},
@@ -66,28 +65,28 @@ releases: "0.49.0": {
 		{
 			type: "fix"
 			description: """
-				Fix URI provided for basic auth in OpenSearch. Credentials provided in the URI were ignored. It is now being used correctly.
+				Fixed a bug in the `elasticsearch` sink that caused URI credentials to be ignored. They are now correctly used.
 				"""
 			contributors: ["ynachi"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixes a bug where the healthcheck in the Postgres sink was not being properly disabled.
+				Previously the `postgres` sink healthcheck was not implemented correctly. Now Vector can start when `healthcheck.enabled` is set to `false`.
 				"""
 			contributors: ["jorgehermo9"]
 		},
 		{
 			type: "fix"
 			description: """
-				Secrets names in the configuration allow hyphens.
+				Secret names in the configuration can now contain hyphens. For example `"SECRET[systemd.vm-token]" is now valid.
 				"""
 			contributors: ["optician"]
 		},
 		{
 			type: "chore"
 			description: """
-				Previously heroku_logs and demo_logs could output logs, metrics and traces depending on the decoding. Now they can only output logs.
+				Previously `heroku_logs` and `demo_logs` sinks could output logs, metrics and traces depending on the decoding. Now they can only output logs.
 				This behavior was unintuitive and undocumented.
 				"""
 			contributors: ["thomasqueirozb"]
@@ -109,7 +108,7 @@ releases: "0.49.0": {
 		{
 			type: "fix"
 			description: """
-				Fix an issue where tags were not modifiable via VRL if `metrics-tag-values` was set to `full`.
+				Fixed an issue where tags were not modifiable via VRL if `metrics-tag-values` was set to `full`.
 				"""
 			contributors: ["thomasqueirozb"]
 		},
@@ -123,21 +122,21 @@ releases: "0.49.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed an issue with `dnstap` `tcp` source, where it could have a drastically reduced throughput after number of connections exceeded number of available cores.
+				Fixed an issue in the `dnstap` and `tcp` sources where throughput could drop significantly when the number of connections exceeded the number of available cores.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed race condition bug causing negative values to be reported by the `vector_buffer_byte_size` and `vector_buffer_events` gauges.
+				Fixed a race condition that caused negative values to be reported by the `vector_buffer_byte_size` and `vector_buffer_events` gauges.
 				"""
 			contributors: ["vparfonov"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds `time_settings` configuration for `dedupe` transform, to enable configuring `max_age` for items in the deduplication cache, helping make a distinction between real duplicates and duplication that is expected in the incoming data over a longer period of time.
+				Added `time_settings` configuration to the `dedupe` transform, allowing the `max_age` of items in the deduplication cache to be set. This helps distinguish between true duplicates and expected repetition in data over longer periods.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
