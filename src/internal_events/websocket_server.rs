@@ -43,7 +43,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_code = "ws_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         let mut all_tags = self.extra_tags.clone();
         all_tags.extend([
@@ -100,7 +100,7 @@ impl InternalEvent for WebSocketListenerSendError {
             error_code = "ws_server_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
