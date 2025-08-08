@@ -276,7 +276,7 @@ impl GcsSinkConfig {
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic)
+            .settings(request, GcsRetryLogic::default())
             .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self, cx)?;

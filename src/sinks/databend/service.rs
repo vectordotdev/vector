@@ -23,6 +23,7 @@ pub struct DatabendRetryLogic;
 
 impl RetryLogic for DatabendRetryLogic {
     type Error = DatabendError;
+    type Request = DatabendRequest;
     type Response = DatabendResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
