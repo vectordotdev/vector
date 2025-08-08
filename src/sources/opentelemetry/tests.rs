@@ -1132,6 +1132,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            decoding: None,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1237,6 +1238,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        decoding: None,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
