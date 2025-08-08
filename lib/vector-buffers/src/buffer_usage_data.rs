@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        atomic::{AtomicI64, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, LazyLock,
     },
     time::Duration,
@@ -16,22 +16,26 @@ use crate::{
     spawn_named,
 };
 
-static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicI64, AtomicI64)>> =
+static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicU64, AtomicU64)>> =
     LazyLock::new(DashMap::new);
 
-fn update_and_get(counter: &AtomicI64, delta: i64) -> u64 {
+fn update_and_get(counter: &AtomicU64, delta: i64) -> u64 {
     let mut new_val = 0;
     counter
         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            new_val = current.saturating_add(delta).clamp(0, i64::MAX);
+            // This will never be negative due to the `clamp`
+            #[expect(clippy::cast_sign_loss)]
+            {
+                new_val = current
+                    .try_into()
+                    .unwrap_or(i64::MAX)
+                    .saturating_add(delta)
+                    .clamp(0, i64::MAX) as u64;
+            }
             Some(new_val)
         })
         .ok();
-    // This will never be negative due to the `clamp` above
-    #[expect(clippy::cast_sign_loss)]
-    {
-        new_val as u64
-    }
+    new_val
 }
 
 fn update_buffer_counters(
@@ -388,7 +392,7 @@ mod tests {
         BUFFER_COUNTERS.clear();
     }
 
-    fn get_counter_values(buffer_id: &str, stage: usize) -> (i64, i64) {
+    fn get_counter_values(buffer_id: &str, stage: usize) -> (u64, u64) {
         match BUFFER_COUNTERS.get(&(buffer_id.to_string(), stage)) {
             Some(counters) => {
                 let events = counters.0.load(Ordering::Relaxed);
@@ -431,10 +435,10 @@ mod tests {
 
     #[test]
     fn test_multithreaded_updates_are_correct() {
-        const NUM_THREADS: i64 = 10;
-        const INCREMENTS_PER_THREAD: i64 = 1000;
-        const EXPECTED_EVENTS: i64 = NUM_THREADS * INCREMENTS_PER_THREAD;
-        const EXPECTED_BYTES: i64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
+        const NUM_THREADS: u64 = 10;
+        const INCREMENTS_PER_THREAD: u64 = 1000;
+        const EXPECTED_EVENTS: u64 = NUM_THREADS * INCREMENTS_PER_THREAD;
+        const EXPECTED_BYTES: u64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
 
         let _guard = TEST_LOCK
             .lock()
@@ -464,6 +468,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::cast_possible_wrap)]
     fn test_large_values_capped_to_f64_safe_max() {
         let _guard = TEST_LOCK
             .lock()
@@ -471,7 +476,8 @@ mod tests {
 
         reset_counters();
 
-        update_buffer_counters("test_buffer", 3, F64_SAFE_INT_MAX * 2, F64_SAFE_INT_MAX * 2);
+        let increment = F64_SAFE_INT_MAX as i64 * 2;
+        update_buffer_counters("test_buffer", 3, increment, increment);
 
         let (events, bytes) = get_counter_values("test_buffer", 3);
 
