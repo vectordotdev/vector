@@ -725,8 +725,8 @@ pub async fn reload_enrichment_tables(config: &Config) {
                 Ok(table) => table,
                 Err(error) => {
                     error!(
+                        internal_log_rate_limit = true,
                         "Enrichment table \"{name}\" reload failed: {error}",
-                        internal_log_rate_limit = true
                     );
                     continue;
                 }
@@ -742,9 +742,12 @@ pub async fn reload_enrichment_tables(config: &Config) {
                             // If there is an error adding an index we do not want to use the reloaded
                             // data, the previously loaded data will still need to be used.
                             // Just report the error and continue.
-                            error!(message = "Unable to add index to reloaded enrichment table.",
-                                    table = ?name.to_string(),
-                                    %error);
+                            error!(
+                                internal_log_rate_limit = true,
+                                message = "Unable to add index to reloaded enrichment table.",
+                                table = ?name.to_string(),
+                                %error
+                            );
                             continue 'tables;
                         }
                     }

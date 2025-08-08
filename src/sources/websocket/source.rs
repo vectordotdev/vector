@@ -94,7 +94,7 @@ impl WebSocketSource {
         loop {
             let result = tokio::select! {
                 _ = cx.shutdown.clone() => {
-                    info!("Received shutdown signal.", internal_log_rate_limit = true);
+                    info!(internal_log_rate_limit = true, "Received shutdown signal.");
                     break;
                 },
 
@@ -124,15 +124,15 @@ impl WebSocketSource {
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
                         warn!(
-                            "Connection closed by server without a close frame.",
-                            internal_log_rate_limit = true
+                            internal_log_rate_limit = true,
+                            "Connection closed by server without a close frame."
                         );
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
                         error!(
-                            "Disconnecting due to pong timeout.",
-                            internal_log_rate_limit = true
+                            internal_log_rate_limit = true,
+                            "Disconnecting due to pong timeout."
                         );
                         emit!(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
@@ -202,8 +202,8 @@ impl WebSocketSource {
             Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
                 warn!(
-                    "Unsupported message type received: frame.",
-                    internal_log_rate_limit = true
+                    internal_log_rate_limit = true,
+                    "Unsupported message type received: frame."
                 );
                 Ok(())
             }
@@ -276,8 +276,8 @@ impl WebSocketSource {
         ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
         info!(
-            "Reconnecting to WebSocket...",
-            internal_log_rate_limit = true
+            internal_log_rate_limit = true,
+            "Reconnecting to WebSocket..."
         );
 
         let (new_sink, new_source) = self.connect(out).await?;
@@ -285,7 +285,7 @@ impl WebSocketSource {
         *ws_sink = new_sink;
         *ws_source = new_source;
 
-        info!("Reconnected to Websocket.", internal_log_rate_limit = true);
+        info!(internal_log_rate_limit = true, "Reconnected to Websocket.");
 
         Ok(())
     }
