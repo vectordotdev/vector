@@ -61,6 +61,7 @@ pub struct OpentelemetryConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
+    /// Setting this field will override the legacy mapping of OTEL protos to Vector events.
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decoding: Option<DeserializerConfig>,
@@ -154,6 +155,9 @@ impl SourceConfig for OpentelemetryConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let decoder = self.decoding.map(|deserializer|
+            DecodingConfig::new(FramingConfig::Bytes, deserializer, self.log_namespace));
+
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
@@ -162,6 +166,7 @@ impl SourceConfig for OpentelemetryConfig {
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
+            decoder,
         })
             .accept_compressed(CompressionEncoding::Gzip)
             .max_decoding_message_size(usize::MAX);
@@ -171,6 +176,7 @@ impl SourceConfig for OpentelemetryConfig {
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
+            decoder
         })
             .accept_compressed(CompressionEncoding::Gzip)
             .max_decoding_message_size(usize::MAX);
@@ -180,6 +186,7 @@ impl SourceConfig for OpentelemetryConfig {
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
+            decoder
         })
             .accept_compressed(CompressionEncoding::Gzip)
             .max_decoding_message_size(usize::MAX);

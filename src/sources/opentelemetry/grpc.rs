@@ -1,3 +1,4 @@
+use crate::codecs::Decoder;
 use crate::sources::opentelemetry::config::{LOGS, METRICS, TRACES};
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
@@ -34,6 +35,7 @@ pub(super) struct Service {
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
     pub log_namespace: LogNamespace,
+    pub decoder: Option<Decoder>
 }
 
 #[tonic::async_trait]
@@ -42,25 +44,18 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let raw_bytes = request.get_ref().encode_to_vec();
-        let bytes = bytes::Bytes::from(raw_bytes);
-        let deserializer = ProtobufDeserializerConfig {
-            protobuf: ProtobufDeserializerOptions {
-                desc_file: PathBuf::from("src/proto/opentelemetry-proto/opentelemetry-proto.desc"),
-                message_type: "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest".to_string(),
-            }
-        }.build().unwrap();
-        let events = deserializer
-            .parse(bytes, self.log_namespace)
-            .unwrap()
-            .into_vec();
-
-        // let events: Vec<Event> = request
-        //     .into_inner()
-        //     .resource_spans
-        //     .into_iter()
-        //     .flat_map(|v| v.into_event_iter())
-        //     .collect();
+        let events = if let Some(decoder) = self.decoder.as_deref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            let bytes = bytes::Bytes::from(raw_bytes);
+            decoder.dexcode(bytes)
+        } else {
+            request
+                .into_inner()
+                .resource_spans
+                .into_iter()
+                .flat_map(|v| v.into_event_iter())
+                .collect()
+        };
         self.handle_events(events, TRACES).await?;
 
         Ok(Response::new(ExportTraceServiceResponse {
