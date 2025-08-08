@@ -129,7 +129,10 @@ pub fn spawn_thread<'a>(
                             .iter()
                             .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                         {
-                            info!("Only enrichment tables have changed.", internal_log_rate_limit = true);
+                            info!(
+                                "Only enrichment tables have changed.",
+                                internal_log_rate_limit = true
+                            );
                             _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
                                 error!(message = "Unable to reload enrichment tables.", cause = %error, internal_log_rate_limit = true,)
                             });

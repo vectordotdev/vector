@@ -678,7 +678,10 @@ async fn handle_tcp_frame<T>(
         .await;
     } else if let Some(event) = frame_handler.handle_event(received_from, frame) {
         if let Err(e) = event_sink.send_event(event).await {
-            error!("Error sending event: {e:?}.", internal_log_rate_limit = true);
+            error!(
+                "Error sending event: {e:?}.",
+                internal_log_rate_limit = true
+            );
         }
     }
 }

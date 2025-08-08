@@ -123,11 +123,17 @@ impl WebSocketSource {
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
-                        warn!("Connection closed by server without a close frame.", internal_log_rate_limit = true);
+                        warn!(
+                            "Connection closed by server without a close frame.",
+                            internal_log_rate_limit = true
+                        );
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
-                        error!("Disconnecting due to pong timeout.", internal_log_rate_limit = true);
+                        error!(
+                            "Disconnecting due to pong timeout.",
+                            internal_log_rate_limit = true
+                        );
                         emit!(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
@@ -195,7 +201,10 @@ impl WebSocketSource {
             Message::Ping(_) => Ok(()),
             Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
-                warn!("Unsupported message type received: frame.", internal_log_rate_limit = true);
+                warn!(
+                    "Unsupported message type received: frame.",
+                    internal_log_rate_limit = true
+                );
                 Ok(())
             }
         }
@@ -266,7 +275,10 @@ impl WebSocketSource {
         ws_sink: &mut WebSocketSink,
         ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
-        info!("Reconnecting to WebSocket...", internal_log_rate_limit = true);
+        info!(
+            "Reconnecting to WebSocket...",
+            internal_log_rate_limit = true
+        );
 
         let (new_sink, new_source) = self.connect(out).await?;
 
