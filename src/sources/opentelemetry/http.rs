@@ -1,12 +1,12 @@
 use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
-use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
 use crate::codecs::Decoder as VectorDecoder;
 use crate::common::http::ErrorMessage;
 use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
 use crate::sources::util::add_headers;
 use crate::{
     event::Event,
@@ -190,7 +190,7 @@ fn build_warp_log_filter(
                     events,
                     acknowledgements,
                     out.clone(),
-                    super::LOGS,
+                    LOGS,
                     ExportLogsServiceResponse::default(),
                 )
             },
@@ -222,7 +222,7 @@ fn build_warp_metrics_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::METRICS,
+                METRICS,
                 ExportMetricsServiceResponse::default(),
             )
         })
@@ -253,7 +253,7 @@ fn build_warp_trace_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::TRACES,
+                TRACES,
                 ExportTraceServiceResponse::default(),
             )
         })

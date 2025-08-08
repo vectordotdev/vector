@@ -1,6 +1,6 @@
+use crate::sources::opentelemetry::config::{LOGS, METRICS, TRACES};
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::{LOGS, METRICS, TRACES},
     SourceSender,
 };
 use futures::TryFutureExt;
@@ -46,7 +46,7 @@ impl TraceService for Service {
         let bytes = bytes::Bytes::from(raw_bytes);
         let deserializer = ProtobufDeserializerConfig {
             protobuf: ProtobufDeserializerOptions {
-                desc_file: PathBuf::from("/Users/pavlos.rontidis/CLionProjects/vector/pront/otel/proto/vector-proto-related/trace_service.desc"),
+                desc_file: PathBuf::from("src/proto/opentelemetry-proto/opentelemetry-proto.desc"),
                 message_type: "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest".to_string(),
             }
         }.build().unwrap();
