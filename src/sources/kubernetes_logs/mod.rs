@@ -4,6 +4,9 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::{cmp::min, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
@@ -76,6 +79,172 @@ use self::pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+
+/// Thread-safe cache for Kubernetes metadata with composite-key indexing.
+///
+/// ## Design Overview
+/// - **Thread Safety**: Uses `Arc<Mutex<HashMap>>` for concurrent access
+/// - **Key Format**: Composite keys (e.g., `pod_uid|container_name`) prevent collisions
+/// - **Value Type**: `Arc<dyn Any + Send + Sync>` enables type-erasure and zero-copy sharing
+///
+/// ## Performance Notes
+/// - `get()`: Clones only `Arc` pointer (O(1) cost)
+/// - `insert()`: Short-term mutex lock during write
+///
+/// ## Example
+/// ```rust
+/// use k8s_metadata::K8sMetadataCache;
+///
+/// let cache = K8sMetadataCache::new();
+/// cache.insert("pod-123".to_string(), "nginx".to_string(), 8080);
+///
+/// if let Some(port) = cache.get("pod-123", "nginx").and_then(|v| v.downcast_ref::<i32>()) {
+///     println!("Container port: {}", port);
+/// }
+/// ```
+pub struct K8sMetadataCache {
+    cache: Arc<Mutex<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
+}
+
+impl K8sMetadataCache {
+    /// Creates a new empty metadata cache.
+    ///
+    /// Initializes an internally synchronized `HashMap` wrapped in:
+    /// - `Mutex` for thread-safe mutation
+    /// - `Arc` for shared ownership across threads
+    pub fn new() -> Self {
+        K8sMetadataCache {
+            cache: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Generates a composite cache key from Pod UID and container name.
+    ///
+    /// ## Format
+    /// `{pod_uuid}|{container_name}`  
+    /// (e.g., `"c5b4a3d2|nginx"`)
+    ///
+    /// ## Why Composite Keys?
+    /// - Uniquely identifies containers within a Pod
+    /// - Avoids collisions between Pods with same container names
+    pub fn generate_key(pod_uuid: &str, container_name: &str) -> String {
+        format!("{}|{}", pod_uuid, container_name)
+    }
+
+    /// Retrieves cached metadata by Pod UID and container name.
+    ///
+    /// ## Behavior
+    /// 1. Constructs composite key via `generate_key()`
+    /// 2. Locks cache for read (blocking until available)
+    /// 3. Returns `Some(Arc)` if key exists (**clones `Arc` pointer only**)
+    ///
+    /// ## Performance
+    /// - ⚡️ **Zero data copy**: Only increments `Arc` reference count
+    /// - 🔒 Short-lived lock contention
+    pub fn get(&self, pod_uuid: &str, container_name: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+        let key = Self::generate_key(pod_uuid, container_name);
+        let cache = self.cache.lock().unwrap();
+        cache.get(&key).map(Arc::clone)
+    }
+
+    /// Inserts metadata into cache with automatic type erasure.
+    ///
+    /// ## Type Requirements
+    /// - `T: Any` → Enables runtime type checking
+    /// - `T: Send + Sync` → Permits cross-thread sharing
+    /// - `'static` → Guarantees no short-lived references
+    ///
+    /// ## Operation
+    /// 1. Converts `value` into `Arc<T>`
+    /// 2. Type-erases to `Arc<dyn Any + Send + Sync>`
+    /// 3. Locks cache briefly for insertion
+    ///
+    /// ## Example: Storing Custom Metadata
+    /// ```rust
+    /// struct ContainerSpec {
+    ///     image: String,
+    ///     ports: Vec<i32>,
+    /// }
+    ///
+    /// cache.insert("pod-456", "redis", ContainerSpec {
+    ///     image: "redis:7.0".into(),
+    ///     ports: vec![6379],
+    /// });
+    /// ```
+    pub fn insert<T: Any + Send + Sync + 'static>(
+        &self,
+        pod_uuid: String,
+        container_name: String,
+        value: T,
+    ) {
+        let key = Self::generate_key(&pod_uuid, &container_name);
+        let value = Arc::new(value);
+        let mut cache = self.cache.lock().unwrap();
+        cache.insert(key, value);
+    }
+}
+
+/// Converts a type-erased `Arc` pointer into a concrete [`vrl::value::Value`] instance.
+///
+/// This function attempts to downcast the input [`Arc<dyn Any + Send + Sync>`] to known types,
+/// producing a clone of the underlying data. It is designed for interoperability with
+/// type-erased metadata storage systems (e.g., Kubernetes metadata caches).
+///
+/// ## Behavior
+/// 1. **Priority Downcast Order**:
+///    - First attempts to downcast to `Arc<Value>` (common when storing pre-wrapped values)
+///    - Falls back to downcasting to `&Value` (direct value storage)
+///    - Returns [`vrl::value::Value::Null`] for unsupported types
+/// 2. **Cloning Semantics**:
+///    - Returns a **deep clone** of the underlying data ([`vrl::value::Value`] must be owned)
+///    - Avoids data duplication when input is `Arc<Value>` by unwrapping before cloning
+///
+/// ## Type Handling
+/// - Supported input types:
+///   - `Arc<vrl::value::Value>`
+///   - `vrl::value::Value` (as `&dyn Any`)
+/// - Unsupported types return [`vrl::value::Value::Null`]
+///
+/// ## Performance Notes
+/// - ⏱️ **Low Overhead for `Arc<Value>`**:  
+///   Single `Arc` dereference + `Value::clone()` (avoids double-indirection)
+/// - ⚠️ **Deep Copy for Direct `Value`**:  
+///   Full clone of the [``vrl::value::Value`] tree (consider storing `Arc<`vrl::value::Value>` in cache)
+///
+/// ## Example
+/// ```rust
+/// use std::sync::Arc;
+/// use std::any::Any;
+/// use vrl::value::Value;
+///
+/// let input = Value::Integer(42);
+///
+/// // Case 1: Stored as Arc<Value>
+/// let arc_val = Arc::new(input.clone());
+/// assert_eq!(any_to_value(Arc::clone(&arc_val)), input);
+///
+/// // Case 2: Stored as raw Value (less efficient)
+/// let raw_val: Arc<dyn Any + Send + Sync> = Arc::new(input.clone());
+/// assert_eq!(any_to_value(raw_val), input);
+///
+/// // Case 3: Unsupported type
+/// let unknown: Arc<dyn Any + Send + Sync> = Arc::new("string".to_string());
+/// assert_eq!(any_to_value(unknown), Value::Null);
+/// ```
+///
+/// ## Safety & Threading
+/// - ✅ **Thread-Safe**: Input requires [`Send + Sync`] bounds
+/// - ✅ **No Panics**: Gracefully handles downcast failures via [`vrl::value::Value::Null`]
+pub fn any_to_value(any: Arc<dyn Any + Send + Sync>) -> vrl::value::Value {
+    if let Some(arc_val) = any.downcast_ref::<Arc<vrl::value::Value>>() {
+        return (**arc_val).clone();
+    }
+
+    if let Some(val) = any.downcast_ref::<vrl::value::Value>() {
+        return val.clone();
+    }
+    vrl::value::Value::Null
+}
 
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
@@ -857,6 +1026,7 @@ impl Source {
             rotate_wait,
         };
 
+        let metadata_cache = K8sMetadataCache::new();
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let checkpoints = checkpointer.view();
@@ -873,37 +1043,59 @@ impl Source {
                 log_namespace,
             );
 
-            let file_info = annotator.annotate(&mut event, &line.filename);
+            //only get base info, to avoid pod annotate
+            let file = annotator.get_pod_info(&line.filename);
+            let pod_uid = file
+                .as_ref()
+                .map(|info| info.pod_uid.to_owned())
+                .unwrap_or_else(|| "unknown_pod".to_string());
+            let container_name = file
+                .as_ref()
+                .map(|info| info.container_name.to_owned())
+                .unwrap_or_else(|| "unknown_container".to_string());
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                pod_info: file.as_ref().map(|info| KubernetesLogsPodInfo {
                     name: info.pod_name.to_owned(),
                     namespace: info.pod_namespace.to_owned(),
                 }),
             });
 
-            if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationError { event: &event });
+            let cached_metadata_point = metadata_cache.get(&pod_uid, &container_name);
+            let real_val =
+                cached_metadata_point.unwrap_or(Arc::new(vrl::value::Value::Null.clone()));
+            let vrlvalue = any_to_value(real_val);
+            if vrlvalue != vrl::value::Value::Null {
+                let logx = event.as_mut_log();
+                logx.insert("kubernetes", vrlvalue);
             } else {
-                let namespace = file_info.as_ref().map(|info| info.pod_namespace);
+                let file_info = annotator.annotate(&mut event, &line.filename);
+                if file_info.is_none() {
+                    emit!(KubernetesLogsEventAnnotationError { event: &event });
+                } else {
+                    let namespace = file_info.as_ref().map(|info| info.pod_namespace);
+                    if let Some(name) = namespace {
+                        let ns_info = ns_annotator.annotate(&mut event, name);
 
-                if let Some(name) = namespace {
-                    let ns_info = ns_annotator.annotate(&mut event, name);
-
-                    if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        if ns_info.is_none() {
+                            emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        }
+                    }
+                    let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
+                    if node_info.is_none() {
+                        emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                     }
                 }
-
-                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
-
-                if node_info.is_none() {
-                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
-                }
+                // build cache map
+                let loge = event.as_log();
+                let k8map = loge.as_map().unwrap();
+                let k8mapval = k8map.get("kubernetes");
+                let k8val = k8mapval.unwrap().clone();
+                // update cache
+                metadata_cache.insert(pod_uid.to_string(), container_name.to_string(), k8val);
             }
-
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
@@ -1151,6 +1343,7 @@ fn prepare_label_selector(selector: &str) -> String {
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
+    use std::sync::Arc;
     use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::{config::LogNamespace, schema::Definition};
     use vrl::value::{kind::Collection, Kind};
@@ -1158,6 +1351,7 @@ mod tests {
     use crate::config::SourceConfig;
 
     use super::Config;
+    use super::K8sMetadataCache;
 
     #[test]
     fn generate_config() {
@@ -1513,5 +1707,46 @@ mod tests {
                 )
             )
         )
+    }
+
+    #[test]
+    fn test_insert_and_get_metadata() {
+        let cache = K8sMetadataCache::new();
+
+        #[derive(Debug, PartialEq)]
+        struct ContainerSpec {
+            image: String,
+            ports: Vec<i32>,
+        }
+
+        let pod_uid = "pod-123";
+        let container_name = "nginx";
+
+        cache.insert(
+            pod_uid.to_string(),
+            container_name.to_string(),
+            ContainerSpec {
+                image: "nginx:1.25".into(),
+                ports: vec![80, 443],
+            },
+        );
+
+        let result = cache.get(pod_uid, container_name);
+        assert!(result.is_some(), "Expected cache hit but got None");
+
+        let arc_any = result.unwrap();
+
+        let spec = arc_any.downcast_ref::<ContainerSpec>();
+        assert!(spec.is_some(), "Failed to downcast to ContainerSpec");
+
+        let spec = spec.unwrap();
+        assert_eq!(spec.image, "nginx:1.25");
+        assert_eq!(spec.ports, vec![80, 443]);
+
+        let result2 = cache.get(pod_uid, container_name).unwrap();
+        assert!(
+            Arc::ptr_eq(&arc_any, &result2),
+            "Arc pointers should be equal"
+        );
     }
 }
