@@ -22,19 +22,16 @@ fn u64_to_i64(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-fn update_and_get(counter: &AtomicU64, delta: i64) -> u64 {
-    let mut new_val = 0;
+fn update_counter(counter: &AtomicU64, delta: i64) {
     counter
         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
             // This will never be negative due to the `clamp`
             #[expect(clippy::cast_sign_loss)]
             {
-                new_val = u64_to_i64(current).saturating_add(delta).clamp(0, i64::MAX) as u64;
+                Some(u64_to_i64(current).saturating_add(delta).clamp(0, i64::MAX) as u64)
             }
-            Some(new_val)
         })
         .ok();
-    new_val
 }
 
 /// Snapshot of category metrics.
@@ -65,14 +62,14 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        update_and_get(&self.event_count, u64_to_i64(event_count));
-        update_and_get(&self.event_byte_size, u64_to_i64(event_byte_size));
+        update_counter(&self.event_count, u64_to_i64(event_count));
+        update_counter(&self.event_byte_size, u64_to_i64(event_byte_size));
     }
 
     /// Decrements the event count and byte size by the given amounts.
     fn decrement(&self, event_count: u64, event_byte_size: u64) {
-        update_and_get(&self.event_count, -u64_to_i64(event_count));
-        update_and_get(&self.event_byte_size, -u64_to_i64(event_byte_size));
+        update_counter(&self.event_count, -u64_to_i64(event_count));
+        update_counter(&self.event_byte_size, -u64_to_i64(event_byte_size));
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -372,8 +369,8 @@ mod tests {
             let counter = Arc::clone(&counter);
             let handle = thread::spawn(move || {
                 for _ in 0..INCREMENTS_PER_THREAD {
-                    update_and_get(&counter, 1);
-                    update_and_get(&counter, -1);
+                    update_counter(&counter, 1);
+                    update_counter(&counter, -1);
                 }
             });
             handles.push(handle);
