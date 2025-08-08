@@ -1,11 +1,13 @@
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicI64, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
 };
 
+use crate::cast_utils::i64_to_f64_safe;
+use metrics::gauge;
 use tokio::time::interval;
 use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
@@ -38,14 +40,35 @@ impl CategorySnapshot {
 struct CategoryMetrics {
     event_count: AtomicU64,
     event_byte_size: AtomicU64,
+    total_event_count: AtomicI64,
+    total_event_byte_size: AtomicI64,
 }
 
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
-    fn increment(&self, event_count: u64, event_byte_size: u64) {
+    /// is_addition: true: This is for events being received.
+    /// It tells the function to fetch_add the values to the permanent gauge totals. This increases the buffer size.
+    /// is_addition: false: This is for events being sent or dropped.
+    /// It tells the function to fetch_sub the values from the permanent gauge totals. This decreases the buffer size.
+    fn record_usage(&self, event_count: u64, event_byte_size: u64, is_addition: bool) {
         self.event_count.fetch_add(event_count, Ordering::Relaxed);
         self.event_byte_size
             .fetch_add(event_byte_size, Ordering::Relaxed);
+
+        let event_delta = i64::try_from(event_count).unwrap_or(i64::MAX);
+        let byte_delta = i64::try_from(event_byte_size).unwrap_or(i64::MAX);
+
+        if is_addition {
+            self.total_event_count
+                .fetch_add(event_delta, Ordering::Relaxed);
+            self.total_event_byte_size
+                .fetch_add(byte_delta, Ordering::Relaxed);
+        } else {
+            self.total_event_count
+                .fetch_sub(event_delta, Ordering::Relaxed);
+            self.total_event_byte_size
+                .fetch_sub(byte_delta, Ordering::Relaxed);
+        }
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -117,14 +140,14 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.received.increment(count, byte_size);
+        self.state.received.record_usage(count, byte_size, true);
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.sent.increment(count, byte_size);
+        self.state.sent.record_usage(count, byte_size, false);
     }
 
     /// Increment the number of dropped events (and their total size) for this buffer component.
@@ -135,9 +158,11 @@ impl BufferUsageHandle {
         intentional: bool,
     ) {
         if intentional {
-            self.state.dropped_intentional.increment(count, byte_size);
+            self.state
+                .dropped_intentional
+                .record_usage(count, byte_size, false);
         } else {
-            self.state.dropped.increment(count, byte_size);
+            self.state.dropped.record_usage(count, byte_size, false);
         }
     }
 }
@@ -251,65 +276,296 @@ impl BufferUsage {
             let mut interval = interval(Duration::from_secs(2));
             loop {
                 interval.tick().await;
-
-                for stage in &stages {
-                    let max_size = stage.max_size.get();
-                    emit(BufferCreated {
-                        idx: stage.idx,
-                        max_size_bytes: max_size.event_byte_size,
-                        max_size_events: max_size
-                            .event_count
-                            .try_into()
-                            .expect("should never be bigger than `usize`"),
-                    });
-
-                    let received = stage.received.consume();
-                    if received.has_updates() {
-                        emit(BufferEventsReceived {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            count: received.event_count,
-                            byte_size: received.event_byte_size,
-                        });
-                    }
-
-                    let sent = stage.sent.consume();
-                    if sent.has_updates() {
-                        emit(BufferEventsSent {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            count: sent.event_count,
-                            byte_size: sent.event_byte_size,
-                        });
-                    }
-
-                    let dropped = stage.dropped.consume();
-                    if dropped.has_updates() {
-                        emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            intentional: false,
-                            reason: "corrupted_events",
-                            count: dropped.event_count,
-                            byte_size: dropped.event_byte_size,
-                        });
-                    }
-
-                    let dropped_intentional = stage.dropped_intentional.consume();
-                    if dropped_intentional.has_updates() {
-                        emit(BufferEventsDropped {
-                            buffer_id: buffer_id.clone(),
-                            idx: stage.idx,
-                            intentional: true,
-                            reason: "drop_newest",
-                            count: dropped_intentional.event_count,
-                            byte_size: dropped_intentional.event_byte_size,
-                        });
-                    }
-                }
+                Self::report_metrics(&stages, &buffer_id);
             }
         };
 
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
+    }
+
+    /// A single reporting pass for all registered stages.
+    /// This function is separate from `install` to facilitate testing.
+    fn report_metrics(stages: &[Arc<BufferUsageData>], buffer_id: &str) {
+        for stage in stages {
+            let max_size = stage.max_size.get();
+            if max_size.has_updates() {
+                emit(BufferCreated {
+                    idx: stage.idx,
+                    max_size_bytes: max_size.event_byte_size,
+                    max_size_events: max_size
+                        .event_count
+                        .try_into()
+                        .expect("should never be bigger than `usize`"),
+                });
+            }
+
+            let received = stage.received.consume();
+            if received.has_updates() {
+                emit(BufferEventsReceived {
+                    buffer_id: buffer_id.to_string(),
+                    idx: stage.idx,
+                    count: received.event_count,
+                    byte_size: received.event_byte_size,
+                });
+            }
+
+            let sent = stage.sent.consume();
+            if sent.has_updates() {
+                emit(BufferEventsSent {
+                    buffer_id: buffer_id.to_string(),
+                    idx: stage.idx,
+                    count: sent.event_count,
+                    byte_size: sent.event_byte_size,
+                });
+            }
+
+            let dropped = stage.dropped.consume();
+            if dropped.has_updates() {
+                emit(BufferEventsDropped {
+                    buffer_id: buffer_id.to_string(),
+                    idx: stage.idx,
+                    intentional: false,
+                    reason: "corrupted_events",
+                    count: dropped.event_count,
+                    byte_size: dropped.event_byte_size,
+                });
+            }
+
+            let dropped_intentional = stage.dropped_intentional.consume();
+            if dropped_intentional.has_updates() {
+                emit(BufferEventsDropped {
+                    buffer_id: buffer_id.to_string(),
+                    idx: stage.idx,
+                    intentional: true,
+                    reason: "drop_newest",
+                    count: dropped_intentional.event_count,
+                    byte_size: dropped_intentional.event_byte_size,
+                });
+            }
+
+            let total_events = stage.received.total_event_count.load(Ordering::Relaxed)
+                + stage.sent.total_event_count.load(Ordering::Relaxed)
+                + stage.dropped.total_event_count.load(Ordering::Relaxed)
+                + stage
+                    .dropped_intentional
+                    .total_event_count
+                    .load(Ordering::Relaxed);
+
+            let total_bytes = stage.received.total_event_byte_size.load(Ordering::Relaxed)
+                + stage.sent.total_event_byte_size.load(Ordering::Relaxed)
+                + stage.dropped.total_event_byte_size.load(Ordering::Relaxed)
+                + stage
+                    .dropped_intentional
+                    .total_event_byte_size
+                    .load(Ordering::Relaxed);
+
+            let total_events_clamped = total_events.max(0);
+            let total_bytes_clamped = total_bytes.max(0);
+
+            gauge!(
+                "buffer_events",
+                "buffer_id" => buffer_id.to_string(),
+                "stage" => stage.idx.to_string()
+            )
+            .set(i64_to_f64_safe(total_events_clamped));
+
+            gauge!(
+                "buffer_byte_size",
+                "buffer_id" => buffer_id.to_string(),
+                "stage" => stage.idx.to_string()
+            )
+            .set(i64_to_f64_safe(total_bytes_clamped));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use metrics::{Key, Label};
+    use metrics_util::{
+        debugging::{DebugValue, DebuggingRecorder},
+        CompositeKey, MetricKind,
+    };
+    use ordered_float::OrderedFloat;
+
+    #[test]
+    fn category_metrics_increment_addition() {
+        let metrics = CategoryMetrics::default();
+        metrics.record_usage(10, 1024, true);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 10);
+        assert_eq!(snapshot.event_byte_size, 1024);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), 10);
+        assert_eq!(metrics.total_event_byte_size.load(Ordering::Relaxed), 1024);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 0);
+        assert_eq!(snapshot.event_byte_size, 0);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), 10);
+        assert_eq!(metrics.total_event_byte_size.load(Ordering::Relaxed), 1024);
+    }
+
+    #[test]
+    fn category_metrics_increment_subtraction() {
+        let metrics = CategoryMetrics::default();
+        metrics.record_usage(5, 512, false);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 5);
+        assert_eq!(snapshot.event_byte_size, 512);
+
+        assert_eq!(metrics.total_event_count.load(Ordering::Relaxed), -5);
+        assert_eq!(metrics.total_event_byte_size.load(Ordering::Relaxed), -512);
+    }
+
+    #[test]
+    fn category_metrics_increment_mixed() {
+        let metrics = CategoryMetrics::default();
+        metrics.record_usage(100, 1000, true);
+        metrics.record_usage(20, 200, false);
+        metrics.record_usage(10, 100, false);
+
+        let snapshot = metrics.consume();
+        assert_eq!(snapshot.event_count, 130);
+        assert_eq!(snapshot.event_byte_size, 1300);
+
+        let expected_events = 100 - 20 - 10;
+        let expected_bytes = 1000 - 200 - 100;
+        assert_eq!(
+            metrics.total_event_count.load(Ordering::Relaxed),
+            expected_events
+        );
+        assert_eq!(
+            metrics.total_event_byte_size.load(Ordering::Relaxed),
+            expected_bytes
+        );
+    }
+
+    #[test]
+    fn buffer_usage_reports_correct_gauges() {
+        let recorder = DebuggingRecorder::default();
+        let snapshotter = recorder.snapshotter();
+        let buffer_id = "test_buffer_1";
+        let stage_idx = 0;
+
+        metrics::with_local_recorder(&recorder, || {
+            let mut usage = BufferUsage::from_span(Span::current());
+            let handle = usage.add_stage(stage_idx);
+
+            // Simulate some buffer activity
+            handle.increment_received_event_count_and_byte_size(100, 2048);
+            handle.increment_sent_event_count_and_byte_size(30, 600);
+            handle.increment_dropped_event_count_and_byte_size(5, 100, false);
+
+            // Manually trigger a reporting pass
+            BufferUsage::report_metrics(&usage.stages, buffer_id);
+
+            // Verify the gauge values
+            let metrics = snapshotter.snapshot().into_vec();
+
+            let expected_events = 100.0 - 30.0 - 5.0;
+            let expected_bytes = 2048.0 - 600.0 - 100.0;
+
+            let events_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_events",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+            let bytes_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_byte_size",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+
+            let events_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &events_key)
+                .unwrap();
+            let bytes_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &bytes_key)
+                .unwrap();
+
+            assert_eq!(
+                events_gauge.3,
+                DebugValue::Gauge(OrderedFloat(expected_events))
+            );
+            assert_eq!(
+                bytes_gauge.3,
+                DebugValue::Gauge(OrderedFloat(expected_bytes))
+            );
+        });
+    }
+
+    #[test]
+    fn buffer_usage_gauge_clamps_to_zero() {
+        let recorder = DebuggingRecorder::default();
+        let snapshotter = recorder.snapshotter();
+        let buffer_id = "test_buffer_clamp";
+        let stage_idx = 0;
+
+        metrics::with_local_recorder(&recorder, || {
+            let mut usage = BufferUsage::from_span(Span::current());
+            let handle = usage.add_stage(stage_idx);
+
+            handle.increment_received_event_count_and_byte_size(100, 1000);
+            handle.increment_sent_event_count_and_byte_size(120, 1200); // More sent than received
+            handle.increment_dropped_event_count_and_byte_size(10, 100, false);
+
+            // calculation:
+            // events: 100 - 120 - 10 = -30
+            // bytes: 1000 - 1200 - 100 = -300
+
+            BufferUsage::report_metrics(&usage.stages, buffer_id);
+
+            let metrics = snapshotter.snapshot().into_vec();
+
+            let events_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_events",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+            let bytes_key = CompositeKey::new(
+                MetricKind::Gauge,
+                Key::from_parts(
+                    "buffer_byte_size",
+                    vec![
+                        Label::new("buffer_id", buffer_id.to_string()),
+                        Label::new("stage", stage_idx.to_string()),
+                    ],
+                ),
+            );
+
+            let events_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &events_key)
+                .unwrap();
+            let bytes_gauge = metrics
+                .iter()
+                .find(|(key, _, _, _)| key == &bytes_key)
+                .unwrap();
+
+            assert_eq!(events_gauge.3, DebugValue::Gauge(OrderedFloat(0.0)));
+            assert_eq!(bytes_gauge.3, DebugValue::Gauge(OrderedFloat(0.0)));
+        });
     }
 }
