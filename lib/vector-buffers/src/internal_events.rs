@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::cast_utils::u64_to_f64_safe;
 use metrics::{counter, gauge, histogram, Histogram};
 use vector_common::{
     internal_event::{error_type, InternalEvent},
@@ -15,6 +14,7 @@ pub struct BufferCreated {
 }
 
 impl InternalEvent for BufferCreated {
+    #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         if self.max_size_events != 0 {
             gauge!(
@@ -22,7 +22,7 @@ impl InternalEvent for BufferCreated {
                 "buffer_id" => self.buffer_id.clone(),
                 "stage" => self.idx.to_string(),
             )
-            .set(u64_to_f64_safe(self.max_size_events as u64));
+            .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
@@ -30,7 +30,7 @@ impl InternalEvent for BufferCreated {
                 "buffer_id" => self.buffer_id,
                 "stage" => self.idx.to_string(),
             )
-            .set(u64_to_f64_safe(self.max_size_bytes));
+            .set(self.max_size_bytes as f64);
         }
     }
 }
@@ -45,6 +45,7 @@ pub struct BufferEventsReceived {
 }
 
 impl InternalEvent for BufferEventsReceived {
+    #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!(
             "buffer_received_events_total",
@@ -64,13 +65,13 @@ impl InternalEvent for BufferEventsReceived {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(self.total_count as f64);
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(self.total_byte_size as f64);
     }
 }
 
@@ -84,6 +85,7 @@ pub struct BufferEventsSent {
 }
 
 impl InternalEvent for BufferEventsSent {
+    #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!(
             "buffer_sent_events_total",
@@ -102,13 +104,13 @@ impl InternalEvent for BufferEventsSent {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(self.total_count as f64);
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(self.total_byte_size as f64);
     }
 }
 
@@ -124,6 +126,7 @@ pub struct BufferEventsDropped {
 }
 
 impl InternalEvent for BufferEventsDropped {
+    #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
         let intentional_str = if self.intentional { "true" } else { "false" };
         if self.intentional {
@@ -165,13 +168,13 @@ impl InternalEvent for BufferEventsDropped {
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_count));
+        .set(self.total_count as f64);
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
             "stage" => self.idx.to_string()
         )
-        .set(u64_to_f64_safe(self.total_byte_size));
+        .set(self.total_byte_size as f64);
     }
 }
 
