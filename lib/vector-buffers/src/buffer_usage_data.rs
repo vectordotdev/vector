@@ -82,9 +82,10 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.fetch_add(event_count, Ordering::Relaxed);
-        self.event_byte_size
-            .fetch_add(event_byte_size, Ordering::Relaxed);
+        let count = i64::try_from(event_count).unwrap_or(i64::MAX);
+        let bytes = i64::try_from(event_byte_size).unwrap_or(i64::MAX);
+        update_and_get(&self.event_count, count);
+        update_and_get(&self.event_byte_size, bytes);
     }
 
     /// Sets the event count and event byte size to the given amount.
