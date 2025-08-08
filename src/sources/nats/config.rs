@@ -76,7 +76,7 @@ impl Default for BatchConfig {
     }
 }
 
-/// Configuration for NATS JetStream..
+/// Configuration for NATS JetStream.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct JetStreamConfig {
@@ -167,7 +167,7 @@ pub struct NatsSourceConfig {
     #[derivative(Default(value = "default_subscription_capacity()"))]
     pub subscriber_capacity: usize,
 
-    /// JetStream-specific options for the source.
+    #[configurable(derived)]
     #[serde(default)]
     pub jetstream: Option<JetStreamConfig>,
 }
