@@ -154,12 +154,14 @@ impl InternalEvent for BufferEventsDropped {
         counter!(
             "buffer_discarded_events_total",
             "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string(),
             "intentional" => intentional_str,
         )
         .increment(self.count);
         counter!(
             "buffer_discarded_bytes_total",
             "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string(),
             "intentional" => intentional_str,
         )
         .increment(self.byte_size);
