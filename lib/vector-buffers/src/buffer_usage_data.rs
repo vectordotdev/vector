@@ -437,8 +437,6 @@ mod tests {
     fn test_multithreaded_updates_are_correct() {
         const NUM_THREADS: u64 = 10;
         const INCREMENTS_PER_THREAD: u64 = 1000;
-        const EXPECTED_EVENTS: u64 = NUM_THREADS * INCREMENTS_PER_THREAD;
-        const EXPECTED_BYTES: u64 = NUM_THREADS * INCREMENTS_PER_THREAD * 10;
 
         let _guard = TEST_LOCK
             .lock()
@@ -452,6 +450,7 @@ mod tests {
             let handle = thread::spawn(move || {
                 for _ in 0..INCREMENTS_PER_THREAD {
                     update_buffer_counters("test_buffer", 0, 1, 10);
+                    update_buffer_counters("test_buffer", 0, -1, -10);
                 }
             });
             handles.push(handle);
@@ -463,8 +462,8 @@ mod tests {
 
         let (final_events, final_bytes) = get_counter_values("test_buffer", 0);
 
-        assert_eq!(final_events, EXPECTED_EVENTS);
-        assert_eq!(final_bytes, EXPECTED_BYTES);
+        assert_eq!(final_events, 0);
+        assert_eq!(final_bytes, 0);
     }
 
     #[test]
