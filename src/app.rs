@@ -615,7 +615,10 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(message = "Internal log rate limit configured.",);
+    debug!(
+        message = "Internal log rate limit configured.",
+        internal_log_rate_secs = rate,
+    );
     info!(message = "Log level is enabled.", level = ?level);
 }
 

@@ -47,6 +47,7 @@ impl InternalEvent for UdpSendIncompleteError {
             dropped = self.data_size - self.sent,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

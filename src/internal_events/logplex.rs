@@ -36,7 +36,7 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             error_type = error_type::READER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

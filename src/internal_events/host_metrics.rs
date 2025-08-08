@@ -13,6 +13,7 @@ impl InternalEvent for HostMetricsScrapeError {
             message = self.message,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -37,7 +38,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -64,7 +65,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
 
         counter!(

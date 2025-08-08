@@ -166,7 +166,10 @@ impl RedisConnection {
             if !repairing {
                 // Wait until a repair is needed
                 if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
-                    warn!("Connection state channel was dropped {error:?}.");
+                    warn!(
+                        internal_log_rate_limit = true,
+                        "Connection state channel was dropped {error:?}."
+                    );
                     continue;
                 }
 
@@ -189,7 +192,7 @@ impl RedisConnection {
                     }
                 }
                 Err(error) => {
-                    warn!("Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
+                    warn!(internal_log_rate_limit = true, "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
                     sleep(Duration::from_millis(250)).await;
                     continue;
                 }

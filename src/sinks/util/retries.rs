@@ -152,6 +152,7 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
+                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
@@ -197,7 +198,7 @@ where
                         error!(
                             message = "Non-retriable error; dropping the request.",
                             %error,
-
+                            internal_log_rate_limit = true,
                         );
                         None
                     }
@@ -211,6 +212,7 @@ where
                     error!(
                         message = "Unexpected error type; dropping the request.",
                         %error,
+                        internal_log_rate_limit = true
                     );
                     None
                 }
