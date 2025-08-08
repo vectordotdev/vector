@@ -1,5 +1,8 @@
 #![deny(warnings)]
 
+#[cfg(test)]
+#[macro_use]
+extern crate tracing;
 use std::fmt;
 
 use dashmap::DashMap;
@@ -11,10 +14,6 @@ use tracing_core::{
     Event, Metadata, Subscriber,
 };
 use tracing_subscriber::layer::{Context, Layer};
-
-#[cfg(test)]
-#[macro_use]
-extern crate tracing;
 
 #[cfg(not(test))]
 use std::time::Instant;
@@ -184,16 +183,14 @@ where
         // Otherwise, we don't emit anything.
         let previous_count = state.increment_count();
         if state.should_limit() {
-            match previous_count {
-                0 => self.inner.on_event(event, ctx),
-                1 => {
-                    let message = format!(
+            if previous_count < state.limit {
+                self.inner.on_event(event, ctx)
+            } else {
+                let message = format!(
                         "Internal log [{}] is being suppressed to avoid flooding.",
                         state.message
                     );
                     self.create_event(&ctx, metadata, message, state.limit);
-                }
-                _ => {}
             }
         } else {
             // If we saw this event 3 or more times total, emit an event that indicates the total number of times we
