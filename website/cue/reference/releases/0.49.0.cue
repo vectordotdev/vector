@@ -9,7 +9,10 @@ releases: "0.49.0": {
 	description: """
 		The Vector team is excited to announce version `0.49.0`!
 
-		Release highlights:
+		Be sure to check out the [upgrade guide](/highlights/2025-02-24-0-45-0-upgrade-guide) for
+		breaking changes in this release.
+
+		*Release highlights*:
 
 		- A `websocket` source was introduced. A WebSocket source in Vector enables ingestion of real-time data from services that expose WebSocket APIs.
     - The `http` sink's `uri` and `request.headers` config fields now support templating, enabling dynamic construction based on event data.
