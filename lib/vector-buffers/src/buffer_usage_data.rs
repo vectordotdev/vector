@@ -19,6 +19,13 @@ use crate::{
 static BUFFER_COUNTERS: LazyLock<DashMap<(String, usize), (AtomicU64, AtomicU64)>> =
     LazyLock::new(DashMap::new);
 
+fn u64_to_i64(value: u64) -> i64 {
+    // If we ever have to deal with more than 9,223,372,036,854,775,808 events or bytes _in a single
+    // update_, this conversion will break counters. That number is effectively impossibly large,
+    // though.
+    i64::try_from(value).unwrap_or(i64::MAX)
+}
+
 fn update_and_get(counter: &AtomicU64, delta: i64) -> u64 {
     let mut new_val = 0;
     counter
@@ -26,11 +33,7 @@ fn update_and_get(counter: &AtomicU64, delta: i64) -> u64 {
             // This will never be negative due to the `clamp`
             #[expect(clippy::cast_sign_loss)]
             {
-                new_val = current
-                    .try_into()
-                    .unwrap_or(i64::MAX)
-                    .saturating_add(delta)
-                    .clamp(0, i64::MAX) as u64;
+                new_val = u64_to_i64(current).saturating_add(delta).clamp(0, i64::MAX) as u64;
             }
             Some(new_val)
         })
@@ -82,10 +85,8 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        let count = i64::try_from(event_count).unwrap_or(i64::MAX);
-        let bytes = i64::try_from(event_byte_size).unwrap_or(i64::MAX);
-        update_and_get(&self.event_count, count);
-        update_and_get(&self.event_byte_size, bytes);
+        update_and_get(&self.event_count, u64_to_i64(event_count));
+        update_and_get(&self.event_byte_size, u64_to_i64(event_byte_size));
     }
 
     /// Sets the event count and event byte size to the given amount.
