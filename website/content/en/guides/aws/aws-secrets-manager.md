@@ -14,7 +14,7 @@ Before you begin, ensure you have:
 
 - An AWS account with access to AWS Secrets Manager
 - Appropriate AWS IAM permissions to read secrets
-- Vector installed and configured
+- Vector v0.38.0 or higher installed and configured
 - Vector compiled with the `secrets-aws-secrets-manager` feature (enabled by default in most distributions)
 
 ## Setting up AWS Secrets Manager
