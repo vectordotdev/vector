@@ -87,6 +87,7 @@ CFFI
 CGP
 cgroups
 chartmuseum
+checkpointer
 chronosphere
 cicd
 Claranet

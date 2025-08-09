@@ -64,6 +64,7 @@ components: sources: postgresql_metrics: {
 				- `pg_stat_database`
 				- `pg_stat_database_conflicts`
 				- `pg_stat_bgwriter`
+				- `pg_stat_checkpointer` (For PostgreSQL >= v17)
 				"""
 		}
 	}

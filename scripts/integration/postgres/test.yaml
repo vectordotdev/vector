@@ -13,7 +13,7 @@ runner:
     postgres_socket: /pg_socket
 
 matrix:
-  version: ['13.1']
+  version: ['13.1', '17.5']
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
