@@ -84,62 +84,71 @@ Ensure the AWS credentials have the following IAM policy attached:
 
 Add the AWS Secrets Manager backend to your Vector configuration:
 
-```toml
-[secret.my_aws_secrets]
-type = "aws_secrets_manager"
-secret_id = "my-app-secrets"  # The name or ARN of your secret
-region = "us-east-1"          # Optional: AWS region
+```yaml
+secret:
+  my_aws_secrets:
+    type: aws_secrets_manager
+    secret_id: "my-app-secrets"  # The name or ARN of your secret
+    region: "us-east-1"          # Optional: AWS region
 
-# Optional: Explicit AWS authentication (if not using default credential chain)
-[secret.my_aws_secrets.auth]
-access_key_id = "AKIAIOSFODNN7EXAMPLE"
-secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    # Optional: Explicit AWS authentication (if not using default credential chain)
+    auth:
+      access_key_id: "AKIAIOSFODNN7EXAMPLE"
+      secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 ```
 
 ### 2. Use secrets in your Vector configuration
 
 Reference the secrets using the `SECRET[backend.key]` syntax:
 
-```toml
-[sources.my_database]
-type = "postgresql_metrics"
-endpoints = ["postgresql://user:SECRET[my_aws_secrets.database_password]@localhost:5432/mydb"]
+```yaml
+sources:
+  my_database:
+    type: postgresql_metrics
+    endpoints:
+      - "postgresql://user:SECRET[my_aws_secrets.database_password]@localhost:5432/mydb"
 
-[sinks.my_api_sink]
-type = "http"
-uri = "https://api.example.com/events"
-encoding.codec = "json"
-
-[sinks.my_api_sink.headers]
-Authorization = "Bearer SECRET[my_aws_secrets.oauth_token]"
-X-API-Key = "SECRET[my_aws_secrets.api_key]"
+sinks:
+  my_api_sink:
+    type: http
+    uri: "https://api.example.com/events"
+    encoding:
+      codec: json
+    headers:
+      Authorization: "Bearer SECRET[my_aws_secrets.oauth_token]"
+      X-API-Key: "SECRET[my_aws_secrets.api_key]"
 ```
 
 ### 3. Complete example
 
 Here's a complete example configuration:
 
-```toml
+```yaml
 # AWS Secrets Manager backend configuration
-[secret.production_secrets]
-type = "aws_secrets_manager"
-secret_id = "vector-production-secrets"
-region = "us-west-2"
+secret:
+  production_secrets:
+    type: aws_secrets_manager
+    secret_id: "vector-production-secrets"
+    region: "us-west-2"
 
 # Source that reads from a database using a secret password
-[sources.app_logs]
-type = "postgresql_metrics"
-endpoints = ["postgresql://vector:SECRET[production_secrets.db_password]@db.example.com:5432/logs"]
+sources:
+  app_logs:
+    type: postgresql_metrics
+    endpoints:
+      - "postgresql://vector:SECRET[production_secrets.db_password]@db.example.com:5432/logs"
 
 # Sink that sends to an external API using secret API key
-[sinks.external_api]
-type = "http"
-uri = "https://logs.example.com/v1/events"
-inputs = ["app_logs"]
-encoding.codec = "json"
-
-[sinks.external_api.headers]
-Authorization = "Bearer SECRET[production_secrets.api_token]"
+sinks:
+  external_api:
+    type: http
+    uri: "https://logs.example.com/v1/events"
+    inputs:
+      - app_logs
+    encoding:
+      codec: json
+    headers:
+      Authorization: "Bearer SECRET[production_secrets.api_token]"
 ```
 
 ## Configuration options
@@ -213,20 +222,20 @@ Vector will retrieve the entire secret and make individual key-value pairs avail
 
 Enable debug logging to see more details about secret retrieval:
 
-```toml
-[api]
-enabled = true
-address = "0.0.0.0:8686"
+```yaml
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
 
 # Add debug logging
-[log]
-level = "debug"
+log:
+  level: debug
 ```
 
 Check Vector logs for messages related to secret retrieval:
 
 ```bash
-vector --config vector.toml 2>&1 | grep -i secret
+vector --config vector.yaml 2>&1 | grep -i secret
 ```
 
 ## Best practices

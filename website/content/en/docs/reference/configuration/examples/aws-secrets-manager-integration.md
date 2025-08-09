@@ -83,118 +83,124 @@ Attach this policy to the IAM role or user that Vector will use.
 
 Create your Vector configuration file:
 
-```toml
-# vector.toml
+```yaml
+# vector.yaml
 
 # Configure AWS Secrets Manager backend
-[secret.aws_creds]
-type = "aws_secrets_manager"
-secret_id = "vector-production-credentials"
-region = "us-west-2"
+secret:
+  aws_creds:
+    type: aws_secrets_manager
+    secret_id: "vector-production-credentials"
+    region: "us-west-2"
 
 # Source: Read logs from S3
-[sources.s3_logs]
-type = "aws_s3"
-region = "us-west-2"
-bucket = "your-logs-bucket"
-key_prefix = "application-logs/"
+sources:
+  s3_logs:
+    type: aws_s3
+    region: "us-west-2"
+    bucket: "your-logs-bucket"
+    key_prefix: "application-logs/"
+    # Use secrets for S3 authentication
+    auth:
+      access_key_id: "SECRET[aws_creds.s3_access_key]"
+      secret_access_key: "SECRET[aws_creds.s3_secret_key]"
 
-# Use secrets for S3 authentication
-[sources.s3_logs.auth]
-access_key_id = "SECRET[aws_creds.s3_access_key]"
-secret_access_key = "SECRET[aws_creds.s3_secret_key]"
-
-# Source: Internal metrics
-[sources.internal_metrics]
-type = "internal_metrics"
+  # Source: Internal metrics
+  internal_metrics:
+    type: internal_metrics
 
 # Transform: Parse and enrich logs
-[transforms.parse_logs]
-type = "remap"
-inputs = ["s3_logs"]
-source = '''
-  . = parse_json!(.message)
-  .timestamp = now()
-  .environment = "production"
-'''
+transforms:
+  parse_logs:
+    type: remap
+    inputs:
+      - s3_logs
+    source: |
+      . = parse_json!(.message)
+      .timestamp = now()
+      .environment = "production"
 
-# Transform: Generate custom metrics
-[transforms.generate_metrics]
-type = "log_to_metric"
-inputs = ["parse_logs"]
-
-[[transforms.generate_metrics.metrics]]
-type = "counter"
-field = "level"
-name = "log_events_total"
-namespace = "application"
-
-[transforms.generate_metrics.metrics.tags]
-level = "{{ level }}"
-service = "{{ service }}"
+  # Transform: Generate custom metrics
+  generate_metrics:
+    type: log_to_metric
+    inputs:
+      - parse_logs
+    metrics:
+      - type: counter
+        field: level
+        name: log_events_total
+        namespace: application
+        tags:
+          level: "{{ level }}"
+          service: "{{ service }}"
 
 # Sink: Send metrics to CloudWatch
-[sinks.cloudwatch_metrics]
-type = "aws_cloudwatch_metrics"
-inputs = ["internal_metrics", "generate_metrics"]
-namespace = "Vector/Application"
-region = "us-west-2"
+sinks:
+  cloudwatch_metrics:
+    type: aws_cloudwatch_metrics
+    inputs:
+      - internal_metrics
+      - generate_metrics
+    namespace: "Vector/Application"
+    region: "us-west-2"
 
-# Sink: Forward logs to external API
-[sinks.external_api]
-type = "http"
-inputs = ["parse_logs"]
-uri = "https://logs.example.com/v1/ingest"
-encoding.codec = "json"
-compression = "gzip"
+  # Sink: Forward logs to external API
+  external_api:
+    type: http
+    inputs:
+      - parse_logs
+    uri: "https://logs.example.com/v1/ingest"
+    encoding:
+      codec: json
+    compression: gzip
+    # Use secret for API authentication
+    headers:
+      Authorization: "Bearer SECRET[aws_creds.external_api_token]"
+      X-API-Version: "v1"
+    # Batch logs for efficiency
+    batch:
+      max_bytes: 1048576  # 1MB
+      timeout_secs: 30
 
-# Use secret for API authentication
-[sinks.external_api.headers]
-Authorization = "Bearer SECRET[aws_creds.external_api_token]"
-X-API-Version = "v1"
+  # Sink: Store processed logs in S3 for archival
+  s3_archive:
+    type: aws_s3
+    inputs:
+      - parse_logs
+    bucket: "your-archive-bucket"
+    key_prefix: "processed-logs/%Y/%m/%d/"
+    region: "us-west-2"
+    compression: gzip
+    encoding:
+      codec: ndjson
+    # Use the same S3 credentials from secrets
+    auth:
+      access_key_id: "SECRET[aws_creds.s3_access_key]"
+      secret_access_key: "SECRET[aws_creds.s3_secret_key]"
 
-# Batch logs for efficiency
-[sinks.external_api.batch]
-max_bytes = 1048576  # 1MB
-timeout_secs = 30
+  # Optional: Database source using secret password
+  postgres_metrics:
+    type: postgresql_metrics
+    endpoints:
+      - "postgresql://vector:SECRET[aws_creds.database_password]@postgres.internal:5432/metrics"
+    scrape_interval_secs: 60
 
-# Sink: Store processed logs in S3 for archival
-[sinks.s3_archive]
-type = "aws_s3"
-inputs = ["parse_logs"]
-bucket = "your-archive-bucket"
-key_prefix = "processed-logs/%Y/%m/%d/"
-region = "us-west-2"
-compression = "gzip"
-encoding.codec = "ndjson"
-
-# Use the same S3 credentials from secrets
-[sinks.s3_archive.auth]
-access_key_id = "SECRET[aws_creds.s3_access_key]"
-secret_access_key = "SECRET[aws_creds.s3_secret_key]"
-
-# Optional: Database source using secret password
-[sources.postgres_metrics]
-type = "postgresql_metrics"
-endpoints = ["postgresql://vector:SECRET[aws_creds.database_password]@postgres.internal:5432/metrics"]
-scrape_interval_secs = 60
-
-# Optional: Webhook source with secret validation
-[sources.webhook]
-type = "http_server"
-address = "0.0.0.0:8080"
-encoding = "json"
+  # Optional: Webhook source with secret validation
+  webhook:
+    type: http_server
+    address: "0.0.0.0:8080"
+    encoding: json
 
 # Transform: Validate webhook signature
-[transforms.validate_webhook]
-type = "remap"
-inputs = ["webhook"]
-source = '''
-  expected_signature = hmac_sha256(string!(.message), "SECRET[aws_creds.webhook_secret]")
-  if .headers."x-signature" != expected_signature {
-    abort
-  }
-'''
+  validate_webhook:
+    type: remap
+    inputs:
+      - webhook
+    source: |
+      expected_signature = hmac_sha256(string!(.message), "SECRET[aws_creds.webhook_secret]")
+      if .headers."x-signature" != expected_signature {
+        abort
+      }
 ```
 
 ## Step 4: Deploy Vector
@@ -203,7 +209,7 @@ Deploy Vector with the configuration:
 
 ```bash
 # Run Vector
-vector --config vector.toml
+vector --config vector.yaml
 
 # Or as a service
 sudo systemctl start vector
@@ -262,33 +268,34 @@ aws s3 ls s3://your-archive-bucket/processed-logs/
 
 If Vector needs to assume a different role to access secrets:
 
-```toml
-[secret.aws_creds]
-type = "aws_secrets_manager"
-secret_id = "vector-production-credentials"
-region = "us-west-2"
-
-[secret.aws_creds.auth]
-assume_role = "arn:aws:iam::123456789012:role/VectorSecretsRole"
-external_id = "unique-external-id"
+```yaml
+secret:
+  aws_creds:
+    type: aws_secrets_manager
+    secret_id: "vector-production-credentials"
+    region: "us-west-2"
+    auth:
+      assume_role: "arn:aws:iam::123456789012:role/VectorSecretsRole"
+      external_id: "unique-external-id"
 ```
 
 ### Cross-region secrets
 
 For multi-region deployments:
 
-```toml
+```yaml
 # Primary region secrets
-[secret.us_west_2_creds]
-type = "aws_secrets_manager"
-secret_id = "vector-prod-us-west-2"
-region = "us-west-2"
+secret:
+  us_west_2_creds:
+    type: aws_secrets_manager
+    secret_id: "vector-prod-us-west-2"
+    region: "us-west-2"
 
-# Backup region secrets
-[secret.us_east_1_creds]
-type = "aws_secrets_manager"
-secret_id = "vector-prod-us-east-1"
-region = "us-east-1"
+  # Backup region secrets
+  us_east_1_creds:
+    type: aws_secrets_manager
+    secret_id: "vector-prod-us-east-1"
+    region: "us-east-1"
 ```
 
 This example demonstrates a production-ready setup using AWS Secrets Manager with Vector, providing secure credential management across multiple AWS services and external integrations.
