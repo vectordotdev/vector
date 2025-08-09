@@ -16,7 +16,7 @@ In this example, Vector is set up to:
 
 ## Prerequisites
 
-- AWS account with appropriate permissions
+- An AWS account with appropriate permissions
 - AWS CLI configured
 - Vector installed with AWS Secrets Manager support
 
