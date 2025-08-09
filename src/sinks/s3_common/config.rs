@@ -13,7 +13,7 @@ use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
-use super::service::{S3Response, S3Service};
+use super::service::{S3Request, S3Response, S3Service};
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
     common::s3::S3ClientBuilder,
@@ -360,6 +360,7 @@ pub enum RetryStrategy {
 
 impl RetryLogic for RetryStrategy {
     type Error = SdkError<PutObjectError, HttpResponse>;
+    type Request = S3Request;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

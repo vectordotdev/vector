@@ -40,6 +40,7 @@ jobs:
             ci
             cli
             codecs
+            codecs protobuf
             compression
             config
             core
@@ -253,3 +254,4 @@ jobs:
             website deps
 
             config provider
+            opentelemetry lib

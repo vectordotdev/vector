@@ -7,7 +7,7 @@ use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    service::{VectorResponse, VectorService},
+    service::{VectorRequest, VectorResponse, VectorService},
     sink::VectorSink,
     VectorSinkError,
 };
@@ -220,6 +220,7 @@ struct VectorGrpcRetryLogic;
 
 impl RetryLogic for VectorGrpcRetryLogic {
     type Error = VectorSinkError;
+    type Request = VectorRequest;
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
