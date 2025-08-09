@@ -169,7 +169,7 @@ The AWS Secrets Manager backend supports the following configuration options:
 
 ## Secret format
 
-The secret stored in AWS Secrets Manager must be a JSON object with string keys and string values:
+The secret stored in AWS Secrets Manager must be a JSON object with string keys and string values. For example:
 
 ```json
 {
