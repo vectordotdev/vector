@@ -3,7 +3,7 @@ title: AWS Secrets Manager Integration Example
 weight: 8
 ---
 
-This example demonstrates how to use Vector with AWS Secrets Manager to securely manage credentials for various AWS services and external APIs.
+This document goes over how to use Vector with AWS Secrets Manager to securely manage credentials for various AWS services and external APIs.
 
 ## Scenario
 
