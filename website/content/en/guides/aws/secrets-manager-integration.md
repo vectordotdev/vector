@@ -230,72 +230,8 @@ aws cloudwatch list-metrics --namespace "Vector/Application"
 aws s3 ls s3://your-archive-bucket/processed-logs/
 ```
 
-## Security considerations
+## Next steps
 
-1. **IAM permissions**: Use the principle of least privilege
-2. **Secret rotation**: Set up automatic rotation in AWS Secrets Manager
-3. **Network security**: Use VPC endpoints for AWS services when possible
-4. **Monitoring**: Enable CloudTrail logging for secret access
-5. **Backup**: Consider cross-region secret replication for disaster recovery
-
-## Troubleshooting
-
-### Common issues and solutions
-
-1. **Permission denied errors**
-   - Verify IAM permissions include `secretsmanager:GetSecretValue`
-   - Check that the secret ARN is correct
-   - Ensure Vector is running with the correct IAM role/credentials
-
-2. **Secret not found**
-   - Verify the secret name/ID is correct
-   - Ensure the secret exists in the specified region
-   - Check for typos in the `secret_id` configuration
-
-3. **Invalid JSON in secret**
-   - Validate that your secret value is valid JSON
-   - Ensure all values are strings
-   - Check for special characters that need escaping
-
-4. **Network connectivity issues**
-   - Verify Vector can reach AWS Secrets Manager endpoints
-   - Check security groups and NACLs
-   - Consider using VPC endpoints for private connectivity
-
-## Advanced configuration
-
-### Using assume role
-
-If Vector needs to assume a different role to access secrets:
-
-```yaml
-secret:
-  aws_creds:
-    type: aws_secrets_manager
-    secret_id: "vector-production-credentials"
-    region: "us-west-2"
-    auth:
-      assume_role: "arn:aws:iam::123456789012:role/VectorSecretsRole"
-      external_id: "unique-external-id"
-```
-
-### Cross-region secrets
-
-For multi-region deployments:
-
-```yaml
-# Primary region secrets
-secret:
-  us_west_2_creds:
-    type: aws_secrets_manager
-    secret_id: "vector-prod-us-west-2"
-    region: "us-west-2"
-
-  # Backup region secrets
-  us_east_1_creds:
-    type: aws_secrets_manager
-    secret_id: "vector-prod-us-east-1"
-    region: "us-east-1"
-```
+For detailed configuration options, troubleshooting, and security best practices, see the [AWS Secrets Manager guide](../aws-secrets-manager/).
 
 This example demonstrates a production-ready setup using AWS Secrets Manager with Vector, providing secure credential management across multiple AWS services and external integrations.
