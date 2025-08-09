@@ -9,10 +9,10 @@ This document goes over how to use Vector with AWS Secrets Manager to securely m
 
 In this example, Vector is set up to:
 
-1. Read logs from Amazon S3
-2. Send metrics to Amazon CloudWatch
-3. Forward logs to an external API
-4. Store database credentials and API keys securely in AWS Secrets Manager
+1. Read logs from Amazon S3.
+2. Send metrics to Amazon CloudWatch.
+3. Forward logs to an external API.
+4. Store database credentials and API keys securely in AWS Secrets Manager.
 
 ## Prerequisites
 
