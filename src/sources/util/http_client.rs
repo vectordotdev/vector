@@ -17,6 +17,8 @@ use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
 
+#[cfg(feature = "aws-core")]
+use crate::aws::sign_request_with_empty_body;
 use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
     http::{Auth, HttpClient},
@@ -28,6 +30,8 @@ use crate::{
     tls::TlsSettings,
     SourceSender,
 };
+#[cfg(feature = "aws-core")]
+use aws_config::meta::region::ProvideRegion;
 use vector_lib::shutdown::ShutdownSignal;
 use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
@@ -194,7 +198,8 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            tokio::time::timeout(inputs.timeout, client.send(request))
+            prepare_request(inputs.auth.clone(), request)
+                .then(move |request| tokio::time::timeout(inputs.timeout, client.send(request)))
                 .then(move |result| async move {
                     match result {
                         Ok(Ok(response)) => Ok(response),
@@ -282,4 +287,42 @@ pub(crate) async fn call<
             Err(())
         }
     }
+}
+
+async fn prepare_request(auth: Option<Auth>, request: Request<Body>) -> Request<Body> {
+    let prepared_request = request;
+
+    #[cfg(feature = "aws-core")]
+    let prepared_request = match auth {
+        None => prepared_request,
+        Some(Auth::Aws { auth, service }) => {
+            let mut signed_request = prepared_request;
+            let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)
+                .expect("Region provider must be available")
+                .region()
+                .await;
+            let region = auth
+                .region()
+                .or(default_region)
+                .expect("Region must be specified");
+            let credentials_provider = &auth
+                .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                .await
+                .expect("Credentials provider must be available");
+            sign_request_with_empty_body(
+                service.as_str(),
+                &mut signed_request,
+                credentials_provider,
+                Some(&region),
+                false,
+            )
+            .await
+            .expect("Signing request failed");
+
+            signed_request
+        }
+        _ => prepared_request,
+    };
+
+    prepared_request
 }
