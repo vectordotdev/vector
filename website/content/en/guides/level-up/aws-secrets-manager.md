@@ -198,7 +198,7 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 ### Common issues
 
-#### "Backend not found in config" error
+#### `Backend not found in config` error
 
 - Ensure the backend name in `SECRET[backend_name.key]` exactly matches the section name in your config.
 
