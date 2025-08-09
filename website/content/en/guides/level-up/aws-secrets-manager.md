@@ -3,6 +3,7 @@ title: Using AWS Secrets Manager with Vector
 short: AWS Secrets Manager
 weight: 7
 tags: ["aws", "secrets", "security", "authentication"]
+domain: enriching
 ---
 
 AWS Secrets Manager is a fully managed service that helps you protect secrets needed to access your applications, services, and IT resources. This guide shows you how to integrate AWS Secrets Manager with Vector to securely manage sensitive configuration values like API keys, database passwords, and other credentials.
