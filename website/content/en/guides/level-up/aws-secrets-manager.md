@@ -180,7 +180,7 @@ The secret stored in AWS Secrets Manager must be a JSON object with string keys 
 }
 ```
 
-Vector will retrieve the entire secret and make individual key-value pairs available using the `SECRET[backend_name.key_name]` syntax.
+Vector retrieves the entire secret and makes individual key-value pairs available using the `SECRET[backend_name.key_name]` syntax.
 
 ## Security considerations
 
