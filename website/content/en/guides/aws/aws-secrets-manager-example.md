@@ -18,7 +18,7 @@ In this example, Vector is set up to:
 
 - An AWS account with appropriate permissions
 - AWS CLI configured
-- Vector v0.38.0 or higher installed with AWS Secrets Manager support
+- Vector v0.38.0 or higher installed
 
 ## Step 1: Create secrets in AWS Secrets Manager
 
