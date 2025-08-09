@@ -186,7 +186,7 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 1. **Least privilege**: Grant only the minimum required IAM permissions (`secretsmanager:GetSecretValue`) for the specific secrets Vector needs to access.
 
-2. **Secret rotation**: AWS Secrets Manager supports automatic secret rotation. Vector will fetch the latest secret value each time it starts or reloads its configuration.
+2. **Secret rotation**: AWS Secrets Manager supports automatic secret rotation. Vector fetches the latest secret value each time it starts or reloads its configuration.
 
 3. **Network security**: Ensure Vector can reach the AWS Secrets Manager service endpoints. In VPC environments, you may need VPC endpoints or appropriate routing.
 
