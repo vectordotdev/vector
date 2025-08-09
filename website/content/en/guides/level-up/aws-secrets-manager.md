@@ -204,20 +204,20 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 #### "Key does not exist" error
 
-- Verify the key name exists in your AWS Secrets Manager secret
-- Check that the secret contains valid JSON
+- Verify the key name exists in your AWS Secrets Manager secret.
+- Check that the secret contains valid JSON.
 
 #### "Secret could not be retrieved" error
 
-- Verify AWS credentials have the correct permissions
-- Check that the secret ID/ARN is correct
-- Ensure the secret exists in the specified region
+- Verify AWS credentials have the correct permissions.
+- Check that the secret ID and ARN are correct.
+- Ensure the secret exists in the specified region.
 
 #### AWS authentication errors
 
-- Verify AWS credentials are configured correctly
-- Check IAM permissions
-- Ensure the region is correctly specified
+- Verify AWS credentials are configured correctly.
+- Check IAM permissions.
+- Ensure the region is correctly specified.
 
 ### Debugging
 
