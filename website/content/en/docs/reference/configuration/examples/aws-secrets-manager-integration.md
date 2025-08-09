@@ -7,7 +7,7 @@ This document goes over how to use Vector with AWS Secrets Manager to securely m
 
 ## Scenario
 
-In this example, we'll set up Vector to:
+In this example, Vector is set up to:
 
 1. Read logs from Amazon S3
 2. Send metrics to Amazon CloudWatch
