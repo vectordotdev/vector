@@ -198,123 +198,80 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            #[cfg(feature = "aws-core")]
-            let aws_auth = match &inputs.auth {
-                None => None,
-                Some(Auth::Aws { auth, service }) => Some((auth.clone(), service.clone())),
-                _ => None,
-            };
-
-            tokio::time::timeout(inputs.timeout, async move {
-                let request = request;
-
-                #[cfg(feature = "aws-core")]
-                let request = match aws_auth {
-                    None => request,
-                    Some((auth, service)) => {
-                        let mut signed_request = request;
-                        let default_region =
-                            crate::aws::region_provider(&ProxyConfig::default(), None)
-                                .expect("Region provider must be available")
-                                .region()
-                                .await;
-                        let region = auth
-                            .region()
-                            .or(default_region)
-                            .expect("Region must be specified");
-                        let credentials_provider = &auth
-                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
-                            .await
-                            .expect("Credentials provider must be available");
-                        sign_request_with_empty_body(
-                            service.as_str(),
-                            &mut signed_request,
-                            credentials_provider,
-                            Some(&region),
-                            false,
+            prepare_request(inputs.auth.clone(), request)
+                .then(move |request| tokio::time::timeout(inputs.timeout, client.send(request)))
+                .then(move |result| async move {
+                    match result {
+                        Ok(Ok(response)) => Ok(response),
+                        Ok(Err(error)) => Err(error.into()),
+                        Err(_) => Err(format!(
+                            "Timeout error: request exceeded {}s",
+                            inputs.timeout.as_secs_f64()
                         )
-                        .await
-                        .expect("Signing request failed");
-
-                        signed_request
-                    }
-                };
-
-                request
-            })
-            .and_then(move |request| tokio::time::timeout(inputs.timeout, client.send(request)))
-            .then(move |result| async move {
-                match result {
-                    Ok(Ok(response)) => Ok(response),
-                    Ok(Err(error)) => Err(error.into()),
-                    Err(_) => Err(format!(
-                        "Timeout error: request exceeded {}s",
-                        inputs.timeout.as_secs_f64()
-                    )
-                    .into()),
-                }
-            })
-            .and_then(|response| async move {
-                let (header, body) = response.into_parts();
-                let body = hyper::body::to_bytes(body).await?;
-                emit!(EndpointBytesReceived {
-                    byte_size: body.len(),
-                    protocol: "http",
-                    endpoint: endpoint.as_str(),
-                });
-                Ok((header, body))
-            })
-            .into_stream()
-            .filter_map(move |response| {
-                ready(match response {
-                    Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                        context.on_response(&url, &header, &body).map(|mut events| {
-                            let byte_size = if events.is_empty() {
-                                // We need to explicitly set the byte size
-                                // to 0 since
-                                // `estimated_json_encoded_size_of` returns
-                                // at least 1 for an empty collection. For
-                                // the purposes of the
-                                // HttpClientEventsReceived event, we should
-                                // emit 0 when there aren't any usable
-                                // metrics.
-                                JsonSize::zero()
-                            } else {
-                                events.estimated_json_encoded_size_of()
-                            };
-
-                            emit!(HttpClientEventsReceived {
-                                byte_size,
-                                count: events.len(),
-                                url: url.to_string()
-                            });
-
-                            // We'll enrich after receiving the events so
-                            // that the byte sizes are accurate.
-                            context.enrich_events(&mut events);
-
-                            stream::iter(events)
-                        })
-                    }
-                    Ok((header, _)) => {
-                        context.on_http_response_error(&url, &header);
-                        emit!(HttpClientHttpResponseError {
-                            code: header.status,
-                            url: url.to_string(),
-                        });
-                        None
-                    }
-                    Err(error) => {
-                        emit!(HttpClientHttpError {
-                            error,
-                            url: url.to_string()
-                        });
-                        None
+                        .into()),
                     }
                 })
-            })
-            .flatten()
-            .boxed()
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    emit!(EndpointBytesReceived {
+                        byte_size: body.len(),
+                        protocol: "http",
+                        endpoint: endpoint.as_str(),
+                    });
+                    Ok((header, body))
+                })
+                .into_stream()
+                .filter_map(move |response| {
+                    ready(match response {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
+                            context.on_response(&url, &header, &body).map(|mut events| {
+                                let byte_size = if events.is_empty() {
+                                    // We need to explicitly set the byte size
+                                    // to 0 since
+                                    // `estimated_json_encoded_size_of` returns
+                                    // at least 1 for an empty collection. For
+                                    // the purposes of the
+                                    // HttpClientEventsReceived event, we should
+                                    // emit 0 when there aren't any usable
+                                    // metrics.
+                                    JsonSize::zero()
+                                } else {
+                                    events.estimated_json_encoded_size_of()
+                                };
+
+                                emit!(HttpClientEventsReceived {
+                                    byte_size,
+                                    count: events.len(),
+                                    url: url.to_string()
+                                });
+
+                                // We'll enrich after receiving the events so
+                                // that the byte sizes are accurate.
+                                context.enrich_events(&mut events);
+
+                                stream::iter(events)
+                            })
+                        }
+                        Ok((header, _)) => {
+                            context.on_http_response_error(&url, &header);
+                            emit!(HttpClientHttpResponseError {
+                                code: header.status,
+                                url: url.to_string(),
+                            });
+                            None
+                        }
+                        Err(error) => {
+                            emit!(HttpClientHttpError {
+                                error,
+                                url: url.to_string()
+                            });
+                            None
+                        }
+                    })
+                })
+                .flatten()
+                .boxed()
         })
         .flatten_unordered(None)
         .boxed();
@@ -330,4 +287,42 @@ pub(crate) async fn call<
             Err(())
         }
     }
+}
+
+async fn prepare_request(auth: Option<Auth>, request: Request<Body>) -> Request<Body> {
+    let prepared_request = request;
+
+    #[cfg(feature = "aws-core")]
+    let prepared_request = match auth {
+        None => prepared_request,
+        Some(Auth::Aws { auth, service }) => {
+            let mut signed_request = prepared_request;
+            let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)
+                .expect("Region provider must be available")
+                .region()
+                .await;
+            let region = auth
+                .region()
+                .or(default_region)
+                .expect("Region must be specified");
+            let credentials_provider = &auth
+                .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                .await
+                .expect("Credentials provider must be available");
+            sign_request_with_empty_body(
+                service.as_str(),
+                &mut signed_request,
+                credentials_provider,
+                Some(&region),
+                false,
+            )
+            .await
+            .expect("Signing request failed");
+
+            signed_request
+        }
+        _ => prepared_request,
+    };
+
+    prepared_request
 }
