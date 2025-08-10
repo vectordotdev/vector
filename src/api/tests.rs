@@ -198,13 +198,13 @@ async fn integration_test_source_metric() {
         "to_metric",
         &["in"],
         LogToMetricConfig {
-            metrics: vec![MetricConfig {
+            metrics: Some(vec![MetricConfig {
                 field: "message".try_into().expect("Fixed template string"),
                 name: None,
                 namespace: None,
                 tags: None,
                 metric: MetricTypeConfig::Gauge,
-            }],
+            }]),
             all_metrics: None,
         },
     );

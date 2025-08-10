@@ -1,14 +1,15 @@
 use core::fmt;
 use std::{num::NonZeroUsize, time::Duration};
 
+use crate::common::{consume, FixedLogStream};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
-use vector::transforms::dedupe::{CacheConfig, Dedupe, DedupeConfig, FieldMatchConfig};
+use vector::transforms::dedupe::common::{CacheConfig, FieldMatchConfig, TimedCacheConfig};
+use vector::transforms::dedupe::config::DedupeConfig;
+use vector::transforms::dedupe::transform::Dedupe;
 use vector_lib::transform::Transform;
-
-use crate::common::{consume, FixedLogStream};
 
 #[derive(Debug)]
 struct Param {
@@ -44,6 +45,7 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::IgnoreFields(vec!["message".into()])),
                 cache: cache.clone(),
+                time_settings: None,
             },
         },
         // Modification of previous where field "message" is matched.
@@ -53,6 +55,33 @@ fn dedupe(c: &mut Criterion) {
             dedupe_config: DedupeConfig {
                 fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
                 cache: cache.clone(),
+                time_settings: None,
+            },
+        },
+        // Modification of previous where deduplication with max age is used.
+        Param {
+            slug: "field_match_message_timed",
+            input: fixed_stream.clone(),
+            dedupe_config: DedupeConfig {
+                fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
+                cache: cache.clone(),
+                time_settings: Some(TimedCacheConfig {
+                    max_age_ms: Duration::from_secs(5),
+                    refresh_on_drop: false,
+                }),
+            },
+        },
+        // Modification of previous where refresh on drop is enabled.
+        Param {
+            slug: "field_match_message_timed_refresh_on_drop",
+            input: fixed_stream.clone(),
+            dedupe_config: DedupeConfig {
+                fields: Some(FieldMatchConfig::MatchFields(vec!["message".into()])),
+                cache: cache.clone(),
+                time_settings: Some(TimedCacheConfig {
+                    max_age_ms: Duration::from_secs(5),
+                    refresh_on_drop: true,
+                }),
             },
         },
         // Measurement where ignore fields do not exist in the event.
@@ -68,6 +97,7 @@ fn dedupe(c: &mut Criterion) {
                     "cdeab".into(),
                     "bcdea".into(),
                 ])),
+                time_settings: None,
             },
         },
         // Modification of previous where match fields do not exist in the
@@ -84,6 +114,7 @@ fn dedupe(c: &mut Criterion) {
                     "cdeab".into(),
                     "bcdea".into(),
                 ])),
+                time_settings: None,
             },
         },
     ] {
@@ -91,8 +122,12 @@ fn dedupe(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("transform", param), &param, |b, param| {
             b.iter_batched(
                 || {
-                    let dedupe =
-                        Transform::event_task(Dedupe::new(param.dedupe_config.clone())).into_task();
+                    let config = param.dedupe_config.clone();
+                    let dedupe = Transform::event_task(Dedupe::new(
+                        config.cache.num_events,
+                        config.fields.unwrap(),
+                    ))
+                    .into_task();
                     (Box::new(dedupe), Box::pin(param.input.clone()))
                 },
                 |(dedupe, input)| {

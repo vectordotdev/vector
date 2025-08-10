@@ -8,7 +8,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
     time::Duration,
@@ -374,7 +374,7 @@ pub trait FrameHandler {
     fn max_frame_length(&self) -> usize;
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
     fn multithreaded(&self) -> bool;
-    fn max_frame_handling_tasks(&self) -> u32;
+    fn max_frame_handling_tasks(&self) -> usize;
     fn host_key(&self) -> &Option<OwnedValuePath>;
     fn timestamp_key(&self) -> Option<&OwnedValuePath>;
     fn source_type_key(&self) -> Option<&OwnedValuePath>;
@@ -451,8 +451,10 @@ pub fn build_framestream_tcp_source(
         let connection_gauge = OpenGauge::new();
         let shutdown_clone = shutdown.clone();
 
-        let request_limiter =
-            RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+        let request_limiter = RequestLimiter::new(
+            MAX_IN_FLIGHT_EVENTS_TARGET,
+            frame_handler.max_frame_handling_tasks(),
+        );
 
         listener
             .accept_stream_limited(frame_handler.max_connections())
@@ -604,7 +606,7 @@ async fn handle_stream(
             })
         });
 
-    let active_parsing_task_nums = Arc::new(AtomicU32::new(0));
+    let active_parsing_task_nums = Arc::new(AtomicUsize::new(0));
     loop {
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
@@ -660,7 +662,7 @@ async fn handle_tcp_frame<T>(
     frame: Bytes,
     event_sink: &mut SourceSender,
     received_from: Option<Bytes>,
-    active_parsing_task_nums: Arc<AtomicU32>,
+    active_parsing_task_nums: Arc<AtomicUsize>,
 ) where
     T: TcpFrameHandler + Send + Sync + Clone + 'static,
 {
@@ -743,8 +745,7 @@ pub fn build_framestream_unix_source(
     if let Some(socket_permission) = frame_handler.socket_file_mode() {
         if !(448..=511).contains(&socket_permission) {
             return Err(format!(
-                "Invalid Socket permission {:#o}. Must between 0o700 and 0o777.",
-                socket_permission
+                "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
             )
             .into());
         }
@@ -763,7 +764,7 @@ pub fn build_framestream_unix_source(
     };
 
     let fut = async move {
-        let active_parsing_task_nums = Arc::new(AtomicU32::new(0));
+        let active_parsing_task_nums = Arc::new(AtomicUsize::new(0));
 
         info!(message = "Listening...", ?path, r#type = "unix");
 
@@ -833,7 +834,7 @@ fn build_framestream_source<T: Send + 'static>(
     out: SourceSender,
     shutdown: impl Future<Output = T> + Unpin + Send + 'static,
     span: Span,
-    active_task_nums: Arc<AtomicU32>,
+    active_task_nums: Arc<AtomicUsize>,
     error_mapper: impl FnMut(std::io::Error) + Send + 'static,
 ) {
     let content_type = frame_handler.content_type();
@@ -903,8 +904,8 @@ async fn spawn_event_handling_tasks(
     event_handler: impl FrameHandler + Send + Sync + 'static,
     mut event_sink: SourceSender,
     received_from: Option<Bytes>,
-    active_task_nums: Arc<AtomicU32>,
-    max_frame_handling_tasks: u32,
+    active_task_nums: Arc<AtomicUsize>,
+    max_frame_handling_tasks: usize,
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
@@ -921,7 +922,7 @@ async fn spawn_event_handling_tasks(
     })
 }
 
-async fn wait_for_task_quota(active_task_nums: &Arc<AtomicU32>, max_tasks: u32) {
+async fn wait_for_task_quota(active_task_nums: &Arc<AtomicUsize>, max_tasks: usize) {
     while max_tasks > 0 && max_tasks < active_task_nums.load(Ordering::Acquire) {
         tokio::time::sleep(Duration::from_millis(3)).await;
     }
@@ -936,7 +937,7 @@ mod test {
     use std::{
         path::PathBuf,
         sync::{
-            atomic::{AtomicU32, Ordering},
+            atomic::{AtomicUsize, Ordering},
             Arc,
         },
         thread,
@@ -985,7 +986,7 @@ mod test {
         content_type: String,
         max_frame_length: usize,
         multithreaded: bool,
-        max_frame_handling_tasks: u32,
+        max_frame_handling_tasks: usize,
         extra_task_handling_routine: F,
         host_key: Option<OwnedValuePath>,
         timestamp_key: Option<OwnedValuePath>,
@@ -1100,7 +1101,7 @@ mod test {
         fn multithreaded(&self) -> bool {
             self.multithreaded
         }
-        fn max_frame_handling_tasks(&self) -> u32 {
+        fn max_frame_handling_tasks(&self) -> usize {
             self.max_frame_handling_tasks
         }
 
@@ -1134,7 +1135,7 @@ mod test {
             self.frame_handler.multithreaded()
         }
 
-        fn max_frame_handling_tasks(&self) -> u32 {
+        fn max_frame_handling_tasks(&self) -> usize {
             self.frame_handler.max_frame_handling_tasks()
         }
 
@@ -1186,7 +1187,7 @@ mod test {
             self.frame_handler.multithreaded()
         }
 
-        fn max_frame_handling_tasks(&self) -> u32 {
+        fn max_frame_handling_tasks(&self) -> usize {
             self.frame_handler.max_frame_handling_tasks()
         }
 
@@ -1746,9 +1747,9 @@ mod test {
         let (out, rx) = SourceSender::new_test();
 
         let max_frame_handling_tasks = 20;
-        let active_task_nums = Arc::new(AtomicU32::new(0));
+        let active_task_nums = Arc::new(AtomicUsize::new(0));
         let active_task_nums_copy = Arc::clone(&active_task_nums);
-        let max_task_nums_reached = Arc::new(AtomicU32::new(0));
+        let max_task_nums_reached = Arc::new(AtomicUsize::new(0));
         let max_task_nums_reached_copy = Arc::clone(&max_task_nums_reached);
 
         let mut join_handles = vec![];
@@ -1765,8 +1766,8 @@ mod test {
 
         join_handles.push(tokio::spawn(async move {
             future::ready({
-                let events = collect_n(rx, total_events as usize).await;
-                assert_eq!(total_events as usize, events.len(), "Missed events");
+                let events = collect_n(rx, total_events).await;
+                assert_eq!(total_events, events.len(), "Missed events");
             })
             .await;
         }));

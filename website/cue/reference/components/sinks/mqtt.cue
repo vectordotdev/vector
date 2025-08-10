@@ -62,7 +62,7 @@ components: sinks: mqtt: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.mqtt.configuration
+	configuration: generated.components.sinks.mqtt.configuration
 
 	input: {
 		logs:    true

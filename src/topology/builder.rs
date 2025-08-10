@@ -174,7 +174,7 @@ impl<'a> Builder<'a> {
                     Ok(table) => table,
                     Err(error) => {
                         self.errors
-                            .push(format!("Enrichment Table \"{}\": {}", name, error));
+                            .push(format!("Enrichment Table \"{name}\": {error}"));
                         continue;
                     }
                 };
@@ -353,7 +353,7 @@ impl<'a> Builder<'a> {
             let source = source.inner.build(context).await;
             let server = match source {
                 Err(error) => {
-                    self.errors.push(format!("Source \"{}\": {}", key, error));
+                    self.errors.push(format!("Source \"{key}\": {error}"));
                     continue;
                 }
                 Ok(server) => server,
@@ -501,8 +501,7 @@ impl<'a> Builder<'a> {
                 .await
             {
                 Err(error) => {
-                    self.errors
-                        .push(format!("Transform \"{}\": {}", key, error));
+                    self.errors.push(format!("Transform \"{key}\": {error}"));
                     continue;
                 }
                 Ok(transform) => transform,
@@ -573,28 +572,30 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = if let Some(buffer) = self.buffers.remove(key) {
-                buffer
-            } else {
-                let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                    BufferType::Memory { .. } => "memory",
-                    BufferType::DiskV2 { .. } => "disk",
-                };
-                let buffer_span = error_span!("sink", buffer_type);
-                let buffer = sink
-                    .buffer
-                    .build(
-                        self.config.global.data_dir.clone(),
-                        key.to_string(),
-                        buffer_span,
-                    )
-                    .await;
-                match buffer {
-                    Err(error) => {
-                        self.errors.push(format!("Sink \"{}\": {}", key, error));
-                        continue;
+            let (tx, rx) = match self.buffers.remove(key) {
+                Some(buffer) => buffer,
+                _ => {
+                    let buffer_type =
+                        match sink.buffer.stages().first().expect("cant ever be empty") {
+                            BufferType::Memory { .. } => "memory",
+                            BufferType::DiskV2 { .. } => "disk",
+                        };
+                    let buffer_span = error_span!("sink", buffer_type);
+                    let buffer = sink
+                        .buffer
+                        .build(
+                            self.config.global.data_dir.clone(),
+                            key.to_string(),
+                            buffer_span,
+                        )
+                        .await;
+                    match buffer {
+                        Err(error) => {
+                            self.errors.push(format!("Sink \"{key}\": {error}"));
+                            continue;
+                        }
+                        Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                     }
-                    Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
                 }
             };
 
@@ -611,7 +612,7 @@ impl<'a> Builder<'a> {
 
             let (sink, healthcheck) = match sink.inner.build(cx).await {
                 Err(error) => {
-                    self.errors.push(format!("Sink \"{}\": {}", key, error));
+                    self.errors.push(format!("Sink \"{key}\": {error}"));
                     continue;
                 }
                 Ok(built) => built,
@@ -709,6 +710,49 @@ impl<'a> Builder<'a> {
             self.detach_triggers.insert(key.clone(), trigger);
         }
     }
+}
+
+pub async fn reload_enrichment_tables(config: &Config) {
+    let mut enrichment_tables = HashMap::new();
+    // Build enrichment tables
+    'tables: for (name, table_outer) in config.enrichment_tables.iter() {
+        let table_name = name.to_string();
+        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
+
+            let mut table = match table_outer.inner.build(&config.global).await {
+                Ok(table) => table,
+                Err(error) => {
+                    error!("Enrichment table \"{name}\" reload failed: {error}");
+                    continue;
+                }
+            };
+
+            if let Some(indexes) = indexes {
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                    table = ?name.to_string(),
+                                    %error);
+                            continue 'tables;
+                        }
+                    }
+                }
+            }
+
+            enrichment_tables.insert(table_name, table);
+        }
+    }
+
+    ENRICHMENT_TABLES.load(enrichment_tables);
+    ENRICHMENT_TABLES.finish_load();
 }
 
 pub struct TopologyPieces {

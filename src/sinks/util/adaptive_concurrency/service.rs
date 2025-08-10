@@ -115,7 +115,7 @@ impl fmt::Debug for State {
                 .debug_tuple("State::Waiting")
                 .field(&format_args!("..."))
                 .finish(),
-            State::Ready(ref r) => f.debug_tuple("State::Ready").field(&r).finish(),
+            State::Ready(r) => f.debug_tuple("State::Ready").field(&r).finish(),
             State::Empty => f.debug_tuple("State::Empty").finish(),
         }
     }
@@ -156,6 +156,7 @@ mod tests {
     struct TestRetryLogic;
     impl RetryLogic for TestRetryLogic {
         type Error = TestError;
+        type Request = ();
         type Response = String;
         fn is_retriable_error(&self, _error: &Self::Error) -> bool {
             true

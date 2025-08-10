@@ -72,7 +72,7 @@ fn build_trace_filter(
                         .map_err(|error| {
                             ErrorMessage::new(
                                 StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {:?}", error),
+                                format!("Error decoding Datadog traces: {error:?}"),
                             )
                         })
                     });

@@ -187,12 +187,12 @@ pub fn get_version() -> String {
     // or full debug symbols. See the Cargo Book profiling section for value meaning:
     // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
     let build_string = match built_info::DEBUG {
-        "1" => format!("{} debug=line", build_string),
-        "2" | "true" => format!("{} debug=full", build_string),
+        "1" => format!("{build_string} debug=line"),
+        "2" | "true" => format!("{build_string} debug=full"),
         _ => build_string,
     };
 
-    format!("{} ({})", pkg_version, build_string)
+    format!("{pkg_version} ({build_string})")
 }
 
 /// Includes information about the current build.

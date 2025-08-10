@@ -169,10 +169,11 @@ pub trait ContainerTestRunner: TestRunner {
         let network_name = self.network_name().unwrap_or("host");
 
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
-        let docker_args = self
-            .needs_docker_socket()
-            .then(|| vec!["--volume", &docker_socket])
-            .unwrap_or_default();
+        let docker_args = if self.needs_docker_socket() {
+            vec!["--volume", &docker_socket]
+        } else {
+            vec![]
+        };
 
         let volumes = self.volumes();
         let volumes: Vec<_> = volumes

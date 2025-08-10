@@ -1,28 +1,13 @@
 use std::{
-    fmt::Debug,
     io,
-    net::SocketAddr,
     num::NonZeroU64,
-    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
-use snafu::{ResultExt, Snafu};
-use tokio::{net::TcpStream, time};
-use tokio_tungstenite::{
-    client_async_with_config,
-    tungstenite::{
-        client::{uri_mode, IntoClientRequest},
-        error::{Error as WsError, ProtocolError, UrlError},
-        handshake::client::Request as WsRequest,
-        protocol::{Message, WebSocketConfig},
-        stream::Mode as UriMode,
-    },
-    WebSocketStream as WsStream,
-};
+use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     emit,
@@ -34,159 +19,14 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    dns,
+    common::websocket::{is_closed, PingInterval, WebSocketConnector},
     event::{Event, EventStatus, Finalizable},
-    http::Auth,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
-        WsConnectionFailedError, WsConnectionShutdown,
+        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
     },
-    sinks::util::{retries::ExponentialBackoff, StreamSink},
+    sinks::util::StreamSink,
     sinks::websocket::config::WebSocketSinkConfig,
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
-
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum WebSocketError {
-    #[snafu(display("Creating WebSocket client failed: {}", source))]
-    CreateFailed { source: WsError },
-    #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: TlsError },
-    #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError { source: dns::DnsError },
-    #[snafu(display("No addresses returned."))]
-    NoAddresses,
-}
-
-#[derive(Clone)]
-pub struct WebSocketConnector {
-    uri: String,
-    host: String,
-    port: u16,
-    tls: MaybeTlsSettings,
-    auth: Option<Auth>,
-}
-
-impl WebSocketConnector {
-    pub fn new(
-        uri: String,
-        tls: MaybeTlsSettings,
-        auth: Option<Auth>,
-    ) -> Result<Self, WebSocketError> {
-        let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
-        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
-
-        Ok(Self {
-            uri,
-            host,
-            port,
-            tls,
-            auth,
-        })
-    }
-
-    fn extract_host_and_port(request: &WsRequest) -> Result<(String, u16), WsError> {
-        let host = request
-            .uri()
-            .host()
-            .ok_or(WsError::Url(UrlError::NoHostName))?
-            .to_string();
-        let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or(match mode {
-            UriMode::Tls => 443,
-            UriMode::Plain => 80,
-        });
-
-        Ok((host, port))
-    }
-
-    const fn fresh_backoff() -> ExponentialBackoff {
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
-    }
-
-    async fn tls_connect(&self) -> Result<MaybeTlsStream<TcpStream>, WebSocketError> {
-        let ip = dns::Resolver
-            .lookup_ip(self.host.clone())
-            .await
-            .context(DnsSnafu)?
-            .next()
-            .ok_or(WebSocketError::NoAddresses)?;
-
-        let addr = SocketAddr::new(ip, self.port);
-        self.tls
-            .connect(&self.host, &addr)
-            .await
-            .context(ConnectSnafu)
-    }
-
-    async fn connect(&self) -> Result<WsStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
-        let mut request = (&self.uri)
-            .into_client_request()
-            .context(CreateFailedSnafu)?;
-
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
-        }
-
-        let maybe_tls = self.tls_connect().await?;
-
-        let ws_config = WebSocketConfig::default();
-
-        let (ws_stream, _response) = client_async_with_config(request, maybe_tls, Some(ws_config))
-            .await
-            .context(CreateFailedSnafu)?;
-
-        Ok(ws_stream)
-    }
-
-    async fn connect_backoff(&self) -> WsStream<MaybeTlsStream<TcpStream>> {
-        let mut backoff = Self::fresh_backoff();
-        loop {
-            match self.connect().await {
-                Ok(ws_stream) => {
-                    emit!(WsConnectionEstablished {});
-                    return ws_stream;
-                }
-                Err(error) => {
-                    emit!(WsConnectionFailedError {
-                        error: Box::new(error)
-                    });
-                    time::sleep(backoff.next().unwrap()).await;
-                }
-            }
-        }
-    }
-
-    pub async fn healthcheck(&self) -> crate::Result<()> {
-        self.connect().await.map(|_| ()).map_err(Into::into)
-    }
-}
-
-struct PingInterval {
-    interval: Option<time::Interval>,
-}
-
-impl PingInterval {
-    fn new(period: Option<u64>) -> Self {
-        Self {
-            interval: period.map(|period| time::interval(Duration::from_secs(period))),
-        }
-    }
-
-    fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<time::Instant> {
-        match self.interval.as_mut() {
-            Some(interval) => interval.poll_tick(cx),
-            None => Poll::Pending,
-        }
-    }
-
-    async fn tick(&mut self) -> time::Instant {
-        std::future::poll_fn(|cx| self.poll_tick(cx)).await
-    }
-}
 
 pub struct WebSocketSink {
     transformer: Transformer,
@@ -197,7 +37,10 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector) -> crate::Result<Self> {
+    pub(crate) fn new(
+        config: &WebSocketSinkConfig,
+        connector: WebSocketConnector,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -206,25 +49,25 @@ impl WebSocketSink {
             transformer,
             encoder,
             connector,
-            ping_interval: config.ping_interval,
-            ping_timeout: config.ping_timeout,
+            ping_interval: config.common.ping_interval,
+            ping_timeout: config.common.ping_timeout,
         })
     }
 
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = WsError>,
-        impl Stream<Item = Result<Message, WsError>>,
+        impl Sink<Message, Error = TungsteniteError>,
+        impl Stream<Item = Result<Message, TungsteniteError>>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
     }
 
-    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), WsError> {
+    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
         if let Some(ping_timeout) = self.ping_timeout {
             if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-                return Err(WsError::Io(io::Error::new(
+                return Err(TungsteniteError::Io(io::Error::new(
                     io::ErrorKind::TimedOut,
                     "Pong not received in time",
                 )));
@@ -253,8 +96,8 @@ impl WebSocketSink {
     ) -> Result<(), ()>
     where
         I: Stream<Item = Event> + Unpin,
-        WS: Stream<Item = Result<Message, WsError>> + Unpin,
-        O: Sink<Message, Error = WsError> + Unpin,
+        WS: Stream<Item = Result<Message, TungsteniteError>> + Unpin,
+        O: Sink<Message, Error = TungsteniteError> + Unpin,
     {
         const PING: &[u8] = b"PING";
 
@@ -263,7 +106,7 @@ impl WebSocketSink {
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
         if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
-            emit!(WsConnectionError { error });
+            emit!(WebSocketConnectionError { error });
             return Err(());
         }
         let mut last_pong = Instant::now();
@@ -338,9 +181,9 @@ impl WebSocketSink {
 
             if let Err(error) = result {
                 if is_closed(&error) {
-                    emit!(WsConnectionShutdown);
+                    emit!(WebSocketConnectionShutdown);
                 } else {
-                    emit!(WsConnectionError { error });
+                    emit!(WebSocketConnectionError { error });
                 }
                 return Err(());
             }
@@ -376,37 +219,32 @@ impl StreamSink<Event> for WebSocketSink {
     }
 }
 
-const fn is_closed(error: &WsError) -> bool {
-    matches!(
-        error,
-        WsError::ConnectionClosed
-            | WsError::AlreadyClosed
-            | WsError::Protocol(ProtocolError::ResetWithoutClosingHandshake)
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use std::net::SocketAddr;
 
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
-    use tokio::time::timeout;
+    use tokio::{time, time::timeout};
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
-        tungstenite::error::{Error as WsError, ProtocolError},
-        tungstenite::handshake::server::{Request, Response},
+        tungstenite::{
+            error::ProtocolError,
+            handshake::server::{Request, Response},
+        },
     };
     use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
     use crate::{
+        common::websocket::WebSocketCommonConfig,
         config::{SinkConfig, SinkContext},
+        http::Auth,
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, random_lines_with_stream, trace_init, CountReceiver,
         },
-        tls::{self, TlsConfig, TlsEnableableConfig},
+        tls::{self, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
     };
 
     #[tokio::test(flavor = "multi_thread")]
@@ -415,13 +253,15 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
-            tls: None,
+            common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -438,13 +278,15 @@ mod tests {
         let auth_clone = auth.clone();
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
-            tls: None,
+            common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -460,21 +302,23 @@ mod tests {
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
         let config = WebSocketSinkConfig {
-            uri: format!("wss://{}", addr),
-            tls: Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    verify_certificate: Some(false),
-                    verify_hostname: Some(true),
-                    ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
-                    ..Default::default()
-                },
-            }),
+            common: WebSocketCommonConfig {
+                uri: format!("wss://{addr}"),
+                tls: Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(false),
+                        verify_hostname: Some(true),
+                        ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        ..Default::default()
+                    },
+                }),
+                ping_timeout: None,
+                ping_interval: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_timeout: None,
-            ping_interval: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
 
         send_events_and_assert(addr, config, tls, None).await;
@@ -486,13 +330,15 @@ mod tests {
 
         let addr = next_addr();
         let config = WebSocketSinkConfig {
-            uri: format!("ws://{}", addr),
-            tls: None,
+            common: WebSocketCommonConfig {
+                uri: format!("ws://{addr}"),
+                tls: None,
+                ping_interval: None,
+                ping_timeout: None,
+                auth: None,
+            },
             encoding: JsonSerializerConfig::default().into(),
-            ping_interval: None,
-            ping_timeout: None,
             acknowledgements: Default::default(),
-            auth: None,
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -606,7 +452,7 @@ mod tests {
                                         Ok(msg) if msg.is_text() => {
                                             Some(Ok(msg.into_text().unwrap()))
                                         }
-                                        Err(WsError::Protocol(
+                                        Err(TungsteniteError::Protocol(
                                             ProtocolError::ResetWithoutClosingHandshake,
                                         )) => None,
                                         Err(e) => Some(Err(e)),

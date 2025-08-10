@@ -83,8 +83,8 @@ impl SocketListenAddr {
 impl fmt::Display for SocketListenAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::SocketAddr(ref addr) => addr.fmt(f),
-            Self::SystemdFd(offset) => write!(f, "systemd socket #{}", offset),
+            Self::SocketAddr(addr) => addr.fmt(f),
+            Self::SystemdFd(offset) => write!(f, "systemd socket #{offset}"),
         }
     }
 }
@@ -137,7 +137,7 @@ impl From<SocketListenAddr> for String {
                 if fd == 0 {
                     "systemd".to_owned()
                 } else {
-                    format!("systemd#{}", fd)
+                    format!("systemd#{fd}")
                 }
             }
         }
