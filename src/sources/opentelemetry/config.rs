@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 
-use futures::{future::join, FutureExt, TryFutureExt};
+use futures::FutureExt;
+use futures_util::future::join;
+use futures_util::TryFutureExt;
 use tonic::codec::CompressionEncoding;
 use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
 use vector_lib::opentelemetry::logs::{
@@ -8,7 +10,6 @@ use vector_lib::opentelemetry::logs::{
     SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
 };
 
-use crate::codecs::DecodingConfig;
 use crate::sources::http_server::{build_param_matcher, remove_duplicates};
 use crate::sources::opentelemetry::grpc::Service;
 use crate::sources::opentelemetry::http::{build_warp_filter, run_http_server};
@@ -23,7 +24,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 use tonic::transport::server::RoutesBuilder;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
 use vector_lib::opentelemetry::proto::collector::{
@@ -41,30 +42,35 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
+pub static OTEL_PROTO_DESCRIPTOR_BYTES: &[u8] = include_bytes!("../../../lib/opentelemetry-proto/src/proto/opentelemetry-proto/opentelemetry-proto.desc");
+pub const OTEL_PROTO_LOGS_REQUEST: &str = "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
+pub const OTEL_PROTO_TRACES_REQUEST: &str = "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
+pub const OTEL_PROTO_METRICS_REQUEST: &str = "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
+
 /// Configuration for the `opentelemetry` source.
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
     #[configurable(derived)]
-    grpc: GrpcConfig,
+    pub grpc: GrpcConfig,
 
     #[configurable(derived)]
-    http: HttpConfig,
+    pub http: HttpConfig,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: SourceAcknowledgementsConfig,
+    pub acknowledgements: SourceAcknowledgementsConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 
-    /// Setting this field will override the legacy mapping of OTEL protos to Vector events.
+    /// Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
     #[configurable(derived)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub decoding: Option<DeserializerConfig>,
+    #[serde(default)]
+    pub use_oltp_decoding: bool,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -72,16 +78,16 @@ pub struct OpentelemetryConfig {
 #[configurable(metadata(docs::examples = "example_grpc_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-struct GrpcConfig {
+pub struct GrpcConfig {
     /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
-    address: SocketAddr,
+    pub address: SocketAddr,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    tls: Option<TlsEnableableConfig>,
+    pub tls: Option<TlsEnableableConfig>,
 }
 
 fn example_grpc_config() -> GrpcConfig {
@@ -96,20 +102,20 @@ fn example_grpc_config() -> GrpcConfig {
 #[configurable(metadata(docs::examples = "example_http_config()"))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-struct HttpConfig {
+pub struct HttpConfig {
     /// The socket address to listen for connections on.
     ///
     /// It _must_ include a port.
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
-    address: SocketAddr,
+    pub address: SocketAddr,
 
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    tls: Option<TlsEnableableConfig>,
+    pub tls: Option<TlsEnableableConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
-    keepalive: KeepaliveConfig,
+    pub keepalive: KeepaliveConfig,
 
     /// A list of HTTP headers to include in the log event.
     ///
@@ -123,7 +129,7 @@ struct HttpConfig {
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
     #[configurable(metadata(docs::examples = "X-*"))]
     #[configurable(metadata(docs::examples = "*"))]
-    headers: Vec<String>,
+    pub headers: Vec<String>,
 }
 
 fn example_http_config() -> HttpConfig {
@@ -142,9 +148,18 @@ impl GenerateConfig for OpentelemetryConfig {
             http: example_http_config(),
             acknowledgements: Default::default(),
             log_namespace: None,
-            decoding: None,
+            use_oltp_decoding: false,
         })
         .unwrap()
+    }
+}
+
+impl OpentelemetryConfig {
+    fn get_deserializer(&self, message_type: &str) -> vector_common::Result<Option<ProtobufDeserializer>> {
+        if self.use_oltp_decoding {
+            let deserializer = ProtobufDeserializer::new_from_bytes(OTEL_PROTO_DESCRIPTOR_BYTES, message_type)?;
+            Ok(Some(deserializer))
+        } else { Ok(None) }
     }
 }
 
@@ -155,38 +170,39 @@ impl SourceConfig for OpentelemetryConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = self.decoding.map(|deserializer| {
-            DecodingConfig::new(FramingConfig::Bytes, deserializer, self.log_namespace)
-        });
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
+        let log_deserializer = self.get_deserializer(OTEL_PROTO_LOGS_REQUEST)?;
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            decoder,
+            deserializer: log_deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let trace_service = TraceServiceServer::new(Service {
-            pipeline: cx.out.clone(),
-            acknowledgements,
-            log_namespace,
-            events_received: events_received.clone(),
-            decoder,
-        })
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(usize::MAX);
-
+        let metric_deserializer = self.get_deserializer(OTEL_PROTO_METRICS_REQUEST)?;
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            decoder,
+            deserializer: metric_deserializer,
+        })
+            .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(usize::MAX);
+
+
+        let trace_deserializer = self.get_deserializer(OTEL_PROTO_TRACES_REQUEST)?;
+        let trace_service = TraceServiceServer::new(Service {
+            pipeline: cx.out.clone(),
+            acknowledgements,
+            log_namespace,
+            events_received: events_received.clone(),
+            deserializer: trace_deserializer,
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
@@ -196,17 +212,6 @@ impl SourceConfig for OpentelemetryConfig {
             .add_service(log_service)
             .add_service(metrics_service)
             .add_service(trace_service);
-
-        let decoder = if let Some(deserializer_config) = &self.decoding {
-            let decoding_config = DecodingConfig::new(
-                FramingConfig::NewlineDelimited(Default::default()),
-                deserializer_config.clone(),
-                log_namespace,
-            );
-            Some(decoding_config.build()?)
-        } else {
-            None
-        };
 
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
@@ -231,7 +236,7 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
             headers,
-            decoder,
+            log_deserializer,
         );
 
         let http_source = run_http_server(

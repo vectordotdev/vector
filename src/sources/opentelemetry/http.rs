@@ -2,7 +2,6 @@ use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
 use super::{reply::protobuf, status::Status};
-use crate::codecs::Decoder as VectorDecoder;
 use crate::common::http::ErrorMessage;
 use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::sources::http_server::HttpConfigParamKind;
@@ -17,16 +16,17 @@ use crate::{
     tls::MaybeTlsSettings,
     SourceSender,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
 use hyper::{service::make_service_fn, Server};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tokio_util::codec::Decoder;
 use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::codecs::decoding::format::Deserializer;
+use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
@@ -94,7 +94,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    decoder: Option<VectorDecoder>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -103,7 +103,7 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
-        decoder,
+        deserializer,
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
@@ -147,7 +147,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    decoder: Option<VectorDecoder>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -161,16 +161,11 @@ fn build_warp_log_filter(
         .and_then(
             move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
                 println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
-                let events = if let Some(mut decoder) = decoder.clone() {
-                    let mut body = BytesMut::from(body);
-                    decoder
-                        .decode(&mut body)
+                let events = if let Some(deserializer) = deserializer.as_ref() {
+                    deserializer
+                        .parse(body, log_namespace)
                         .map(|result| {
-                            if let Some(result) = result {
-                                result.0.into_vec()
-                            } else {
-                                Vec::new()
-                            }
+                            result.into_vec()
                         })
                         .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
                 } else {

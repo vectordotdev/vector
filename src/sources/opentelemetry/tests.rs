@@ -6,7 +6,7 @@ use crate::{
     event::{
         into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
     },
-    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
     test_util::{
         self,
         components::{assert_source_compliance, SOURCE_TAGS},
@@ -1132,7 +1132,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
-            decoding: None,
+            use_oltp_decoding: false,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1238,7 +1238,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
-        decoding: None,
+        use_oltp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());

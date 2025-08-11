@@ -1,4 +1,3 @@
-use crate::codecs::Decoder;
 use crate::sources::opentelemetry::config::{LOGS, METRICS, TRACES};
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
@@ -9,7 +8,7 @@ use prost::Message;
 use std::path::PathBuf;
 use tonic::{Request, Response, Status};
 use vector_lib::codecs::decoding::format::Deserializer;
-use vector_lib::codecs::decoding::{ProtobufDeserializerConfig, ProtobufDeserializerOptions};
+use vector_lib::codecs::decoding::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions};
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{
@@ -35,7 +34,7 @@ pub(super) struct Service {
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
     pub log_namespace: LogNamespace,
-    pub decoder: Option<Decoder>,
+    pub deserializer: Option<ProtobufDeserializer>,
 }
 
 #[tonic::async_trait]
@@ -44,10 +43,10 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let events = if let Some(decoder) = self.decoder.as_deref() {
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
-            decoder.dexcode(bytes)
+            deserializer.parse(bytes, self.log_namespace).map_err(|e| Status::invalid_argument(e.to_string()))?.into_vec()
         } else {
             request
                 .into_inner()
