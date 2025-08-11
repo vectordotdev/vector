@@ -1,4 +1,6 @@
 //! Functionality to handle enrichment tables.
+use std::path::PathBuf;
+
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::enrichment::{Condition, IndexHandle, Table};
@@ -75,5 +77,20 @@ impl GenerateConfig for EnrichmentTables {
             schema: Default::default(),
         }))
         .unwrap()
+    }
+}
+
+impl EnrichmentTables {
+    /// Gets the files to watch to trigger reload
+    pub fn files_to_watch(&self) -> Vec<&PathBuf> {
+        match self {
+            EnrichmentTables::File(file_config) => vec![&file_config.file.path],
+            #[cfg(feature = "enrichment-tables-memory")]
+            EnrichmentTables::Memory(_) => vec![],
+            #[cfg(feature = "enrichment-tables-geoip")]
+            EnrichmentTables::Geoip(geoip_config) => vec![&geoip_config.path],
+            #[cfg(feature = "enrichment-tables-mmdb")]
+            EnrichmentTables::Mmdb(mmdb_config) => vec![&mmdb_config.path],
+        }
     }
 }

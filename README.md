@@ -32,7 +32,7 @@ faster than every alternative in the space.
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
 
-Vector is maintained by the Datadog's [Community Open Source Engineering team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team).
+Vector is maintained by Datadog's [Community Open Source Engineering team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team).
 
 ### Principles
 
