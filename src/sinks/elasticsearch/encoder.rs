@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub enum DocumentVersionType {
     External,
     ExternalGte,
@@ -34,20 +34,20 @@ impl DocumentVersionType {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct DocumentVersion {
     pub kind: DocumentVersionType,
     pub value: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub enum DocumentMetadata {
     WithoutId,
     Id(String),
     IdAndVersion(String, DocumentVersion),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,

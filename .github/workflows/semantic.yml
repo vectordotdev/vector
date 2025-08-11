@@ -40,6 +40,7 @@ jobs:
             ci
             cli
             codecs
+            codecs protobuf
             compression
             config
             core
@@ -200,6 +201,7 @@ jobs:
             blackhole sink
             clickhouse sink
             console sink
+            datadog_common sink
             datadog_archives sink
             datadog_events sink
             datadog_logs sink
@@ -252,3 +254,4 @@ jobs:
             website deps
 
             config provider
+            opentelemetry lib
