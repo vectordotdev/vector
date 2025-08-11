@@ -1,5 +1,5 @@
 use glob::glob;
-use std::{env, io::Result, path::PathBuf};
+use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_root = PathBuf::from("src/proto/opentelemetry-proto");
@@ -15,8 +15,7 @@ fn main() -> Result<()> {
         println!("cargo:rerun-if-changed={}", proto.display());
     }
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let descriptor_path = out_dir.join("opentelemetry-proto.desc");
+    let descriptor_path = proto_root.join("opentelemetry-proto.desc");
 
     tonic_build::configure()
         .build_client(true)
