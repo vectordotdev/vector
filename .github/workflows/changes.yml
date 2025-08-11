@@ -201,7 +201,6 @@ jobs:
           website:
             - "website/**"
           not_website:
-            - "**"
             - "!website/**"
 
   # Detects changes that are specific to integration tests
