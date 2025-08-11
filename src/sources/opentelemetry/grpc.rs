@@ -35,7 +35,7 @@ pub(super) struct Service {
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
     pub log_namespace: LogNamespace,
-    pub decoder: Option<Decoder>
+    pub decoder: Option<Decoder>,
 }
 
 #[tonic::async_trait]

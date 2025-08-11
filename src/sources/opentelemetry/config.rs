@@ -144,7 +144,7 @@ impl GenerateConfig for OpentelemetryConfig {
             log_namespace: None,
             decoding: None,
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -155,9 +155,9 @@ impl SourceConfig for OpentelemetryConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
-        let decoder = self.decoding.map(|deserializer|
-            DecodingConfig::new(FramingConfig::Bytes, deserializer, self.log_namespace));
-
+        let decoder = self.decoding.map(|deserializer| {
+            DecodingConfig::new(FramingConfig::Bytes, deserializer, self.log_namespace)
+        });
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
@@ -168,28 +168,28 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             decoder,
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            decoder
+            decoder,
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            decoder
+            decoder,
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let mut builder = RoutesBuilder::default();
         builder
@@ -214,9 +214,9 @@ impl SourceConfig for OpentelemetryConfig {
             builder.routes(),
             cx.shutdown.clone(),
         )
-            .map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            });
+        .map_err(|error| {
+            error!(message = "Source future failed.", %error);
+        });
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
