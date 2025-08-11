@@ -104,6 +104,11 @@ jobs:
               should_run=false
             fi
 
+            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
+              exit 0
+            fi
+
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "merge_group" || \
                   "${{ github.event_name }}" == "workflow_dispatch" || \
