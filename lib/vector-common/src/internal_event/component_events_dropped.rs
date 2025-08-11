@@ -58,6 +58,7 @@ impl<const INTENDED: bool> InternalEventHandle for DroppedHandle<'_, INTENDED> {
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
+                internal_log_rate_limit = true,
             );
         } else {
             error!(
@@ -65,6 +66,7 @@ impl<const INTENDED: bool> InternalEventHandle for DroppedHandle<'_, INTENDED> {
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
+                internal_log_rate_limit = true,
             );
         }
         self.discarded_events.increment(data.0 as u64);
