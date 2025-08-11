@@ -104,6 +104,13 @@ jobs:
               should_run=false
             fi
 
+            SKIP_MSG="Skipping ${{ matrix.service }} test as the value is false or conditions not met."
+
+            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+              echo "$SKIP_MSG"
+              exit 0
+            done
+
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "merge_group" || \
                   "${{ github.event_name }}" == "workflow_dispatch" || \
@@ -114,7 +121,7 @@ jobs:
               echo "Running test for ${{ matrix.service }}"
               bash scripts/int-e2e-test.sh int ${{ matrix.service }}
             else
-              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
+              echo "$SKIP_MSG"
             fi
 
 
