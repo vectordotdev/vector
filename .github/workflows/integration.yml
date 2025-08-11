@@ -104,10 +104,8 @@ jobs:
               should_run=false
             fi
 
-            SKIP_MSG="Skipping ${{ matrix.service }} test as the value is false or conditions not met."
-
             if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
-              echo "$SKIP_MSG"
+              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
               exit 0
             fi
 
@@ -121,7 +119,7 @@ jobs:
               echo "Running test for ${{ matrix.service }}"
               bash scripts/int-e2e-test.sh int ${{ matrix.service }}
             else
-              echo "$SKIP_MSG"
+              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
 
 
