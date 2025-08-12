@@ -461,6 +461,7 @@ Softbank
 Sogou
 solarwinds
 Soref
+sortedset
 splunk
 ssh
 staticuser
@@ -524,6 +525,7 @@ XSALSA
 yandex
 Yarvik
 Yifang
+zadd
 zeek
 zookeeper
 Zopo
@@ -533,3 +535,10 @@ ZTE
 Zync
 envsubst
 jimmystewpot
+esensar
+jchap-pnnl
+jhbigler-pnnl
+jlambatl
+jorgehermo9
+notchairmk
+yjagdale

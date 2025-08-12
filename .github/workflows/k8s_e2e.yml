@@ -245,7 +245,7 @@ jobs:
       - test-e2e-kubernetes
     if: always()
     env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
       - name: (PR review) Get PR branch
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
@@ -260,10 +260,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ env.FAILED }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

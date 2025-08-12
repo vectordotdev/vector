@@ -1,5 +1,5 @@
-use crate::config::ComponentConfig;
-use std::collections::HashSet;
+use crate::config::{ComponentConfig, ComponentType};
+use std::collections::HashMap;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
@@ -61,7 +61,7 @@ impl Watcher {
     }
 }
 
-/// Sends a ReloadFromDisk on config_path changes.
+/// Sends a ReloadFromDisk or ReloadEnrichmentTables on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
@@ -103,7 +103,7 @@ pub fn spawn_thread<'a>(
 
                     debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
-                    let component_keys: HashSet<_> = component_configs
+                    let changed_components: HashMap<_, _> = component_configs
                         .clone()
                         .into_iter()
                         .flat_map(|p| p.contains(&event.paths))
@@ -119,15 +119,32 @@ pub fn spawn_thread<'a>(
                     debug!(message = "Reloaded paths.");
 
                     info!("Configuration file changed.");
-                    if !component_keys.is_empty() {
-                        info!("Component {:?} configuration changed.", component_keys);
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
-                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                        });
+                    if !changed_components.is_empty() {
+                        info!(
+                            internal_log_rate_limit = true,
+                            "Component {:?} configuration changed.",
+                            changed_components.keys()
+                        );
+                        if changed_components
+                            .iter()
+                            .all(|(_, t)| *t == ComponentType::EnrichmentTable)
+                        {
+                            info!(
+                                internal_log_rate_limit = true,
+                                "Only enrichment tables have changed."
+                            );
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
+                                error!(message = "Unable to reload enrichment tables.", cause = %error, internal_log_rate_limit = true)
+                            });
+                        } else {
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
+                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
+                            });
+                        }
                     } else {
                         _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
                             .map_err(|error| {
-                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
+                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
                             });
                     }
                 } else {
@@ -187,7 +204,7 @@ mod tests {
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{fs::File, io::Write, time::Duration};
+    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
 
     async fn test_signal(
@@ -221,8 +238,11 @@ mod tests {
             .iter()
             .map(|file| File::create(file).unwrap())
             .collect();
-        let component_config =
-            ComponentConfig::new(component_file_path.clone(), http_component.clone());
+        let component_config = ComponentConfig::new(
+            component_file_path.clone(),
+            http_component.clone(),
+            ComponentType::Sink,
+        );
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
         spawn_thread(
