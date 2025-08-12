@@ -138,7 +138,7 @@ impl GenerateConfig for OpentelemetryConfig {
             acknowledgements: Default::default(),
             log_namespace: None,
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -158,8 +158,8 @@ impl SourceConfig for OpentelemetryConfig {
             log_namespace,
             events_received: events_received.clone(),
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -167,8 +167,8 @@ impl SourceConfig for OpentelemetryConfig {
             log_namespace,
             events_received: events_received.clone(),
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -176,8 +176,8 @@ impl SourceConfig for OpentelemetryConfig {
             log_namespace,
             events_received: events_received.clone(),
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let mut builder = RoutesBuilder::default();
         builder
@@ -190,9 +190,9 @@ impl SourceConfig for OpentelemetryConfig {
             builder.routes(),
             cx.shutdown.clone(),
         )
-            .map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            });
+        .map_err(|error| {
+            error!(message = "Source future failed.", %error);
+        });
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
         let protocol = http_tls_settings.http_protocol_name();
