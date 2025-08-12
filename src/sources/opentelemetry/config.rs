@@ -42,7 +42,6 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
-pub static OTEL_PROTO_DESCRIPTOR_BYTES: &[u8] = include_bytes!("../../../lib/opentelemetry-proto/src/proto/opentelemetry-proto/opentelemetry-proto.desc");
 pub const OTEL_PROTO_LOGS_REQUEST: &str = "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
 pub const OTEL_PROTO_TRACES_REQUEST: &str = "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
 pub const OTEL_PROTO_METRICS_REQUEST: &str = "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
@@ -157,7 +156,7 @@ impl GenerateConfig for OpentelemetryConfig {
 impl OpentelemetryConfig {
     fn get_deserializer(&self, message_type: &str) -> vector_common::Result<Option<ProtobufDeserializer>> {
         if self.use_oltp_decoding {
-            let deserializer = ProtobufDeserializer::new_from_bytes(OTEL_PROTO_DESCRIPTOR_BYTES, message_type)?;
+            let deserializer = ProtobufDeserializer::new_from_bytes(vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES, message_type)?;
             Ok(Some(deserializer))
         } else { Ok(None) }
     }
