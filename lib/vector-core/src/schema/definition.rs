@@ -552,6 +552,8 @@ mod test_utils {
 
                 let actual_kind = Kind::from(log.value());
                 if let Err(path) = self.event_kind.is_superset(&actual_kind) {
+                    println!("pavlos actual {actual_kind:#?}");
+                    println!("pavlos self {:#?}", self.event_kind);
                     return Result::Err(format!("Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
                         path,
                         actual_kind.at_path(&path).debug_info(),
