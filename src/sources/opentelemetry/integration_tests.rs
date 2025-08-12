@@ -3,19 +3,19 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use itertools::Itertools;
 use serde_json::json;
 
-use super::{LOGS, METRICS, TRACES};
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES},
     test_util::{
         collect_n,
         components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
-    },
+    }
 };
 use prost::Message;
 
-use super::{tests::new_source, GrpcConfig, HttpConfig, OpentelemetryConfig};
+use super::tests::new_source;
 use vector_lib::opentelemetry::proto::{
     collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
     common::v1::{any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},

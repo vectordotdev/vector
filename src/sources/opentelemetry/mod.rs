@@ -3,7 +3,7 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-mod config;
+pub mod config;
 mod grpc;
 mod http;
 mod reply;
