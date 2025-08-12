@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: xxhash: {
-	category:    "Hashing"
+	category:    "Checksum"
 	description: """
 		Calculates a [xxHash](\(urls.xxhash_rust)) hash of the `value`.
 		**Note**: Due to limitations in the underlying VRL data types, this function converts the unsigned 64-bit integer hash result to a signed 64-bit integer. Results higher than the signed 64-bit integer maximum value wrap around to negative values. For the XXH3-128 hash algorithm, values are returned as a string.
