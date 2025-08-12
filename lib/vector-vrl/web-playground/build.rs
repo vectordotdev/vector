@@ -74,19 +74,11 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
                     Some(format!("https://crates.io/crates/vrl/{version}")),
                 )
             }
-            SourceKind::Path => {
-                (
-                    vrl_dep.version.to_string(),
-                    None,
-                )
-            }
+            SourceKind::Path => (vrl_dep.version.to_string(), None),
             kind => unimplemented!("unhandled source kind: {:?}", kind),
         }
     } else {
-        (
-            vrl_dep.version.to_string(),
-            None,
-        )
+        (vrl_dep.version.to_string(), None)
     };
 
     output_file
