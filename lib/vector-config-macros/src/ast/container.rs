@@ -22,6 +22,10 @@ use super::{
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
 const ERR_NO_ENUM_VARIANT_DESCRIPTION: &str = "enum variants must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in style/shape when in untagged mode i.e. there cannot be multiple unit variants, or tuple variants with the same fields, etc";
+const ERR_ENUM_MULTIPLE_UNTAGGED_VARIANTS: &str =
+    "at most one variant may be marked with #[serde(untagged)] in a tagged enum";
+const ERR_ENUM_UNTAGGED_VARIANT_POSITION: &str =
+    "a variant marked with #[serde(untagged)] must be the last variant in a tagged enum";
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";
 const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 const ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION: &str = "any container using `from`/`try_from`/`into` via `#[serde(...)]` must do so symmetrically i.e. the from/into types must match";
@@ -162,7 +166,8 @@ impl<'a> Container<'a> {
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
                         // Not all enum variant styles are compatible with the various tagging types that `serde`
                         // supports, and additionally, we have some of our own constraints that we want to enforce.
-                        for variant in &variants {
+                        let mut untagged_variant_index: Option<usize> = None;
+                        for (idx, variant) in variants.iter().enumerate() {
                             // We don't support tuple variants.
                             if variant.style() == Style::Tuple {
                                 accumulator.push(
@@ -175,11 +180,43 @@ impl<'a> Container<'a> {
                             // This allows untagged enums used for "(de)serialize as A, B, or C"
                             // purposes to avoid needless titles/descriptions when their fields will
                             // implicitly provide that.
-                            if variant.description().is_none() && tagging != Tagging::None {
+                            if variant.description().is_none()
+                                && tagging != Tagging::None
+                                && variant.tagging() != &Tagging::None
+                            {
                                 accumulator.push(
                                     darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION)
                                         .with_span(variant),
                                 );
+                            }
+
+                            // For tagged enums, detect and validate per-variant untagged usage.
+                            if tagging != Tagging::None && variant.tagging() == &Tagging::None {
+                                match untagged_variant_index {
+                                    None => untagged_variant_index = Some(idx),
+                                    Some(prev) => {
+                                        let err = darling::Error::custom(
+                                            ERR_ENUM_MULTIPLE_UNTAGGED_VARIANTS,
+                                        )
+                                        .with_span(variant)
+                                        .with_span(variants[prev].ident());
+                                        accumulator.push(err);
+                                    }
+                                }
+                            }
+                        }
+
+                        // If there is an untagged variant in a tagged enum, it must be last.
+                        if tagging != Tagging::None {
+                            if let Some(last_idx) =
+                                variants.iter().rposition(|v| v.tagging() == &Tagging::None)
+                            {
+                                if last_idx != variants.len() - 1 {
+                                    accumulator.push(
+                                        darling::Error::custom(ERR_ENUM_UNTAGGED_VARIANT_POSITION)
+                                            .with_span(variants[last_idx].ident()),
+                                    );
+                                }
                             }
                         }
 
