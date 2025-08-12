@@ -2,6 +2,9 @@
 name = "vector-vrl-web-playground"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/vectordotdev/vector"
+description = "A playground for experimenting with VRL"
+license = "MPL-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

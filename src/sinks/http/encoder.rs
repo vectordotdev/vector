@@ -71,6 +71,10 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
                 .map_err(|_| io::Error::other("unable to encode event"))?;
         }
 
+        println!("🚧 encoder: {:?}", self.encoder);
+        println!("📦 First encoded HTTP payload ({} bytes):", body.len());
+        println!("{:?}", body);
+
         match (self.encoder.serializer(), self.encoder.framer()) {
             (Json(_), NewlineDelimited(_)) => {
                 if !body.is_empty() {
@@ -91,6 +95,9 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
         }
 
         let body = body.freeze();
+
+        println!("📦 Final encoded HTTP payload ({} bytes):", body.len());
+        println!("{:?}", body);
 
         write_all(writer, n_events, body.as_ref()).map(|()| (body.len(), byte_size))
     }

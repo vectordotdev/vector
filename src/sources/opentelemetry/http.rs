@@ -1,6 +1,21 @@
 use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
+use super::{reply::protobuf, status::Status};
+use crate::common::http::ErrorMessage;
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
+use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
+use crate::sources::util::add_headers;
+use crate::{
+    event::Event,
+    http::build_http_trace_layer,
+    internal_events::{EventsReceived, StreamClosedError},
+    shutdown::ShutdownSignal,
+    sources::util::decode,
+    tls::MaybeTlsSettings,
+    SourceSender,
+};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
@@ -10,6 +25,8 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::codecs::decoding::format::Deserializer;
+use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
 };
@@ -27,23 +44,6 @@ use vector_lib::{
 use warp::{
     filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
 };
-
-use crate::common::http::ErrorMessage;
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
-use crate::sources::http_server::HttpConfigParamKind;
-use crate::sources::util::add_headers;
-use crate::{
-    event::Event,
-    http::build_http_trace_layer,
-    internal_events::{EventsReceived, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::util::decode,
-    tls::MaybeTlsSettings,
-    SourceSender,
-};
-
-use super::OpentelemetryConfig;
-use super::{reply::protobuf, status::Status};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -94,6 +94,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -102,6 +103,7 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
+        deserializer,
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
@@ -145,6 +147,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(warp::path!("v1" / "logs"))
@@ -157,21 +160,32 @@ fn build_warp_log_filter(
         .and(warp::body::bytes())
         .and_then(
             move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
-                let events = decode(encoding_header.as_deref(), body)
-                    .and_then(|body| {
-                        bytes_received.emit(ByteSize(body.len()));
-                        decode_log_body(body, log_namespace, &events_received)
-                    })
-                    .map(|mut events| {
-                        enrich_events(&mut events, &headers, &headers_config, log_namespace);
-                        events
-                    });
+                println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
+                let events = if let Some(deserializer) = deserializer.as_ref() {
+                    deserializer
+                        .parse(body, log_namespace)
+                        .map(|result| {
+                            result.into_vec()
+                        })
+                        .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                } else {
+                    decode(encoding_header.as_deref(), body)
+                        .and_then(|body| {
+                            bytes_received.emit(ByteSize(body.len()));
+                            decode_log_body(body, log_namespace, &events_received)
+                        })
+                        .map(|mut events| {
+                            enrich_events(&mut events, &headers, &headers_config, log_namespace);
+                            events
+                        })
+                };
 
+                println!("{:#?}", events);
                 handle_request(
                     events,
                     acknowledgements,
                     out.clone(),
-                    super::LOGS,
+                    LOGS,
                     ExportLogsServiceResponse::default(),
                 )
             },
@@ -203,7 +217,7 @@ fn build_warp_metrics_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::METRICS,
+                METRICS,
                 ExportMetricsServiceResponse::default(),
             )
         })
@@ -234,7 +248,7 @@ fn build_warp_trace_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::TRACES,
+                TRACES,
                 ExportTraceServiceResponse::default(),
             )
         })
