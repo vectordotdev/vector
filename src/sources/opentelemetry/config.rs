@@ -3,10 +3,7 @@ use std::net::SocketAddr;
 use futures::FutureExt;
 use futures_util::{future::join, TryFutureExt};
 
-use tonic::{
-    codec::CompressionEncoding,
-    transport::server::RoutesBuilder,
-};
+use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace},

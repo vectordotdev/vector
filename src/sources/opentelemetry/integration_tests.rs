@@ -6,12 +6,14 @@ use serde_json::json;
 use crate::{
     config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES},
+    sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES,
+    },
     test_util::{
         collect_n,
         components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
-    }
+    },
 };
 use prost::Message;
 
