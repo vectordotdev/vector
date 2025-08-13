@@ -389,4 +389,41 @@ mod tests {
 
         assert_eq!(counter.load(Ordering::Relaxed), 0);
     }
+
+    #[test]
+    fn test_update_counter_prevents_negatives() {
+        let counter = AtomicU64::new(100);
+
+        update_counter(&counter, -50);
+        assert_eq!(counter.load(Ordering::Relaxed), 50);
+
+        update_counter(&counter, -100);
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        update_counter(&counter, -50);
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+
+        update_counter(&counter, i64::MIN);
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_update_counter_prevents_overflow() {
+        // The counter is stored as a `u64` but is updated with `i64` math, so the actual maximum
+        // value is `i64::MAX`, not `u64::MAX`.
+        const MAX: u64 = i64::MAX as u64;
+        let counter = AtomicU64::new(MAX - 2);
+
+        update_counter(&counter, 1);
+        assert_eq!(counter.load(Ordering::Relaxed), MAX - 1);
+
+        update_counter(&counter, 1);
+        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+
+        update_counter(&counter, 1);
+        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+
+        update_counter(&counter, i64::MAX);
+        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+    }
 }
