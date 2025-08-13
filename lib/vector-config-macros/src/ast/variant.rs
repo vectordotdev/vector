@@ -40,9 +40,9 @@ impl<'a> Variant<'a> {
             .map(|field| Field::from_ast(field, is_virtual_newtype, is_newtype_wrapper_field))
             .collect_darling_results(&mut accumulator);
 
-        // If the enum overall is tagged (internal/adjacent) serde still allows a single
-        // trailing variant to be explicitly marked with `#[serde(untagged)]`. In that case,
-        // the variant itself is untagged; reflect that here so schema generation matches serde.
+        // If the enum overall is tagged (internal/adjacent) serde still allows one or more
+        // variants to be explicitly marked with `#[serde(untagged)]`. In that case, the
+        // variant itself is untagged; reflect that here so schema generation matches serde.
         let tagging = if has_flag_attribute(&original.attrs, "serde", "untagged") {
             Tagging::None
         } else {
