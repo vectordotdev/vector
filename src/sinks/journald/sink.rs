@@ -74,7 +74,8 @@ impl JournaldSink {
             }
         }
 
-        let bytes_sent = self.writer
+        let bytes_sent = self
+            .writer
             .write()
             .map_err(|err| JournaldSinkError::Send { source: err })?;
 

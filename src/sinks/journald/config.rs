@@ -79,6 +79,9 @@ mod tests {
     #[test]
     fn test_config_default() {
         let config = JournaldSinkConfig::default();
-        assert_eq!(config.journald_path, "/run/systemd/journal/socket".to_string());
+        assert_eq!(
+            config.journald_path,
+            "/run/systemd/journal/socket".to_string()
+        );
     }
 }
