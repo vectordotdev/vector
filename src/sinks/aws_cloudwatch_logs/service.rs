@@ -50,7 +50,7 @@ type Svc = Buffer<
     <ConcurrencyLimit<
         RateLimit<
             Retry<
-                FibonacciRetryPolicy<CloudwatchRetryLogic<()>>,
+                FibonacciRetryPolicy<CloudwatchRetryLogic<Vec<InputLogEvent>, ()>>,
                 Buffer<
                     Vec<InputLogEvent>,
                     <Timeout<CloudwatchLogsSvc> as Service<Vec<InputLogEvent>>>::Future,

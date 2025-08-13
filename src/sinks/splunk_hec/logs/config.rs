@@ -241,7 +241,7 @@ impl HecLogsSinkConfig {
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
-            .settings(request_settings, HttpRetryLogic)
+            .settings(request_settings, HttpRetryLogic::default())
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),

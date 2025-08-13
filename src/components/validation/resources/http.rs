@@ -7,29 +7,30 @@ use std::{
 };
 
 use axum::{
-    Router,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
+    Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::{Body, Client, Server};
 use tokio::{
     select,
-    sync::{Mutex, Notify, mpsc, oneshot},
+    sync::{mpsc, oneshot, Mutex, Notify},
 };
 use tokio_util::codec::Decoder;
 
 use crate::components::validation::{
-    RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
+    RunnerMetrics,
 };
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
-    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
+    codecs::encoding::Framer, codecs::encoding::Serializer::Json,
+    codecs::CharacterDelimitedEncoder, config::LogNamespace, event::Event,
+    EstimatedJsonEncodedSizeOf,
 };
 
-use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
+use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -335,15 +336,11 @@ impl HttpResourceOutputContext<'_> {
                                     // entire payload which may contain multiple frames and their delimiters.
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
-                                            info!(
-                                                "HTTP server external output resource decoded {decoded_byte_size} bytes but test case configured to reject."
-                                            );
+                                            info!(internal_log_rate_limit = true, "HTTP server external output resource decoded {decoded_byte_size:?} bytes but test case configured to reject.", );
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
-                                            info!(
-                                                "HTTP server external output resource decoded {decoded_byte_size} bytes."
-                                            );
+                                            info!(internal_log_rate_limit = true, "HTTP server external output resource decoded {decoded_byte_size:?} bytes.");
 
                                             // Update the runner metrics for the received events. This will later
                                             // be used in the Validators, as the "expected" case.

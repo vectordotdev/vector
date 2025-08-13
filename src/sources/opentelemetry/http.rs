@@ -42,8 +42,8 @@ use crate::{
     tls::MaybeTlsSettings,
 };
 
-use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
+use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -171,7 +171,7 @@ fn build_warp_log_filter(
                     events,
                     acknowledgements,
                     out.clone(),
-                    super::LOGS,
+                    LOGS,
                     ExportLogsServiceResponse::default(),
                 )
             },
@@ -203,7 +203,7 @@ fn build_warp_metrics_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::METRICS,
+                METRICS,
                 ExportMetricsServiceResponse::default(),
             )
         })
@@ -234,7 +234,7 @@ fn build_warp_trace_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::TRACES,
+                TRACES,
                 ExportTraceServiceResponse::default(),
             )
         })

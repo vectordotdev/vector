@@ -7,9 +7,9 @@ use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    VectorSinkError,
-    service::{VectorResponse, VectorService},
+    service::{VectorRequest, VectorResponse, VectorService},
     sink::VectorSink,
+    VectorSinkError,
 };
 use crate::{
     config::{
@@ -19,11 +19,11 @@ use crate::{
     http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
-        Healthcheck, VectorSink as VectorSinkType,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, retries::RetryLogic,
+            retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
+            ServiceBuilderExt, TowerRequestConfig,
         },
+        Healthcheck, VectorSink as VectorSinkType,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -220,6 +220,7 @@ struct VectorGrpcRetryLogic;
 
 impl RetryLogic for VectorGrpcRetryLogic {
     type Error = VectorSinkError;
+    type Request = VectorRequest;
     type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {

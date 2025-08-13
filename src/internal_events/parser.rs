@@ -30,6 +30,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total",

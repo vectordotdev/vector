@@ -70,6 +70,7 @@ pub async fn flush_apm_stats_thread(
             }
             Err(_) => {
                 error!(
+                    internal_log_rate_limit = true,
                     message = "Tokio Sender unexpectedly dropped."
                 );
                 break;

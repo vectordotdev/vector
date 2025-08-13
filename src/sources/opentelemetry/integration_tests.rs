@@ -3,25 +3,27 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use itertools::Itertools;
 use serde_json::json;
 
-use super::{LOGS, METRICS, TRACES};
 use crate::{
-    config::{SourceConfig, SourceContext, log_schema},
+    config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
+    sources::opentelemetry::config::{
+        GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES,
+    },
     test_util::{
         collect_n,
-        components::{SOURCE_TAGS, assert_source_compliance},
+        components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
     },
 };
 use prost::Message;
 
-use super::{GrpcConfig, HttpConfig, OpentelemetryConfig, tests::new_source};
+use super::tests::new_source;
 use vector_lib::opentelemetry::proto::{
     collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
-    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
+    common::v1::{any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},
     metrics::v1::{
-        Gauge, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
-        number_data_point::Value,
+        metric::Data, number_data_point::Value, Gauge, Metric, NumberDataPoint, ResourceMetrics,
+        ScopeMetrics,
     },
     resource::v1::Resource,
     trace::v1::{ResourceSpans, ScopeSpans, Span},

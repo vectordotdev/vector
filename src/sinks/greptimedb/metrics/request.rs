@@ -13,7 +13,7 @@ use vector_lib::event::Metric;
 /// that is used to send metrics to GreptimeDB.
 /// It also contains the finalizers and metadata that are used to
 #[derive(Clone)]
-pub(super) struct GreptimeDBGrpcRequest {
+pub struct GreptimeDBGrpcRequest {
     pub(super) items: RowInsertRequests,
     pub(super) finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
@@ -90,8 +90,9 @@ impl DriverResponse for GreptimeDBGrpcBatchOutput {
 pub struct GreptimeDBGrpcRetryLogic;
 
 impl RetryLogic for GreptimeDBGrpcRetryLogic {
-    type Response = GreptimeDBGrpcBatchOutput;
     type Error = GreptimeError;
+    type Request = GreptimeDBGrpcRequest;
+    type Response = GreptimeDBGrpcBatchOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()

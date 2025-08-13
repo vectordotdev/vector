@@ -250,7 +250,7 @@ impl Query {
                         let warnings = Formatter::new(param.value(), compilation_result.warnings)
                             .colored()
                             .to_string();
-                        warn!(message = "VRL compilation warnings.", %warnings);
+                        warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
                     }
                     Some(compilation_result.program)
                 }
@@ -258,7 +258,7 @@ impl Query {
                     let error = Formatter::new(param.value(), diagnostics)
                         .colored()
                         .to_string();
-                    warn!(message = "VRL compilation failed.", %error);
+                    warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
                     None
                 }
             }
@@ -427,7 +427,7 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
     Runtime::default()
         .resolve(&mut target, program, &timezone)
         .map_err(|error| {
-            warn!(message = "VRL runtime error.", source = %value, %error);
+            warn!(message = "VRL runtime error.", source = %value, %error, internal_log_rate_limit = true);
         })
         .ok()
         .and_then(|vrl_value| {

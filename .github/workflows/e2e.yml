@@ -117,13 +117,12 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs: e2e-tests
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi
