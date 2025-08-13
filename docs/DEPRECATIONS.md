@@ -14,6 +14,8 @@ For example:
 
 ## To be deprecated
 
+* `v0.49.0` | `block_interpolation` | Interpolating _multi-line_ config blocks via environment variables is now deprecated.
+
 ## To be migrated
 
 ## To be removed
