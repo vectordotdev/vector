@@ -70,14 +70,17 @@ Automated steps include:
 # On the day of release
 
 - [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case
+  - [ ] `git checkout "${RELEASE_BRANCH}"`
+  - [ ] `git show --stat HEAD` - This should show the squashed prepare commit
+  - [ ] `git diff HEAD~1 origin/master --quiet && echo "Same" || echo "Different"` - Should output `Same`
   - Follow these steps if the release branch needs to be updated
-  - [ ] Rebase the release preparation branch on the release branch
-    - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
-        commit. This makes it easier to cherry-pick to master after the release.
-    - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
-      - If this needs to be updated commit and squash it in the release branch
-  - [ ] Merge release preparation branch into the release branch
-      - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+    - [ ] Rebase the release preparation branch on the release branch
+      - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
+          commit. This makes it easier to cherry-pick to master after the release.
+      - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
+        - If this needs to be updated commit and squash it in the release branch
+    - [ ] Merge release preparation branch into the release branch
+        - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
 
 - [ ] Tag new release
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
