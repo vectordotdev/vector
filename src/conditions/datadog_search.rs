@@ -78,9 +78,7 @@ impl ConditionalConfig for DatadogSearchConfig {
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Condition> {
-        Ok(Condition::DatadogSearch(DatadogSearchRunner::try_from(
-            self,
-        )?))
+        Ok(Condition::DatadogSearch(self.try_into()?))
     }
 }
 
