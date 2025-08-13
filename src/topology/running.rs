@@ -1,17 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicBool, Ordering}, Arc,
-        Mutex,
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use super::{
-    builder::{self, reload_enrichment_tables, TopologyPieces}, fanout::{ControlChannel, ControlMessage},
-    handle_errors,
-    retain,
-    take_healthchecks, task::{Task, TaskOutput}, BuiltBuffer,
-    TaskHandle,
+    BuiltBuffer, TaskHandle,
+    builder::{self, TopologyPieces, reload_enrichment_tables},
+    fanout::{ControlChannel, ControlMessage},
+    handle_errors, retain, take_healthchecks,
+    task::{Task, TaskOutput},
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -21,11 +21,11 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
-use futures::{future, Future, FutureExt};
+use futures::{Future, FutureExt, future};
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
+    time::{Duration, Instant, interval, sleep_until},
 };
 use tracing::Instrument;
 use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
