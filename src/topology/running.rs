@@ -195,18 +195,29 @@ impl RunningTopology {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let time_remaining = deadline
-                    .map(|d| match d.checked_duration_since(Instant::now()) {
-                        Some(remaining) => format!("{} seconds left", remaining.as_secs()),
-                        None => "overdue".to_string(),
-                    })
-                    .unwrap_or("no time limit".to_string());
+                let (deadline_passed, time_remaining) = match deadline {
+                    Some(d) => match d.checked_duration_since(Instant::now()) {
+                        Some(remaining) => (false, format!("{} seconds left", remaining.as_secs())),
+                        None => (true, "overdue".to_string()),
+                    },
+                    None => (false, "no time limit".to_string()),
+                };
 
                 info!(
                     remaining_components = ?remaining_components,
                     time_remaining = ?time_remaining,
                     "Shutting down... Waiting on running components."
                 );
+
+                let all_done = check_handles.is_empty();
+
+                if all_done {
+                    info!("Shutdown reporter exiting: all components shut down");
+                    break;
+                } else if deadline_passed {
+                    info!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded");
+                    break;
+                }
             }
         };
 

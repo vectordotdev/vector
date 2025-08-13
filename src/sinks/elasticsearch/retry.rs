@@ -154,7 +154,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 .clone()
                                                 .into_iter()
                                                 .zip(status_codes.iter())
-                                                .filter(|(_, &flag)| flag)
+                                                .filter(|&(_, &flag)| flag)
                                                 .map(|(item, _)| item)
                                                 .collect();
                                             let finalizers = failed_events.take_finalizers();
