@@ -141,16 +141,20 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.received.increment(count, byte_size);
-        self.state.current.increment(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            self.state.received.increment(count, byte_size);
+            self.state.current.increment(count, byte_size);
+        }
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.sent.increment(count, byte_size);
-        self.state.current.decrement(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            self.state.sent.increment(count, byte_size);
+            self.state.current.decrement(count, byte_size);
+        }
     }
 
     /// Increment the number of dropped events (and their total size) for this buffer component.
@@ -160,12 +164,14 @@ impl BufferUsageHandle {
         byte_size: u64,
         intentional: bool,
     ) {
-        if intentional {
-            self.state.dropped_intentional.increment(count, byte_size);
-        } else {
-            self.state.dropped.increment(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            if intentional {
+                self.state.dropped_intentional.increment(count, byte_size);
+            } else {
+                self.state.dropped.increment(count, byte_size);
+            }
+            self.state.current.decrement(count, byte_size);
         }
-        self.state.current.decrement(count, byte_size);
     }
 }
 
