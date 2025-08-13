@@ -1,27 +1,24 @@
 use nix::fcntl::{FcntlArg, SealFlag};
 use nix::sys::socket::{ControlMessage, MsgFlags};
+use std::io;
 use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::{io, os::unix::net::UnixDatagram};
 
 /// A writer for journald that sends log messages over a Unix domain socket.
 /// For protocol details, see [this link](https://systemd.io/JOURNAL_NATIVE_PROTOCOL/)
 pub struct JournaldWriter {
-    socket: UnixDatagram,
+    socket: tokio::net::UnixDatagram,
     buf: Vec<u8>,
 }
 
 impl JournaldWriter {
     pub fn new(journald_path: impl AsRef<Path>) -> io::Result<Self> {
-        let socket = UnixDatagram::unbound()?;
+        let socket = tokio::net::UnixDatagram::unbound()?;
         socket.connect(journald_path)?;
         let writer = Self {
             socket,
             buf: vec![],
         };
-        // Send an empty payload to ensure the socket is ready for use.
-        // This will be ignored by journald.
-        writer.send_payload(&[])?;
         Ok(writer)
     }
 
@@ -41,11 +38,11 @@ impl JournaldWriter {
 
     /// Write the buffered data to journald.
     /// Returns the number of bytes sent.
-    pub fn write(&mut self) -> io::Result<usize> {
+    pub async fn write(&mut self) -> io::Result<usize> {
         if self.buf.is_empty() {
             return Ok(0);
         }
-        let bytes_sent = self.send_payload(&self.buf)?;
+        let bytes_sent = self.send_payload(&self.buf).await?;
         // Clear the buffer after sending
         // We could also keep the buffer for reuse, but by doing this we ensure that
         // we don't allocate too much memory for long time in case of rare large payloads.
@@ -56,8 +53,8 @@ impl JournaldWriter {
     /// Send the payload to journald.
     /// If the payload is too large, it will attempt to send it via a memfd.
     /// Returns the number of bytes sent.
-    fn send_payload(&self, payload: &[u8]) -> io::Result<usize> {
-        self.socket.send(payload).or_else(|error| {
+    async fn send_payload(&self, payload: &[u8]) -> io::Result<usize> {
+        self.socket.send(payload).await.or_else(|error| {
             if Some(nix::libc::EMSGSIZE) == error.raw_os_error() {
                 self.send_with_memfd(payload)
             } else {
@@ -66,6 +63,8 @@ impl JournaldWriter {
         })
     }
 
+    /// Send the payload using a memfd if the payload is too large for a direct send.
+    /// This method uses a blocking call to write the payload to a memfd.
     fn send_with_memfd(&self, payload: &[u8]) -> io::Result<usize> {
         // If the payload is too large, we should try to send it via a memfd
         // This method is described in the journald protocol: https://systemd.io/JOURNAL_NATIVE_PROTOCOL/

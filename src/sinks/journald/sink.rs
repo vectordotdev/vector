@@ -37,7 +37,10 @@ impl JournaldSink {
     /// This method extracts all fields from the log event and sends them to journald.
     /// It handles different value types appropriately, converting them to strings or bytes as needed.
     /// Returns the number of bytes sent to journald.
-    fn send_log_to_journal(&mut self, log: &LogEvent) -> Result<usize, JournaldSinkError> {
+    pub async fn send_log_to_journal(
+        &mut self,
+        log: &LogEvent,
+    ) -> Result<usize, JournaldSinkError> {
         // Add other relevant fields from the log event
         if let Some(all_fields) = log.all_event_fields() {
             for (key, value) in all_fields {
@@ -77,6 +80,7 @@ impl JournaldSink {
         let bytes_sent = self
             .writer
             .write()
+            .await
             .map_err(|err| JournaldSinkError::Send { source: err })?;
 
         Ok(bytes_sent)
@@ -94,7 +98,7 @@ impl StreamSink<Event> for JournaldSink {
             let finalizers = event.take_finalizers();
 
             match event {
-                Event::Log(ref log) => match self.send_log_to_journal(log) {
+                Event::Log(ref log) => match self.send_log_to_journal(log).await {
                     Ok(bytes_written) => {
                         finalizers.update_status(EventStatus::Delivered);
                         events_sent.emit(CountByteSize(1, event_byte_size));
