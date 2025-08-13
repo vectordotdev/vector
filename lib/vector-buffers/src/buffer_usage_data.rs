@@ -418,21 +418,18 @@ mod tests {
 
     #[test]
     fn test_increment_counter_prevents_overflow() {
-        // The counter is stored as a `u64` but is updated with `i64` math, so the actual maximum
-        // value is `i64::MAX`, not `u64::MAX`.
-        const MAX: u64 = i64::MAX as u64;
-        let counter = AtomicU64::new(MAX - 2);
+        let counter = AtomicU64::new(u64::MAX - 2);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), MAX - 1);
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX - 1);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
 
         increment_counter(&counter, u64::MAX);
-        assert_eq!(counter.load(Ordering::Relaxed), MAX);
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
     }
 }
