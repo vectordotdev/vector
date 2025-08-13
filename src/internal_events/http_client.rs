@@ -86,7 +86,7 @@ impl InternalEvent for GotHttpWarning<'_> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!("http_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
         histogram!("http_client_rtt_seconds").record(self.roundtrip);

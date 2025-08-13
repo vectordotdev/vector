@@ -387,6 +387,7 @@ impl ChunkedGelfDecoder {
                     warn!(
                         message_id = message_id,
                         timeout_secs = timeout.as_secs_f64(),
+                        internal_log_rate_limit = true,
                         "Message was not fully received within the timeout window. Discarding it."
                     );
                 }
@@ -408,6 +409,7 @@ impl ChunkedGelfDecoder {
             debug!(
                 message_id = message_id,
                 sequence_number = sequence_number,
+                internal_log_rate_limit = true,
                 "Received a duplicate chunk. Ignoring it."
             );
             return Ok(None);
