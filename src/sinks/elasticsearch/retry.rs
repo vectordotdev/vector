@@ -12,8 +12,8 @@ use crate::{
 };
 use http::StatusCode;
 use serde::Deserialize;
-use vector_lib::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::json_size::JsonSize;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {

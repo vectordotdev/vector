@@ -1,17 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use super::{
-    builder::{self, reload_enrichment_tables, TopologyPieces},
+    BuiltBuffer, TaskHandle,
+    builder::{self, TopologyPieces, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
-    BuiltBuffer, TaskHandle,
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -21,11 +21,11 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
-use futures::{future, Future, FutureExt};
+use futures::{Future, FutureExt, future};
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
+    time::{Duration, Instant, interval, sleep_until},
 };
 use tracing::Instrument;
 use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
@@ -264,8 +264,7 @@ impl RunningTopology {
 
         if self.config.global != new_config.global {
             error!(
-                message =
-                "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
+                message = "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
             );
             return Ok(false);
         }
@@ -1212,8 +1211,8 @@ impl RunningTopology {
         ) {
             (Some(e), None) => {
                 warn!(
-                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-            );
+                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+                );
                 if e < Duration::from_secs(0) {
                     None
                 } else {

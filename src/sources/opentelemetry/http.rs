@@ -43,7 +43,7 @@ use crate::{
 };
 
 use super::{reply::protobuf, status::Status};
-use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
+use crate::sources::opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
