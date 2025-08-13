@@ -74,7 +74,7 @@ components: sinks: elasticsearch: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.elasticsearch.configuration
+	configuration: generated.components.sinks.elasticsearch.configuration
 
 	input: {
 		logs: true

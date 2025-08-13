@@ -235,7 +235,7 @@ impl SinkConfig for DatadogTracesConfig {
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{}{}", host, endpoint)
+    let result = format!("{host}{endpoint}")
         .parse::<Uri>()
         .context(UriParseSnafu)?;
     Ok(result)

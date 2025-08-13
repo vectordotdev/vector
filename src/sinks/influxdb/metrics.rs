@@ -167,7 +167,7 @@ impl InfluxDbSvc {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic,
+                HttpRetryLogic::default(),
                 influxdb_http_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
@@ -217,9 +217,12 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 fn create_build_request(
     uri: http::Uri,
     token: &str,
-) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
-{
-    let auth = format!("Token {}", token);
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>
+       + Sync
+       + Send
+       + 'static
+       + use<> {
+    let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(
             hyper::Request::post(uri.clone())
@@ -415,7 +418,7 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
             statistic
                 .quantiles
                 .iter()
-                .map(|&(p, val)| (format!("quantile_{:.2}", p).into(), Field::Float(val))),
+                .map(|&(p, val)| (format!("quantile_{p:.2}").into(), Field::Float(val))),
         )
         .collect(),
     )
@@ -1003,7 +1006,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.expect("error when building config");
         run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
-        let res = query_v1_json(url, &format!("show series on {}", database)).await;
+        let res = query_v1_json(url, &format!("show series on {database}")).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -1037,8 +1040,7 @@ mod integration_tests {
                 _ => unreachable!(),
             };
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
-            let res =
-                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+            let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
             assert_eq!(
                 res,
@@ -1120,7 +1122,7 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{metric}\")"));
         body.insert("type", "flux".to_owned());
 
         let client = reqwest::Client::builder()
@@ -1183,7 +1185,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("counter-{}", i),
+                format!("counter-{i}"),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )

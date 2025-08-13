@@ -9,7 +9,7 @@ Welcome to the documentation for **Vector**! Vector is a lightweight and ultra-f
 
 If you'd like to familiarize yourself with Vector's core concepts, we recommend reading up on Vector's core concepts:
 
-{{< jump "/docs/about/concepts" >}}
+{{< jump "/docs/introduction/concepts" >}}
 
 If you feel comfortable with the concepts, we recommend our quickstart guide, which takes you through a practical example:
 

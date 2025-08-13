@@ -97,8 +97,7 @@ impl OctetCountingDecoder {
                 // There are enough chars in this frame to discard
                 src.advance(chars);
                 self.octet_decoding = None;
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
+                Err(LinesCodecError::Io(io::Error::other(
                     "Frame length limit exceeded",
                 )))
             }
@@ -117,8 +116,7 @@ impl OctetCountingDecoder {
                 // When discarding we keep discarding to the next newline.
                 src.advance(offset + 1);
                 self.octet_decoding = None;
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
+                Err(LinesCodecError::Io(io::Error::other(
                     "Frame length limit exceeded",
                 )))
             }
@@ -203,8 +201,7 @@ impl OctetCountingDecoder {
             (State::NotDiscarding, Some(newline_pos), _) => {
                 // Beyond maximum length, advance to the newline.
                 src.advance(newline_pos + 1);
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
+                Err(LinesCodecError::Io(io::Error::other(
                     "Frame length limit exceeded",
                 )))
             }
@@ -392,7 +389,7 @@ mod tests {
         buffer.put(&b"defghijklmnopqrstuvwxyzand here we are"[..]);
         let result = decoder.decode(&mut buffer);
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_err());
         assert_eq!(b"and here we are"[..], buffer);
     }

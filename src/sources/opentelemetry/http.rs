@@ -42,8 +42,8 @@ use crate::{
     SourceSender,
 };
 
-use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
+use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -171,7 +171,7 @@ fn build_warp_log_filter(
                     events,
                     acknowledgements,
                     out.clone(),
-                    super::LOGS,
+                    LOGS,
                     ExportLogsServiceResponse::default(),
                 )
             },
@@ -203,7 +203,7 @@ fn build_warp_metrics_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::METRICS,
+                METRICS,
                 ExportMetricsServiceResponse::default(),
             )
         })
@@ -234,7 +234,7 @@ fn build_warp_trace_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::TRACES,
+                TRACES,
                 ExportTraceServiceResponse::default(),
             )
         })
@@ -248,7 +248,7 @@ fn decode_trace_body(
     let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -274,7 +274,7 @@ fn decode_log_body(
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -299,7 +299,7 @@ fn decode_metrics_body(
     let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -367,7 +367,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
     } else {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
+            message: format!("{err:?}"),
             ..Default::default()
         });
 

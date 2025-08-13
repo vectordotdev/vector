@@ -360,7 +360,7 @@ impl InfluxDbLogsConfig {
                        For example, you can use `measurement=<namespace>.vector` for the \
                        same effect."
                 );
-                Ok(format!("{}.vector", namespace))
+                Ok(format!("{namespace}.vector"))
             }
             (None, None) => Err("The `measurement` option is required."),
         }
@@ -765,7 +765,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr);
+        let host = format!("http://{addr}");
         config.endpoint = host;
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -784,7 +784,7 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{}", i).as_str(), format!("value{}", i));
+            event.insert(format!("key{i}").as_str(), format!("value{i}"));
 
             let timestamp = Utc
                 .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
@@ -831,7 +831,7 @@ mod tests {
         assert_fields(
             line_protocol.2.to_string(),
             [
-                &*format!("key{}=\"value{}\"", i, i),
+                &*format!("key{i}=\"value{i}\""),
                 "message=\"message_value\"",
             ]
             .to_vec(),
@@ -984,7 +984,7 @@ mod integration_tests {
             .unwrap();
 
         let res = client
-            .post(format!("{}/api/v2/query?org=my-org", endpoint))
+            .post(format!("{endpoint}/api/v2/query?org=my-org"))
             .json(&body)
             .header("accept", "application/json")
             .header("Authorization", "Token my-token")

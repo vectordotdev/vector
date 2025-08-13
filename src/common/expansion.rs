@@ -25,7 +25,7 @@ pub(crate) fn pair_expansion(
         // key_* -> key_one, key_two, key_three
         // * -> one, two, three
         for (k, v) in output {
-            let key = slugify_text(&format!("{}{}", opening_prefix, k));
+            let key = slugify_text(&format!("{opening_prefix}{k}"));
             let val = Value::from(v).to_string_lossy().into_owned();
             if val == "<null>" {
                 warn!("Encountered \"null\" value for dynamic pair. key: {}", key);

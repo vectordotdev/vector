@@ -101,7 +101,7 @@ impl GenerateConfig for SematextMetricsConfig {
 }
 
 async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
-    let uri = format!("{}/health", endpoint);
+    let uri = format!("{endpoint}/health");
 
     let request = Request::get(uri)
         .body(Body::empty())
@@ -176,7 +176,7 @@ impl SematextMetricsService {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic,
+                HttpRetryLogic::default(),
                 sematext_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
@@ -412,7 +412,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        let endpoint = format!("http://{}", addr);
+        let endpoint = format!("http://{addr}");
         config.endpoint = Some(endpoint.clone());
 
         let (sink, _) = config.build(cx).await.unwrap();

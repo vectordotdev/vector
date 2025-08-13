@@ -120,7 +120,7 @@ impl Lua {
 
         let additional_paths = search_dirs
             .iter()
-            .map(|d| format!("{}/?.lua", d))
+            .map(|d| format!("{d}/?.lua"))
             .collect::<Vec<_>>()
             .join(";");
 
@@ -132,7 +132,7 @@ impl Lua {
             let current_paths = package
                 .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths).context(InvalidLuaSnafu)?;
         }
 
@@ -255,6 +255,7 @@ impl mlua::UserData for LuaEvent {
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
+                            internal_log_rate_limit = true
                         );
                         this.inner.as_mut_log().remove(&key_path);
                     }

@@ -56,7 +56,7 @@ pub struct Cmd {
 impl Cmd {
     fn timezone(&self) -> TimeZone {
         if let Some(ref tz) = self.timezone {
-            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {tz}"))
         } else {
             TimeZone::Named(Tz::UTC)
         }

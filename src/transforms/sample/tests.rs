@@ -324,7 +324,7 @@ fn sample_at_rates_higher_then_half() {
 
 fn condition_contains(key: &str, needle: &str) -> Condition {
     let vrl_config = VrlConfig {
-        source: format!(r#"contains!(."{}", "{}")"#, key, needle),
+        source: format!(r#"contains!(."{key}", "{needle}")"#),
         runtime: Default::default(),
     };
 

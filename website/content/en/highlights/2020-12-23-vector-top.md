@@ -36,5 +36,5 @@ a primary consumer. The dashboard UI was created using the excellent [tui-rs] li
 [cli]: /docs/reference/cli
 [htop]: https://htop.dev
 [top]: /docs/reference/cli/#top
-[topology]: /docs/about/concepts/#topology
+[topology]: /docs/introduction/concepts/#topology
 [tui]: https://docs.rs/tui

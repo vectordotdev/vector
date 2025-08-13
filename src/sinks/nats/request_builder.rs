@@ -1,12 +1,13 @@
 use std::io;
 
+use async_nats::HeaderMap;
 use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
 use crate::sinks::prelude::*;
 
-use super::sink::NatsEvent;
+use super::{config::NatsHeaderConfig, sink::NatsEvent};
 
 pub(super) struct NatsEncoder {
     pub(super) transformer: Transformer,
@@ -28,7 +29,7 @@ impl encoding::Encoder<Event> for NatsEncoder {
         let mut encoder = self.encoder.clone();
         encoder
             .encode(input, &mut body)
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
+            .map_err(|_| io::Error::other("unable to encode"))?;
 
         let body = body.freeze();
         write_all(writer, 1, body.as_ref())?;
@@ -39,17 +40,20 @@ impl encoding::Encoder<Event> for NatsEncoder {
 
 pub(super) struct NatsMetadata {
     subject: String,
+    headers: HeaderMap,
     finalizers: EventFinalizers,
 }
 
 pub(super) struct NatsRequestBuilder {
     pub(super) encoder: NatsEncoder,
+    pub(super) headers: Option<NatsHeaderConfig>,
 }
 
 #[derive(Clone)]
 pub(super) struct NatsRequest {
     pub(super) bytes: Bytes,
     pub(super) subject: String,
+    pub(super) headers: HeaderMap,
     finalizers: EventFinalizers,
     pub(super) metadata: RequestMetadata,
 }
@@ -91,9 +95,15 @@ impl RequestBuilder<NatsEvent> for NatsRequestBuilder {
         mut input: NatsEvent,
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let builder = RequestMetadataBuilder::from_event(&input.event);
+        let headers = self
+            .headers
+            .as_ref()
+            .map(|config| config.build_headers(&input.event))
+            .unwrap_or_default();
 
         let metadata = NatsMetadata {
             subject: input.subject,
+            headers,
             finalizers: input.event.take_finalizers(),
         };
 
@@ -110,6 +120,7 @@ impl RequestBuilder<NatsEvent> for NatsRequestBuilder {
         NatsRequest {
             bytes: body,
             subject: nats_metadata.subject,
+            headers: nats_metadata.headers,
             finalizers: nats_metadata.finalizers,
             metadata,
         }

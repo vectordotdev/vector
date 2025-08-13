@@ -60,18 +60,6 @@ tar \
 cp "${TEMP}/cue" /usr/bin/cue
 rm -rf "$TEMP"
 
-# Grease
-# Grease is used for the `make release-github` task.
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
-    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
-tar \
-    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/grease/bin/grease" /usr/bin/grease
-rm -rf "$TEMP"
-
 # Locales
 locale-gen en_US.UTF-8
 dpkg-reconfigure locales

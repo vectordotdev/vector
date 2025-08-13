@@ -36,7 +36,7 @@ components: sinks: opentelemetry: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.opentelemetry.configuration
+	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
 		quickstart: {
 			title: "Quickstart"

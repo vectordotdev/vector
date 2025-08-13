@@ -182,14 +182,17 @@ fn decode_datadog_sketches(
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
-        debug!(message = "Empty payload ignored.",);
+        debug!(
+            message = "Empty payload ignored.",
+            internal_log_rate_limit = true
+        );
         return Ok(Vec::new());
     }
 
     let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Error decoding Datadog sketch: {:?}", error),
+            format!("Error decoding Datadog sketch: {error:?}"),
         )
     })?;
 
@@ -218,7 +221,7 @@ fn decode_datadog_series_v2(
     let metrics = decode_ddseries_v2(body, &api_key).map_err(|error| {
         ErrorMessage::new(
             StatusCode::UNPROCESSABLE_ENTITY,
-            format!("Error decoding Datadog sketch: {:?}", error),
+            format!("Error decoding Datadog sketch: {error:?}"),
         )
     })?;
 
@@ -413,7 +416,7 @@ fn decode_datadog_series_v1(
     let metrics: DatadogSeriesRequest = serde_json::from_slice(&body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {:?}", error),
+            format!("Error parsing JSON: {error:?}"),
         )
     })?;
 

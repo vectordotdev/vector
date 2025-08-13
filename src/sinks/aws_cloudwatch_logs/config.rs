@@ -68,7 +68,7 @@ where
     if ALLOWED_VALUES.contains(&days) {
         Ok(days)
     } else {
-        let msg = format!("one of allowed values: {:?}", ALLOWED_VALUES).to_owned();
+        let msg = format!("one of allowed values: {ALLOWED_VALUES:?}").to_owned();
         let expected: &str = &msg[..];
         Err(de::Error::invalid_value(
             de::Unexpected::Signed(days.into()),
