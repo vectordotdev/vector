@@ -657,6 +657,9 @@ enum WithTrailingUntaggedVariant {
     /// Untagged fallback variant.
     #[serde(untagged)]
     Fallback(String),
+    /// Another untagged fallback variant, also allowed by serde.
+    #[serde(untagged)]
+    FallbackAlt(u64),
 }
 
 #[test]
@@ -688,15 +691,15 @@ fn tagged_enum_with_trailing_untagged_variant_schema() {
         } else {
             untagged_schemas += 1;
 
-            // The untagged variant in this test is a String newtype, so it should be a string schema.
+            // The untagged variants in this test are newtypes: one string and one integer.
             let instance_type = subschema.get("type").and_then(|t| t.as_str());
-            assert_eq!(instance_type, Some("string"));
+            assert!(matches!(instance_type, Some("string") | Some("integer")));
         }
     }
 
     assert_eq!(tagged_schemas, 2, "expected two tagged variants in schema");
     assert_eq!(
-        untagged_schemas, 1,
-        "expected one untagged variant in schema"
+        untagged_schemas, 2,
+        "expected two untagged variants in schema"
     );
 }
