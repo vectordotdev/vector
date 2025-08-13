@@ -17,6 +17,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
+    internal_events::config::ConfigReloadRejected,
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -265,11 +266,8 @@ impl RunningTopology {
         if self.config.global != new_config.global {
             match self.config.global.diff(&new_config.global) {
                 Ok(changed) => {
-                    error!(
-                        message = "Global options changed; reload aborted.",
-                        changed_fields = ?changed
-                    );
-                }
+                    emit!(ConfigReloadRejected::global_options_changed(changed));
+            }
                 Err(err) => {
                     error!(
                         message = "Failed to compute config diff; reload aborted.",
