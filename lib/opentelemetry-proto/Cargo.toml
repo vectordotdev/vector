@@ -8,6 +8,7 @@ publish = false
 [build-dependencies]
 prost-build.workspace = true
 tonic-build.workspace = true
+glob.workspace = true
 
 [dependencies]
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }

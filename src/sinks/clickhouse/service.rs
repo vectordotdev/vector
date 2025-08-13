@@ -23,18 +23,19 @@ use snafu::ResultExt;
 
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic,
+    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
+    type Request = HttpRequest<PartitionKey>;
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         match response.http_response.status() {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.http_response.body();
