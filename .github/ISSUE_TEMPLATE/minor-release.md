@@ -11,11 +11,11 @@ labels: "domain: releasing"
 Note the preparation steps are now automated. First, alter/create release.env
 
 ```shell
-export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version
-export MINOR_VERSION=$(echo "NEW_VECTOR_VERSION" | cut -d. -f2)
+export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version (e.g.: 0.50.0)
+export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version (e.g.: 0.30.0)
+export MINOR_VERSION=$(echo "$NEW_VECTOR_VERSION" | cut -d. -f2)
 export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VECTOR_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
-export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version
 ```
 
 and then source it by running `source ./release.env`
@@ -69,12 +69,16 @@ Automated steps include:
 
 # On the day of release
 
-- [ ] Rebase the release preparation branch on the release branch
+- [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case
+  - Follow these steps if the release branch needs to be updated
+  - [ ] Rebase the release preparation branch on the release branch
     - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
         commit. This makes it easier to cherry-pick to master after the release.
-    - [ ] Ensure release date in cue matches current date.
-- [ ] Merge release preparation branch into the release branch
-    - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+    - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
+      - If this needs to be updated commit and squash it in the release branch
+  - [ ] Merge release preparation branch into the release branch
+      - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+
 - [ ] Tag new release
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
   - [ ] `git push origin v"${NEW_VECTOR_VERSION}"`
