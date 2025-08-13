@@ -15,21 +15,30 @@ use crate::{
     spawn_named,
 };
 
-fn u64_to_i64(value: u64) -> i64 {
-    // If we ever have to deal with more than 9,223,372,036,854,775,808 events or bytes _in a single
-    // update_, this conversion will break counters. That number is effectively impossibly large,
-    // though.
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-fn update_counter(counter: &AtomicU64, delta: i64) {
+fn increment_counter(counter: &AtomicU64, delta: u64) {
     counter
         .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
-            // This will never be negative due to the `clamp`
-            #[expect(clippy::cast_sign_loss)]
-            {
-                Some(u64_to_i64(current).saturating_add(delta).clamp(0, i64::MAX) as u64)
-            }
+            Some(current.checked_add(delta).unwrap_or_else(|| {
+                warn!(
+                    current,
+                    delta, "Buffer counter overflowed. Clamping value to `u64::MAX`."
+                );
+                u64::MAX
+            }))
+        })
+        .ok();
+}
+
+fn decrement_counter(counter: &AtomicU64, delta: u64) {
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+            Some(current.checked_sub(delta).unwrap_or_else(|| {
+                warn!(
+                    current,
+                    delta, "Buffer counter underflowed. Clamping value to `0`."
+                );
+                0
+            }))
         })
         .ok();
 }
@@ -62,14 +71,14 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        update_counter(&self.event_count, u64_to_i64(event_count));
-        update_counter(&self.event_byte_size, u64_to_i64(event_byte_size));
+        increment_counter(&self.event_count, event_count);
+        increment_counter(&self.event_byte_size, event_byte_size);
     }
 
     /// Decrements the event count and byte size by the given amounts.
     fn decrement(&self, event_count: u64, event_byte_size: u64) {
-        update_counter(&self.event_count, -u64_to_i64(event_count));
-        update_counter(&self.event_byte_size, -u64_to_i64(event_byte_size));
+        decrement_counter(&self.event_count, event_count);
+        decrement_counter(&self.event_byte_size, event_byte_size);
     }
 
     /// Sets the event count and event byte size to the given amount.
@@ -376,8 +385,8 @@ mod tests {
             let counter = Arc::clone(&counter);
             let handle = thread::spawn(move || {
                 for _ in 0..INCREMENTS_PER_THREAD {
-                    update_counter(&counter, 1);
-                    update_counter(&counter, -1);
+                    increment_counter(&counter, 1);
+                    decrement_counter(&counter, 1);
                 }
             });
             handles.push(handle);
@@ -391,39 +400,39 @@ mod tests {
     }
 
     #[test]
-    fn test_update_counter_prevents_negatives() {
+    fn test_decrement_counter_prevents_negatives() {
         let counter = AtomicU64::new(100);
 
-        update_counter(&counter, -50);
+        decrement_counter(&counter, 50);
         assert_eq!(counter.load(Ordering::Relaxed), 50);
 
-        update_counter(&counter, -100);
+        decrement_counter(&counter, 100);
         assert_eq!(counter.load(Ordering::Relaxed), 0);
 
-        update_counter(&counter, -50);
+        decrement_counter(&counter, 50);
         assert_eq!(counter.load(Ordering::Relaxed), 0);
 
-        update_counter(&counter, i64::MIN);
+        decrement_counter(&counter, u64::MAX);
         assert_eq!(counter.load(Ordering::Relaxed), 0);
     }
 
     #[test]
-    fn test_update_counter_prevents_overflow() {
+    fn test_increment_counter_prevents_overflow() {
         // The counter is stored as a `u64` but is updated with `i64` math, so the actual maximum
         // value is `i64::MAX`, not `u64::MAX`.
         const MAX: u64 = i64::MAX as u64;
         let counter = AtomicU64::new(MAX - 2);
 
-        update_counter(&counter, 1);
+        increment_counter(&counter, 1);
         assert_eq!(counter.load(Ordering::Relaxed), MAX - 1);
 
-        update_counter(&counter, 1);
+        increment_counter(&counter, 1);
         assert_eq!(counter.load(Ordering::Relaxed), MAX);
 
-        update_counter(&counter, 1);
+        increment_counter(&counter, 1);
         assert_eq!(counter.load(Ordering::Relaxed), MAX);
 
-        update_counter(&counter, i64::MAX);
+        increment_counter(&counter, u64::MAX);
         assert_eq!(counter.load(Ordering::Relaxed), MAX);
     }
 }
