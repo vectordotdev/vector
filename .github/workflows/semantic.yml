@@ -91,7 +91,7 @@ jobs:
             unit tests
             vdev
             vrl
-            
+
             amazon-linux platform
             apt platform
             arm platform
@@ -134,7 +134,7 @@ jobs:
             service providers
             splunk service
             yandex service
-            
+
             apache_metrics source
             aws_ecs_metrics source
             aws_kinesis_firehose source
@@ -175,7 +175,7 @@ jobs:
             syslog source
             vector source
             websocket source
-            
+
             aws_ec2_metadata transform
             dedupe transform
             exclusive_route transform
@@ -192,7 +192,7 @@ jobs:
             sample transform
             tag_cardinality_limit transform
             throttle transform
-            
+
             amqp sink
             apex sink
             aws_cloudwatch_logs sink
@@ -249,7 +249,7 @@ jobs:
             vector sink
             websocket sink
             websocket_server sink
-            
+
             blog website
             css website
             guides website
@@ -259,5 +259,5 @@ jobs:
             template website
             website
             website deps
-            
+
             opentelemetry lib
