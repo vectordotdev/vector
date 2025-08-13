@@ -1,17 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, Ordering}, Arc,
+        Mutex,
     },
 };
 
 use super::{
-    BuiltBuffer, TaskHandle,
-    builder::{self, TopologyPieces, reload_enrichment_tables},
-    fanout::{ControlChannel, ControlMessage},
-    handle_errors, retain, take_healthchecks,
-    task::{Task, TaskOutput},
+    builder::{self, reload_enrichment_tables, TopologyPieces}, fanout::{ControlChannel, ControlMessage},
+    handle_errors,
+    retain,
+    take_healthchecks, task::{Task, TaskOutput}, BuiltBuffer,
+    TaskHandle,
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -21,11 +21,11 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
-use futures::{Future, FutureExt, future};
+use futures::{future, Future, FutureExt};
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
-    time::{Duration, Instant, interval, sleep_until},
+    time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
 use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
@@ -215,7 +215,7 @@ impl RunningTopology {
                     info!("Shutdown reporter exiting: all components shut down.");
                     break;
                 } else if deadline_passed {
-                    info!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
+                    error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
                     break;
                 }
             }
