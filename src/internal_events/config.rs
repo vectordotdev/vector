@@ -1,5 +1,5 @@
-use crate::internal_events::InternalEvent;
-use metrics::counter;
+use metrics::gauge;
+use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ConfigReloadRejected {
@@ -9,17 +9,17 @@ pub struct ConfigReloadRejected {
 impl InternalEvent for ConfigReloadRejected {
     fn emit(self) {
         match self.reason {
-            ReloadRejectReason::GlobalOptionsChanged(items) => {
+            ReloadRejectReason::GlobalOptionsChanged { ref fields } => {
                 error!(
                     message = "Config reload rejected due to non-reloadable global options.",
-                    reason = "global_options_changed",
+                    reason = %self.reason.as_str(),
                     changed_fields = %fields.join(", "),
                     internal_log_rate_limit = true,
                 );
 
                 gauge!(
                     "vector_config_reload_rejected",
-                    "reason" => "global_options_changed",
+                    "reason" => self.reason.as_str(),
                 )
                 .set(1.0);
             }
@@ -39,6 +39,7 @@ impl ConfigReloadRejected {
     }
 }
 
+#[derive(Debug)]
 enum ReloadRejectReason {
     GlobalOptionsChanged { fields: Vec<String> },
 }
@@ -46,7 +47,7 @@ enum ReloadRejectReason {
 impl ReloadRejectReason {
     fn as_str(&self) -> &'static str {
         match self {
-            Self::GlobalOptionsChanged => "global_options changed",
+            Self::GlobalOptionsChanged { fields: _ } => "global_options changed",
         }
     }
 }

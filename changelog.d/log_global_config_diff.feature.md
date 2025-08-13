@@ -1,3 +1,3 @@
-When config reload is aborted due to `GlobalOptions` changes, the specific top-level fields that differ are now logged to help debugging.
+Add GlobalOptions::diff helper to identify top-level config changes; expose vector_config_reload_rejected{reason="global_options_changed"} metric for rejected config reloads
 
 authors: suikammd
