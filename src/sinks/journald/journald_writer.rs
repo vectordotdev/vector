@@ -120,7 +120,9 @@ impl JournaldWriter {
                     _ => c,
                 })
                 .filter(|&c| c == b'_' || char::from(c).is_ascii_alphanumeric())
-                .map(|c| char::from(c).to_ascii_uppercase() as u8),
+                .map(|c| char::from(c).to_ascii_uppercase() as u8)
+                // Journald keys are limited to 64 bytes
+                .take(64),
         );
     }
 }
