@@ -15,9 +15,13 @@ use crate::{
     spawn_named,
 };
 
+/// Since none of the values used with atomic operations are used to protect other values, we can
+/// always used a "relaxed" ordering when updating them.
+const ORDERING: Ordering = Ordering::Relaxed;
+
 fn increment_counter(counter: &AtomicU64, delta: u64) {
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .fetch_update(ORDERING, ORDERING, |current| {
             Some(current.checked_add(delta).unwrap_or_else(|| {
                 warn!(
                     current,
@@ -31,7 +35,7 @@ fn increment_counter(counter: &AtomicU64, delta: u64) {
 
 fn decrement_counter(counter: &AtomicU64, delta: u64) {
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .fetch_update(ORDERING, ORDERING, |current| {
             Some(current.checked_sub(delta).unwrap_or_else(|| {
                 warn!(
                     current,
@@ -85,16 +89,15 @@ impl CategoryMetrics {
     ///
     /// Most updates are meant to be incremental, so this should be used sparingly.
     fn set(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.store(event_count, Ordering::Release);
-        self.event_byte_size
-            .store(event_byte_size, Ordering::Release);
+        self.event_count.store(event_count, ORDERING);
+        self.event_byte_size.store(event_byte_size, ORDERING);
     }
 
     /// Gets a snapshot of the event count and event byte size.
     fn get(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.load(Ordering::Acquire),
-            event_byte_size: self.event_byte_size.load(Ordering::Acquire),
+            event_count: self.event_count.load(ORDERING),
+            event_byte_size: self.event_byte_size.load(ORDERING),
         }
     }
 
@@ -106,8 +109,8 @@ impl CategoryMetrics {
     /// track the last seen values.
     fn consume(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.swap(0, Ordering::AcqRel),
-            event_byte_size: self.event_byte_size.swap(0, Ordering::AcqRel),
+            event_count: self.event_count.swap(0, ORDERING),
+            event_byte_size: self.event_byte_size.swap(0, ORDERING),
         }
     }
 }
@@ -396,7 +399,7 @@ mod tests {
             handle.join().unwrap();
         }
 
-        assert_eq!(counter.load(Ordering::Relaxed), 0);
+        assert_eq!(counter.load(ORDERING), 0);
     }
 
     #[test]
@@ -404,16 +407,16 @@ mod tests {
         let counter = AtomicU64::new(100);
 
         decrement_counter(&counter, 50);
-        assert_eq!(counter.load(Ordering::Relaxed), 50);
+        assert_eq!(counter.load(ORDERING), 50);
 
         decrement_counter(&counter, 100);
-        assert_eq!(counter.load(Ordering::Relaxed), 0);
+        assert_eq!(counter.load(ORDERING), 0);
 
         decrement_counter(&counter, 50);
-        assert_eq!(counter.load(Ordering::Relaxed), 0);
+        assert_eq!(counter.load(ORDERING), 0);
 
         decrement_counter(&counter, u64::MAX);
-        assert_eq!(counter.load(Ordering::Relaxed), 0);
+        assert_eq!(counter.load(ORDERING), 0);
     }
 
     #[test]
@@ -421,15 +424,15 @@ mod tests {
         let counter = AtomicU64::new(u64::MAX - 2);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX - 1);
+        assert_eq!(counter.load(ORDERING), u64::MAX - 1);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
 
         increment_counter(&counter, 1);
-        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
 
         increment_counter(&counter, u64::MAX);
-        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
     }
 }
