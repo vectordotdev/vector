@@ -16,6 +16,7 @@ glob.workspace = true
 scan_fmt = "0.2.6"
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
+vector-util.workspace = true
 
 [dependencies.bstr]
 version = "1.12"

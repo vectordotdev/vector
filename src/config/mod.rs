@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 use std::{
-    collections::{HashMap, HashSet},
     fmt::{self, Display, Formatter},
     fs,
     hash::Hash,
@@ -27,6 +26,7 @@ pub use vector_lib::config::{
 pub use vector_lib::configurable::component::{
     GenerateConfig, SinkDescription, TransformDescription,
 };
+use vector_util::{HashMap, HashSet};
 
 pub mod api;
 mod builder;

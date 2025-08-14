@@ -12,10 +12,11 @@ use bytes::Bytes;
 use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::{response::Parts, Uri};
 use hyper::{Body, Request};
+use std::future::ready;
 use std::time::Duration;
-use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::json_size::JsonSize;
+use vector_util::HashMap;
 
 use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{

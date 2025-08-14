@@ -192,7 +192,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
 #[cfg(all(test, feature = "sources", feature = "transforms", feature = "sinks"))]
 mod tests {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use proptest::{num, prelude::*, sample};
     use rand::{

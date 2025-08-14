@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
 use std::time::Duration;

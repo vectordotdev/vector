@@ -1,6 +1,5 @@
-use std::collections::{HashMap, HashSet};
-
 use vector_lib::configurable::configurable_component;
+use vector_util::{HashMap, HashSet};
 
 use crate::{config::SecretBackend, signal};
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::ready, task::Poll};
+use std::{future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
@@ -9,6 +9,7 @@ use tower::Service;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_util::HashMap;
 
 use super::Region;
 use crate::{

@@ -3,7 +3,7 @@ use crate::sinks::pulsar::config::PulsarSinkConfig;
 use crate::sinks::pulsar::sink::PulsarEvent;
 use crate::template::Template;
 use bytes::Bytes;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vector_lib::event::Event;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vrl::value::{KeyString, Value};

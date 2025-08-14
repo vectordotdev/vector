@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use mongodb::bson::DateTime;
 use serde::{Deserialize, Serialize};

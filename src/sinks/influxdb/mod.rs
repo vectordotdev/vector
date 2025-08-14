@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};

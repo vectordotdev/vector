@@ -1,7 +1,7 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
 use serde::{de, Deserialize, Deserializer};
-use std::collections::HashMap;
+use vector_util::HashMap;
 use tower::ServiceBuilder;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;

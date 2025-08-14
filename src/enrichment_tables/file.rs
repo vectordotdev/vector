@@ -1,11 +1,12 @@
 //! Handles enrichment tables for `type = file`.
-use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTime};
+use std::{fs, hash::Hasher, path::PathBuf, time::SystemTime};
 
 use bytes::Bytes;
 use tracing::trace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
 use vector_lib::{conversion::Conversion, TimeZone};
+use vector_util::HashMap;
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;
@@ -266,7 +267,7 @@ pub struct File {
     indexes: Vec<(
         Case,
         Vec<usize>,
-        HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
+        std::collections::HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
     )>,
 }
 
@@ -423,8 +424,9 @@ impl File {
         &self,
         fieldidx: &[usize],
         case: Case,
-    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
-        let mut index = HashMap::with_capacity_and_hasher(
+    ) -> Result<std::collections::HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String>
+    {
+        let mut index = std::collections::HashMap::with_capacity_and_hasher(
             self.data.len(),
             hash_hasher::HashBuildHasher::default(),
         );

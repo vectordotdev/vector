@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::io;
 
 use crate::event::KeyString;

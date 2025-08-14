@@ -1,5 +1,5 @@
 use std::sync::{Arc, LazyLock};
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
+use std::{error, fmt, future::ready, pin::Pin};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
@@ -16,6 +16,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
 use vector_lib::lookup::owned_value_path;
 use vector_lib::lookup::OwnedTargetPath;
+use vector_util::HashSet;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 

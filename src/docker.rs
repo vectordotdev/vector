@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{env, path::PathBuf};
 
 use bollard::{
     errors::Error as DockerError,
@@ -14,6 +14,7 @@ use bollard::{
 use futures::StreamExt;
 use http::uri::Uri;
 use snafu::Snafu;
+use std::collections::HashMap;
 use vector_lib::configurable::configurable_component;
 
 // From bollard source.

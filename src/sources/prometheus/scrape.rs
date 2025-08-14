@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -8,6 +7,7 @@ use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, event::Event};
+use vector_util::HashMap;
 
 use super::parser;
 use crate::http::QueryParameters;

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::convert::TryFrom;
 
 use aws_config::Region;

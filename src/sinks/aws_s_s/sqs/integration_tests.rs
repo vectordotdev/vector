@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use aws_config::Region;
 use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};

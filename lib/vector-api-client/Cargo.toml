@@ -7,6 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
+vector-util.workspace = true
 
 # Serde
 serde.workspace = true

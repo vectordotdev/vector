@@ -1,11 +1,11 @@
 #![allow(missing_docs)]
 
 use snafu::Snafu;
-use std::collections::HashSet;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
 use super::config::{ComponentKey, ConfigBuilder};
+use vector_util::HashSet;
 
 pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = broadcast::Sender<SignalTo>;

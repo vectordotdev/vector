@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 use std::{
-    collections::HashMap,
     marker::PhantomData,
     str::FromStr,
     sync::{
@@ -27,6 +26,7 @@ use tracing_subscriber::{
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 use vector_lib::lookup::event_path;
+use vector_util::HashMap;
 use vrl::value::Value;
 
 use crate::event::LogEvent;

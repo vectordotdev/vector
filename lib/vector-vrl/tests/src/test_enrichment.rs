@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vrl::value::{ObjectMap, Value};
 
 #[derive(Debug, Clone)]

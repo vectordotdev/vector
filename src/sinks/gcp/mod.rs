@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use serde::{Deserialize, Serialize};
 use vector_lib::configurable::configurable_component;

@@ -1,10 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use tracing::debug;
 use vector_config_common::schema::{
     visit::{with_resolved_schema_reference, Visitor},
     *,
 };
+use vector_util::HashMap;
 
 use crate::schema::visitors::merge::Mergeable;
 

@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     pin::Pin,
     task::{ready, Context, Poll},
     time::{Duration, Instant},
@@ -12,6 +11,7 @@ use pin_project::pin_project;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal};
+use vector_util::HashMap;
 
 use crate::stats;
 

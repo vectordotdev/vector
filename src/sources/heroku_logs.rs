@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
@@ -17,6 +16,7 @@ use vector_lib::{
     },
     config::DataType,
 };
+use vector_util::HashMap;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::{HeaderMap, StatusCode};
 

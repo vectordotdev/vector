@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use vector_lib::lookup::path;
 use vector_lib::{

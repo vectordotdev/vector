@@ -444,7 +444,7 @@ impl EstimatedJsonEncodedSizeOf for isize {
 mod tests {
     #![allow(clippy::needless_pass_by_value)]
 
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};

@@ -1,8 +1,9 @@
 use crate::event::metric::TagValueSet;
 use crate::transforms::tag_cardinality_limit::config::Mode;
 use bloomy::BloomFilter;
-use std::collections::HashSet;
 use std::fmt;
+
+use vector_util::HashSet;
 
 /// Container for storing the set of accepted values for a given tag key.
 #[derive(Debug)]

@@ -5,7 +5,7 @@ use derivative::Derivative;
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snafu::{ensure, ResultExt, Snafu};
 use std::any::Any;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

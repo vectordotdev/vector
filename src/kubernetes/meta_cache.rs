@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use vector_util::HashSet;
 
 use kube::core::ObjectMeta;
 

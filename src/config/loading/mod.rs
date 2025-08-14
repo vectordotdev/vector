@@ -4,7 +4,6 @@ mod secret;
 mod source;
 
 use std::{
-    collections::HashMap,
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
@@ -18,6 +17,7 @@ pub use loader::*;
 pub use secret::*;
 pub use source::*;
 use vector_lib::configurable::NamedComponent;
+use vector_util::HashMap;
 
 use super::{
     builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,

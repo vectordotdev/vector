@@ -489,7 +489,7 @@ fn load_windows_certs(builder: &mut SslContextBuilder) -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use security_framework::trust_settings::{Domain, TrustSettings, TrustSettingsForCertificate};
 

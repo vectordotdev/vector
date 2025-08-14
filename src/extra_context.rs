@@ -1,10 +1,11 @@
 //! ExtraContext is used for passing extra data to Vector's components when Vector is used as a library.
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
     marker::{Send, Sync},
     sync::Arc,
 };
+
+use vector_util::HashMap;
 
 /// Structure containing any extra data.
 /// The data is held in an [`Arc`] so is cheap to clone.

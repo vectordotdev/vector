@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
+use vector_util::HashMap;
 
 use regex::{Captures, Regex};
 

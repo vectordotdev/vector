@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
+use std::{io::Error, path::PathBuf, process::ExitStatus};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -19,6 +19,7 @@ use vector_lib::codecs::{
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_util::HashMap;
 use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 

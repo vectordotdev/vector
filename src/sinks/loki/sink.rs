@@ -1,8 +1,10 @@
-use std::{collections::HashMap, num::NonZeroUsize};
+use std::num::NonZeroUsize;
 
 use bytes::{Bytes, BytesMut};
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
+
+use vector_util::HashMap;
 use vrl::path::parse_target_path;
 
 use super::{

@@ -16,7 +16,7 @@ use crate::{
         util::http::HttpService,
     },
 };
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vector_lib::{
     codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig},
     configurable::configurable_component,

@@ -50,8 +50,9 @@ smallvec = { version = "1", default-features = false }
 stream-cancel = { version = "0.8.2", default-features = false }
 tokio = { version = "1.45.1", default-features = false, features = ["macros", "time"] }
 tracing = { version = "0.1.34", default-features = false }
-vrl.workspace = true
+vector-util.workspace = true
 vector-config = { path = "../vector-config" }
+vrl.workspace = true
 
 [dev-dependencies]
 futures = { version = "0.3.31", default-features = false, features = ["async-await"] }

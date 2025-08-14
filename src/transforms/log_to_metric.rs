@@ -1,5 +1,5 @@
+use std::num::ParseFloatError;
 use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError};
 
 use chrono::Utc;
 use indexmap::IndexMap;
@@ -13,6 +13,7 @@ use vector_lib::{
         metric::{Bucket, Quantile},
     },
 };
+use vector_util::HashMap;
 use vrl::path::{parse_target_path, PathParseError};
 use vrl::{event_path, path};
 

@@ -13,13 +13,13 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{future::BoxFuture, FutureExt};
 use http::{header::HeaderName, HeaderValue};
 use indexmap::IndexMap;
-use std::collections::HashMap;
 use std::{
     future::Future,
     pin::Pin,
     task::{ready, Context, Poll},
 };
 use tokio::sync::oneshot;
+use vector_util::HashMap;
 
 use crate::sinks::aws_cloudwatch_logs::config::Retention;
 use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
@@ -301,7 +301,7 @@ impl Client {
                 .create_log_group()
                 .log_group_name(group_name)
                 .set_kms_key_id(kms_key)
-                .set_tags(tags)
+                .set_tags(tags.map(|t| std::collections::HashMap::from_iter(t.into_iter())))
                 .send()
                 .await?;
             Ok(())

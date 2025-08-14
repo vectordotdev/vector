@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     hash::Hash,
     net::{Ipv4Addr, SocketAddr},
     num::{
@@ -14,6 +14,7 @@ use std::{
 use indexmap::IndexMap;
 use serde_json::{Number, Value};
 use vector_config_common::{attributes::CustomAttribute, constants, validation::Validation};
+use vector_util::{HashMap, HashSet};
 use vrl::value::KeyString;
 
 use crate::{
@@ -332,6 +333,20 @@ where
         )?;
 
         generate_map_schema(&V::as_configurable_ref(), gen)
+    }
+}
+
+impl<K, V> ToValue for std::collections::HashMap<K, V>
+where
+    K: ToString,
+    V: ToValue,
+{
+    fn to_value(&self) -> Value {
+        Value::Object(
+            self.iter()
+                .map(|(k, v)| (k.to_string(), v.to_value()))
+                .collect(),
+        )
     }
 }
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
@@ -32,6 +32,7 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 
 use crate::{
     codecs::{Encoder, Transformer},

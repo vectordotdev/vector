@@ -9,4 +9,5 @@ publish = false
 arc-swap = { version = "1.7.1", default-features = false }
 chrono.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
+vector-util.workspace = true
 vrl.workspace = true

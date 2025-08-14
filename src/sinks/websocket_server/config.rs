@@ -1,7 +1,8 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
+use vector_util::HashMap;
 
 use crate::{
     codecs::EncodingConfig,

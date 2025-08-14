@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use bytes::BytesMut;
 use futures::executor;
 use futures_util::StreamExt;
@@ -7,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_util::{HashMap, HashSet};
 
 use crate::{config::SecretBackend, signal};
 

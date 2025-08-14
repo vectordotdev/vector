@@ -1,5 +1,5 @@
 use http::Uri;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use tokio::time::Duration;
 use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};

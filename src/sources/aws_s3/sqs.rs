@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
+use vector_util::HashMap;
 
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -726,6 +726,8 @@ impl IngestorProcess {
             ),
             None => lines,
         };
+
+        let metadata = metadata.map(|m| m.into_iter().collect());
 
         let mut stream = lines.flat_map(|line| {
             let events = match self.state.decoder.deserializer_parse(line) {

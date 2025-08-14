@@ -1,6 +1,6 @@
 mod renderer;
 
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use crate::renderer::SchemaRenderer;
 use anyhow::{Context, Result};

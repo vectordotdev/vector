@@ -1,5 +1,4 @@
 use std::{
-    collections::{HashMap, HashSet},
     io::SeekFrom,
     path::PathBuf,
     process::Stdio,
@@ -39,6 +38,8 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
 };
+use vector_util::{HashMap, HashSet};
+
 use vrl::event_path;
 use vrl::value::{kind::Collection, Kind, Value};
 

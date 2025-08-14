@@ -1,10 +1,11 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+use std::{fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
+use vector_util::HashMap;
 
 use crate::{
     config::{self, Config, ConfigDiff},

@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    ops::{Add, AddAssign},
-};
+use std::ops::{Add, AddAssign};
+
+use vector_util::HashMap;
 
 use crate::{
     internal_event::{

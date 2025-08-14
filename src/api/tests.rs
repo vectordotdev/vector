@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::api::schema::events::output::OutputEventsPayload;
@@ -17,6 +16,7 @@ use vector_lib::fanout;
 use vector_lib::tap::controller::{TapController, TapPatterns, TapPayload};
 use vector_lib::tap::notification::{InvalidMatch, Matched, NotMatched, Notification};
 use vector_lib::tap::topology::{TapOutput, TapResource};
+use vector_util::{HashMap, HashSet};
 
 #[tokio::test]
 /// A tap sink should match a pattern, receive the correct notifications,

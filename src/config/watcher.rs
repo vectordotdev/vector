@@ -1,5 +1,5 @@
 use crate::config::{ComponentConfig, ComponentType};
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::{
     path::{Path, PathBuf},
     time::Duration,

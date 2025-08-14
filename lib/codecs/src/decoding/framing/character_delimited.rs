@@ -166,7 +166,7 @@ impl Decoder for CharacterDelimitedDecoder {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use bytes::BufMut;
     use indoc::indoc;

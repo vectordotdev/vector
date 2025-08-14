@@ -5,7 +5,7 @@ use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, TimestampSecondsWithFrac};
 use smallvec::{smallvec, SmallVec};
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::{

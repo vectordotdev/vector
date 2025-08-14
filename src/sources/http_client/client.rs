@@ -7,7 +7,7 @@ use futures_util::FutureExt;
 use http::{response::Parts, Uri};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 use tokio_util::codec::Decoder as _;
 use vrl::diagnostic::Formatter;
 
@@ -39,6 +39,7 @@ use vector_lib::{
     event::{Event, LogEvent, VrlTarget},
     TimeZone,
 };
+use vector_util::HashMap;
 use vrl::{
     compiler::{runtime::Runtime, CompileConfig, Function, Program},
     prelude::TypeState,

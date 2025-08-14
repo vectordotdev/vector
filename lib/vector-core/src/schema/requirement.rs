@@ -245,7 +245,7 @@ impl std::error::Error for ValidationError {}
 mod tests {
     use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use super::*;
 

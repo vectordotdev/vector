@@ -10,9 +10,10 @@ publish = false
 [dependencies]
 prost.workspace = true
 prost-types.workspace = true
+vector-util.workspace = true
 
 [dev-dependencies]
 chrono.workspace = true
 
 [build-dependencies]
-prost-build .workspace = true
+prost-build.workspace = true

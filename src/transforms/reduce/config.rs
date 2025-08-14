@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 

@@ -16,7 +16,6 @@ use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use std::{
-    collections::HashMap,
     fmt,
     net::SocketAddr,
     task::{Context, Poll},
@@ -31,6 +30,7 @@ use tower_http::{
 use tracing::{Instrument, Span};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
+use vector_util::HashMap;
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;

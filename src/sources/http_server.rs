@@ -1,5 +1,5 @@
 use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -20,6 +20,7 @@ use vector_lib::{
     config::{DataType, LegacyKey, LogNamespace},
     schema::Definition,
 };
+use vector_util::HashMap;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

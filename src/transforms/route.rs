@@ -176,7 +176,7 @@ impl TransformConfig for RouteConfig {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use indoc::indoc;
     use vector_lib::transform::TransformOutputsBuf;

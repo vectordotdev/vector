@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    pin::Pin,
-    time::Duration,
-};
+use std::{collections::hash_map::Entry, pin::Pin, time::Duration};
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
@@ -11,6 +7,7 @@ use vector_lib::{
     configurable::configurable_component,
     event::metric::{Metric, MetricData, MetricKind, MetricSeries},
 };
+use vector_util::HashMap;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},

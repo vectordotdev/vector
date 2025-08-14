@@ -13,12 +13,13 @@
 
 use base64::prelude::BASE64_URL_SAFE;
 use base64::Engine;
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use bytes::Bytes;
 use itertools::Itertools;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_util::HashMap;
 use warp::http::HeaderMap;
 
 use super::parser;

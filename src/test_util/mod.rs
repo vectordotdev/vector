@@ -1,6 +1,5 @@
 #![allow(missing_docs)]
 use std::{
-    collections::HashMap,
     convert::Infallible,
     fs::File,
     future::{ready, Future},
@@ -42,6 +41,7 @@ use vector_lib::{
     buffers::topology::channel::LimitedReceiver,
     event::{Metric, MetricKind},
 };
+use vector_util::HashMap;
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;
 

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use snafu::Snafu;
 use vector_lib::config::SourceOutput;
@@ -439,7 +439,7 @@ impl ComponentContainer for Config {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use indexmap::IndexMap;
     use similar_asserts::assert_eq;

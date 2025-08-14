@@ -178,6 +178,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false, features = ["v
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
+vector-util = { path = "lib/vector-util" }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -204,6 +205,7 @@ vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
+vector-util.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 

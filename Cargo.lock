@@ -95,16 +95,16 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.11"
+version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
+checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
 dependencies = [
  "cfg-if",
- "getrandom 0.2.15",
+ "getrandom 0.3.1",
  "once_cell",
  "serde",
  "version_check",
- "zerocopy 0.7.31",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1878,7 +1878,7 @@ version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61570f4de0cc9c03b481c96057b3ae7c6ff7b5b35da8b0832c44f0131987a718"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "base64 0.13.1",
  "bitvec",
  "hex",
@@ -2307,6 +2307,7 @@ dependencies = [
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
+ "vector-util",
  "vrl",
 ]
 
@@ -3459,6 +3460,7 @@ dependencies = [
  "arc-swap",
  "chrono",
  "dyn-clone",
+ "vector-util",
  "vrl",
 ]
 
@@ -3789,6 +3791,7 @@ dependencies = [
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
+ "vector-util",
  "winapi",
 ]
 
@@ -4403,7 +4406,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ff8ae62cd3a9102e5637afc8452c55acf3844001bd5374e0b0bd7b6616c038"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
 ]
 
 [[package]]
@@ -4412,7 +4415,7 @@ version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "allocator-api2",
 ]
 
@@ -5559,7 +5562,7 @@ version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24690c68dfcdde5980d676b0f1820981841016b1f29eecb4c42ad48ab4118681"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "base64 0.22.1",
  "bytecount",
  "email_address",
@@ -5742,7 +5745,7 @@ version = "0.93.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b84733c0fed6085c9210b43ffb96248676c1e800d0ba38d15043275a792ffa4"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "async-broadcast",
  "async-stream",
  "async-trait",
@@ -6017,6 +6020,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
+ "vector-util",
 ]
 
 [[package]]
@@ -6223,7 +6227,7 @@ version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25dea7ac8057892855ec285c440160265225438c3c45072613c25a4b26e98ef5"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "portable-atomic",
 ]
 
@@ -8433,7 +8437,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b08f3c9802962f7e1b25113931d94f43ed9725bebc59db9d0c3e9a23b67e15ff"
 dependencies = [
  "getrandom 0.3.1",
- "zerocopy 0.8.16",
+ "zerocopy",
 ]
 
 [[package]]
@@ -8674,7 +8678,7 @@ version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a3d769362109497b240e66462606bc28af68116436c8669bac17069533b908e"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
  "fluent-uri 0.3.2",
  "once_cell",
  "parking_lot",
@@ -12058,6 +12062,7 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vector-lib",
+ "vector-util",
  "vector-vrl-functions",
  "vrl",
  "warp",
@@ -12083,6 +12088,7 @@ dependencies = [
  "tokio-tungstenite 0.20.1",
  "url",
  "uuid",
+ "vector-util",
 ]
 
 [[package]]
@@ -12127,6 +12133,7 @@ dependencies = [
  "tracing-subscriber",
  "vector-common",
  "vector-config",
+ "vector-util",
 ]
 
 [[package]]
@@ -12150,6 +12157,7 @@ dependencies = [
  "tokio",
  "tracing 0.1.41",
  "vector-config",
+ "vector-util",
  "vrl",
 ]
 
@@ -12175,6 +12183,7 @@ dependencies = [
  "url",
  "vector-config-common",
  "vector-config-macros",
+ "vector-util",
  "vrl",
 ]
 
@@ -12190,6 +12199,7 @@ dependencies = [
  "serde_json",
  "syn 2.0.104",
  "tracing 0.1.41",
+ "vector-util",
 ]
 
 [[package]]
@@ -12282,6 +12292,7 @@ dependencies = [
  "vector-config",
  "vector-config-common",
  "vector-lookup",
+ "vector-util",
  "vrl",
 ]
 
@@ -12360,6 +12371,14 @@ dependencies = [
  "vector-buffers",
  "vector-common",
  "vector-core",
+ "vector-util",
+]
+
+[[package]]
+name = "vector-util"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.12",
 ]
 
 [[package]]
@@ -13418,38 +13437,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.7.31"
+version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c4061bedbb353041c12f413700357bec76df2c7e2ca8e4df8bac24c6bf68e3d"
+checksum = "1039dd0d3c310cf05de012d8a39ff557cb0d23087fd44cad61df08fc31907a2f"
 dependencies = [
- "zerocopy-derive 0.7.31",
-]
-
-[[package]]
-name = "zerocopy"
-version = "0.8.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b8c07a70861ce02bad1607b5753ecb2501f67847b9f9ada7c160fff0ec6300c"
-dependencies = [
- "zerocopy-derive 0.8.16",
+ "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.31"
+version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c129550b3e6de3fd0ba67ba5c81818f9805e58b8d7fee80a3a59d2c9fc601a"
-dependencies = [
- "proc-macro2 1.0.95",
- "quote 1.0.40",
- "syn 2.0.104",
-]
-
-[[package]]
-name = "zerocopy-derive"
-version = "0.8.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5226bc9a9a9836e7428936cde76bb6b22feea1a8bfdbc0d241136e4d13417e25"
+checksum = "9ecf5b4cc5364572d7f4c329661bcc82724222973f2cab6f050a4e5c22f75181"
 dependencies = [
  "proc-macro2 1.0.95",
  "quote 1.0.40",

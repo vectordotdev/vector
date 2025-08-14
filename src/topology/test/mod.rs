@@ -1,11 +1,11 @@
 use std::{
-    collections::HashMap,
     iter,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
+use vector_util::HashMap;
 
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},

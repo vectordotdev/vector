@@ -1,6 +1,5 @@
 use ipnet::IpNet;
 use std::{
-    collections::HashMap,
     future::Future,
     net::SocketAddr,
     pin::Pin,
@@ -19,6 +18,8 @@ use tokio::{
 };
 use tokio_openssl::SslStream;
 use tonic::transport::{server::Connected, Certificate};
+
+use vector_util::HashMap;
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,

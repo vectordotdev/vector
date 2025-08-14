@@ -246,7 +246,7 @@ fn generate_avro_test_case_map() {
         ]
     }
     "#;
-    use std::collections::HashMap;
+    use vector_util::HashMap;
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct Test {
         map_field: HashMap<String, i64>,

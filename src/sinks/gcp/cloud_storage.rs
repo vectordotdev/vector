@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, io};
+use std::{convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
@@ -13,6 +13,7 @@ use vector_lib::codecs::encoding::Framer;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{EventFinalizers, Finalizable};
 use vector_lib::{request_metadata::RequestMetadata, TimeZone};
+use vector_util::HashMap;
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::service::TowerRequestConfigDefaults;

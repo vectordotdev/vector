@@ -1,8 +1,7 @@
 #![allow(missing_docs)]
-use std::collections::{HashMap, HashSet};
-
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
+use vector_util::{HashMap, HashSet};
 
 use crate::config::GenerateConfig;
 use crate::{config::SecretBackend, signal};

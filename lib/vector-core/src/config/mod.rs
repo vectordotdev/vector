@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::{collections::HashMap, fmt, num::NonZeroUsize};
+use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 pub use telemetry::{init_telemetry, telemetry, Tags, Telemetry};
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
+use vector_util::HashMap;
 use vrl::value::Value;
 
 use crate::schema;

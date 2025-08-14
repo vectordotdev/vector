@@ -16,7 +16,7 @@ use http::{
 };
 use hyper::Body;
 use snafu::ResultExt;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vector_lib::codecs::encoding::Framer;
 
 /// Partition key for GreptimeDB logs sink.

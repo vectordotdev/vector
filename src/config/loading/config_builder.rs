@@ -1,7 +1,8 @@
-use std::{collections::HashMap, io::Read};
+use std::io::Read;
 
 use indexmap::IndexMap;
 use toml::value::Table;
+use vector_util::HashMap;
 
 use super::{deserialize_table, loader, prepare_input, secret};
 use super::{ComponentHint, Process};

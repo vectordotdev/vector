@@ -11,10 +11,7 @@
 mod tests;
 mod unit_test_components;
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -23,6 +20,7 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use vector_util::{HashMap, HashSet};
 use vrl::{
     compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
     diagnostic::Formatter,

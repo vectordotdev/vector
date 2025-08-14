@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    io::Read,
-    sync::LazyLock,
-};
+use std::{io::Read, sync::LazyLock};
 
 use futures::TryFutureExt;
 use indexmap::IndexMap;
@@ -10,6 +6,7 @@ use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use toml::value::Table;
 use vector_lib::config::ComponentKey;
+use vector_util::{HashMap, HashSet};
 
 use crate::{
     config::{
@@ -151,7 +148,7 @@ pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<Str
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use vector_util::HashMap;
 
     use indoc::indoc;
 

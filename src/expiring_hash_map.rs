@@ -3,7 +3,6 @@
 
 use std::{
     borrow::Borrow,
-    collections::HashMap,
     fmt,
     hash::Hash,
     time::{Duration, Instant},
@@ -11,6 +10,7 @@ use std::{
 
 use futures::StreamExt;
 use tokio_util::time::{delay_queue, DelayQueue};
+use vector_util::HashMap;
 
 /// An expired item, holding the value and the key with an expiration information.
 pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);

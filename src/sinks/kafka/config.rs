@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use futures::FutureExt;
 use rdkafka::ClientConfig;
@@ -6,6 +6,7 @@ use serde_with::serde_as;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+use vector_util::HashMap;
 use vrl::value::Kind;
 
 use crate::{

@@ -2,7 +2,7 @@
 
 use bytes::BytesMut;
 use futures::{Stream, StreamExt};
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::time::{Duration, Instant};
 use vector_lib::config::LogNamespace;
 use vector_lib::lookup::OwnedTargetPath;

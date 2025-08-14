@@ -3,6 +3,7 @@ use std::io;
 use bytes::Bytes;
 use chrono::Utc;
 use vector_lib::event::{Metric, MetricValue};
+use vector_util::HashMap;
 
 use crate::sinks::{gcp, prelude::*, util::http::HttpRequest};
 
@@ -105,7 +106,7 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     .tags
                     .unwrap_or_default()
                     .into_iter_single()
-                    .collect::<std::collections::HashMap<_, _>>();
+                    .collect::<HashMap<_, _>>();
 
                 gcp::GcpSerie {
                     metric: gcp::GcpMetric {

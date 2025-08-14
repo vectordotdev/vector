@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
@@ -13,6 +11,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::PathPrefix;
 use vector_lib::schema;
+use vector_util::{HashMap, HashSet};
 
 use super::{
     encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,

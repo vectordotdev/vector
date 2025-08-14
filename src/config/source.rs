@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
@@ -103,7 +102,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             let body = request.body.clone();
             let byte_size = request.body.len();
 
-            let mut properties = HashMap::new();
+            let mut properties = std::collections::HashMap::new();
             if let Some(props) = request.metadata.properties {
                 for (key, value) in props {
                     properties.insert(key.into(), String::from_utf8_lossy(&value).to_string());

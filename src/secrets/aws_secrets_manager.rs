@@ -1,7 +1,6 @@
-use std::collections::{HashMap, HashSet};
-
 use aws_sdk_secretsmanager::{config, Client};
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_util::{HashMap, HashSet};
 
 use crate::aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint};
 use crate::config::ProxyConfig;

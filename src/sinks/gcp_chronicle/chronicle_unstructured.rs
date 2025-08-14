@@ -12,7 +12,7 @@ use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};

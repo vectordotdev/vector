@@ -1,10 +1,11 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use bytes::Bytes;
 use prost::Message;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::prometheus::parser::proto;
+use vector_util::HashMap;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;

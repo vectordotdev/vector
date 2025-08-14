@@ -1,7 +1,7 @@
 #![allow(clippy::print_stderr)] // test framework
 #![allow(clippy::print_stdout)] // test framework
 
-use std::collections::HashSet;
+use vector_util::HashSet;
 
 /// This helper function issues an HTTP request to the Prometheus-exposition
 /// format metrics endpoint, validates that it completes successfully and

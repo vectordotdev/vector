@@ -1,6 +1,6 @@
 use crate::config::{DataType, TransformOutput};
 use crate::event::{Event, LogEvent};
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use indoc::indoc;
 use vector_lib::transform::TransformOutputsBuf;

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use vector_util::HashMap;
 
 use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
 use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue};

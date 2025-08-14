@@ -29,12 +29,10 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use arc_swap::ArcSwap;
+use vector_util::HashMap;
 use vrl::value::{ObjectMap, Value};
 
 use super::{Condition, IndexHandle, Table};

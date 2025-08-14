@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -17,6 +16,7 @@ use vector_lib::{
     schema,
     transform::Transform,
 };
+use vector_util::{HashMap, HashSet};
 
 use super::dot_graph::GraphConfig;
 use super::schema::Options as SchemaOptions;

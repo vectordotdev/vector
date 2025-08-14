@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::ready, task::Poll};
+use std::{future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
@@ -8,6 +8,7 @@ use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},

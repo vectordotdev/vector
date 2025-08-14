@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    iter::FromIterator,
-    str::FromStr,
-};
+use std::{iter::FromIterator, str::FromStr};
 
 use futures::{SinkExt, StreamExt};
 use indoc::indoc;
@@ -11,6 +7,8 @@ use k8s_test_framework::{
     lock, namespace, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
 use tracing::{debug, info};
+
+use vector_util::{BTreeMap, HashSet};
 
 const HELM_VALUES_AGENT: &str = indoc! {r#"
     role: "Agent"

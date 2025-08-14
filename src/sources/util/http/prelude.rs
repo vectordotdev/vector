@@ -1,5 +1,5 @@
 use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
-use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
+use std::{convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
@@ -12,6 +12,7 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 use warp::{
     filters::{
         path::{FullPath, Tail},

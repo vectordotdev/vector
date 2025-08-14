@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fmt,
     task::{ready, Context, Poll},
 };
@@ -36,6 +35,7 @@ use vector_lib::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };
+use vector_util::HashMap;
 
 use crate::sinks::{
     aws_cloudwatch_logs::{

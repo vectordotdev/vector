@@ -1,4 +1,5 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
+use vector_util::HashMap;
 
 use hyper::{
     service::{make_service_fn, service_fn},

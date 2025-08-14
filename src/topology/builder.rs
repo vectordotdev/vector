@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -32,6 +31,7 @@ use vector_lib::{
     schema::Definition,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 
 use super::{
     fanout::{self, Fanout},

@@ -1,5 +1,4 @@
 use std::{
-    collections::{HashMap, HashSet},
     io::Cursor,
     pin::Pin,
     sync::{
@@ -49,6 +48,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::{HashMap, HashSet};
 use vrl::value::{kind::Collection, Kind, ObjectMap};
 
 use crate::{

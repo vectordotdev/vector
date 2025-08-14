@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use vector_util::{HashMap, HashSet};
 
 use std::fmt::Display;
 

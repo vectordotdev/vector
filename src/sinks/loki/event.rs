@@ -1,9 +1,10 @@
-use std::{collections::HashMap, io};
+use std::io;
 
 use crate::sinks::{prelude::*, util::encoding::Encoder};
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_lib::config::telemetry;
+use vector_util::HashMap;
 
 pub type Labels = Vec<(String, String)>;
 pub type StructuredMetadata = Vec<(String, String)>;

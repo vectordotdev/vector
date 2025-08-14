@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_util::{HashMap, HashSet};
 
 use crate::{config::SecretBackend, signal};
 

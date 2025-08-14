@@ -1,7 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
 use std::{
-    collections::HashMap,
     future::Future,
     pin::Pin,
     sync::Arc,
@@ -11,6 +10,7 @@ use std::{
 use futures::{future, FutureExt};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
+use vector_util::HashMap;
 
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 

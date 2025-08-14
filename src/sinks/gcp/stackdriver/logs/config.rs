@@ -17,7 +17,7 @@ use crate::{
 use http::{Request, Uri};
 use hyper::Body;
 use snafu::Snafu;
-use std::collections::HashMap;
+use vector_util::HashMap;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 

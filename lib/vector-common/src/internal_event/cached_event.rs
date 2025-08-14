@@ -1,10 +1,10 @@
 use std::{
-    collections::HashMap,
     hash::Hash,
     sync::{Arc, RwLock},
 };
 
 use derivative::Derivative;
+use vector_util::HashMap;
 
 use super::{InternalEventHandle, RegisterInternalEvent};
 
