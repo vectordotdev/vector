@@ -3,7 +3,7 @@
 
 use core::task::Context;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fmt,
     fs::File,
     future::pending,
@@ -28,6 +28,7 @@ use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
 use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
+use vector_util::HashMap;
 
 use super::controller::ControllerStatistics;
 use super::AdaptiveConcurrencySettings;

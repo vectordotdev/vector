@@ -3266,6 +3266,7 @@ dependencies = [
  "tracing 0.1.41",
  "vector-config",
  "vector-config-common",
+ "vector-util",
 ]
 
 [[package]]
@@ -5598,6 +5599,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing 0.1.41",
+ "vector-util",
 ]
 
 [[package]]
@@ -12413,6 +12415,7 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
+ "vector-util",
  "vector-vrl-functions",
  "vrl",
 ]

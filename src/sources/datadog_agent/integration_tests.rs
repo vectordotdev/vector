@@ -1,11 +1,9 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime};
 
 use chrono::Utc;
 use indoc::indoc;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use vector_util::HashMap;
 
 use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{

@@ -579,7 +579,9 @@ pub struct TestOutput<T: 'static = OutputId> {
 
 #[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod tests {
-    use std::{collections::HashMap, path::PathBuf};
+    use std::path::PathBuf;
+
+    use vector_util::HashMap;
 
     use crate::{config, topology};
     use indoc::indoc;
@@ -1203,10 +1205,9 @@ mod acknowledgements_tests {
 
 #[cfg(test)]
 mod resource_tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    };
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+
+    use vector_util::{HashMap, HashSet};
 
     use proptest::prelude::*;
 

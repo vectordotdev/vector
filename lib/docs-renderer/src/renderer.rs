@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use anyhow::Result;
 use serde::Serialize;
@@ -9,6 +9,7 @@ use vector_config::schema::parser::query::{
     QueryError, QueryableSchema, SchemaQuerier, SchemaType,
 };
 use vector_config_common::constants;
+use vector_util::HashMap;
 
 #[derive(Debug, Snafu)]
 pub enum RenderError {

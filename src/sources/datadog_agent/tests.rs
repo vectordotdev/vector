@@ -1,9 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter::FromIterator,
-    net::SocketAddr,
-    str,
-};
+use std::{collections::BTreeMap, iter::FromIterator, net::SocketAddr, str};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -30,6 +25,7 @@ use vector_lib::{
     event::{metric::TagValue, MetricTags},
     metric_tags,
 };
+use vector_util::HashMap;
 use vrl::compiler::value::Collection;
 use vrl::value;
 use vrl::value::{Kind, ObjectMap};

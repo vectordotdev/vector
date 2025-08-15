@@ -674,7 +674,9 @@ impl From<PatternWrapper> for String {
 #[cfg(test)]
 mod tests {
     use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
-    use std::{collections::HashSet, future::Future, time::Duration};
+    use std::{future::Future, time::Duration};
+
+    use vector_util::HashSet;
 
     use super::*;
 

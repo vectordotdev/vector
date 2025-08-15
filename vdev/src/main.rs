@@ -3,7 +3,8 @@
     clippy::module_name_repetitions,
     clippy::print_stdout,
     clippy::unused_self,
-    clippy::unnecessary_wraps
+    clippy::unnecessary_wraps,
+    clippy::disallowed_types // FIXME
 )]
 
 #[macro_use]

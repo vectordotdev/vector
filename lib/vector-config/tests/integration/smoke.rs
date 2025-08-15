@@ -5,7 +5,6 @@
 #![allow(clippy::print_stderr)] // tests
 
 use std::{
-    collections::HashMap,
     fmt,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
@@ -19,6 +18,7 @@ use vector_config::{
     component::GenerateConfig, configurable_component, schema::generate_root_schema,
     ConfigurableString,
 };
+use vector_util::HashMap;
 
 /// A templated string.
 #[configurable_component]

@@ -10,9 +10,11 @@ use flate2::read::GzDecoder;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
-use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
+use std::{io::Read, net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::{sleep, Duration};
+
+use vector_util::HashMap;
 
 use crate::{
     config::ConfigBuilder,

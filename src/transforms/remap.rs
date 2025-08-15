@@ -1,4 +1,3 @@
-use vector_util::HashMap;
 use std::sync::Mutex;
 use std::{
     collections::BTreeMap,
@@ -6,6 +5,7 @@ use std::{
     io::{self, Read},
     path::PathBuf,
 };
+use vector_util::HashMap;
 
 use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::MetricTagValues;
@@ -663,7 +663,6 @@ pub enum BuildError {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
     use indoc::{formatdoc, indoc};
@@ -690,6 +689,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::enrichment::TableRegistry;
+    use vector_util::{HashMap, HashSet};
 
     fn test_default_schema_definition() -> schema::Definition {
         schema::Definition::empty_legacy_namespace().with_event_field(

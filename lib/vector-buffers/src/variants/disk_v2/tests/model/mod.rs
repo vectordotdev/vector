@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     io::Cursor,
     sync::{
         atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
@@ -12,6 +12,8 @@ use crossbeam_queue::SegQueue;
 use proptest::{prop_assert, prop_assert_eq, proptest};
 use temp_dir::TempDir;
 use tokio::runtime::Builder;
+
+use vector_util::HashMap;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,

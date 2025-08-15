@@ -231,8 +231,10 @@ mod integration_tests {
     use indoc::indoc;
     use serde::Deserialize;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::convert::TryFrom;
     use tokio::time::Duration;
+
+    use vector_util::HashMap;
 
     use super::*;
     use crate::{

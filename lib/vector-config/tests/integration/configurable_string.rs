@@ -1,8 +1,9 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt;
 
 use indexmap::IndexMap;
 use vector_config::{configurable_component, schema::generate_root_schema, ConfigurableString};
+use vector_util::HashMap;
 
 /// A type that pretends to be `ConfigurableString` but has a non-string-like schema.
 #[configurable_component]

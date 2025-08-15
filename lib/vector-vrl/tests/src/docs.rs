@@ -1,11 +1,9 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fs,
-    process::Command,
-};
+use std::{collections::BTreeMap, fs, process::Command};
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
+
+use vector_util::HashMap;
 
 use crate::Test;
 

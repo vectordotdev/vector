@@ -1,4 +1,5 @@
-use vector_util::HashMap;
+#[allow(clippy::disallowed_types)]
+use std::collections::HashMap;
 
 use aws_config::Region;
 use aws_sdk_sns::Client as SnsClient;
@@ -134,6 +135,7 @@ async fn sns_send_message_batch() {
 async fn ensure_topic(topic_arn: String) -> String {
     let client = create_sns_test_client().await;
 
+    #[allow(clippy::disallowed_types)]
     let attributes: Option<HashMap<String, String>> = None;
 
     client
@@ -183,6 +185,7 @@ fn gen_queue_name() -> String {
 }
 
 async fn subscribe_queue_to_topic(sns_client: &SnsClient, topic_arn: &str, queue_arn: &str) {
+    #[allow(clippy::disallowed_types)]
     let mut attributes = HashMap::new();
     attributes.insert("RawMessageDelivery".to_string(), "true".to_string());
 

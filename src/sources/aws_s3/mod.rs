@@ -446,7 +446,6 @@ mod test {
 mod integration_tests {
     use std::{
         any::Any,
-        collections::HashMap,
         fs::File,
         io::{self, BufRead},
         path::Path,
@@ -458,6 +457,7 @@ mod integration_tests {
     use similar_asserts::assert_eq;
     use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vector_lib::lookup::path;
+    use vector_util::HashMap;
     use vrl::value::Value;
 
     use super::*;

@@ -9,6 +9,7 @@ publish = false
 chrono-tz.workspace = true
 dnstap-parser = { path = "../../dnstap-parser" }
 enrichment = { path = "../../enrichment" }
+vector-util.workspace = true
 vrl.workspace = true
 vector-vrl-functions = { path = "../../vector-vrl/functions" }
 

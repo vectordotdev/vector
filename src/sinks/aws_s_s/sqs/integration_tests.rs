@@ -1,4 +1,5 @@
-use vector_util::HashMap;
+#[allow(clippy::disallowed_types)]
+use std::collections::HashMap;
 
 use aws_config::Region;
 use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
@@ -103,6 +104,7 @@ async fn sqs_send_message_batch() {
     assert_eq!(input_lines.len(), response.messages.unwrap().len());
 }
 
+#[allow(clippy::disallowed_types)]
 async fn ensure_queue(queue_name: String) {
     let client = create_test_client().await;
 

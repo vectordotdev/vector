@@ -843,7 +843,6 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
         fs::{self, File},
         future::Future,
         io::{Seek, Write},
@@ -854,6 +853,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
     use vector_lib::schema::Definition;
+    use vector_util::HashSet;
     use vrl::value::kind::Collection;
 
     use super::*;

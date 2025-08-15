@@ -269,7 +269,6 @@ impl HttpRequestBuilder {
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
         future::poll_fn,
         num::{NonZeroU64, NonZeroU8, NonZeroUsize},
         sync::{
@@ -287,6 +286,7 @@ mod tests {
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
     };
+    use vector_util::HashMap;
     use wiremock::{
         matchers::{header, header_exists, method, path},
         Mock, MockServer, Request, Respond, ResponseTemplate,

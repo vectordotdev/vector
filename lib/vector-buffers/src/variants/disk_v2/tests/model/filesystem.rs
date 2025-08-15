@@ -1,7 +1,5 @@
 use std::{
-    cmp,
-    collections::HashMap,
-    fmt, io,
+    cmp, fmt, io,
     path::{Path, PathBuf},
     pin::Pin,
     sync::{Arc, Mutex},
@@ -9,6 +7,8 @@ use std::{
 };
 
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+use vector_util::HashMap;
 
 use crate::variants::disk_v2::{
     io::{AsyncFile, Metadata, ReadableMemoryMap, WritableMemoryMap},

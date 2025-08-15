@@ -1,5 +1,4 @@
 use http::Uri;
-use vector_util::HashMap;
 use tokio::time::Duration;
 use vector_lib::config::LogNamespace;
 use warp::{http::HeaderMap, Filter};
@@ -13,6 +12,7 @@ use vector_lib::codecs::decoding::{
 };
 use vector_lib::codecs::CharacterDelimitedDecoderConfig;
 use vector_lib::event::Event;
+use vector_util::{HashMap, HashSet};
 
 use super::HttpClientConfig;
 use crate::test_util::{
@@ -418,7 +418,7 @@ async fn request_query_vrl_dynamic_updates() {
     }
 
     // Check that timestamps are unique (should be different for each request)
-    let unique_timestamps: std::collections::HashSet<String> = timestamps.iter().cloned().collect();
+    let unique_timestamps: HashSet<String> = timestamps.iter().cloned().collect();
     assert_eq!(
         timestamps.len(),
         unique_timestamps.len(),

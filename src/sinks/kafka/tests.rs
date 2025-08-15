@@ -3,7 +3,7 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use std::{collections::HashMap, future::ready, thread, time::Duration};
+    use std::{future::ready, thread, time::Duration};
 
     use bytes::Bytes;
     use futures::StreamExt;
@@ -18,6 +18,7 @@ mod integration_test {
         config::{init_telemetry, Tags, Telemetry},
         event::{BatchNotifier, BatchStatus},
     };
+    use vector_util::HashMap;
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{

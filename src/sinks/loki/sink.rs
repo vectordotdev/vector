@@ -565,12 +565,13 @@ impl StreamSink<Event> for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::convert::TryFrom;
 
     use futures::stream::StreamExt;
     use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{Event, LogEvent, ObjectMap, Value};
     use vector_lib::lookup::PathPrefix;
+    use vector_util::HashMap;
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{

@@ -229,7 +229,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, time::Duration};
+    use std::time::Duration;
 
     use chrono::{DateTime, Utc};
     use proptest::prelude::*;
@@ -237,6 +237,7 @@ mod tests {
         event::{Metric, MetricKind, MetricValue},
         metric_tags,
     };
+    use vector_util::HashSet;
 
     use super::sort_and_collapse_counters_by_series_and_timestamp;
 

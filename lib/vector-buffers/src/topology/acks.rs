@@ -469,7 +469,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashSet, VecDeque};
+    use std::collections::VecDeque;
+    use vector_util::HashSet;
 
     use proptest::{
         arbitrary::any,

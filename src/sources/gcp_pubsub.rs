@@ -827,7 +827,7 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
-    use std::collections::{BTreeMap, HashSet};
+    use std::collections::BTreeMap;
     use std::sync::LazyLock;
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -837,6 +837,7 @@ mod integration_tests {
     use hyper::{Request, StatusCode};
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
+    use vector_util::HashSet;
     use vrl::btreemap;
 
     use super::*;

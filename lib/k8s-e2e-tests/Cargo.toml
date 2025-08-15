@@ -19,6 +19,7 @@ indoc.workspace = true
 env_logger = "0.11"
 tracing = { version = "0.1", features = ["log"] }
 rand.workspace = true
+vector-util.workspace = true
 
 [features]
 e2e-tests = []

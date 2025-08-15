@@ -1,8 +1,6 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
+use vector_util::HashMap;
 use vrl::value::{ObjectMap, Value};
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};

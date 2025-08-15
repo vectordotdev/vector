@@ -1,12 +1,14 @@
 #![cfg(feature = "aws-sqs-integration-tests")]
 #![cfg(test)]
 
-use std::{collections::HashSet, time::Duration};
+use std::time::Duration;
 
 use aws_sdk_sqs::operation::create_queue::CreateQueueOutput;
 use aws_types::region::Region;
 use futures::StreamExt;
 use tokio::time::timeout;
+
+use vector_util::HashSet;
 
 use crate::{
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},

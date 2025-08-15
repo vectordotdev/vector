@@ -1,6 +1,8 @@
-use std::{collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use serde_json::Value;
+
+use vector_util::HashMap;
 
 use super::tests::*;
 use crate::{

@@ -941,6 +941,7 @@ mod integration_tests {
     use futures::stream;
     use similar_asserts::assert_eq;
     use vector_lib::metric_tags;
+    use vector_util::HashMap;
 
     use crate::{
         config::{SinkConfig, SinkContext},
@@ -1122,7 +1123,7 @@ mod integration_tests {
         let sink = InfluxDbSvc::new(config, client).unwrap();
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
-        let mut body = std::collections::HashMap::new();
+        let mut body = HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{metric}\")"));
         body.insert("type", "flux".to_owned());
 

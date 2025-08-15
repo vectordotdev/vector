@@ -615,7 +615,8 @@ mod tests {
     use crate::event::{Event, EventMetadata, LogEvent};
     use lookup::lookup_v2::parse_target_path;
     use lookup::owned_value_path;
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
+    use vector_util::HashMap;
     use vrl::value::Value;
 
     use super::*;

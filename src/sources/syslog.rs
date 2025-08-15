@@ -448,7 +448,7 @@ fn enrich_syslog_event(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fmt, str::FromStr};
+    use std::{fmt, str::FromStr};
     use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
@@ -460,6 +460,7 @@ mod test {
     use vector_lib::codecs::decoding::format::Deserializer;
     use vector_lib::lookup::PathPrefix;
     use vector_lib::{config::ComponentKey, schema::Definition};
+    use vector_util::HashMap;
     use vrl::value::{kind::Collection, Kind, ObjectMap, Value};
 
     use super::*;

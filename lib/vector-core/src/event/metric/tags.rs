@@ -607,6 +607,7 @@ impl ByteSizeOf for MetricTags {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_types)]
 mod test_support {
     use std::collections::HashSet;
 

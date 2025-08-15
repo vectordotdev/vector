@@ -177,7 +177,8 @@ impl fmt::Display for Discriminant {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{hash_map::DefaultHasher, HashMap};
+    use std::collections::hash_map::DefaultHasher;
+    use vector_util::HashMap;
 
     use super::*;
     use crate::event::LogEvent;

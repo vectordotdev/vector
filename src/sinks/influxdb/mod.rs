@@ -517,7 +517,7 @@ pub mod test_util {
     }
 
     pub(crate) async fn onboarding_v2(endpoint: &str) {
-        let mut body = std::collections::HashMap::new();
+        let mut body = HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
         body.insert("org", ORG);

@@ -877,6 +877,7 @@ mod integration_tests {
     use vector_lib::config::{LegacyKey, LogNamespace};
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
     use vector_lib::lookup::{owned_value_path, path};
+    use vector_util::HashMap;
 
     use crate::{
         config::SinkContext,
@@ -973,7 +974,7 @@ mod integration_tests {
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        let mut body = std::collections::HashMap::new();
+        let mut body = HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}\")", measure.clone()));
         body.insert("type", "flux".to_owned());
 

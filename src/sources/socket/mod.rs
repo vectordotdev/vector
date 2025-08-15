@@ -318,7 +318,6 @@ pub(crate) fn default_host_key() -> OptionalValuePath {
 mod test {
     use approx::assert_relative_eq;
     use std::{
-        collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -344,6 +343,7 @@ mod test {
     use vector_lib::codecs::{GelfDeserializerConfig, NewlineDelimitedDecoderConfig};
     use vector_lib::event::EventContainer;
     use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+    use vector_util::HashMap;
     use vrl::value::ObjectMap;
     use vrl::{btreemap, value};
 

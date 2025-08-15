@@ -189,6 +189,7 @@ impl FunctionExpression for ParseDnstapFn {
     }
 }
 
+#[allow(clippy::disallowed_types)]
 #[cfg(test)]
 mod tests {
     use super::*;
