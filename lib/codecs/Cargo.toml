@@ -11,20 +11,20 @@ path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
 apache-avro = { version = "0.16.0", default-features = false }
-bytes = { version = "1", default-features = false }
+bytes.workspace = true
 chrono.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
-derivative = { version = "2", default-features = false }
+derivative.workspace = true
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
+ordered-float.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
@@ -33,7 +33,7 @@ snafu.workspace = true
 syslog_loose = { version = "0.22", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio.workspace = true
-tracing = { version = "0.1", default-features = false }
+tracing.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }

@@ -12345,7 +12345,6 @@ dependencies = [
  "chrono",
  "colored",
  "futures 0.3.31",
- "futures-util",
  "glob",
  "portpicker",
  "serde_json",
