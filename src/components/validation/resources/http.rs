@@ -336,11 +336,11 @@ impl HttpResourceOutputContext<'_> {
                                     // entire payload which may contain multiple frames and their delimiters.
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
-                                            info!("HTTP server external output resource decoded {decoded_byte_size} bytes but test case configured to reject.");
+                                            info!(internal_log_rate_limit = true, "HTTP server external output resource decoded {decoded_byte_size:?} bytes but test case configured to reject.", );
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
-                                            info!("HTTP server external output resource decoded {decoded_byte_size} bytes.");
+                                            info!(internal_log_rate_limit = true, "HTTP server external output resource decoded {decoded_byte_size:?} bytes.");
 
                                             // Update the runner metrics for the received events. This will later
                                             // be used in the Validators, as the "expected" case.

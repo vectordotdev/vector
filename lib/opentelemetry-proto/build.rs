@@ -1,22 +1,28 @@
-use std::io::Error;
+use glob::glob;
+use std::{env, io::Result, path::PathBuf};
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
+    let proto_root = PathBuf::from("src/proto/opentelemetry-proto");
+    let include_path = proto_root.clone();
+
+    let proto_paths: Vec<_> = glob(&format!("{}/**/*.proto", proto_root.display()))
+        .expect("Failed to read glob pattern")
+        .filter_map(|result| result.ok())
+        .collect();
+
+    // Set up re-run triggers
+    for proto in &proto_paths {
+        println!("cargo:rerun-if-changed={}", proto.display());
+    }
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let descriptor_path = out_dir.join("opentelemetry-proto.desc");
+
     tonic_build::configure()
         .build_client(true)
         .build_server(true)
-        .compile(
-            &[
-                "src/proto/opentelemetry-proto/opentelemetry/proto/common/v1/common.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/resource/v1/resource.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/logs/v1/logs.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/metrics/v1/metrics.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/trace/v1/trace.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/collector/trace/v1/trace_service.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/collector/logs/v1/logs_service.proto",
-                "src/proto/opentelemetry-proto/opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
-            ],
-            &["src/proto/opentelemetry-proto"],
-        )?;
+        .file_descriptor_set_path(&descriptor_path)
+        .compile(&proto_paths, &[include_path])?;
 
     Ok(())
 }

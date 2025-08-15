@@ -18,7 +18,7 @@ use super::{
     config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
-    RedisEvent, RepairChannelSnafu,
+    RedisEvent, RedisRequest, RepairChannelSnafu,
 };
 
 pub(super) type GenerationCount = u64;
@@ -166,7 +166,10 @@ impl RedisConnection {
             if !repairing {
                 // Wait until a repair is needed
                 if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
-                    warn!("Connection state channel was dropped {error:?}.");
+                    warn!(
+                        internal_log_rate_limit = true,
+                        "Connection state channel was dropped {error:?}."
+                    );
                     continue;
                 }
 
@@ -189,7 +192,7 @@ impl RedisConnection {
                     }
                 }
                 Err(error) => {
-                    warn!("Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
+                    warn!(internal_log_rate_limit = true, "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
                     sleep(Duration::from_millis(250)).await;
                     continue;
                 }
@@ -377,6 +380,7 @@ pub(super) struct RedisRetryLogic {
 
 impl RetryLogic for RedisRetryLogic {
     type Error = RedisSinkError;
+    type Request = RedisRequest;
     type Response = RedisResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -396,7 +400,7 @@ impl RetryLogic for RedisRetryLogic {
         }
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         if response.is_successful() {
             RetryAction::Successful
         } else {
