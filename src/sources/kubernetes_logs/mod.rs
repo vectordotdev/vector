@@ -1200,7 +1200,7 @@ mod tests {
         "#;
         let config: Config = toml::from_str(toml_config).unwrap();
         assert_eq!(config.add_namespace_fields, false);
-        
+
         let default_toml = "";
         let default_config: Config = toml::from_str(default_toml).unwrap();
         assert_eq!(default_config.add_namespace_fields, true);
@@ -1218,13 +1218,13 @@ mod tests {
             add_namespace_fields: false,
             ..Default::default()
         };
-        
+
         // The main validation is that the flag is passed through correctly
         // and can be used in conditional logic
         assert!(should_watch_namespaces(&enabled_config));
         assert!(!should_watch_namespaces(&disabled_config));
     }
-    
+
     // Helper function to simulate the conditional logic from the run method
     fn should_watch_namespaces(config: &Config) -> bool {
         config.add_namespace_fields
