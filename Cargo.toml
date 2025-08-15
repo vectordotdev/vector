@@ -174,7 +174,7 @@ prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11.26", default-features = false, features = ["default-tls", "charset", "http2", "system-proxy", "json"] }
+reqwest = { version = "0.11.26", features = ["json"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.142", default-features = false, features = ["raw_value", "std"] }
