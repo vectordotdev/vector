@@ -15,4 +15,4 @@ prost-types.workspace = true
 chrono.workspace = true
 
 [build-dependencies]
-prost-build .workspace = true
+prost-build.workspace = true
