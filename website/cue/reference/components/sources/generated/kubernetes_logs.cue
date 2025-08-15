@@ -7,6 +7,8 @@ generated: components: sources: kubernetes_logs: configuration: {
 
 			This can be useful to make Vector not pull in namespaces to reduce load on
 			kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
+			In the case that this is set to `false`, fields based on namespace labels will not
+			be available.
 			"""
 		required: false
 		type: bool: default: true

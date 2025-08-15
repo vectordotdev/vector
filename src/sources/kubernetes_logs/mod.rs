@@ -111,7 +111,10 @@ pub struct Config {
     ///
     /// This can be useful to make Vector not pull in namespaces to reduce load on
     /// kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
+    /// In the case that this is set to `false`, fields based on namespace labels will not
+    /// be available.
     ///
+    #[serde(default = "default_add_namespace_fields")]
     add_namespace_fields: bool,
 
     /// The name of the Kubernetes [Node][node] that is running.
@@ -1056,6 +1059,11 @@ const fn default_max_read_bytes() -> usize {
 // We'd like to consume rotated pod log files first to release our file handle and let
 // the space be reclaimed
 const fn default_oldest_first() -> bool {
+    true
+}
+
+// We'd like to add these in all but clusters with very many namespaces
+const fn default_add_namespace_fields() -> bool {
     true
 }
 
