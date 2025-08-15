@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc, time::Instant};
+use std::{fmt, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
@@ -24,6 +24,7 @@ use vector_lib::{
     },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 use vrl::value::Value;
 
 mod errors;

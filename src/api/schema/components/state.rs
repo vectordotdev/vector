@@ -1,7 +1,5 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, LazyLock, RwLock},
-};
+use std::sync::{Arc, LazyLock, RwLock};
+use vector_util::{HashMap, HashSet};
 
 use super::{sink, source, transform, Component};
 use crate::config::{ComponentKey, OutputId};

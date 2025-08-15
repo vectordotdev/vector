@@ -3,7 +3,7 @@
 #![deny(missing_docs)]
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::hash_map::Entry,
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
@@ -16,6 +16,7 @@ use pin_project::pin_project;
 use regex::bytes::Regex;
 use tokio_util::time::delay_queue::{DelayQueue, Key};
 use vector_lib::configurable::configurable_component;
+use vector_util::HashMap;
 
 /// Mode of operation of the line aggregator.
 #[configurable_component]

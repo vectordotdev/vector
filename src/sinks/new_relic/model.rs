@@ -1,14 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-    fmt::Debug,
-};
+use std::{collections::BTreeMap, convert::TryFrom, fmt::Debug};
 
 use chrono::Utc;
 use ordered_float::NotNan;
 use serde::Serialize;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
 use vector_lib::{config::log_schema, event::ObjectMap};
+use vector_util::HashMap;
 use vrl::event_path;
 
 use super::NewRelicSinkError;
@@ -176,6 +173,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                 if let Some(message) = log.get(event_path!("message")) {
                     let message = message.to_string_lossy().replace("\\\"", "\"");
                     // If message contains a JSON string, parse it and insert all fields into self
+                    #[allow(clippy::disallowed_types)]
                     if let serde_json::Result::Ok(json_map) =
                         serde_json::from_str::<HashMap<String, serde_json::Value>>(&message)
                     {

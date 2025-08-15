@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use bytes::Bytes;
 use chrono::{DateTime, Timelike, Utc};
@@ -165,11 +165,33 @@ where
 
 /// JSON only support string keys, so `K` is constrained to anything that can be converted into a
 /// `str`.
-impl<K, V, S> EstimatedJsonEncodedSizeOf for HashMap<K, V, S>
+#[allow(clippy::disallowed_types)]
+impl<K, V, S> EstimatedJsonEncodedSizeOf for std::collections::HashMap<K, V, S>
 where
     K: AsRef<str>,
     V: EstimatedJsonEncodedSizeOf,
     S: ::std::hash::BuildHasher,
+{
+    fn estimated_json_encoded_size_of(&self) -> JsonSize {
+        let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
+            acc + k.as_ref().estimated_json_encoded_size_of().get()
+                + COLON_SIZE
+                + v.estimated_json_encoded_size_of().get()
+                + COMMA_SIZE
+        });
+
+        JsonSize::new(if size > BRACES_SIZE {
+            size - COMMA_SIZE
+        } else {
+            size
+        })
+    }
+}
+
+impl<K, V> EstimatedJsonEncodedSizeOf for vector_util::HashMap<K, V>
+where
+    K: AsRef<str>,
+    V: EstimatedJsonEncodedSizeOf,
 {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
         let size = self.iter().fold(BRACES_SIZE, |acc, (k, v)| {
@@ -444,8 +466,6 @@ impl EstimatedJsonEncodedSizeOf for isize {
 mod tests {
     #![allow(clippy::needless_pass_by_value)]
 
-    use vector_util::HashMap;
-
     use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
@@ -617,8 +637,9 @@ mod tests {
         got == want.len().into()
     }
 
+    #[allow(clippy::disallowed_types)]
     #[quickcheck]
-    fn estimate_map(v: HashMap<ValidString, bool>) -> TestResult {
+    fn estimate_map(v: std::collections::HashMap<ValidString, bool>) -> TestResult {
         let got = v.estimated_json_encoded_size_of();
         let want = serde_json::to_string(&v).unwrap();
 

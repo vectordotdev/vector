@@ -16,6 +16,7 @@ prost.workspace = true
 snafu.workspace = true
 tracing = { version = "0.1.34", default-features = false }
 vector-lib = { path = "../vector-lib" }
+vector-util.workspace = true
 vrl.workspace = true
 paste.workspace = true
 

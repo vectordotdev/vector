@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     convert::TryInto,
     fmt::Debug,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -17,6 +16,7 @@ use hickory_proto::{
 };
 use prost::Message;
 use snafu::Snafu;
+use vector_util::HashSet;
 use vrl::{owned_value_path, path};
 
 use vector_lib::{

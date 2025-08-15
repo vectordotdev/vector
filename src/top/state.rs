@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use chrono::{DateTime, Local};
 use ratatui::{
@@ -10,6 +7,7 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 use vector_lib::internal_event::DEFAULT_OUTPUT;
+use vector_util::HashMap;
 
 use crate::config::ComponentKey;
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     future::Future,
     net::{IpAddr, SocketAddr},
     str::FromStr,
@@ -29,6 +29,7 @@ use vector_lib::{
     codecs::CharacterDelimitedEncoder, config::LogNamespace, event::Event,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 
 use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 

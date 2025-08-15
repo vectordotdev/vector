@@ -1,5 +1,6 @@
-use std::{borrow::Cow, collections::HashMap, fmt};
+use std::{borrow::Cow, fmt};
 use vector_lib::config::LegacyKey;
+use vector_util::HashMap;
 
 use crate::{
     conditions::Condition,

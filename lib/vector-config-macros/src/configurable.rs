@@ -175,7 +175,7 @@ fn build_enum_generate_schema_fn(
     quote! {
         fn generate_schema(schema_gen: &::std::cell::RefCell<::vector_config::schema::SchemaGenerator>) -> std::result::Result<::vector_config::schema::SchemaObject, ::vector_config::GenerateError> {
             let mut subschemas = ::std::vec::Vec::new();
-            let mut discriminant_map = ::std::collections::HashMap::new();
+            let mut discriminant_map = ::vector_util::HashMap::new();
 
             #(#mapped_variants)*
 

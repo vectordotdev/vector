@@ -1,5 +1,5 @@
 //! Shared authentication config between components that use HTTP.
-use std::{collections::HashMap, fmt, net::SocketAddr};
+use std::{fmt, net::SocketAddr};
 
 use bytes::Bytes;
 use headers::{authorization::Credentials, Authorization};
@@ -15,6 +15,7 @@ use vector_lib::{
     sensitive_string::SensitiveString,
     TimeZone,
 };
+use vector_util::HashMap;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, CompileConfig, Program},
     core::Value,

@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_types)] // Usage of std::collections::HashMap with custom random state
 //! Handles enrichment tables for `type = file`.
 use std::{fs, hash::Hasher, path::PathBuf, time::SystemTime};
 

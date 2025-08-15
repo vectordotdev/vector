@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_types)]
 use std::{collections::HashSet, env, fs::File, io::Write, path::Path, process::Command};
 
 struct TrackedEnv {

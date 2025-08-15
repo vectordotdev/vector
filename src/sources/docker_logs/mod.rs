@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_types)] // External types expect std's HashMap
+
 use std::sync::{Arc, LazyLock};
 use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
 

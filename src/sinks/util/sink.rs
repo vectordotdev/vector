@@ -32,7 +32,6 @@
 //! it to notify the consumer that the request has succeeded.
 
 use std::{
-    collections::HashMap,
     fmt,
     hash::Hash,
     marker::PhantomData,
@@ -51,6 +50,7 @@ use tracing::Instrument;
 use vector_lib::internal_event::{
     CallError, CountByteSize, EventsSent, InternalEventHandle as _, Output,
 };
+use vector_util::HashMap;
 // === StreamSink<Event> ===
 pub use vector_lib::sink::StreamSink;
 

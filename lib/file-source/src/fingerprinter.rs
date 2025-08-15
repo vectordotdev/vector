@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fs::{self, metadata, File},
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
@@ -10,6 +9,7 @@ use crc::Crc;
 use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
 use vector_common::constants::GZIP_MAGIC;
+use vector_util::HashMap;
 
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 
@@ -385,7 +385,6 @@ fn fingerprinter_read_until(
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashMap,
         fs,
         io::{Error, Read, Write},
         path::Path,
@@ -397,6 +396,7 @@ mod test {
     use tempfile::{tempdir, TempDir};
 
     use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use vector_util::HashMap;
 
     fn gzip(data: &mut [u8]) -> Vec<u8> {
         let mut buffer = vec![];

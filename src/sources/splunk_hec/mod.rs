@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     convert::Infallible,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
@@ -34,6 +33,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
+use vector_util::HashMap;
 use vrl::path::OwnedTargetPath;
 use vrl::value::{kind::Collection, Kind};
 use warp::http::header::{HeaderValue, CONTENT_TYPE};

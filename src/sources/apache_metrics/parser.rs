@@ -1,6 +1,7 @@
-use std::{collections::HashMap, error, fmt, iter, num, sync::LazyLock};
+use std::{error, fmt, iter, num, sync::LazyLock};
 
 use chrono::{DateTime, Utc};
+use vector_util::HashMap;
 
 use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue};
 

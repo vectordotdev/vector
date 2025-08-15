@@ -3,15 +3,12 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
-use std::{
-    cmp,
-    collections::{HashMap, HashSet},
-    sync::LazyLock,
-};
+use std::{cmp, sync::LazyLock};
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_lib::internal_event::DEFAULT_OUTPUT;
+use vector_util::{HashMap, HashSet};
 
 use crate::{
     api::schema::{

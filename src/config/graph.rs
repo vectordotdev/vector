@@ -3,8 +3,9 @@ use super::{
     TransformOutput, WildcardMatching,
 };
 use indexmap::{set::IndexSet, IndexMap};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::fmt;
+use vector_util::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub enum Node {

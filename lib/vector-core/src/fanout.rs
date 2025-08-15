@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, task::Poll, time::Instant};
+use std::{fmt, task::Poll, time::Instant};
 
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_buffers::topology::channel::BufferSender;
+use vector_util::HashMap;
 
 use crate::{config::ComponentKey, event::EventArray};
 

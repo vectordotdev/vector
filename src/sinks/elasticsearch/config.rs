@@ -1,10 +1,8 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-};
+use std::{collections::BTreeMap, convert::TryFrom};
 
 use futures::{FutureExt, TryFutureExt};
 use vector_lib::configurable::configurable_component;
+use vector_util::HashMap;
 
 use crate::{
     codecs::Transformer,

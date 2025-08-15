@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_types)] // External types expect std's HashMap
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{

@@ -1,12 +1,9 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeSet, HashMap},
-    env, mem,
-};
+use std::{cell::RefCell, collections::BTreeSet, env, mem};
 
 use indexmap::IndexMap;
 use serde_json::{Map, Value};
 use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
+use vector_util::HashMap;
 
 use crate::{
     num::ConfigurableNumber, Configurable, ConfigurableRef, GenerateError, Metadata, ToValue,

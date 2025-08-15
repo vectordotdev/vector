@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use aws_sdk_s3::{
     operation::put_object::PutObjectError,
@@ -12,6 +12,7 @@ use aws_smithy_runtime_api::{
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
+use vector_util::HashMap;
 
 use super::service::{S3Request, S3Response, S3Service};
 use crate::{

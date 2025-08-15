@@ -1,8 +1,10 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use async_stream::stream;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
+
+use vector_util::HashSet;
 
 use super::{
     filter_output_metric, OutputThroughput, ReceivedBytesTotal, ReceivedEventsTotal,

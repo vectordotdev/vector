@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
@@ -22,6 +21,7 @@ use vector_common::{
     request_metadata::GetEventCountTags,
     EventDataEq,
 };
+use vector_util::HashMap;
 use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
 use vrl::{event_path, owned_value_path};
 

@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use glob::Pattern;
 use tokio::task::JoinHandle;
@@ -10,6 +7,7 @@ use vector_lib::api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };
+use vector_util::HashMap;
 
 use super::state::{self, OutputMetrics};
 use crate::{config::ComponentKey, top::state::SentEventsMetric};

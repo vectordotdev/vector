@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     num::{NonZeroU64, NonZeroU8},
     sync::Arc,
     time::Duration,
@@ -10,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::EventStatus;
+use vector_util::HashMap;
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{

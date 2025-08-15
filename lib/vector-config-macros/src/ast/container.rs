@@ -2,14 +2,14 @@
 // https://github.com/TedDriggs/darling/issues/293
 #![allow(clippy::manual_unwrap_or_default)]
 
-use std::collections::HashSet;
-
 use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
 use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
+
+use vector_util::HashSet;
 
 use super::{
     util::{

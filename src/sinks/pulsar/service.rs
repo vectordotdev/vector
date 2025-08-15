@@ -102,6 +102,7 @@ impl<Exe: Executor> Service<PulsarRequest> for PulsarService<Exe> {
             let body = request.body.clone();
             let byte_size = request.body.len();
 
+            #[allow(clippy::disallowed_types)]
             let mut properties = std::collections::HashMap::new();
             if let Some(props) = request.metadata.properties {
                 for (key, value) in props {

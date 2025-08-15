@@ -9,6 +9,7 @@ use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use crate::transforms::Transform;
 use std::hash::{Hash, Hasher};
 use vector_lib::config::clone_input_definitions;
+use vector_util::HashMap;
 
 pub(super) const UNMATCHED_ROUTE: &str = "_unmatched";
 
@@ -99,7 +100,7 @@ impl TransformConfig for ExclusiveRouteConfig {
     fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        let mut counts = std::collections::HashMap::new();
+        let mut counts = HashMap::new();
         for route in &self.routes {
             *counts.entry(route.name.clone()).or_insert(0) += 1;
         }

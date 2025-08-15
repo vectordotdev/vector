@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    num::NonZeroUsize,
-};
+use std::num::NonZeroUsize;
 
 use futures::{future::try_join_all, FutureExt};
 use tokio::sync::{
@@ -15,6 +12,7 @@ use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
 use vector_common::config::ComponentKey;
 use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
 use vector_core::fanout;
+use vector_util::{HashMap, HashSet};
 
 use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
 use crate::topology::{TapOutput, TapResource, WatchRx};

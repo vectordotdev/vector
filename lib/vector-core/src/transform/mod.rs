@@ -1,10 +1,11 @@
-use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
+use std::{error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
     self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
 };
 use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
+use vector_util::HashMap;
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;

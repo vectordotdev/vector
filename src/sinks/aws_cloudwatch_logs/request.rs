@@ -301,7 +301,10 @@ impl Client {
                 .create_log_group()
                 .log_group_name(group_name)
                 .set_kms_key_id(kms_key)
-                .set_tags(tags.map(|t| std::collections::HashMap::from_iter(t.into_iter())))
+                .set_tags(tags.map(|t| {
+                    #[allow(clippy::disallowed_types)]
+                    std::collections::HashMap::from_iter(t.into_iter())
+                }))
                 .send()
                 .await?;
             Ok(())

@@ -1,6 +1,6 @@
 use std::{
     cmp,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
@@ -16,6 +16,8 @@ use futures::{
 use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
+
+use vector_util::HashMap;
 
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},

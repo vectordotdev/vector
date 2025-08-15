@@ -14,6 +14,7 @@ use bollard::{
 use futures::StreamExt;
 use http::uri::Uri;
 use snafu::Snafu;
+#[allow(clippy::disallowed_types)]
 use std::collections::HashMap;
 use vector_lib::configurable::configurable_component;
 
@@ -107,6 +108,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
         .ok_or(Error::NoHost)
 }
 
+#[allow(clippy::disallowed_types)]
 async fn pull_image(docker: &Docker, image: &str, tag: &str) {
     let mut filters = HashMap::new();
     filters.insert(

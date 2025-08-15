@@ -14,6 +14,7 @@ quote = { version = "1.0", default-features = false }
 serde_derive_internals = "0.29"
 syn = { version = "2.0", default-features = false, features = ["full", "extra-traits", "visit-mut", "visit"] }
 vector-config-common = { path = "../vector-config-common" }
+vector-util.workspace = true
 
 [dev-dependencies]
 serde.workspace = true

@@ -12,7 +12,7 @@ fn main() -> Result<()> {
             "proto/logproto.proto",
             "proto/push.proto",
         ],
-        &["vector_util::HashMap", "proto", "../../proto/third-party"],
+        &["proto", "../../proto/third-party"],
     )?;
     Ok(())
 }

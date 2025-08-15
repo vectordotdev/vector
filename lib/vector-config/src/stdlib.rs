@@ -336,6 +336,7 @@ where
     }
 }
 
+#[allow(clippy::disallowed_types)]
 impl<K, V> ToValue for std::collections::HashMap<K, V>
 where
     K: ToString,

@@ -1,5 +1,6 @@
+#![allow(clippy::disallowed_types)] // Usage of std::collections::HashMap with custom random state
+
 use std::{
-    collections::HashMap,
     hash::{BuildHasherDefault, Hash},
     num::NonZeroUsize,
     pin::Pin,
@@ -13,6 +14,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use twox_hash::XxHash64;
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{partition::Partitioner, time::KeyedTimer};
+use vector_util::HashMap;
 
 use crate::batcher::{
     config::BatchConfigParts,
@@ -189,7 +191,7 @@ where
     state: F,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
-    batches: HashMap<Prt::Key, C, BuildHasherDefault<XxHash64>>,
+    batches: std::collections::HashMap<Prt::Key, C, BuildHasherDefault<XxHash64>>,
     /// The store of 'closed' batches. When this is not empty it will be
     /// preferentially flushed prior to consuming any new items from the
     /// underlying stream.
@@ -216,7 +218,7 @@ where
         let timeout = settings().timeout();
         Self {
             state: settings,
-            batches: HashMap::default(),
+            batches: std::collections::HashMap::default(),
             closed_batches: Vec::default(),
             timer: ExpirationQueue::new(timeout),
             partitioner,
@@ -238,7 +240,7 @@ where
     pub fn with_timer(stream: St, partitioner: Prt, timer: KT, settings: F) -> Self {
         Self {
             state: settings,
-            batches: HashMap::default(),
+            batches: std::collections::HashMap::default(),
             closed_batches: Vec::default(),
             timer,
             partitioner,

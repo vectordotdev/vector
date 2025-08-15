@@ -3245,6 +3245,7 @@ dependencies = [
  "snafu 0.8.6",
  "tracing 0.1.41",
  "vector-lib",
+ "vector-util",
  "vrl",
 ]
 
@@ -12214,6 +12215,7 @@ dependencies = [
  "syn 2.0.104",
  "vector-config",
  "vector-config-common",
+ "vector-util",
 ]
 
 [[package]]
@@ -12346,6 +12348,7 @@ dependencies = [
  "twox-hash",
  "vector-common",
  "vector-core",
+ "vector-util",
 ]
 
 [[package]]

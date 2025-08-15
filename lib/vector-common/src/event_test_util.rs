@@ -1,5 +1,6 @@
+use std::cell::RefCell;
 use std::fmt::Write as _;
-use std::{cell::RefCell, collections::HashSet};
+use vector_util::HashSet;
 
 thread_local! {
     /// A buffer for recording internal events emitted by a single test.

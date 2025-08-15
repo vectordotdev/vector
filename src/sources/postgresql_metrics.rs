@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fmt::Write as _,
     iter,
     path::PathBuf,
@@ -32,6 +31,7 @@ use vector_lib::{
     json_size::JsonSize,
 };
 use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_util::HashSet;
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
