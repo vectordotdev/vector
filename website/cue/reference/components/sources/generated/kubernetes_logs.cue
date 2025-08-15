@@ -1,6 +1,16 @@
 package metadata
 
 generated: components: sources: kubernetes_logs: configuration: {
+	add_namespace_fields: {
+		description: """
+			Specifies whether or not to enrich with namespace fields.
+
+			This can be useful to make Vector not pull in namespaces to reduce load on
+			kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	auto_partial_merge: {
 		description: """
 			Whether or not to automatically merge partial events.
