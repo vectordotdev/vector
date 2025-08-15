@@ -32,7 +32,7 @@ smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
 syslog_loose = { version = "0.22", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
-tokio.workspace = true
+tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
@@ -43,7 +43,7 @@ vector-core = { path = "../vector-core", default-features = false, features = ["
 [dev-dependencies]
 futures.workspace = true
 indoc.workspace = true
-tokio = { version = "1", features = ["test-util"] }
+tokio = { workspace = true, features = ["test-util"] }
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"

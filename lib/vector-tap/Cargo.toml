@@ -15,7 +15,7 @@ colored.workspace = true
 futures.workspace = true
 glob.workspace = true
 serde_yaml.workspace = true
-tokio = { version = "1.45.1", default-features = false, features = ["time"] }
+tokio = { workspace = true, features = ["time"] }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["sync"] }
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 tracing.workspace = true
@@ -30,4 +30,4 @@ vector-buffers = { path = "../vector-buffers" }
 chrono = { workspace = true }
 portpicker = { path = "../portpicker" }
 serde_json = { workspace = true }
-tokio = { version = "1.45.1", default-features = false, features = ["test-util"] }
+tokio = { workspace = true, features = ["test-util"] }

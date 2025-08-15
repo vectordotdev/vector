@@ -182,7 +182,7 @@ serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.6", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.20.0"
-tokio = { version = "1.45.1", default-features = false, features = ["full"] }
+tokio = { version = "1.45.1", default-features = false }
 toml = { version = "0.9.4", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -225,7 +225,7 @@ loki-logproto = { path = "lib/loki-logproto", optional = true }
 async-stream.workspace = true
 async-trait.workspace = true
 futures.workspace = true
-tokio = { version = "1.45.1", default-features = false, features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 tokio-openssl = { version = "0.6.5", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -463,7 +463,7 @@ reqwest.workspace = true
 rstest = { version = "0.26.1" }
 tempfile.workspace = true
 test-generator = "0.3.1"
-tokio = { version = "1.45.1", features = ["test-util"] }
+tokio = { workspace = true, features = ["test-util"] }
 tokio-test = "0.4.4"
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }

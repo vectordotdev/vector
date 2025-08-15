@@ -10,7 +10,7 @@ async-stream.workspace = true
 futures.workspace = true
 futures-util.workspace = true
 pin-project.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["full"] }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
 tracing.workspace = true
