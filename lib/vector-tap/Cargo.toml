@@ -27,7 +27,4 @@ vector-core = { path = "../vector-core" }
 vector-buffers = { path = "../vector-buffers" }
 
 [dev-dependencies]
-chrono = { workspace = true }
-portpicker = { path = "../portpicker" }
-serde_json = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
