@@ -1,7 +1,7 @@
-use vector_util::HashMap;
 use std::io::{self, Read};
 use std::net::SocketAddr;
 use std::time::Duration;
+use vector_util::HashMap;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use bytes::{Buf, Bytes, BytesMut};

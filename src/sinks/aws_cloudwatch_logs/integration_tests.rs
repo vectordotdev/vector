@@ -1,5 +1,5 @@
-use vector_util::HashMap;
 use std::convert::TryFrom;
+use vector_util::HashMap;
 
 use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;

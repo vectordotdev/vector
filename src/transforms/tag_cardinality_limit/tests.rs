@@ -1,5 +1,5 @@
-use vector_util::HashMap;
 use std::sync::Arc;
+use vector_util::HashMap;
 
 use config::PerMetricConfig;
 use vector_lib::config::ComponentKey;

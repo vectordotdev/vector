@@ -2,8 +2,8 @@
 //! The container configuration file is `docker-compose.http_client.yml`
 //! It leverages a static file server ("dufs"), which serves the files in tests/data/http-client
 
-use vector_util::HashMap;
 use tokio::time::{Duration, Instant};
+use vector_util::HashMap;
 
 use crate::sources::util::http::HttpMethod;
 use crate::{

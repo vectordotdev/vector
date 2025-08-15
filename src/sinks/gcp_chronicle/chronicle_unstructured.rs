@@ -12,7 +12,6 @@ use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use vector_util::HashMap;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
@@ -24,6 +23,7 @@ use vector_lib::{
     sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
 };
+use vector_util::HashMap;
 use vrl::value::Kind;
 
 use crate::sinks::util::service::TowerRequestConfigDefaults;

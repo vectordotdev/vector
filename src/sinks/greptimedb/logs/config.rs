@@ -16,12 +16,12 @@ use crate::{
         util::http::HttpService,
     },
 };
-use vector_util::HashMap;
 use vector_lib::{
     codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig},
     configurable::configurable_component,
     sensitive_string::SensitiveString,
 };
+use vector_util::HashMap;
 
 fn extra_params_examples() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([("source".to_owned(), "vector".to_owned())])

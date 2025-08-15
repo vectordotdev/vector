@@ -5,7 +5,6 @@ use derivative::Derivative;
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snafu::{ensure, ResultExt, Snafu};
 use std::any::Any;
-use vector_util::HashMap;
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -15,6 +14,7 @@ use tokio_util::codec::Decoder;
 use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
 use vector_config::configurable_component;
+use vector_util::HashMap;
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;

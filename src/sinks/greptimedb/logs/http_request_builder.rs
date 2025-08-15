@@ -16,8 +16,8 @@ use http::{
 };
 use hyper::Body;
 use snafu::ResultExt;
-use vector_util::HashMap;
 use vector_lib::codecs::encoding::Framer;
+use vector_util::HashMap;
 
 /// Partition key for GreptimeDB logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]

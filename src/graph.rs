@@ -1,6 +1,6 @@
-use vector_util::HashMap;
 use std::fmt::Write as _;
 use std::path::PathBuf;
+use vector_util::HashMap;
 
 use clap::Parser;
 use itertools::Itertools;

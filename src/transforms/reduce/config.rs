@@ -1,6 +1,6 @@
-use vector_util::HashMap;
 use std::num::NonZeroUsize;
 use std::time::Duration;
+use vector_util::HashMap;
 
 use indexmap::IndexMap;
 use serde_with::serde_as;

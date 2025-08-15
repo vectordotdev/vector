@@ -2,11 +2,11 @@
 
 use bytes::BytesMut;
 use futures::{Stream, StreamExt};
-use vector_util::HashMap;
 use std::time::{Duration, Instant};
 use vector_lib::config::LogNamespace;
 use vector_lib::lookup::OwnedTargetPath;
 use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
+use vector_util::HashMap;
 use vrl::owned_value_path;
 
 use crate::event;

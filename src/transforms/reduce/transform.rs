@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
-use vector_util::HashMap;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
+use vector_util::HashMap;
 
 use crate::internal_events::ReduceAddEventError;
 use crate::transforms::reduce::merge_strategy::{

@@ -47,10 +47,10 @@
 //! observed, to build a complete picture that allows deciding if a given metric has gone "idle" or
 //! not, and thus whether it should actually be deleted.
 
-use vector_util::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use vector_util::HashMap;
 
 use metrics::{atomics::AtomicU64, Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
 use metrics_util::{

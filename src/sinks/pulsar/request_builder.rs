@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use vector_util::HashMap;
 use std::io;
+use vector_util::HashMap;
 
 use crate::event::KeyString;
 use crate::sinks::{

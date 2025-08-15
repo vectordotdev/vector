@@ -1,5 +1,4 @@
 use crate::config::{ComponentConfig, ComponentType};
-use vector_util::HashMap;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
@@ -8,6 +7,7 @@ use std::{
     sync::mpsc::{channel, Receiver},
     thread,
 };
+use vector_util::HashMap;
 
 use notify::{recommended_watcher, EventKind, RecursiveMode};
 
