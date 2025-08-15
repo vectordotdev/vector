@@ -204,8 +204,9 @@ mod tests {
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
+    use std::{fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
+    use vector_util::HashSet;
 
     async fn test_signal(
         file: &mut File,
