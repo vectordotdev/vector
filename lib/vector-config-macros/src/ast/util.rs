@@ -218,14 +218,16 @@ fn find_name_value_attribute(
         // Only take attributes whose name matches `attr_name`.
         .filter(|attr| path_matches(attr.path(), attr_name))
         // Derive macro helper attributes will always be in the list form.
-        .filter_map(|attr| match &attr.meta {
+        .flat_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
                 .map(|nested| nested.into_iter())
-                .ok(),
-            _ => None,
+                // If parsing fails, return an empty iterator. By this point, `serde` has already
+                // emitted its own error, so we don't want to duplicate any error emission here.
+                .unwrap_or_else(|_| Punctuated::<NestedMeta, Comma>::new().into_iter()),
+            // Non-list attributes cannot contain nested meta items; return empty iterator.
+            _ => Punctuated::<NestedMeta, Comma>::new().into_iter(),
         })
-        .flatten()
         // For each nested meta item in the list, find any that are name/value pairs where the
         // name matches `name_key`, and return their value.
         .find_map(|nm| match nm {
@@ -238,6 +240,29 @@ fn find_name_value_attribute(
             },
             _ => None,
         })
+}
+
+/// Checks whether an attribute list contains a flag-style entry.
+///
+/// For example, this returns true when `attributes` contains something like `#[serde(untagged)]`
+/// when called with `attr_name = "serde"` and `flag_name = "untagged"`.
+pub(crate) fn has_flag_attribute(
+    attributes: &[syn::Attribute],
+    attr_name: &str,
+    flag_name: &str,
+) -> bool {
+    attributes
+        .iter()
+        .filter(|attr| path_matches(attr.path(), attr_name))
+        .filter_map(|attr| match &attr.meta {
+            Meta::List(ml) => ml
+                .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
+                .map(|nested| nested.into_iter())
+                .ok(),
+            _ => None,
+        })
+        .flatten()
+        .any(|nm| matches!(nm, NestedMeta::Meta(Meta::Path(ref path)) if path_matches(path, flag_name)))
 }
 
 /// Tries to find a delegated (de)serialization type from attributes.
