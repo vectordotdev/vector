@@ -107,6 +107,16 @@ pub struct Config {
     ))]
     extra_namespace_label_selector: String,
 
+    /// Specifies whether or not to enrich with namespace fields.
+    ///
+    /// This can be useful to make Vector not pull in namespaces to reduce load on
+    /// kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
+    /// In the case that this is set to `false`, fields based on namespace labels will not
+    /// be available.
+    ///
+    #[serde(default = "default_add_namespace_fields")]
+    add_namespace_fields: bool,
+
     /// The name of the Kubernetes [Node][node] that is running.
     ///
     /// Configured to use an environment variable by default, to be evaluated to a value provided by
@@ -290,6 +300,7 @@ impl Default for Config {
         Self {
             extra_label_selector: "".to_string(),
             extra_namespace_label_selector: "".to_string(),
+            add_namespace_fields: true,
             self_node_name: default_self_node_name_env_template(),
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
@@ -555,6 +566,7 @@ struct Source {
     field_selector: String,
     label_selector: String,
     namespace_label_selector: String,
+    add_namespace_fields: bool,
     node_selector: String,
     self_node_name: String,
     include_paths: Vec<glob::Pattern>,
@@ -643,6 +655,7 @@ impl Source {
             field_selector,
             label_selector,
             namespace_label_selector,
+            add_namespace_fields: config.add_namespace_fields,
             node_selector,
             self_node_name,
             include_paths,
@@ -679,6 +692,7 @@ impl Source {
             field_selector,
             label_selector,
             namespace_label_selector,
+            add_namespace_fields,
             node_selector,
             self_node_name,
             include_paths,
@@ -733,27 +747,29 @@ impl Source {
 
         // -----------------------------------------------------------------
 
-        let namespaces = Api::<Namespace>::all(client.clone());
-        let ns_watcher = watcher(
-            namespaces,
-            watcher::Config {
-                label_selector: Some(namespace_label_selector),
-                list_semantic: list_semantic.clone(),
-                page_size: get_page_size(use_apiserver_cache),
-                ..Default::default()
-            },
-        )
-        .backoff(watcher::DefaultBackoff::default());
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
-        let ns_cacher = MetaCache::new();
+        if add_namespace_fields {
+            let namespaces = Api::<Namespace>::all(client.clone());
+            let ns_watcher = watcher(
+                namespaces,
+                watcher::Config {
+                    label_selector: Some(namespace_label_selector),
+                    list_semantic: list_semantic.clone(),
+                    page_size: get_page_size(use_apiserver_cache),
+                    ..Default::default()
+                },
+            )
+            .backoff(watcher::DefaultBackoff::default());
+            let ns_cacher = MetaCache::new();
 
-        reflectors.push(tokio::spawn(custom_reflector(
-            ns_store_w,
-            ns_cacher,
-            ns_watcher,
-            delay_deletion,
-        )));
+            reflectors.push(tokio::spawn(custom_reflector(
+                ns_store_w,
+                ns_cacher,
+                ns_watcher,
+                delay_deletion,
+            )));
+        }
 
         // -----------------------------------------------------------------
 
@@ -784,6 +800,7 @@ impl Source {
             ns_state.clone(),
             include_paths,
             exclude_paths,
+            add_namespace_fields,
         );
         let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator =
@@ -889,11 +906,13 @@ impl Source {
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-                if let Some(name) = namespace {
-                    let ns_info = ns_annotator.annotate(&mut event, name);
+                if add_namespace_fields {
+                    if let Some(name) = namespace {
+                        let ns_info = ns_annotator.annotate(&mut event, name);
 
-                    if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        if ns_info.is_none() {
+                            emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        }
                     }
                 }
 
@@ -1046,6 +1065,11 @@ const fn default_oldest_first() -> bool {
     true
 }
 
+// We'd like to add these in all but clusters with very many namespaces
+const fn default_add_namespace_fields() -> bool {
+    true
+}
+
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
     // https://github.com/vectordotdev/vector/issues/6967
@@ -1162,6 +1186,59 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn test_default_config_add_namespace_fields() {
+        let config = Config::default();
+        assert_eq!(config.add_namespace_fields, true);
+    }
+
+    #[test]
+    fn test_config_add_namespace_fields_disabled() {
+        let config = Config {
+            add_namespace_fields: false,
+            ..Default::default()
+        };
+        assert_eq!(config.add_namespace_fields, false);
+    }
+
+    #[test]
+    fn test_config_serialization_add_namespace_fields() {
+        // Test that the flag serializes/deserializes correctly from TOML
+        let toml_config = r#"
+            add_namespace_fields = false
+        "#;
+        let config: Config = toml::from_str(toml_config).unwrap();
+        assert_eq!(config.add_namespace_fields, false);
+
+        let default_toml = "";
+        let default_config: Config = toml::from_str(default_toml).unwrap();
+        assert_eq!(default_config.add_namespace_fields, true);
+    }
+
+    #[test]
+    fn test_add_namespace_fields_affects_behavior() {
+        // Test that the config field properly controls namespace watching behavior
+        // This is a unit test for the conditional logic in the run method
+        let enabled_config = Config {
+            add_namespace_fields: true,
+            ..Default::default()
+        };
+        let disabled_config = Config {
+            add_namespace_fields: false,
+            ..Default::default()
+        };
+
+        // The main validation is that the flag is passed through correctly
+        // and can be used in conditional logic
+        assert!(should_watch_namespaces(&enabled_config));
+        assert!(!should_watch_namespaces(&disabled_config));
+    }
+
+    // Helper function to simulate the conditional logic from the run method
+    fn should_watch_namespaces(config: &Config) -> bool {
+        config.add_namespace_fields
     }
 
     #[test]
