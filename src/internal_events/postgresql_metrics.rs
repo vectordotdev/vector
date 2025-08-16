@@ -16,7 +16,7 @@ impl InternalEvent for PostgresqlMetricsCollectError<'_> {
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             endpoint = %self.endpoint,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
