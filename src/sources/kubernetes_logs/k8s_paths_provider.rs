@@ -18,6 +18,7 @@ pub struct K8sPathsProvider {
     namespace_state: Store<Namespace>,
     include_paths: Vec<glob::Pattern>,
     exclude_paths: Vec<glob::Pattern>,
+    add_namespace_fields: bool,
 }
 
 impl K8sPathsProvider {
@@ -27,12 +28,14 @@ impl K8sPathsProvider {
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,
         exclude_paths: Vec<glob::Pattern>,
+        add_namespace_fields: bool,
     ) -> Self {
         Self {
             pod_state,
             namespace_state,
             include_paths,
             exclude_paths,
+            add_namespace_fields,
         }
     }
 }
@@ -47,7 +50,12 @@ impl PathsProvider for K8sPathsProvider {
             .into_iter()
             // filter out pods where we haven't fetched the namespace metadata yet
             // they will be picked up on a later run
+            // Only check namespace metadata if add_namespace_fields is enabled
             .filter(|pod| {
+                if !self.add_namespace_fields {
+                    // Skip namespace metadata check when namespace fields are disabled
+                    return true;
+                }
                 trace!(message = "Verifying Namespace metadata for pod.", pod = ?pod.metadata.name);
                 if let Some(namespace) = pod.metadata.namespace.as_ref() {
                     self.namespace_state
