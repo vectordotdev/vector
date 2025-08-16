@@ -178,6 +178,7 @@ impl ResponseExt for http::Response<Bytes> {
     }
 }
 
+#[derive(Clone)]
 pub struct HttpRequestBuilder {
     pub endpoint_target: EndpointTarget,
     pub endpoint: String,
