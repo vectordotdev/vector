@@ -483,6 +483,12 @@ impl DatnameFilter {
             .query_one("SELECT * FROM pg_stat_bgwriter", &[])
             .await
     }
+
+    async fn pg_stat_checkpointer(&self, client: &Client) -> Result<Row, PgError> {
+        client
+            .query_one("SELECT * FROM pg_stat_checkpointer", &[])
+            .await
+    }
 }
 
 struct PostgresqlMetrics {
@@ -566,7 +572,10 @@ impl PostgresqlMetrics {
             self.collect_pg_stat_database(&client, client_version)
                 .boxed(),
             self.collect_pg_stat_database_conflicts(&client).boxed(),
-            self.collect_pg_stat_bgwriter(&client).boxed(),
+            self.collect_pg_stat_bgwriter(&client, client_version)
+                .boxed(),
+            self.collect_pg_stat_checkpointer(&client, client_version)
+                .boxed(),
         ])
         .await
         {
@@ -780,6 +789,7 @@ impl PostgresqlMetrics {
     async fn collect_pg_stat_bgwriter(
         &self,
         client: &Client,
+        client_version: usize,
     ) -> Result<(Vec<Metric>, usize), CollectError> {
         let row = self
             .datname_filter
@@ -788,8 +798,33 @@ impl PostgresqlMetrics {
             .context(QuerySnafu)?;
         let mut reader = RowReader::default();
 
-        Ok((
-            vec![
+        let mut metrics = vec![
+            self.create_metric(
+                "pg_stat_bgwriter_buffers_clean_total",
+                counter!(reader.read::<i64>(&row, "buffers_clean")?),
+                tags!(self.tags),
+            ),
+            self.create_metric(
+                "pg_stat_bgwriter_maxwritten_clean_total",
+                counter!(reader.read::<i64>(&row, "maxwritten_clean")?),
+                tags!(self.tags),
+            ),
+            self.create_metric(
+                "pg_stat_bgwriter_buffers_alloc_total",
+                counter!(reader.read::<i64>(&row, "buffers_alloc")?),
+                tags!(self.tags),
+            ),
+            self.create_metric(
+                "pg_stat_bgwriter_stats_reset",
+                gauge!(reader
+                    .read::<DateTime<Utc>>(&row, "stats_reset")?
+                    .timestamp()),
+                tags!(self.tags),
+            ),
+        ];
+
+        if client_version < 170000 {
+            metrics.extend_from_slice(&[
                 self.create_metric(
                     "pg_stat_bgwriter_checkpoints_timed_total",
                     counter!(reader.read::<i64>(&row, "checkpoints_timed")?),
@@ -816,16 +851,6 @@ impl PostgresqlMetrics {
                     tags!(self.tags),
                 ),
                 self.create_metric(
-                    "pg_stat_bgwriter_buffers_clean_total",
-                    counter!(reader.read::<i64>(&row, "buffers_clean")?),
-                    tags!(self.tags),
-                ),
-                self.create_metric(
-                    "pg_stat_bgwriter_maxwritten_clean_total",
-                    counter!(reader.read::<i64>(&row, "maxwritten_clean")?),
-                    tags!(self.tags),
-                ),
-                self.create_metric(
                     "pg_stat_bgwriter_buffers_backend_total",
                     counter!(reader.read::<i64>(&row, "buffers_backend")?),
                     tags!(self.tags),
@@ -835,13 +860,72 @@ impl PostgresqlMetrics {
                     counter!(reader.read::<i64>(&row, "buffers_backend_fsync")?),
                     tags!(self.tags),
                 ),
+            ]);
+        }
+
+        Ok((metrics, reader.into_inner()))
+    }
+
+    async fn collect_pg_stat_checkpointer(
+        &self,
+        client: &Client,
+        client_version: usize,
+    ) -> Result<(Vec<Metric>, usize), CollectError> {
+        if client_version < 170000 {
+            return Ok((Vec::new(), 0));
+        }
+
+        let row = self
+            .datname_filter
+            .pg_stat_checkpointer(client)
+            .await
+            .context(QuerySnafu)?;
+        let mut reader = RowReader::default();
+
+        Ok((
+            vec![
                 self.create_metric(
-                    "pg_stat_bgwriter_buffers_alloc_total",
-                    counter!(reader.read::<i64>(&row, "buffers_alloc")?),
+                    "pg_stat_checkpointer_num_timed_total",
+                    counter!(reader.read::<i64>(&row, "num_timed")?),
                     tags!(self.tags),
                 ),
                 self.create_metric(
-                    "pg_stat_bgwriter_stats_reset",
+                    "pg_stat_checkpointer_num_requested_total",
+                    counter!(reader.read::<i64>(&row, "num_requested")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_restartpoints_timed_total",
+                    counter!(reader.read::<i64>(&row, "restartpoints_timed")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_restartpoints_req_total",
+                    counter!(reader.read::<i64>(&row, "restartpoints_req")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_restartpoints_done_total",
+                    counter!(reader.read::<i64>(&row, "restartpoints_done")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_write_time_total",
+                    counter!(reader.read::<f64>(&row, "write_time")? / 1000f64),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_sync_time_total",
+                    counter!(reader.read::<f64>(&row, "sync_time")? / 1000f64),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_buffers_written_total",
+                    counter!(reader.read::<i64>(&row, "buffers_written")?),
+                    tags!(self.tags),
+                ),
+                self.create_metric(
+                    "pg_stat_checkpointer_stats_reset",
                     gauge!(reader
                         .read::<DateTime<Utc>>(&row, "stats_reset")?
                         .timestamp()),
@@ -1000,7 +1084,7 @@ mod integration_tests {
         event::Event,
         test_util::{
             components::{assert_source_compliance, PULL_SOURCE_TAGS},
-            integration::postgres::{pg_socket, pg_url},
+            integration::postgres::{pg_socket, pg_url, pg_version},
         },
         tls, SourceSender,
     };
@@ -1076,11 +1160,26 @@ mod integration_tests {
             }
 
             // test metrics from different queries
-            let names = vec![
+            let mut names = vec![
                 "pg_stat_database_datid",
                 "pg_stat_database_conflicts_confl_tablespace_total",
-                "pg_stat_bgwriter_checkpoints_timed_total",
+                "pg_stat_bgwriter_buffers_clean_total",
             ];
+            // Add version-dependent metrics
+            let major_version = pg_version().split(".").collect::<Vec<_>>()[0]
+                .parse::<i32>()
+                .unwrap();
+
+            if major_version >= 12 {
+                names.push("pg_stat_database_checksum_failures_total");
+            }
+
+            if major_version < 17 {
+                names.push("pg_stat_bgwriter_checkpoints_timed_total");
+            } else {
+                names.push("pg_stat_checkpointer_num_timed_total");
+            }
+
             for name in names {
                 assert!(events.iter().any(|e| e.as_metric().name() == name));
             }
