@@ -1,8 +1,8 @@
 use std::{collections::HashMap, panic, str::FromStr, sync::Arc};
 
 use aws_sdk_sqs::{
-    types::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName},
     Client as SqsClient,
+    types::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName},
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
@@ -13,6 +13,7 @@ use vector_lib::finalizer::UnorderedFinalizer;
 use vector_lib::internal_event::{EventsReceived, Registered};
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
     internal_events::{
@@ -20,7 +21,6 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::util,
-    SourceSender,
 };
 
 // This is the maximum SQS supports in a single batch request
@@ -222,7 +222,7 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 mod tests {
     use super::*;
     use crate::codecs::DecodingConfig;
-    use crate::config::{log_schema, SourceConfig};
+    use crate::config::{SourceConfig, log_schema};
     use crate::sources::aws_sqs::AwsSqsConfig;
     use chrono::SecondsFormat;
     use vector_lib::lookup::path;

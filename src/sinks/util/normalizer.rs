@@ -1,10 +1,10 @@
 use std::{
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::Duration,
 };
 
-use futures_util::{stream::Fuse, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, stream::Fuse};
 use pin_project::pin_project;
 use vector_lib::event::Metric;
 

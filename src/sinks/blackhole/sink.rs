@@ -1,22 +1,22 @@
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use tokio::{
     select,
     sync::watch,
     time::{interval, sleep_until},
 };
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::internal_event::{
     ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
     event::{EventArray, EventContainer},

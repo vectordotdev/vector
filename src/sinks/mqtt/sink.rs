@@ -1,15 +1,15 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 
 use crate::common::mqtt::MqttConnector;
 use crate::internal_events::MqttConnectionError;
 use crate::sinks::prelude::*;
 
 use super::{
+    MqttSinkConfig,
     config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
     service::MqttService,
-    MqttSinkConfig,
 };
 
 pub struct MqttSink {

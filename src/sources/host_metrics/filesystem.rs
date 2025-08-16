@@ -7,7 +7,7 @@ use vector_lib::metric_tags;
 
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
-use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
+use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 
 /// Options for the filesystem metrics collector.
 #[configurable_component]
@@ -148,8 +148,8 @@ impl HostMetrics {
 mod tests {
     use super::{
         super::{
-            tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
             HostMetrics, HostMetricsConfig, MetricsBuffer,
+            tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
         },
         FilesystemConfig,
     };

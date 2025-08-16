@@ -13,7 +13,7 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{logs::service::LogApiService, DatadogCommonConfig, LocalDatadogCommonConfig},
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
         util::http::RequestConfig,
     },
@@ -219,7 +219,7 @@ mod test {
     use crate::codecs::EncodingConfigWithFraming;
     use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
 

@@ -3,7 +3,7 @@ use std::fmt;
 use vector_lib::lookup::event_path;
 
 use crate::{
-    internal_events::{ParserMissingFieldError, DROP_EVENT},
+    internal_events::{DROP_EVENT, ParserMissingFieldError},
     sinks::{
         datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder},
         prelude::*,

@@ -4,14 +4,14 @@ use std::{
     time::Duration,
 };
 
-use base64::prelude::{Engine as _, BASE64_URL_SAFE};
+use base64::prelude::{BASE64_URL_SAFE, Engine as _};
 pub use goauth::scopes::Scope;
 use goauth::{
+    GoErr,
     auth::{JwtClaims, Token, TokenErr},
     credentials::Credentials,
-    GoErr,
 };
-use http::{uri::PathAndQuery, Uri};
+use http::{Uri, uri::PathAndQuery};
 use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};

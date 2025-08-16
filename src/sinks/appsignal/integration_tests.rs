@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::header::AUTHORIZATION;
 use hyper::StatusCode;
 use indoc::indoc;
@@ -13,8 +13,8 @@ use crate::{
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{
-            assert_sink_compliance, assert_sink_error, run_and_assert_sink_compliance,
-            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, assert_sink_compliance, assert_sink_error,
+            run_and_assert_sink_compliance,
         },
         generate_lines_with_stream, map_event_batch_stream, next_addr,
     },

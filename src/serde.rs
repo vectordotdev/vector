@@ -2,8 +2,8 @@
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::serde::{bool_or_struct, is_default};

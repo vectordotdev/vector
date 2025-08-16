@@ -4,7 +4,7 @@ use bytes::{BufMut, BytesMut};
 use flate2::write::{GzEncoder, ZlibEncoder};
 
 use super::{
-    batch::{err_event_too_large, Batch, BatchSize, PushResult},
+    batch::{Batch, BatchSize, PushResult, err_event_too_large},
     snappy::SnappyEncoder,
     zstd::ZstdEncoder,
 };
@@ -168,7 +168,7 @@ mod test {
     };
 
     use bytes::{Buf, BytesMut};
-    use futures::{future, stream, SinkExt, StreamExt};
+    use futures::{SinkExt, StreamExt, future, stream};
     use tokio::time::Duration;
     use vector_lib::json_size::JsonSize;
 
@@ -230,10 +230,12 @@ mod test {
             decompressed
         });
 
-        assert!(decompressed.eq(std::iter::repeat_n(
-            b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
-            100_000
-        )
-        .flatten()));
+        assert!(
+            decompressed.eq(std::iter::repeat_n(
+                b"It's going down, I'm yelling timber, You better move, you better dance".to_vec(),
+                100_000
+            )
+            .flatten())
+        );
     }
 }

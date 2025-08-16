@@ -12,11 +12,11 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::{Auth, MaybeAuth},
     sinks::{
+        Healthcheck, VectorSink,
         util::{
             BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
             TowerRequestConfig, UriSerde,
         },
-        Healthcheck, VectorSink,
     },
     tls::TlsConfig,
     vector_version,

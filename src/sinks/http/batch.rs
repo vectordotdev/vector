@@ -2,7 +2,7 @@
 
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::stream::batcher::limiter::ItemBatchSize;
-use vector_lib::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, event::Event};
 
 use crate::codecs::Encoder;
 

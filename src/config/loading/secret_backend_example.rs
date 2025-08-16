@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{stdin, BufReader},
+    io::{BufReader, stdin},
 };
 
 use serde::{Deserialize, Serialize};

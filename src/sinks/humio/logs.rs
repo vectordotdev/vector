@@ -9,15 +9,15 @@ use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck, VectorSink,
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
-                SplunkHecDefaultBatchSettings,
+                EndpointTarget, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig,
             },
             logs::config::HecLogsSinkConfig,
         },
         util::{BatchConfig, Compression, TowerRequestConfig},
-        Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsConfig,
@@ -230,17 +230,17 @@ mod integration_tests {
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
-    use serde_json::{json, Value as JsonValue};
+    use serde_json::{Value as JsonValue, json};
     use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
-        config::{log_schema, SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext, log_schema},
         event::LogEvent,
         sinks::util::Compression,
         test_util::{
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
             random_string,
         },
     };

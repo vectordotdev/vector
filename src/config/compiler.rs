@@ -1,6 +1,6 @@
 use super::{
-    builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids, validation, Config,
-    OutputId,
+    Config, OutputId, builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids,
+    validation,
 };
 
 use indexmap::{IndexMap, IndexSet};

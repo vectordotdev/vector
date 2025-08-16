@@ -6,8 +6,8 @@ mod ddmetric_proto {
 }
 
 use ddmetric_proto::{
-    metric_payload::{MetricSeries, MetricType},
     MetricPayload,
+    metric_payload::{MetricSeries, MetricType},
 };
 use tracing::info;
 use vector::common::datadog::DatadogSeriesMetric;

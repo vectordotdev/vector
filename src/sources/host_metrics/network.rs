@@ -9,7 +9,7 @@ use vector_lib::metric_tags;
 
 use crate::internal_events::HostMetricsScrapeDetailError;
 
-use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
+use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 
 /// Options for the network metrics collector.
 #[configurable_component]
@@ -102,8 +102,8 @@ impl HostMetrics {
 mod tests {
     use super::{
         super::{
-            tests::{all_counters, assert_filtered_metrics, count_tag},
             HostMetrics, HostMetricsConfig, MetricsBuffer,
+            tests::{all_counters, assert_filtered_metrics, count_tag},
         },
         NetworkConfig,
     };
@@ -119,9 +119,11 @@ mod tests {
         assert!(all_counters(&metrics));
 
         // All metrics are named network_*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("network_")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("network_"))
+        );
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());

@@ -1,7 +1,7 @@
 use std::{
     fmt,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use bytes::Bytes;
@@ -9,7 +9,7 @@ use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
@@ -17,16 +17,16 @@ use vector_lib::event::EventStatus;
 use vector_lib::request_metadata::MetaDescriptive;
 
 use super::{
-    acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
     EndpointTarget,
+    acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
     http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
-        splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{sink::Response, Compression},
         UriParseSnafu,
+        splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
+        util::{Compression, sink::Response},
     },
 };
 
@@ -271,40 +271,40 @@ mod tests {
     use std::{
         collections::HashMap,
         future::poll_fn,
-        num::{NonZeroU64, NonZeroU8, NonZeroUsize},
+        num::{NonZeroU8, NonZeroU64, NonZeroUsize},
         sync::{
-            atomic::{AtomicU64, Ordering},
             Arc,
+            atomic::{AtomicU64, Ordering},
         },
         task::Poll,
     };
 
     use bytes::Bytes;
-    use futures_util::{poll, stream::FuturesUnordered, StreamExt};
-    use tower::{util::BoxService, Service, ServiceExt};
+    use futures_util::{StreamExt, poll, stream::FuturesUnordered};
+    use tower::{Service, ServiceExt, util::BoxService};
     use vector_lib::internal_event::CountByteSize;
     use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
     };
     use wiremock::{
-        matchers::{header, header_exists, method, path},
         Mock, MockServer, Request, Respond, ResponseTemplate,
+        matchers::{header, header_exists, method, path},
     };
 
     use crate::{
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
+                EndpointTarget,
                 acknowledgements::{
                     HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
                 },
                 build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
-                EndpointTarget,
             },
-            util::{metadata::RequestMetadataBuilder, Compression},
+            util::{Compression, metadata::RequestMetadataBuilder},
         },
     };
 

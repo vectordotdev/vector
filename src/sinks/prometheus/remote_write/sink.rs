@@ -7,8 +7,8 @@ use vector_lib::stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};
 use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
 
 use super::{
-    request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
     PartitionKey, PrometheusMetricNormalize,
+    request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
 };
 
 pub(super) struct RemoteWriteMetric {

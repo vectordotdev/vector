@@ -6,7 +6,7 @@ use crate::event::{ObjectMap, Value};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::test_util::{
-    components::{assert_sink_compliance, SINK_TAGS},
+    components::{SINK_TAGS, assert_sink_compliance},
     random_lines_with_stream, random_string, trace_init,
 };
 use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;

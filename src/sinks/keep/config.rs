@@ -12,8 +12,8 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
+            http::{HttpService, http_response_retry_logic},
         },
     },
 };

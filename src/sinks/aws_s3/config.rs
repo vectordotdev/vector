@@ -1,10 +1,10 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
 use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
     TextSerializerConfig,
+    encoding::{Framer, FramingConfig},
 };
-use vector_lib::{configurable::configurable_component, sink::VectorSink, TimeZone};
+use vector_lib::{TimeZone, configurable::configurable_component, sink::VectorSink};
 
 use super::sink::S3RequestOptions;
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck,
         s3_common::{
             self,
             config::{RetryStrategy, S3Options},
@@ -20,10 +21,9 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            timezone_to_offset, BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
-            ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
+            TowerRequestConfig, timezone_to_offset,
         },
-        Healthcheck,
     },
     template::Template,
     tls::TlsConfig,

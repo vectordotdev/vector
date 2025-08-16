@@ -1,4 +1,4 @@
-use super::{default_all_processes, example_processes, FilterList, HostMetrics};
+use super::{FilterList, HostMetrics, default_all_processes, example_processes};
 use std::ffi::OsStr;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 use vector_lib::configurable::configurable_component;
@@ -72,9 +72,11 @@ mod tests {
         assert!(!metrics.is_empty());
 
         // All metrics are named process_*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("process_")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("process_"))
+        );
 
         // They should all have the required tag
         assert_eq!(count_tag(&metrics, "pid"), metrics.len());

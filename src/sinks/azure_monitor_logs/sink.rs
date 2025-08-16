@@ -1,7 +1,7 @@
 use std::{fmt::Debug, io};
 
 use bytes::Bytes;
-use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
+use vector_lib::codecs::{CharacterDelimitedEncoder, JsonSerializerConfig, encoding::Framer};
 use vector_lib::lookup::{OwnedValuePath, PathPrefix};
 
 use crate::sinks::prelude::*;

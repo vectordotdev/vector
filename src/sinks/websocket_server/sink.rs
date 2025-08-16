@@ -7,22 +7,23 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
+    StreamExt, TryStreamExt,
+    channel::mpsc::{UnboundedSender, unbounded},
     future, pin_mut,
     stream::BoxStream,
-    StreamExt, TryStreamExt,
 };
 use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    handshake::server::{ErrorResponse, Request, Response},
     Message,
+    handshake::server::{ErrorResponse, Request, Response},
 };
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
@@ -30,7 +31,6 @@ use vector_lib::{
     },
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -48,9 +48,9 @@ use crate::{
 };
 
 use super::{
+    WebSocketListenerSinkConfig,
     buffering::MessageBufferingConfig,
     config::{ExtraMetricTagsConfig, SubProtocolConfig},
-    WebSocketListenerSinkConfig,
 };
 
 pub struct WebSocketListenerSink {
@@ -445,7 +445,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc::UnboundedReceiver, SinkExt, Stream, StreamExt};
+    use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
     use futures_util::stream;
     use std::{future::ready, num::NonZeroUsize};
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
@@ -453,8 +453,8 @@ mod tests {
     use tokio::{task::JoinHandle, time};
     use vector_lib::{
         codecs::{
-            decoding::{DeserializerConfig, JsonDeserializerOptions},
             JsonDeserializerConfig,
+            decoding::{DeserializerConfig, JsonDeserializerOptions},
         },
         lookup::lookup_v2::ConfigValuePath,
         metrics::Controller,
@@ -470,7 +470,7 @@ mod tests {
             config::InternalMetricsConfig,
         },
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
             next_addr,
         },
     };

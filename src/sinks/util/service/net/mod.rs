@@ -7,7 +7,7 @@ mod unix;
 use std::{
     io,
     net::SocketAddr,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::Duration,
 };
 
@@ -36,7 +36,7 @@ use self::udp::UdpConnector;
 #[cfg(unix)]
 use self::unix::UnixConnector;
 
-use futures_util::{future::BoxFuture, FutureExt};
+use futures_util::{FutureExt, future::BoxFuture};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::AsyncWriteExt,

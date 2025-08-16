@@ -8,8 +8,8 @@ use crate::config::{
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    client::SqsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,
-    SSRequestBuilder, SSSink,
+    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SqsMessagePublisher,
+    message_deduplication_id, message_group_id,
 };
 use crate::{aws::create_client, common::sqs::SqsClientBuilder};
 

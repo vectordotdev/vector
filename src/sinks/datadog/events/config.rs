@@ -14,9 +14,9 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
+        util::{ServiceBuilderExt, TowerRequestConfig, http::HttpStatusRetryLogic},
     },
     tls::MaybeTlsSettings,
 };

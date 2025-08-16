@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 use vector_lib::ByteSizeOf;
+use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
 
 use crate::codecs::EncodingConfig;
 use crate::{
@@ -8,8 +8,8 @@ use crate::{
     event::{Event, EventFinalizers, Finalizable},
     internal_events::TemplateRenderingError,
     sinks::util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-        EncodedLength, RequestBuilder,
+        Compression, EncodedLength, RequestBuilder, metadata::RequestMetadataBuilder,
+        request_builder::EncodeResult,
     },
     template::Template,
 };

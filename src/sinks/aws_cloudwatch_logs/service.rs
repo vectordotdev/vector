@@ -1,35 +1,35 @@
 use std::{
     collections::HashMap,
     fmt,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use aws_sdk_cloudwatchlogs::{
+    Client as CloudwatchLogsClient,
     operation::{
         create_log_group::CreateLogGroupError, create_log_stream::CreateLogStreamError,
         describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
         put_retention_policy::PutRetentionPolicyError,
     },
     types::InputLogEvent,
-    Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use chrono::Duration;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt, future::BoxFuture};
 use futures_util::TryFutureExt;
 use http::{
-    header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
     HeaderValue,
+    header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
 };
 use indexmap::IndexMap;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::oneshot;
 use tower::{
+    Service, ServiceBuilder, ServiceExt,
     buffer::Buffer,
     limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
     timeout::Timeout,
-    Service, ServiceBuilder, ServiceExt,
 };
 use vector_lib::stream::DriverResponse;
 use vector_lib::{
@@ -39,10 +39,10 @@ use vector_lib::{
 
 use crate::sinks::{
     aws_cloudwatch_logs::{
-        config::CloudwatchLogsSinkConfig, config::Retention, request, retry::CloudwatchRetryLogic,
-        sink::BatchCloudwatchRequest, CloudwatchKey,
+        CloudwatchKey, config::CloudwatchLogsSinkConfig, config::Retention, request,
+        retry::CloudwatchRetryLogic, sink::BatchCloudwatchRequest,
     },
-    util::{retries::FibonacciRetryPolicy, EncodedLength, TowerRequestSettings},
+    util::{EncodedLength, TowerRequestSettings, retries::FibonacciRetryPolicy},
 };
 
 type Svc = Buffer<

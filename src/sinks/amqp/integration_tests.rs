@@ -1,15 +1,15 @@
 use super::*;
 use crate::{
+    SourceSender,
     amqp::await_connection,
     config::{SinkConfig, SinkContext},
     shutdown::ShutdownSignal,
     sinks::amqp::channel::new_channel_pool,
     template::{Template, UnsignedIntTemplate},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
     },
-    SourceSender,
 };
 use config::AmqpPropertiesConfig;
 use futures::StreamExt;

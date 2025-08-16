@@ -12,8 +12,8 @@ use crate::config::{Protocol, Resource};
 
 #[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{
-    request_limiter::RequestLimiter, try_bind_tcp_listener, TcpNullAcker, TcpSource, TcpSourceAck,
-    TcpSourceAcker, MAX_IN_FLIGHT_EVENTS_TARGET,
+    MAX_IN_FLIGHT_EVENTS_TARGET, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker,
+    request_limiter::RequestLimiter, try_bind_tcp_listener,
 };
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;

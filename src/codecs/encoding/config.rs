@@ -1,7 +1,7 @@
 use crate::codecs::Transformer;
 use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
 };
 use vector_lib::configurable::configurable_component;
 
@@ -156,7 +156,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
+    use vector_lib::lookup::lookup_v2::{ConfigValuePath, parse_value_path};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;

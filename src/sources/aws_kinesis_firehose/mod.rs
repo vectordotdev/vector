@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{convert::Infallible, fmt, net::SocketAddr};
 
 use futures::FutureExt;
-use hyper::{service::make_service_fn, Server};
+use hyper::{Server, service::make_service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -275,27 +275,27 @@ mod tests {
         net::SocketAddr,
     };
 
-    use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use base64::prelude::{BASE64_STANDARD, Engine as _};
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
     use vector_lib::assert_event_data_eq;
     use vector_lib::lookup::path;
     use vrl::value;
 
     use super::*;
     use crate::{
+        SourceSender,
         event::{Event, EventStatus},
         log_event,
         test_util::{
             collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             next_addr, wait_for_tcp,
         },
-        SourceSender,
     };
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
@@ -647,11 +647,12 @@ mod tests {
                         meta.value().get(path!("vector", "source_type")).unwrap(),
                         &value!("aws_kinesis_firehose")
                     );
-                    assert!(meta
-                        .value()
-                        .get(path!("vector", "ingest_timestamp"))
-                        .unwrap()
-                        .is_timestamp());
+                    assert!(
+                        meta.value()
+                            .get(path!("vector", "ingest_timestamp"))
+                            .unwrap()
+                            .is_timestamp()
+                    );
 
                     // source metadata
                     assert_eq!(
@@ -931,10 +932,12 @@ mod tests {
 
         let events = collect_ready(rx).await;
 
-        assert!(events[0]
-            .metadata()
-            .secrets()
-            .get("aws_kinesis_firehose_access_key")
-            .is_none());
+        assert!(
+            events[0]
+                .metadata()
+                .secrets()
+                .get("aws_kinesis_firehose_access_key")
+                .is_none()
+        );
     }
 }

@@ -3,13 +3,13 @@ use crate::{
     sinks::socket::SocketSinkConfig,
     sources::socket::SocketConfig,
     test_util::{
+        CountReceiver,
         mock::{error_sink, error_source, panic_sink, panic_source},
         next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
-        CountReceiver,
     },
 };
 use futures_util::StreamExt;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.

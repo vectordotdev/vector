@@ -1,10 +1,10 @@
 use std::sync::{
-    atomic::{self, AtomicBool},
     Arc,
+    atomic::{self, AtomicBool},
 };
 
 use serde_json::json;
-use warp::{reply::json, Rejection, Reply};
+use warp::{Rejection, Reply, reply::json};
 
 // Health handler, responds with '{ ok: true }' when running and '{ ok: false}'
 // when shutting down

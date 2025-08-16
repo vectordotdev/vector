@@ -5,11 +5,12 @@ use futures::StreamExt;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     internal_events::{
@@ -17,10 +18,9 @@ use crate::{
         UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
+    sources::Source,
     sources::util::change_socket_permissions,
     sources::util::unix::UNNAMED_SOCKET_HOST,
-    sources::Source,
-    SourceSender,
 };
 
 /// Returns a `Source` object corresponding to a Unix domain datagram socket.

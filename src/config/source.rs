@@ -15,8 +15,8 @@ use vector_lib::{
     source::Source,
 };
 
-use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
-use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
+use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 

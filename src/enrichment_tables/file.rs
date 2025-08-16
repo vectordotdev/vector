@@ -5,7 +5,7 @@ use bytes::Bytes;
 use tracing::trace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::{conversion::Conversion, TimeZone};
+use vector_lib::{TimeZone, conversion::Conversion};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;

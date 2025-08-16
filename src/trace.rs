@@ -4,12 +4,12 @@ use std::{
     marker::PhantomData,
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
-use futures_util::{future::ready, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, future::ready};
 use metrics_tracing_context::MetricsLayer;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
@@ -19,11 +19,11 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    Layer,
     filter::LevelFilter,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 use vector_lib::lookup::event_path;

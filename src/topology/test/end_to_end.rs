@@ -1,19 +1,20 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use hyper::{
-    service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
+    service::{make_service_fn, service_fn},
 };
 use tokio::{
-    sync::{mpsc, oneshot, Mutex},
+    sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
-    time::{timeout, Duration},
+    time::{Duration, timeout},
 };
 
 use super::{RunningTopology, TopologyPieces};
 use crate::{
+    Error,
     config::{self, ConfigDiff, Format},
-    test_util, Error,
+    test_util,
 };
 
 type Lock = Arc<Mutex<()>>;

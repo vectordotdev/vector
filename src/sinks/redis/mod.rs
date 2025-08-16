@@ -33,7 +33,7 @@ pub(super) enum RedisSinkError {
     RedisCreateFailed { source: RedisError },
     #[snafu(display(
         "Error sending query: {source}{}",
-        if let Some(gen) = generation { format!(", gen={gen}") } else { String::new() }
+        if let Some(generation) = generation { format!(", gen={generation}") } else { String::new() }
     ))]
     SendError {
         source: RedisError,

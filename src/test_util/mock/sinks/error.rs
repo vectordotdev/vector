@@ -4,7 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures_util::{future::ok, FutureExt, Sink};
+use futures_util::{FutureExt, Sink, future::ok};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},

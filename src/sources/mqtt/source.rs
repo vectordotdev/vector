@@ -3,6 +3,7 @@ use vector_lib::config::LogNamespace;
 use vector_lib::internal_event::EventsReceived;
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     common::mqtt::MqttConnector,
     event::BatchNotifier,
@@ -11,7 +12,6 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::mqtt::MqttSourceConfig,
     sources::util,
-    SourceSender,
 };
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
 use vector_lib::config::LegacyKey;

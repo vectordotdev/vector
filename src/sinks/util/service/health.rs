@@ -2,18 +2,18 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures::FutureExt;
-use futures_util::{future::BoxFuture, TryFuture};
+use futures_util::{TryFuture, future::BoxFuture};
 use pin_project::pin_project;
 use serde_with::serde_as;
 use stream_cancel::{Trigger, Tripwire};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tower::Service;
 use vector_lib::{configurable::configurable_component, emit};
 

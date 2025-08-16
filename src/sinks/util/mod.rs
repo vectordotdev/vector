@@ -37,10 +37,10 @@ pub use batch::{
     RealtimeSizeBasedDefaultBatchSettings, SinkBatchSettings, Unmerged,
 };
 pub use buffer::{
+    Buffer, Compression, PartitionBuffer, PartitionInnerBuffer,
     json::{BoxedRawValue, JsonArrayBuffer},
     partition::Partition,
     vec::{EncodedLength, VecBuffer},
-    Buffer, Compression, PartitionBuffer, PartitionInnerBuffer,
 };
 pub use builder::SinkBuilderExt;
 pub use compressor::Compressor;
@@ -53,7 +53,7 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
-use vector_lib::{json_size::JsonSize, TimeZone};
+use vector_lib::{TimeZone, json_size::JsonSize};
 
 use crate::event::EventFinalizers;
 use chrono::{FixedOffset, Offset, Utc};

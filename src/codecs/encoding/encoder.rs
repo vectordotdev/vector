@@ -1,8 +1,8 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::{
-    encoding::{Error, Framer, Serializer},
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
+    encoding::{Error, Framer, Serializer},
 };
 
 use crate::{

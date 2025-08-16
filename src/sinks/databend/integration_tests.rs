@@ -12,7 +12,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::util::UriSerde,
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };

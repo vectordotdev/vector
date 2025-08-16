@@ -10,7 +10,7 @@ use std::{
 };
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
 use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{get_transform_output_ids, ComponentKey, Config},
+    config::{ComponentKey, Config, get_transform_output_ids},
     filter_check,
 };
 

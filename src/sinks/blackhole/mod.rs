@@ -10,8 +10,8 @@ mod tests {
 
     use crate::{
         sinks::{
-            blackhole::{config::BlackholeConfig, sink::BlackholeSink},
             VectorSink,
+            blackhole::{config::BlackholeConfig, sink::BlackholeSink},
         },
         test_util::{
             components::run_and_assert_nonsending_sink_compliance, random_events_with_stream,

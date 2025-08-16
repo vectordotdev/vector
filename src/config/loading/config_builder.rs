@@ -3,8 +3,8 @@ use std::{collections::HashMap, io::Read};
 use indexmap::IndexMap;
 use toml::value::Table;
 
-use super::{deserialize_table, loader, prepare_input, secret};
 use super::{ComponentHint, Process};
+use super::{deserialize_table, loader, prepare_input, secret};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,

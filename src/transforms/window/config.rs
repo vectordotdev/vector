@@ -1,4 +1,4 @@
-use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{LogNamespace, clone_input_definitions};
 use vector_lib::configurable::configurable_component;
 
 use crate::{

@@ -6,8 +6,8 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
     event::{
-        metric::{MetricData, Sample},
         Event, MetricValue,
+        metric::{MetricData, Sample},
     },
     schema,
     transform::{FunctionTransform, OutputBuffer, Transform},

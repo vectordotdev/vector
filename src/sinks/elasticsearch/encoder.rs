@@ -3,7 +3,7 @@ use std::{io, io::Write};
 use serde::Serialize;
 use serde_json::json;
 use vector_lib::buffers::EventCount;
-use vector_lib::{config::telemetry, event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::telemetry, event::Event};
 use vector_lib::{
     internal_event::TaggedEventsSent,
     json_size::JsonSize,
@@ -15,7 +15,7 @@ use crate::{
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::{
         elasticsearch::{BulkAction, VersionType},
-        util::encoding::{as_tracked_write, Encoder},
+        util::encoding::{Encoder, as_tracked_write},
     },
 };
 

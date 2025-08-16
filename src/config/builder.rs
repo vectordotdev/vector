@@ -9,9 +9,8 @@ use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, schema, BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config,
-    EnrichmentTableOuter, HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
+    HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter, compiler, schema,
 };
 
 /// A complete Vector configuration.

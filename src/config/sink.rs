@@ -10,7 +10,7 @@ use vector_lib::buffers::{BufferConfig, BufferType};
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
 use vector_lib::configurable::{
-    configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
+    Configurable, GenerateError, Metadata, NamedComponent, configurable_component,
 };
 use vector_lib::{
     config::{AcknowledgementsConfig, GlobalOptions, Input},
@@ -18,9 +18,9 @@ use vector_lib::{
     sink::VectorSink,
 };
 
-use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
+use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
 use crate::extra_context::ExtraContext;
-use crate::sinks::{util::UriSerde, Healthcheck};
+use crate::sinks::{Healthcheck, util::UriSerde};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 
@@ -122,7 +122,9 @@ where
 
     pub fn healthcheck(&self) -> SinkHealthcheckOptions {
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
-            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
+            warn!(
+                "Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`."
+            )
         } else if self.healthcheck_uri.is_some() {
             warn!(
                 "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."

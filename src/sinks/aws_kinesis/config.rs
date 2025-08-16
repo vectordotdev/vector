@@ -7,15 +7,15 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         prelude::*,
-        util::{retries::RetryLogic, TowerRequestConfig},
+        util::{TowerRequestConfig, retries::RetryLogic},
     },
 };
 
 use super::{
+    KinesisResponse, KinesisService,
     record::{Record, SendRecord},
     request_builder::KinesisRequestBuilder,
     sink::{BatchKinesisRequest, KinesisSink},
-    KinesisResponse, KinesisService,
 };
 
 /// Base configuration for the `aws_kinesis_` sinks.

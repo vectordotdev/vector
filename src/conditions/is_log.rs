@@ -17,8 +17,8 @@ pub(crate) fn check_is_log_with_context(e: Event) -> (Result<(), String>, Event)
 mod test {
     use super::check_is_log;
     use crate::event::{
-        metric::{Metric, MetricKind, MetricValue},
         Event, LogEvent,
+        metric::{Metric, MetricKind, MetricValue},
     };
 
     #[test]

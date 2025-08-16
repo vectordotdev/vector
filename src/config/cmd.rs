@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use serde_json::Value;
 
-use super::{load_builder_from_paths, load_source_from_paths, process_paths, ConfigBuilder};
+use super::{ConfigBuilder, load_builder_from_paths, load_source_from_paths, process_paths};
 use crate::cli::handle_config_errors;
 use crate::config;
 
@@ -196,8 +196,8 @@ mod tests {
 
     use proptest::{num, prelude::*, sample};
     use rand::{
-        prelude::{SliceRandom, StdRng},
         SeedableRng,
+        prelude::{SliceRandom, StdRng},
     };
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -207,9 +207,9 @@ mod tests {
 
     use crate::config::Format;
     use crate::{
-        config::{cmd::serialize_to_json, vars, ConfigBuilder},
+        config::{ConfigBuilder, cmd::serialize_to_json, vars},
         generate,
-        generate::{generate_example, TransformInputsStrategy},
+        generate::{TransformInputsStrategy, generate_example},
     };
 
     use super::merge_json;

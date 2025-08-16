@@ -3,8 +3,8 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use http::{
-    header::{self, HeaderMap},
     HeaderName, HeaderValue, Request, StatusCode, Uri,
+    header::{self, HeaderMap},
 };
 use hyper::Body;
 use openssl::{base64, hash, pkey, sign};
