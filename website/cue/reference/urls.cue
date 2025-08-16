@@ -678,6 +678,7 @@ urls: {
 	windows_installer:                          "\(wikipedia)/wiki/Windows_Installer"
 	windows_service:                            "https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service"
 	woothee:                                    "https://github.com/woothee/woothee"
+	xxhash_rust:                                "https://github.com/DoumanAsh/xxhash-rust"
 	yaml:                                       "https://yaml.org/"
 	ytt:                                        "https://carvel.dev/ytt/"
 	yum:                                        "\(wikipedia)/wiki/Yum_(software)"
