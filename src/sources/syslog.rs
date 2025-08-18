@@ -984,7 +984,7 @@ mod test {
     #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
-        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
+        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
         let event = event_from_bytes(
             "host",
             Some(Bytes::from("192.168.0.254")),
@@ -1032,8 +1032,7 @@ mod test {
     fn rsyslog_omfwd_tcp_default() {
         let msg = "start";
         let raw = format!(
-            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
-            msg
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {msg}"#
         );
         let event = event_from_bytes(
             "host",
@@ -1081,8 +1080,7 @@ mod test {
     fn rsyslog_omfwd_tcp_forward_format() {
         let msg = "start";
         let raw = format!(
-            r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] {}"#,
-            msg
+            r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] {msg}"#
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -1369,7 +1367,7 @@ mod test {
             //"secfrac" can contain up to 6 digits, but TCP sinks uses `AutoSi`
 
             Self {
-                msgid: format!("test{}", id),
+                msgid: format!("test{id}"),
                 severity: Severity::LOG_INFO,
                 facility: Facility::LOG_USER,
                 version: 1,
@@ -1492,7 +1490,7 @@ mod test {
                 x => {
                     #[allow(clippy::print_stdout)]
                     {
-                        println!("converting severity str, got {}", x);
+                        println!("converting severity str, got {x}");
                     }
                     None
                 }
@@ -1544,7 +1542,7 @@ mod test {
             .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately
             .take(amount)
             .enumerate()
-            .map(|(i, map)| (format!("id{}", i), map))
+            .map(|(i, map)| (format!("id{i}"), map))
             .collect()
     }
 

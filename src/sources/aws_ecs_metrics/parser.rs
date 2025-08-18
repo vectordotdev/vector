@@ -126,7 +126,7 @@ fn counter(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Counter { value },
     )
@@ -144,7 +144,7 @@ fn gauge(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Gauge { value },
     )
@@ -507,6 +507,7 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 enum StatsPayload {

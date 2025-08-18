@@ -300,7 +300,7 @@ fn render_bare_schema<T: QueryableSchema>(
             // All we need to do is figure out the rendered type for the constant value, so we can
             // generate the right type path and stick the constant value in it.
             let rendered_const_type = get_rendered_value_type(&schema, const_value)?;
-            let const_type_path = format!("/type/{}/const", rendered_const_type);
+            let const_type_path = format!("/type/{rendered_const_type}/const");
             data.write(const_type_path.as_str(), const_value.clone());
         }
         SchemaType::Enum(enum_values) => {
@@ -417,7 +417,7 @@ fn render_schema_description<T: QueryableSchema>(schema: T) -> Result<Option<Str
         (None, None) => Ok(None),
         (None, Some(description)) => Ok(Some(description.trim().to_string())),
         (Some(title), Some(description)) => {
-            let concatenated = format!("{}\n\n{}", title, description);
+            let concatenated = format!("{title}\n\n{description}");
             Ok(Some(concatenated.trim().to_string()))
         }
     }

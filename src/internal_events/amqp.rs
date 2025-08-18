@@ -36,7 +36,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::RECEIVING,
-
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -58,7 +58,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::ACKNOWLEDGMENT_FAILED,
                    stage = error_stage::RECEIVING,
-
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -80,7 +80,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::COMMAND_FAILED,
                    stage = error_stage::RECEIVING,
-
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",

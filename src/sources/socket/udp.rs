@@ -231,6 +231,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
+                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
@@ -258,6 +259,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
+                                        internal_log_rate_limit = true
                                     );
                                 }
 
@@ -275,7 +277,7 @@ pub(super) fn udp(
                                 let now = Utc::now();
 
                                 for event in &mut events {
-                                    if let Event::Log(ref mut log) = event {
+                                    if let Event::Log(log) = event {
                                         log_namespace.insert_standard_vector_source_metadata(
                                             log,
                                             SocketConfig::NAME,

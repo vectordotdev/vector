@@ -108,7 +108,7 @@ mod integration_tests {
             vec![
                 "sh",
                 "-c",
-                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {log}; i=$((i+1)); done").as_str(),
             ],
             docker,
             false
@@ -186,7 +186,7 @@ mod integration_tests {
                 .for_each(|item| async move {
                     let info = item.unwrap();
                     if let Some(error) = info.error {
-                        panic!("{:?}", error);
+                        panic!("{error:?}");
                     }
                 })
                 .await
@@ -262,7 +262,7 @@ mod integration_tests {
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
         }
         id
@@ -282,7 +282,7 @@ mod integration_tests {
         let id = eternal_container(name, label, log, &docker).await;
         if let Err(error) = container_start(&id, &docker).await {
             container_remove(&id, &docker).await;
-            panic!("Container start failed with error: {:?}", error);
+            panic!("Container start failed with error: {error:?}");
         }
 
         // Wait for before message
@@ -453,7 +453,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -650,7 +650,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -877,13 +877,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;
@@ -947,13 +947,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;

@@ -104,7 +104,7 @@ fn prepare_log_ingester_url(
     metadata: &PartitionKey,
     extra_params: &Option<HashMap<String, String>>,
 ) -> String {
-    let path = format!("{}/v1/events/logs", endpoint);
+    let path = format!("{endpoint}/v1/events/logs");
     let mut url = url::Url::parse(&path).unwrap();
     let mut url_builder = url.query_pairs_mut();
     url_builder
@@ -239,18 +239,19 @@ pub(super) async fn http_healthcheck(
 /// GreptimeDB HTTP retry logic.
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBHttpRetryLogic {
-    inner: HttpRetryLogic,
+    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
 }
 
 impl RetryLogic for GreptimeDBHttpRetryLogic {
     type Error = HttpError;
+    type Request = HttpRequest<PartitionKey>;
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         self.inner.should_retry_response(&response.http_response)
     }
 }

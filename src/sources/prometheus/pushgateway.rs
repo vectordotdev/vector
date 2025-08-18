@@ -145,7 +145,7 @@ impl HttpSource for PushgatewaySource {
             |error| {
                 ErrorMessage::new(
                     http::StatusCode::UNPROCESSABLE_ENTITY,
-                    format!("Failed to parse metrics body: {}", error),
+                    format!("Failed to parse metrics body: {error}"),
                 )
             },
         )
@@ -234,20 +234,14 @@ fn decode_label_pair(k: &str, v: &str) -> Result<(String, String), ErrorMessage>
     let decoded_bytes = BASE64_URL_SAFE.decode(padded_value).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!(
-                "Grouping key invalid - invalid base64 value for key {}: {}",
-                k, v
-            ),
+            format!("Grouping key invalid - invalid base64 value for key {k}: {v}"),
         )
     })?;
 
     let decoded = String::from_utf8(decoded_bytes).map_err(|_| {
         ErrorMessage::new(
             http::StatusCode::BAD_REQUEST,
-            format!(
-                "Grouping key invalid - invalid UTF-8 in decoded base64 value for key {}",
-                k
-            ),
+            format!("Grouping key invalid - invalid UTF-8 in decoded base64 value for key {k}"),
         )
     })?;
 

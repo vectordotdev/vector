@@ -615,8 +615,7 @@ pub fn get_cleaned_schema_reference(schema_ref: &str) -> &str {
         cleaned
     } else {
         panic!(
-            "Tried to clean schema reference that does not start with the definition prefix: {}",
-            schema_ref
+            "Tried to clean schema reference that does not start with the definition prefix: {schema_ref}"
         );
     }
 }

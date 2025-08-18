@@ -367,7 +367,7 @@ mod integration_tests {
         trace_init();
 
         let (topic, _subscription) = create_topic_subscription().await;
-        let (sink, _healthcheck) = config_build(&format!("BREAK{}BREAK", topic)).await;
+        let (sink, _healthcheck) = config_build(&format!("BREAK{topic}BREAK")).await;
         // Explicitly skip healthcheck
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -381,7 +381,7 @@ mod integration_tests {
         trace_init();
 
         let (topic, _subscription) = create_topic_subscription().await;
-        let topic = format!("BAD{}", topic);
+        let topic = format!("BAD{topic}");
         let (_sink, healthcheck) = config_build(&topic).await;
         healthcheck.await.expect_err("Health check did not fail");
     }
@@ -389,14 +389,14 @@ mod integration_tests {
     async fn create_topic_subscription() -> (String, String) {
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
-        request(Method::PUT, &format!("topics/{}", topic), json!({}))
+        request(Method::PUT, &format!("topics/{topic}"), json!({}))
             .await
             .json::<Value>()
             .await
             .expect("Creating new topic failed");
         request(
             Method::PUT,
-            &format!("subscriptions/{}", subscription),
+            &format!("subscriptions/{subscription}"),
             json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) }),
         )
         .await
@@ -413,13 +413,13 @@ mod integration_tests {
             .json(&json)
             .send()
             .await
-            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {method} request to {url} failed"))
     }
 
     async fn pull_messages(subscription: &str, count: usize) -> PullResponse {
         request(
             Method::POST,
-            &format!("subscriptions/{}:pull", subscription),
+            &format!("subscriptions/{subscription}:pull"),
             json!({
                 "returnImmediately": true,
                 "maxMessages": count

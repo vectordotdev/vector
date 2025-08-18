@@ -683,7 +683,7 @@ impl StartJournalctl {
         }
 
         if let Some(namespace) = &self.journal_namespace {
-            command.arg(format!("--namespace={}", namespace));
+            command.arg(format!("--namespace={namespace}"));
         }
 
         if self.current_boot_only {
@@ -691,7 +691,7 @@ impl StartJournalctl {
         }
 
         if let Some(cursor) = checkpoint {
-            command.arg(format!("--after-cursor={}", cursor));
+            command.arg(format!("--after-cursor={cursor}"));
         } else if self.since_now {
             command.arg("--since=now");
         } else {
@@ -846,7 +846,7 @@ fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
-        format!("{}.service", unit)
+        format!("{unit}.service")
     }
 }
 
@@ -996,7 +996,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file.write_all(format!("{}\n", token).as_bytes()).await
+        self.file.write_all(format!("{token}\n").as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -1091,7 +1091,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("first test\n"));
 
         checkpointer
@@ -1101,7 +1101,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("second\n"));
     }
 }
@@ -1488,7 +1488,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
@@ -1508,7 +1508,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
@@ -1526,7 +1526,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));

@@ -7,7 +7,7 @@ use vector_lib::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use crate::codecs::Encoder;
 
 /// Uses the configured encoder to determine batch sizing.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(super) struct HttpBatchSizer {
     pub(super) encoder: Encoder<Framer>,
 }

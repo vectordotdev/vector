@@ -284,7 +284,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -350,7 +350,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 

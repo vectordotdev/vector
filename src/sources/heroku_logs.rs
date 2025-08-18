@@ -326,7 +326,7 @@ fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, Erro
 fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::BAD_REQUEST,
-        format!("Invalid request header {:?}: {:?}", name, msg),
+        format!("Invalid request header {name:?}: {msg:?}"),
     )
 }
 
@@ -407,6 +407,7 @@ fn line_to_events(
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -493,7 +494,7 @@ mod tests {
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
+        let mut req = reqwest::Client::new().post(format!("http://{address}/events?{query}"));
         if let Some(HttpServerAuthConfig::Basic { username, password }) = auth {
             req = req.basic_auth(username, Some(password.inner()));
         }

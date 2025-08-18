@@ -117,8 +117,7 @@ impl AzureMonitorLogsService {
 
             if log_type.len() > 100 || !LOG_TYPE_REGEX.is_match(log_type) {
                 return Err(format!(
-                "invalid log_type \"{}\": log type can only contain letters, numbers, and underscore (_), and may not exceed 100 characters",
-                log_type
+                "invalid log_type \"{log_type}\": log type can only contain letters, numbers, and underscore (_), and may not exceed 100 characters"
             ).into());
             }
             let log_type = HeaderValue::from_str(log_type)?;

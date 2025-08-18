@@ -202,7 +202,7 @@ pub struct CompiledParam {
 
 #[derive(Clone)]
 pub enum CompiledQueryParameterValue {
-    SingleParam(CompiledParam),
+    SingleParam(Box<CompiledParam>),
     MultiParams(Vec<CompiledParam>),
 }
 
@@ -251,7 +251,7 @@ impl Query {
                         let warnings = Formatter::new(param.value(), compilation_result.warnings)
                             .colored()
                             .to_string();
-                        warn!(message = "VRL compilation warnings.", %warnings);
+                        warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
                     }
                     Some(compilation_result.program)
                 }
@@ -259,7 +259,7 @@ impl Query {
                     let error = Formatter::new(param.value(), diagnostics)
                         .colored()
                         .to_string();
-                    warn!(message = "VRL compilation failed.", %error);
+                    warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
                     None
                 }
             }
@@ -278,9 +278,9 @@ impl Query {
         functions: &[Box<dyn Function>],
     ) -> CompiledQueryParameterValue {
         match value {
-            QueryParameterValue::SingleParam(param) => {
-                CompiledQueryParameterValue::SingleParam(Self::compile_value(param, functions))
-            }
+            QueryParameterValue::SingleParam(param) => CompiledQueryParameterValue::SingleParam(
+                Box::new(Self::compile_value(param, functions)),
+            ),
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()
@@ -428,7 +428,7 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
     Runtime::default()
         .resolve(&mut target, program, &timezone)
         .map_err(|error| {
-            warn!(message = "VRL runtime error.", source = %value, %error);
+            warn!(message = "VRL runtime error.", source = %value, %error, internal_log_rate_limit = true);
         })
         .ok()
         .and_then(|vrl_value| {
@@ -525,14 +525,14 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         for event in events {
             match event {
-                Event::Log(ref mut log) => {
+                Event::Log(log) => {
                     self.log_namespace.insert_standard_vector_source_metadata(
                         log,
                         HttpClientConfig::NAME,
                         now,
                     );
                 }
-                Event::Metric(ref mut metric) => {
+                Event::Metric(metric) => {
                     if let Some(source_type_key) = log_schema().source_type_key() {
                         metric.replace_tag(
                             source_type_key.to_string(),
@@ -540,7 +540,7 @@ impl http_client::HttpClientContext for HttpClientContext {
                         );
                     }
                 }
-                Event::Trace(ref mut trace) => {
+                Event::Trace(trace) => {
                     trace.maybe_insert(log_schema().source_type_key_target_path(), || {
                         Bytes::from(HttpClientConfig::NAME).into()
                     });

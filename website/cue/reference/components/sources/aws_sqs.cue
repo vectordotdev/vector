@@ -54,7 +54,7 @@ components: sources: aws_sqs: components._aws & {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_sqs.configuration & {
+	configuration: generated.components.sources.aws_sqs.configuration & {
 		_aws_include: false
 	}
 

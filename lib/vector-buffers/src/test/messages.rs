@@ -160,14 +160,11 @@ impl FixedEncodable for SizedRecord {
     {
         let minimum_len = self.encoded_len();
         if buffer.remaining_mut() < minimum_len {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "not enough capacity to encode record: need {}, only have {}",
-                    minimum_len,
-                    buffer.remaining_mut()
-                ),
-            ));
+            return Err(io::Error::other(format!(
+                "not enough capacity to encode record: need {}, only have {}",
+                minimum_len,
+                buffer.remaining_mut()
+            )));
         }
 
         buffer.put_u32(self.0);
@@ -219,10 +216,7 @@ impl FixedEncodable for UndecodableRecord {
         B: BufMut,
     {
         if buffer.remaining_mut() < 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "not enough capacity to encode record",
-            ));
+            return Err(io::Error::other("not enough capacity to encode record"));
         }
 
         buffer.put_u32(42);
@@ -233,7 +227,7 @@ impl FixedEncodable for UndecodableRecord {
     where
         B: Buf,
     {
-        Err(io::Error::new(io::ErrorKind::Other, "failed to decode"))
+        Err(io::Error::other("failed to decode"))
     }
 }
 
@@ -254,10 +248,7 @@ impl FixedEncodable for MultiEventRecord {
         B: BufMut,
     {
         if buffer.remaining_mut() < self.encoded_size() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "not enough capacity to encode record",
-            ));
+            return Err(io::Error::other("not enough capacity to encode record"));
         }
 
         buffer.put_u32(self.0);
@@ -292,10 +283,7 @@ impl FixedEncodable for PoisonPillMultiEventRecord {
         B: BufMut,
     {
         if buffer.remaining_mut() < self.encoded_size() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "not enough capacity to encode record",
-            ));
+            return Err(io::Error::other("not enough capacity to encode record"));
         }
 
         buffer.put_u32(self.0);
@@ -309,7 +297,7 @@ impl FixedEncodable for PoisonPillMultiEventRecord {
     {
         let event_count = buffer.get_u32();
         if event_count == 42 {
-            return Err(io::Error::new(io::ErrorKind::Other, "failed to decode"));
+            return Err(io::Error::other("failed to decode"));
         }
 
         buffer.advance(usize::try_from(event_count).unwrap_or(usize::MAX));

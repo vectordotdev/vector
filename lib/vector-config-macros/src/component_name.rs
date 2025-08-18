@@ -134,8 +134,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
         return Err(Error::new(
             attr.span(),
             format!(
-                "{}s must have a name specified (e.g. `{}(\"my_component\")`)",
-                component_type, component_type_attr
+                "{component_type}s must have a name specified (e.g. `{component_type_attr}(\"my_component\")`)"
             ),
         ));
     }
@@ -147,8 +146,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
             Error::new(
                 attr.span(),
                 format!(
-                    "expected a string literal for the {} name (i.e. `{}(\"...\")`)",
-                    component_type, component_type_attr
+                    "expected a string literal for the {component_type} name (i.e. `{component_type_attr}(\"...\")`)"
                 ),
             )
         })
@@ -185,6 +183,6 @@ fn check_component_name_validity(component_name: &str) -> Result<(), String> {
     if component_name == component_name_converted {
         Ok(())
     } else {
-        Err(format!("component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{}\")", component_name_converted))
+        Err(format!("component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{component_name_converted}\")"))
     }
 }

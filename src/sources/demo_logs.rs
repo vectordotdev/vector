@@ -154,10 +154,7 @@ impl OutputFormat {
         emit!(DemoLogsEventProcessed);
 
         match self {
-            Self::Shuffle {
-                sequence,
-                ref lines,
-            } => Self::shuffle_generate(*sequence, lines, n),
+            Self::Shuffle { sequence, lines } => Self::shuffle_generate(*sequence, lines, n),
             Self::ApacheCommon => apache_common_log_line(),
             Self::ApacheError => apache_error_log_line(),
             Self::Syslog => syslog_5424_log_line(),
@@ -171,7 +168,7 @@ impl OutputFormat {
         let line = lines.choose(&mut rand::rng()).unwrap();
 
         if sequence {
-            format!("{} {}", n, line)
+            format!("{n} {line}")
         } else {
             line.into()
         }
@@ -363,7 +360,7 @@ mod tests {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> impl Stream<Item = Event> {
+    async fn runit(config: &str) -> impl Stream<Item = Event> + use<> {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
             let config: DemoLogsConfig = toml::from_str(config).unwrap();

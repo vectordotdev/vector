@@ -11,10 +11,11 @@ use tracing::{Instrument, Span};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::{
-    calculate_ignore_before,
-    paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
-    ReadFromConfig,
+    file_server::{calculate_ignore_before, FileServer, Line},
+    paths_provider::{Glob, MatchOptions},
+};
+use vector_lib::file_source_common::{
+    Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
 };
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
@@ -1178,8 +1179,8 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
-                writeln!(&mut file1, "hello {}", i).unwrap();
-                writeln!(&mut file2, "goodbye {}", i).unwrap();
+                writeln!(&mut file1, "hello {i}").unwrap();
+                writeln!(&mut file2, "goodbye {i}").unwrap();
             }
 
             sleep_500_millis().await;
@@ -1258,7 +1259,7 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
             for i in 0..n {
-                writeln!(&mut file, "pretrunc {}", i).unwrap();
+                writeln!(&mut file, "pretrunc {i}").unwrap();
             }
 
             sleep_500_millis().await; // The writes must be observed before truncating
@@ -1269,7 +1270,7 @@ mod tests {
             sleep_500_millis().await; // The truncate must be observed before writing again
 
             for i in 0..n {
-                writeln!(&mut file, "posttrunc {}", i).unwrap();
+                writeln!(&mut file, "posttrunc {i}").unwrap();
             }
 
             sleep_500_millis().await;
@@ -1320,7 +1321,7 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
             for i in 0..n {
-                writeln!(&mut file, "prerot {}", i).unwrap();
+                writeln!(&mut file, "prerot {i}").unwrap();
             }
 
             sleep_500_millis().await; // The writes must be observed before rotating
@@ -1331,7 +1332,7 @@ mod tests {
             sleep_500_millis().await; // The rotation must be observed before writing again
 
             for i in 0..n {
-                writeln!(&mut file, "postrot {}", i).unwrap();
+                writeln!(&mut file, "postrot {i}").unwrap();
             }
 
             sleep_500_millis().await;
@@ -1388,10 +1389,10 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
-                writeln!(&mut file1, "1 {}", i).unwrap();
-                writeln!(&mut file2, "2 {}", i).unwrap();
-                writeln!(&mut file3, "3 {}", i).unwrap();
-                writeln!(&mut file4, "4 {}", i).unwrap();
+                writeln!(&mut file1, "1 {i}").unwrap();
+                writeln!(&mut file2, "2 {i}").unwrap();
+                writeln!(&mut file3, "3 {i}").unwrap();
+                writeln!(&mut file4, "4 {i}").unwrap();
             }
 
             sleep_500_millis().await;
@@ -1436,8 +1437,8 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
-                writeln!(&mut file1, "1 {}", i).unwrap();
-                writeln!(&mut file2, "2 {}", i).unwrap();
+                writeln!(&mut file1, "1 {i}").unwrap();
+                writeln!(&mut file2, "2 {i}").unwrap();
             }
 
             sleep_500_millis().await;
@@ -1690,7 +1691,7 @@ mod tests {
 
         let line_count = 4000;
         for i in 0..line_count {
-            writeln!(&mut file, "Here's a line for you: {}", i).unwrap();
+            writeln!(&mut file, "Here's a line for you: {i}").unwrap();
         }
         sleep_500_millis().await;
 
@@ -1873,7 +1874,7 @@ mod tests {
             writeln!(&mut file, "this is too long").unwrap();
             writeln!(&mut file, "11 eleven11").unwrap();
             let super_long = "This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved".repeat(10000);
-            writeln!(&mut file, "{}", super_long).unwrap();
+            writeln!(&mut file, "{super_long}").unwrap();
             writeln!(&mut file, "exactly 10").unwrap();
             writeln!(&mut file, "it can end on a line that's too long").unwrap();
 
@@ -2332,7 +2333,7 @@ mod tests {
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
-                writeln!(&mut file, "{}", i).unwrap();
+                writeln!(&mut file, "{i}").unwrap();
             }
             drop(file);
 

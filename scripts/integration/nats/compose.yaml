@@ -43,3 +43,10 @@ services:
     - /usr/share/nats/config/nats-jwt.conf
     volumes:
     - ../../../tests/data/nats:/usr/share/nats/config
+  nats-jetstream-test:
+    image: docker.io/library/nats:${CONFIG_VERSION}
+    command:
+    - --config
+    - /usr/share/nats/config/nats-jetstream.conf
+    volumes:
+    - ../../../tests/data/nats:/usr/share/nats/config

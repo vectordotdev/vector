@@ -26,6 +26,7 @@ pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
     type Error = DatadogApiError;
+    type Request = DatadogMetricsRequest;
     type Response = DatadogMetricsResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

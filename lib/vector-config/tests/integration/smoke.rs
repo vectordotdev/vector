@@ -312,7 +312,7 @@ impl From<SocketListenAddr> for String {
                 if fd == 0 {
                     "systemd".to_owned()
                 } else {
-                    format!("systemd#{}", fd)
+                    format!("systemd#{fd}")
                 }
             }
         }
@@ -633,8 +633,73 @@ fn generate_semi_real_schema() {
             let json = serde_json::to_string_pretty(&schema)
                 .expect("rendering root schema to JSON should not fail");
 
-            println!("{}", json);
+            println!("{json}");
         }
-        Err(e) => eprintln!("error while generating schema: {:?}", e),
+        Err(e) => eprintln!("error while generating schema: {e:?}"),
     }
+}
+
+/// A tagged enum with a trailing untagged variant should generate a schema where the
+/// untagged variant does not require the tag field.
+///
+/// This type exists only to validate schema generation behavior.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(tag = "type")]
+enum WithTrailingUntaggedVariant {
+    /// Tagged struct variant.
+    Foo {
+        /// Some numeric value.
+        value: u32,
+    },
+    /// Tagged unit variant.
+    Bar,
+    /// Untagged fallback variant.
+    #[serde(untagged)]
+    Fallback(String),
+    /// Another untagged fallback variant, also allowed by serde.
+    #[serde(untagged)]
+    FallbackAlt(u64),
+}
+
+#[test]
+fn tagged_enum_with_trailing_untagged_variant_schema() {
+    let root =
+        generate_root_schema::<WithTrailingUntaggedVariant>().expect("should generate root schema");
+    let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
+
+    let one_of = schema
+        .get("oneOf")
+        .and_then(|v| v.as_array())
+        .expect("enum schema should use oneOf");
+
+    let mut tagged_schemas = 0usize;
+    let mut untagged_schemas = 0usize;
+
+    for subschema in one_of {
+        let properties = subschema.get("properties");
+        let required = subschema.get("required");
+
+        let has_type_property = properties.and_then(|p| p.get("type")).is_some();
+        let requires_type = required
+            .and_then(|r| r.as_array())
+            .map(|arr| arr.iter().any(|v| v == "type"))
+            .unwrap_or(false);
+
+        if has_type_property || requires_type {
+            tagged_schemas += 1;
+        } else {
+            untagged_schemas += 1;
+
+            // The untagged variants in this test are newtypes: one string and one integer.
+            let instance_type = subschema.get("type").and_then(|t| t.as_str());
+            assert!(matches!(instance_type, Some("string") | Some("integer")));
+        }
+    }
+
+    assert_eq!(tagged_schemas, 2, "expected two tagged variants in schema");
+    assert_eq!(
+        untagged_schemas, 2,
+        "expected two untagged variants in schema"
+    );
 }

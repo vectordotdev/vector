@@ -15,6 +15,38 @@ use crate::{
     spawn_named,
 };
 
+/// Since none of the values used with atomic operations are used to protect other values, we can
+/// always used a "relaxed" ordering when updating them.
+const ORDERING: Ordering = Ordering::Relaxed;
+
+fn increment_counter(counter: &AtomicU64, delta: u64) {
+    counter
+        .fetch_update(ORDERING, ORDERING, |current| {
+            Some(current.checked_add(delta).unwrap_or_else(|| {
+                warn!(
+                    current,
+                    delta, "Buffer counter overflowed. Clamping value to `u64::MAX`."
+                );
+                u64::MAX
+            }))
+        })
+        .ok();
+}
+
+fn decrement_counter(counter: &AtomicU64, delta: u64) {
+    counter
+        .fetch_update(ORDERING, ORDERING, |current| {
+            Some(current.checked_sub(delta).unwrap_or_else(|| {
+                warn!(
+                    current,
+                    delta, "Buffer counter underflowed. Clamping value to `0`."
+                );
+                0
+            }))
+        })
+        .ok();
+}
+
 /// Snapshot of category metrics.
 struct CategorySnapshot {
     event_count: u64,
@@ -43,25 +75,29 @@ struct CategoryMetrics {
 impl CategoryMetrics {
     /// Increments the event count and byte size by the given amounts.
     fn increment(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.fetch_add(event_count, Ordering::Relaxed);
-        self.event_byte_size
-            .fetch_add(event_byte_size, Ordering::Relaxed);
+        increment_counter(&self.event_count, event_count);
+        increment_counter(&self.event_byte_size, event_byte_size);
+    }
+
+    /// Decrements the event count and byte size by the given amounts.
+    fn decrement(&self, event_count: u64, event_byte_size: u64) {
+        decrement_counter(&self.event_count, event_count);
+        decrement_counter(&self.event_byte_size, event_byte_size);
     }
 
     /// Sets the event count and event byte size to the given amount.
     ///
     /// Most updates are meant to be incremental, so this should be used sparingly.
     fn set(&self, event_count: u64, event_byte_size: u64) {
-        self.event_count.store(event_count, Ordering::Release);
-        self.event_byte_size
-            .store(event_byte_size, Ordering::Release);
+        self.event_count.store(event_count, ORDERING);
+        self.event_byte_size.store(event_byte_size, ORDERING);
     }
 
     /// Gets a snapshot of the event count and event byte size.
     fn get(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.load(Ordering::Acquire),
-            event_byte_size: self.event_byte_size.load(Ordering::Acquire),
+            event_count: self.event_count.load(ORDERING),
+            event_byte_size: self.event_byte_size.load(ORDERING),
         }
     }
 
@@ -73,8 +109,8 @@ impl CategoryMetrics {
     /// track the last seen values.
     fn consume(&self) -> CategorySnapshot {
         CategorySnapshot {
-            event_count: self.event_count.swap(0, Ordering::AcqRel),
-            event_byte_size: self.event_byte_size.swap(0, Ordering::AcqRel),
+            event_count: self.event_count.swap(0, ORDERING),
+            event_byte_size: self.event_byte_size.swap(0, ORDERING),
         }
     }
 }
@@ -117,14 +153,20 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.received.increment(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            self.state.received.increment(count, byte_size);
+            self.state.current.increment(count, byte_size);
+        }
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        self.state.sent.increment(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            self.state.sent.increment(count, byte_size);
+            self.state.current.decrement(count, byte_size);
+        }
     }
 
     /// Increment the number of dropped events (and their total size) for this buffer component.
@@ -134,10 +176,13 @@ impl BufferUsageHandle {
         byte_size: u64,
         intentional: bool,
     ) {
-        if intentional {
-            self.state.dropped_intentional.increment(count, byte_size);
-        } else {
-            self.state.dropped.increment(count, byte_size);
+        if count > 0 || byte_size > 0 {
+            if intentional {
+                self.state.dropped_intentional.increment(count, byte_size);
+            } else {
+                self.state.dropped.increment(count, byte_size);
+            }
+            self.state.current.decrement(count, byte_size);
         }
     }
 }
@@ -150,6 +195,7 @@ struct BufferUsageData {
     dropped: CategoryMetrics,
     dropped_intentional: CategoryMetrics,
     max_size: CategoryMetrics,
+    current: CategoryMetrics,
 }
 
 impl BufferUsageData {
@@ -242,8 +288,10 @@ impl BufferUsage {
     /// The `buffer_id` should be a unique name -- ideally the `component_id` of the sink using this buffer -- but is
     /// not used for anything other than reporting, and so has no _requirement_ to be unique.
     pub fn install(self, buffer_id: &str) {
+        let buffer_id = buffer_id.to_string();
         let span = self.span;
         let stages = self.stages;
+        let task_name = format!("buffer usage reporter ({buffer_id})");
 
         let task = async move {
             let mut interval = interval(Duration::from_secs(2));
@@ -253,6 +301,7 @@ impl BufferUsage {
                 for stage in &stages {
                     let max_size = stage.max_size.get();
                     emit(BufferCreated {
+                        buffer_id: buffer_id.clone(),
                         idx: stage.idx,
                         max_size_bytes: max_size.event_byte_size,
                         max_size_events: max_size
@@ -261,50 +310,129 @@ impl BufferUsage {
                             .expect("should never be bigger than `usize`"),
                     });
 
+                    let current = stage.current.get();
                     let received = stage.received.consume();
                     if received.has_updates() {
                         emit(BufferEventsReceived {
+                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: received.event_count,
                             byte_size: received.event_byte_size,
+                            total_count: current.event_count,
+                            total_byte_size: current.event_byte_size,
                         });
                     }
 
                     let sent = stage.sent.consume();
                     if sent.has_updates() {
                         emit(BufferEventsSent {
+                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             count: sent.event_count,
                             byte_size: sent.event_byte_size,
+                            total_count: current.event_count,
+                            total_byte_size: current.event_byte_size,
                         });
                     }
 
                     let dropped = stage.dropped.consume();
                     if dropped.has_updates() {
                         emit(BufferEventsDropped {
+                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: false,
                             reason: "corrupted_events",
                             count: dropped.event_count,
                             byte_size: dropped.event_byte_size,
+                            total_count: current.event_count,
+                            total_byte_size: current.event_byte_size,
                         });
                     }
 
                     let dropped_intentional = stage.dropped_intentional.consume();
                     if dropped_intentional.has_updates() {
                         emit(BufferEventsDropped {
+                            buffer_id: buffer_id.clone(),
                             idx: stage.idx,
                             intentional: true,
                             reason: "drop_newest",
                             count: dropped_intentional.event_count,
                             byte_size: dropped_intentional.event_byte_size,
+                            total_count: current.event_count,
+                            total_byte_size: current.event_byte_size,
                         });
                     }
                 }
             }
         };
 
-        let task_name = format!("buffer usage reporter ({buffer_id})");
         spawn_named(task.instrument(span.or_current()), task_name.as_str());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_multithreaded_updates_are_correct() {
+        const NUM_THREADS: u64 = 16;
+        const INCREMENTS_PER_THREAD: u64 = 10_000;
+
+        let counter = Arc::new(AtomicU64::new(0));
+
+        let mut handles = vec![];
+
+        for _ in 0..NUM_THREADS {
+            let counter = Arc::clone(&counter);
+            let handle = thread::spawn(move || {
+                for _ in 0..INCREMENTS_PER_THREAD {
+                    increment_counter(&counter, 1);
+                    decrement_counter(&counter, 1);
+                }
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(counter.load(ORDERING), 0);
+    }
+
+    #[test]
+    fn test_decrement_counter_prevents_negatives() {
+        let counter = AtomicU64::new(100);
+
+        decrement_counter(&counter, 50);
+        assert_eq!(counter.load(ORDERING), 50);
+
+        decrement_counter(&counter, 100);
+        assert_eq!(counter.load(ORDERING), 0);
+
+        decrement_counter(&counter, 50);
+        assert_eq!(counter.load(ORDERING), 0);
+
+        decrement_counter(&counter, u64::MAX);
+        assert_eq!(counter.load(ORDERING), 0);
+    }
+
+    #[test]
+    fn test_increment_counter_prevents_overflow() {
+        let counter = AtomicU64::new(u64::MAX - 2);
+
+        increment_counter(&counter, 1);
+        assert_eq!(counter.load(ORDERING), u64::MAX - 1);
+
+        increment_counter(&counter, 1);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
+
+        increment_counter(&counter, 1);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
+
+        increment_counter(&counter, u64::MAX);
+        assert_eq!(counter.load(ORDERING), u64::MAX);
     }
 }

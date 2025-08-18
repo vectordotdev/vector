@@ -100,8 +100,7 @@ pub(super) mod process {
                     }
                     Err(err) => {
                         errors.push(format!(
-                            "Could not read entry in config dir: {:?}, {}.",
-                            path, err
+                            "Could not read entry in config dir: {path:?}, {err}."
                         ));
                     }
                 };
@@ -164,10 +163,9 @@ pub(super) mod process {
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table)>, Vec<String>> {
-            if let (Ok(name), Some(file)) = (component_name(path), open_file(path)) {
-                self.load(file, format).map(|value| Some((name, value)))
-            } else {
-                Ok(None)
+            match (component_name(path), open_file(path)) {
+                (Ok(name), Some(file)) => self.load(file, format).map(|value| Some((name, value))),
+                _ => Ok(None),
             }
         }
 

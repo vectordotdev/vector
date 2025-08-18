@@ -56,7 +56,7 @@ components: sources: socket: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.socket.configuration
+	configuration: generated.components.sources.socket.configuration
 
 	output: {
 		logs: line: {

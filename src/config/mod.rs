@@ -78,13 +78,26 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+// // This is not a comprehensive set; variants are added as needed.
+pub enum ComponentType {
+    Transform,
+    Sink,
+    EnrichmentTable,
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ComponentConfig {
     pub config_paths: Vec<PathBuf>,
     pub component_key: ComponentKey,
+    pub component_type: ComponentType,
 }
 
 impl ComponentConfig {
-    pub fn new(config_paths: Vec<PathBuf>, component_key: ComponentKey) -> Self {
+    pub fn new(
+        config_paths: Vec<PathBuf>,
+        component_key: ComponentKey,
+        component_type: ComponentType,
+    ) -> Self {
         let canonicalized_paths = config_paths
             .into_iter()
             .filter_map(|p| fs::canonicalize(p).ok())
@@ -93,12 +106,13 @@ impl ComponentConfig {
         Self {
             config_paths: canonicalized_paths,
             component_key,
+            component_type,
         }
     }
 
-    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<ComponentKey> {
+    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<(ComponentKey, ComponentType)> {
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
-            return Some(self.component_key.clone());
+            return Some((self.component_key.clone(), self.component_type.clone()));
         }
         None
     }
@@ -361,10 +375,10 @@ impl Display for Protocol {
 impl Display for Resource {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
+            Resource::Port(address, protocol) => write!(fmt, "{protocol} {address}"),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
-            Resource::Fd(fd) => write!(fmt, "file descriptor: {}", fd),
-            Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
+            Resource::Fd(fd) => write!(fmt, "file descriptor: {fd}"),
+            Resource::DiskBuffer(name) => write!(fmt, "disk buffer {name:?}"),
         }
     }
 }
@@ -426,8 +440,7 @@ impl TestDefinition<String> {
                         outputs.push(output_id.clone());
                     } else {
                         errors.push(format!(
-                            r#"Invalid extract_from target in test '{}': '{}' does not exist"#,
-                            name, from
+                            r#"Invalid extract_from target in test '{name}': '{from}' does not exist"#
                         ));
                     }
                 }
@@ -449,8 +462,7 @@ impl TestDefinition<String> {
                     Some(output_id.clone())
                 } else {
                     errors.push(format!(
-                        r#"Invalid no_outputs_from target in test '{}': '{}' does not exist"#,
-                        name, o
+                        r#"Invalid no_outputs_from target in test '{name}': '{o}' does not exist"#
                     ));
                     None
                 }
@@ -1376,9 +1388,9 @@ mod resource_config_tests {
                 let json = serde_json::to_string_pretty(&schema)
                     .expect("rendering root schema to JSON should not fail");
 
-                println!("{}", json);
+                println!("{json}");
             }
-            Err(e) => eprintln!("error while generating schema: {:?}", e),
+            Err(e) => eprintln!("error while generating schema: {e:?}"),
         }
     }
 }

@@ -138,7 +138,7 @@ mod tests {
 
     pub fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
-            format!("counter-{}", num),
+            format!("counter-{num}"),
             kind,
             MetricValue::Counter { value },
         )
@@ -146,12 +146,12 @@ mod tests {
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+        Metric::new(format!("gauge-{num}"), kind, MetricValue::Gauge { value })
     }
 
     pub fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
         Metric::new(
-            format!("set-{}", num),
+            format!("set-{num}"),
             kind,
             MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
@@ -161,7 +161,7 @@ mod tests {
 
     pub fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
         Metric::new(
-            format!("dist-{}", num),
+            format!("dist-{num}"),
             kind,
             MetricValue::Distribution {
                 samples: vector_lib::samples![num as f64 => rate],
@@ -178,7 +178,7 @@ mod tests {
         sum: f64,
     ) -> Metric {
         Metric::new(
-            format!("buckets-{}", num),
+            format!("buckets-{num}"),
             kind,
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![
@@ -194,7 +194,7 @@ mod tests {
 
     pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
         Metric::new(
-            format!("quantiles-{}", num),
+            format!("quantiles-{num}"),
             kind,
             MetricValue::AggregatedSummary {
                 quantiles: vector_lib::quantiles![
@@ -239,7 +239,7 @@ mod tests {
         result
             .into_iter()
             .map(|mut batch| {
-                batch.sort_by_key(|k| format!("{:?}", k));
+                batch.sort_by_key(|k| format!("{k:?}"));
                 batch
             })
             .collect()

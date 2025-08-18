@@ -129,7 +129,7 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let limit_exists = limit_visitor.limit.unwrap_or(true);
+        let limit_exists = limit_visitor.limit.unwrap_or(false);
         if !limit_exists {
             return self.inner.on_event(event, ctx);
         }
@@ -264,8 +264,11 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-        } else if let Some(ratelimit_field) = fields.field(RATE_LIMIT_FIELD) {
-            let values = [(&ratelimit_field, Some(&rate_limit as &dyn Value))];
+        } else {
+            let values = [(
+                &fields.field(RATE_LIMIT_FIELD).unwrap(),
+                Some(&rate_limit as &dyn Value),
+            )];
 
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
@@ -386,7 +389,7 @@ impl Visit for RateLimitedSpanKeys {
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        self.record(field, format!("{:?}", value).into());
+        self.record(field, format!("{value:?}").into());
     }
 }
 
@@ -434,7 +437,7 @@ impl Visit for MessageVisitor {
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if self.message.is_none() && field.name() == MESSAGE_FIELD {
-            self.message = Some(format!("{:?}", value));
+            self.message = Some(format!("{value:?}"));
         }
     }
 }
@@ -523,34 +526,6 @@ mod test {
     }
 
     #[test]
-    fn rate_limits_default() {
-        let events: Arc<Mutex<Vec<String>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(10));
-        tracing::subscriber::with_default(sub, || {
-            for _ in 0..21 {
-                info!(message = "Hello world!");
-                MockClock::advance(Duration::from_millis(100));
-            }
-        });
-
-        let events = events.lock().unwrap();
-
-        assert_eq!(
-            *events,
-            vec![
-                "Hello world!",
-                "Internal log [Hello world!] is being suppressed to avoid flooding.",
-            ]
-            .into_iter()
-            .map(std::borrow::ToOwned::to_owned)
-            .collect::<Vec<String>>()
-        );
-    }
-
-    #[test]
     fn override_rate_limit_at_callsite() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
@@ -559,7 +534,11 @@ mod test {
             .with(RateLimitedLayer::new(recorder).with_default_limit(100));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
-                info!(message = "Hello world!", internal_log_rate_secs = 1);
+                info!(
+                    message = "Hello world!",
+                    internal_log_rate_limit = true,
+                    internal_log_rate_secs = 1
+                );
                 MockClock::advance(Duration::from_millis(100));
             }
         });
@@ -598,8 +577,8 @@ mod test {
                             info_span!("span", component_id = &key, vrl_position = &line_number);
                         let _enter = span.enter();
                         info!(
-                            message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
+                            internal_log_rate_limit = true
                         );
                     }
                 }
@@ -659,8 +638,8 @@ mod test {
                 for key in &["foo", "bar"] {
                     for line_number in &[1, 2] {
                         info!(
-                            message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
+                            internal_log_rate_limit = true,
                             component_id = &key,
                             vrl_position = &line_number
                         );

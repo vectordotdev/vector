@@ -195,7 +195,7 @@ impl SinkConfig for TestConfig {
             .with_flat_map(|event| {
                 stream::iter(Some(Ok(EncodedEvent::new(event, 0, JsonSize::zero()))))
             })
-            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
+            .sink_map_err(|error| panic!("Fatal test sink error: {error}"));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
@@ -321,6 +321,7 @@ enum Error {
 struct TestRetryLogic;
 
 impl RetryLogic for TestRetryLogic {
+    type Request = Vec<Event>;
     type Response = Response;
     type Error = Error;
 
@@ -525,14 +526,14 @@ impl Range {
     fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value: value as f64,
                 reference: self.0,
             })
         } else if value > self.1 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value: value as f64,
                 reference: self.1,
@@ -545,14 +546,14 @@ impl Range {
     fn assert_f64(&self, value: f64, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value,
                 reference: self.0,
             })
         } else if value > self.1 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value,
                 reference: self.1,
@@ -669,7 +670,7 @@ async fn run_compare(input: TestInput) {
             failure.stat_name, failure.value, mode, failure.reference
         );
     }
-    assert!(failures.is_empty(), "{:#?}", results);
+    assert!(failures.is_empty(), "{results:#?}");
 }
 
 #[rstest]
@@ -681,7 +682,7 @@ async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path:
         .read_to_string(&mut data)
         .unwrap();
     let input: TestInput = toml::from_str(&data)
-        .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
+        .unwrap_or_else(|error| panic!("Invalid TOML in {file_path:?}: {error:?}"));
 
     time::pause();
 

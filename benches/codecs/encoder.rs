@@ -92,7 +92,7 @@ fn encoder(c: &mut Criterion) {
         b.iter_batched(
             || {
                 vector::codecs::Encoder::<Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
+                    NewlineDelimitedEncoder::default().into(),
                     JsonSerializerConfig::default().build().into(),
                 )
             },

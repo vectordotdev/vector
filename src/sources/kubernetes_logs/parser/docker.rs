@@ -339,7 +339,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 
@@ -355,7 +355,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 }

@@ -347,7 +347,7 @@ impl ChronicleUnstructuredConfig {
         let partitioner = self.partitioner()?;
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic)
+            .settings(request, GcsRetryLogic::default())
             .service(ChronicleService::new(client, base_url, creds));
 
         let request_settings = ChronicleRequestBuilder::new(self)?;
@@ -788,13 +788,13 @@ mod integration_tests {
 
     async fn request(method: Method, path: &str, log_type: &str) -> Response {
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
-        let url = format!("{}/{}", address, path);
+        let url = format!("{address}/{path}");
         Client::new()
             .request(method.clone(), &url)
             .query(&[("log_type", log_type)])
             .send()
             .await
-            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {method} request to {url} failed"))
     }
 
     async fn pull_messages(log_type: &str) -> Vec<Log> {

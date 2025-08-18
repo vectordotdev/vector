@@ -58,6 +58,7 @@ fn bench(c: &mut Criterion) {
                             bar = "bar",
                             baz = 3,
                             quuux = ?0.99,
+                            internal_log_rate_limit = true
                         )
                     }
                 })
@@ -95,7 +96,7 @@ struct Visitor<'a>(MutexGuard<'a, String>);
 impl field::Visit for Visitor<'_> {
     fn record_debug(&mut self, _field: &field::Field, value: &dyn fmt::Debug) {
         use std::fmt::Write;
-        _ = write!(&mut *self.0, "{:?}", value);
+        _ = write!(&mut *self.0, "{value:?}");
     }
 }
 
