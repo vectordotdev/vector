@@ -1,7 +1,6 @@
 # Example configuration demonstrating varint framing for protobuf
 # This is compatible with tools like ClickHouse that use protobuf with varint length prefixes
 
-# Source configuration with varint framing
 sources:
   protobuf_source:
     type: socket
@@ -15,49 +14,7 @@ sources:
     framing:
       method: varint_length_delimited
 
-# Alternative: using the default framing (length_delimited is default for protobuf)
-sources:
-  protobuf_source_default:
-    type: socket
-    mode: tcp
-    address: "0.0.0.0:8081"
-    decoding:
-      codec: protobuf
-      protobuf:
-        desc_file: "path/to/your/protobuf.desc"
-        message_type: "your.package.MessageType"
-    # No framing specified - will use length_delimited by default
-
-# Sink configuration with explicit varint framing
-sinks:
-  protobuf_sink:
-    type: socket
-    mode: tcp
-    address: "localhost:9090"
-    encoding:
-      codec: protobuf
-      protobuf:
-        desc_file: "path/to/your/protobuf.desc"
-        message_type: "your.package.MessageType"
-    framing:
-      method: varint_length_delimited
-
-# Alternative: using the default framing (length_delimited is default for protobuf)
-sinks:
-  protobuf_sink_default:
-    type: socket
-    mode: tcp
-    address: "localhost:9091"
-    encoding:
-      codec: protobuf
-      protobuf:
-        desc_file: "path/to/your/protobuf.desc"
-        message_type: "your.package.MessageType"
-    # No framing specified - will use length_delimited by default
-
-# Complete pipeline example
-sources:
-  input:
+  socket_source:
     type: socket
     mode: tcp
     address: "0.0.0.0:8080"
@@ -70,7 +27,23 @@ sources:
       method: varint_length_delimited
 
 sinks:
-  output:
+  protobuf_sink:
+    input:
+      - protobuf_source
+    type: socket
+    mode: tcp
+    address: "localhost:9090"
+    encoding:
+      codec: protobuf
+      protobuf:
+        desc_file: "path/to/your/protobuf.desc"
+        message_type: "your.package.MessageType"
+    framing:
+      method: varint_length_delimited
+
+  socket_output:
+    input:
+      - socket_source
     type: socket
     mode: tcp
     address: "localhost:9090"
@@ -81,12 +54,3 @@ sinks:
         message_type: "output.Message"
     framing:
       method: varint_length_delimited
-
-# Connect source to sink
-topology:
-  sources:
-    - input
-  sinks:
-    - output
-  edges:
-    - input -> output
