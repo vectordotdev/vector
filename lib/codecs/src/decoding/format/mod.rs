@@ -15,8 +15,8 @@ mod protobuf;
 mod syslog;
 mod vrl;
 
-use ::bytes::Bytes;
 pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+use ::bytes::Bytes;
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
@@ -44,11 +44,18 @@ pub trait Deserializer: DynClone + Send + Sync {
     /// frame can potentially hold multiple events, e.g. when parsing a JSON
     /// array. However, we optimize the most common case of emitting one event
     /// by not requiring heap allocations for it.
+    ///
+    /// **Note**: The type of the produced events depends on the implementation.
     fn parse(
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>>;
+
+    /// Parses trace events from bytes.
+    fn parse_traces(&self, _bytes: Bytes) -> vector_common::Result<SmallVec<[Event; 1]>> {
+        unimplemented!()
+    }
 }
 
 dyn_clone::clone_trait_object!(Deserializer);

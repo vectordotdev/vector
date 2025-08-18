@@ -6,6 +6,7 @@ use futures_util::{future::join, TryFutureExt};
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 
 use vector_lib::{
+    codecs::decoding::ProtobufDeserializer,
     config::{log_schema, LegacyKey, LogNamespace},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},

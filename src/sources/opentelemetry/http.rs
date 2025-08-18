@@ -45,23 +45,6 @@ use warp::{
     filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
 };
 
-use crate::common::http::ErrorMessage;
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
-use crate::sources::http_server::HttpConfigParamKind;
-use crate::sources::util::add_headers;
-use crate::{
-    event::Event,
-    http::build_http_trace_layer,
-    internal_events::{EventsReceived, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::util::decode,
-    tls::MaybeTlsSettings,
-    SourceSender,
-};
-
-use super::{reply::protobuf, status::Status};
-use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
-
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
     ServerShutdown,
@@ -157,17 +140,24 @@ fn enrich_events(
     );
 }
 
-fn build_warp_log_filter(
+fn build_ingest_filter<Resp, F>(
+    telemetry_type: &'static str,
     acknowledgements: bool,
-    log_namespace: LogNamespace,
     out: SourceSender,
-    bytes_received: Registered<BytesReceived>,
-    events_received: Registered<EventsReceived>,
-    headers: Vec<HttpConfigParamKind>,
-    deserializer: Option<ProtobufDeserializer>,
-) -> BoxedFilter<(Response,)> {
+    make_events: F,
+) -> BoxedFilter<(Response,)>
+where
+    Resp: prost::Message + Default + Send + 'static,
+    F: Clone
+        + Send
+        + Sync
+        + 'static
+        + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
+{
     warp::post()
-        .and(warp::path!("v1" / "logs"))
+        .and(warp::path("v1"))
+        .and(warp::path(telemetry_type))
+        .and(warp::path::end())
         .and(warp::header::exact_ignore_case(
             "content-type",
             "application/x-protobuf",
@@ -176,38 +166,49 @@ fn build_warp_log_filter(
         .and(warp::header::headers_cloned())
         .and(warp::body::bytes())
         .and_then(
-            move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
-                println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
-                let events = if let Some(deserializer) = deserializer.as_ref() {
-                    deserializer
-                        .parse(body, log_namespace)
-                        .map(|result| result.into_vec())
-                        .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
-                } else {
-                    decode(encoding_header.as_deref(), body)
-                        .and_then(|body| {
-                            bytes_received.emit(ByteSize(body.len()));
-                            decode_log_body(body, log_namespace, &events_received)
-                        })
-                        .map(|mut events| {
-                            enrich_events(&mut events, &headers, &headers_config, log_namespace);
-                            events
-                        })
-                };
-
-                println!("{:#?}", events);
+            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+                let events = make_events(encoding_header, headers, body);
                 handle_request(
                     events,
                     acknowledgements,
                     out.clone(),
-                    LOGS,
-                    ExportLogsServiceResponse::default(),
+                    telemetry_type,
+                    Resp::default(),
                 )
             },
         )
         .boxed()
 }
 
+fn build_warp_log_filter(
+    acknowledgements: bool,
+    log_namespace: LogNamespace,
+    out: SourceSender,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
+    deserializer: Option<ProtobufDeserializer>,
+) -> BoxedFilter<(Response,)> {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+        if let Some(d) = deserializer.as_ref() {
+            d.parse(body, log_namespace)
+                .map(|r| r.into_vec())
+                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+        } else {
+            decode(encoding_header.as_deref(), body)
+                .and_then(|body| {
+                    bytes_received.emit(ByteSize(body.len()));
+                    decode_log_body(body, log_namespace, &events_received)
+                })
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
+                    events
+                })
+        }
+    };
+
+    build_ingest_filter::<ExportLogsServiceResponse, _>(LOGS, acknowledgements, out, make_events)
+}
 fn build_warp_metrics_filter(
     acknowledgements: bool,
     out: SourceSender,

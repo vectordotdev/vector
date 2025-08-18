@@ -1,17 +1,14 @@
-use crate::sources::opentelemetry::config::{LOGS, METRICS, TRACES};
+use crate::sources::opentelemetry::config::METRICS;
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
+    sources::opentelemetry::config::{LOGS, TRACES},
     SourceSender,
 };
 use futures::TryFutureExt;
 use prost::Message;
-use std::path::PathBuf;
 use tonic::{Request, Response, Status};
 use vector_lib::codecs::decoding::format::Deserializer;
-use vector_lib::codecs::decoding::{
-    ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions,
-};
+use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{
@@ -30,8 +27,6 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
-
-
 
 #[derive(Clone)]
 pub(super) struct Service {
@@ -52,9 +47,9 @@ impl TraceService for Service {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
             deserializer
-                .parse(bytes, self.log_namespace)
-                .map_err(|e| Status::invalid_argument(e.to_string()))?
-                .into_vec()
+                .parse_traces(bytes)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
         } else {
             request
                 .into_inner()
@@ -77,28 +72,21 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        println!("{request:#?}");
-        let raw_bytes = request.get_ref().encode_to_vec();
-        println!("{raw_bytes:?}");
-
-        let bytes = bytes::Bytes::from(raw_bytes);
-        let deserializer = ProtobufDeserializerConfig {
-            protobuf: ProtobufDeserializerOptions {
-                desc_file: PathBuf::from("/Users/pavlos.rontidis/CLionProjects/vector/pront/otel/proto/vector-proto-related/otlp.desc"),
-                message_type: "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest".to_string(),
-            }
-        }.build().unwrap();
-        let events = deserializer
-            .parse(bytes, self.log_namespace)
-            .unwrap()
-            .into_vec();
-
-        // let events: Vec<Event> = request
-        //     .into_inner()
-        //     .resource_logs
-        //     .into_iter()
-        //     .flat_map(|v| v.into_event_iter(self.log_namespace))
-        //     .collect();
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            let bytes = bytes::Bytes::from(raw_bytes);
+            deserializer
+                .parse(bytes, self.log_namespace)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
+        } else {
+            request
+                .into_inner()
+                .resource_logs
+                .into_iter()
+                .flat_map(|v| v.into_event_iter(self.log_namespace))
+                .collect()
+        };
         self.handle_events(events, LOGS).await?;
 
         Ok(Response::new(ExportLogsServiceResponse {
@@ -113,6 +101,7 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+        // Protobuf deserializer doesn't support metrics.
         let events: Vec<Event> = request
             .into_inner()
             .resource_metrics

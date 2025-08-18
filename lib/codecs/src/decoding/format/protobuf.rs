@@ -6,13 +6,13 @@ use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
-use vector_core::event::LogEvent;
+use vector_core::event::{LogEvent, TraceEvent};
 use vector_core::{
     config::{log_schema, DataType, LogNamespace},
     event::Event,
     schema,
 };
-use vrl::value::Kind;
+use vrl::value::{Kind, Value};
 
 use super::Deserializer;
 
@@ -98,18 +98,28 @@ impl ProtobufDeserializer {
     }
 }
 
+fn extract_vrl_value(
+    bytes: Bytes,
+    message_descriptor: &MessageDescriptor,
+) -> vector_common::Result<Value> {
+    let dynamic_message = DynamicMessage::decode(message_descriptor.clone(), bytes)
+        .map_err(|error| format!("Error parsing protobuf: {error:?}"))?;
+
+    Ok(vrl::protobuf::proto_to_value(
+        &prost_reflect::Value::Message(dynamic_message),
+        None,
+    )?)
+}
+
 impl Deserializer for ProtobufDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
-            .map_err(|error| format!("Error parsing protobuf: {error:?}"))?;
+        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor)?;
+        let mut event = Event::Log(LogEvent::from(vrl_value));
 
-        let proto_vrl =
-            vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
-        let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
             LogNamespace::Legacy => {
@@ -125,6 +135,12 @@ impl Deserializer for ProtobufDeserializer {
         };
 
         Ok(smallvec![event])
+    }
+
+    fn parse_traces(&self, bytes: Bytes) -> vector_common::Result<SmallVec<[Event; 1]>> {
+        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor)?;
+        let trace_event = Event::Trace(TraceEvent::from(vrl_value));
+        Ok(smallvec![trace_event])
     }
 }
 
