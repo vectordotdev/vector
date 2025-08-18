@@ -8,7 +8,7 @@ releases: "0.49.0": {
 
 	known_issues: [
 		"""
-			The protobuf codecs do not support all telemetry types. Specifically the current status is the following:
+			The protobuf codecs do not support all telemetry types. Specifically, the following applies:
 			- Decoder: supports logs.
 			- Encoder: supports logs and traces.
 
