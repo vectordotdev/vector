@@ -108,6 +108,7 @@ members = [
   "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
+  "lib/file-source-common",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
