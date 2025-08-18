@@ -11,7 +11,7 @@ use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
+use crate::{internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt};
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
