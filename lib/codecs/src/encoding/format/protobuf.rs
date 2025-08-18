@@ -30,7 +30,7 @@ impl ProtobufSerializerConfig {
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::all_bits()
+        DataType::Log | DataType::Trace
     }
 
     /// The schema required by the serializer.
