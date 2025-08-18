@@ -1,13 +1,13 @@
 use std::time::SystemTime;
 
 use chrono::prelude::*;
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use vector::enrichment_tables::file::FileData;
 use vector::enrichment_tables::{
-    file::File, geoip::{Geoip, GeoipConfig},
+    Condition, Table,
+    file::File,
+    geoip::{Geoip, GeoipConfig},
     mmdb::{Mmdb, MmdbConfig},
-    Condition,
-    Table,
 };
 use vector_lib::enrichment::Case;
 use vrl::value::{ObjectMap, Value};
