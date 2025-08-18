@@ -1,10 +1,16 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use std::{
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 use async_trait::async_trait;
-use vector_lib::buffers::topology::channel::{limited, LimitedReceiver};
+use vector_lib::buffers::{
+    config::MemoryBufferSize,
+    topology::channel::{limited, LimitedReceiver},
+};
 use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, schema::Definition};
 use vector_lib::{
@@ -41,11 +47,13 @@ pub struct BasicSourceConfig {
 
 impl Default for BasicSourceConfig {
     fn default() -> Self {
-        let (_, receiver) = limited(1000);
+        let (_, receiver) = limited(MemoryBufferSize::MaxEvents(
+            NonZeroUsize::new(1000).unwrap(),
+        ));
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -59,7 +67,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -69,7 +77,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: Some(data.into()),
         }
@@ -82,7 +90,7 @@ impl BasicSourceConfig {
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
-            data_type: Some(DataType::all()),
+            data_type: Some(DataType::all_bits()),
             force_shutdown: false,
             data: None,
         }
@@ -136,7 +144,7 @@ impl SourceConfig for BasicSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.data_type.unwrap(),
             Definition::default_legacy_namespace(),
         )]

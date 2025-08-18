@@ -295,7 +295,6 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>> for
     }
 }
 
-#[async_trait::async_trait]
 impl HttpSink for MezmoConfig {
     type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
     type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
@@ -368,7 +367,7 @@ impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
         let host = &self.endpoint.uri;
 
-        let uri = format!("{}{}?{}", host, PATH, query);
+        let uri = format!("{host}{PATH}?{query}");
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
@@ -483,7 +482,7 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         let endpoint = UriSerde {
-            uri: format!("http://{}", addr).parse::<http::Uri>().unwrap(),
+            uri: format!("http://{addr}").parse::<http::Uri>().unwrap(),
             auth: None,
         };
         config.endpoint = endpoint;
@@ -543,7 +542,7 @@ mod tests {
                 let (p, host) = hosts
                     .iter()
                     .enumerate()
-                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .find(|(_, host)| query.contains(&format!("hostname={host}")))
                     .expect("invalid hostname");
                 let lines = &partitions[p];
 

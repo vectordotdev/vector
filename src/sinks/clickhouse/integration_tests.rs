@@ -19,14 +19,16 @@ use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, 
 use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
-use super::*;
 use crate::{
     codecs::{TimestampFormat, Transformer},
     config::{log_schema, SinkConfig, SinkContext},
-    sinks::util::{BatchConfig, Compression, TowerRequestConfig},
+    sinks::{
+        clickhouse::config::ClickhouseConfig,
+        util::{BatchConfig, Compression, TowerRequestConfig},
+    },
     test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
-        random_string, trace_init,
+        random_table_name, trace_init,
     },
 };
 
@@ -38,7 +40,7 @@ fn clickhouse_address() -> String {
 async fn insert_events() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -87,7 +89,7 @@ async fn insert_events() {
 async fn skip_unknown_fields() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -96,7 +98,7 @@ async fn skip_unknown_fields() {
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
         table: table.clone().try_into().unwrap(),
-        skip_unknown_fields: true,
+        skip_unknown_fields: Some(true),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig {
@@ -133,7 +135,7 @@ async fn skip_unknown_fields() {
 async fn insert_events_unix_timestamps() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -192,21 +194,20 @@ async fn insert_events_unix_timestamps() {
 async fn insert_events_unix_timestamps_toml_config() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let config: ClickhouseConfig = toml::from_str(&format!(
         r#"
-host = "{}"
-table = "{}"
+host = "{host}"
+table = "{table}"
 compression = "none"
 [request]
 retry_attempts = 1
 [batch]
 max_events = 1
 [encoding]
-timestamp_format = "unix""#,
-        host, table
+timestamp_format = "unix""#
     ))
     .unwrap();
 
@@ -250,7 +251,7 @@ timestamp_format = "unix""#,
 async fn no_retry_on_incorrect_data() {
     trace_init();
 
-    let table = gen_table();
+    let table = random_table_name();
     let host = clickhouse_address();
 
     let mut batch = BatchConfig::default();
@@ -309,7 +310,7 @@ async fn no_retry_on_incorrect_data_warp() {
 
     let config = ClickhouseConfig {
         endpoint: host.parse().unwrap(),
-        table: gen_table().try_into().unwrap(),
+        table: random_table_name().try_into().unwrap(),
         batch,
         ..Default::default()
     };
@@ -334,7 +335,7 @@ async fn templated_table() {
     let n_tables = 2;
     let table_events: Vec<(String, Event, BatchStatusReceiver)> = (0..n_tables)
         .map(|_| {
-            let table = gen_table();
+            let table = random_table_name();
             let (mut event, receiver) = make_event();
             event.as_mut_log().insert("table", table.as_str());
             (table, event, receiver)
@@ -373,20 +374,18 @@ async fn templated_table() {
 
     for (table, event, mut receiver) in table_events {
         let output = client.select_all(&table).await;
-        assert_eq!(1, output.rows, "table {} should have 1 row", table);
+        assert_eq!(1, output.rows, "table {table} should have 1 row");
 
         let expected = serde_json::to_value(event.into_log()).unwrap();
         assert_eq!(
             expected, output.data[0],
-            "table \"{}\"'s one row should have the correct data",
-            table
+            "table \"{table}\"'s one row should have the correct data"
         );
 
         assert_eq!(
             receiver.try_recv(),
             Ok(BatchStatus::Delivered),
-            "table \"{}\"'s event should have been delivered",
-            table
+            "table \"{table}\"'s event should have been delivered"
         );
     }
 }
@@ -416,11 +415,10 @@ impl ClickhouseClient {
             .client
             .post(&self.host)
             .body(format!(
-                "CREATE TABLE {}
-                    ({})
+                "CREATE TABLE {table}
+                    ({schema})
                     ENGINE = MergeTree()
-                    ORDER BY (host, timestamp);",
-                table, schema
+                    ORDER BY (host, timestamp);"
             ))
             .send()
             .await
@@ -435,7 +433,7 @@ impl ClickhouseClient {
         let response = self
             .client
             .post(&self.host)
-            .body(format!("SELECT * FROM {} FORMAT JSON", table))
+            .body(format!("SELECT * FROM {table} FORMAT JSON"))
             .send()
             .await
             .unwrap();
@@ -446,7 +444,7 @@ impl ClickhouseClient {
             let text = response.text().await.unwrap();
             match serde_json::from_str(&text) {
                 Ok(value) => value,
-                Err(_) => panic!("json failed: {:?}", text),
+                Err(_) => panic!("json failed: {text:?}"),
             }
         }
     }
@@ -467,8 +465,4 @@ struct Stats {
     bytes_read: usize,
     elapsed: f64,
     rows_read: usize,
-}
-
-fn gen_table() -> String {
-    format!("test_{}", random_string(10).to_lowercase())
 }

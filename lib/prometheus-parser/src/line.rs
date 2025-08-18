@@ -6,11 +6,12 @@ use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
     character::complete::{char, digit1},
-    combinator::{map, opt, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded},
+    Parser,
 };
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
@@ -62,7 +63,7 @@ impl From<nom::Err<ErrorKind>> for ErrorKind {
     }
 }
 
-impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
+impl nom::error::ParseError<&str> for ErrorKind {
     fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
         ErrorKind::Nom {
             input: input.to_owned(),
@@ -140,7 +141,8 @@ impl Metric {
             // This shouldn't be necessary if that issue is remedied.
             value(f64::NAN, tag("NaN")),
             double,
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| {
             ErrorKind::ParseFloatError {
                 input: input.to_owned(),
@@ -151,16 +153,25 @@ impl Metric {
 
     fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
         let input = trim_space(input);
-        opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
-            s.parse().unwrap()
-        }))(input)
+        opt(map_res(
+            recognize(pair(opt(char('-')), digit1)),
+            |s: &str| s.parse(),
+        ))
+        .parse(input)
+        .map_err(|_: NomError| {
+            ErrorKind::ParseTimestampError {
+                input: input.to_owned(),
+            }
+            .into()
+        })
     }
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
         map(
-            tuple((parse_name, match_char('='), Self::parse_escaped_string)),
+            (parse_name, match_char('='), Self::parse_escaped_string),
             |(name, _, value)| (name, value),
-        )(input)
+        )
+        .parse(input)
     }
 
     // Return:
@@ -217,7 +228,7 @@ impl Metric {
     fn parse_labels(input: &str) -> IResult<BTreeMap<String, String>> {
         let input = trim_space(input);
 
-        match opt(char('{'))(input) {
+        match opt(char('{')).parse(input) {
             Ok((input, None)) => Ok((input, BTreeMap::new())),
             Ok((input, Some(_))) => Self::parse_labels_inner(input),
             Err(failure) => Err(failure),
@@ -273,7 +284,7 @@ impl Metric {
             })
         }
 
-        delimited(match_quote, build_string, match_quote)(input)
+        delimited(match_quote, build_string, match_quote).parse(input)
     }
 }
 
@@ -310,7 +321,8 @@ impl Header {
             value(MetricKind::Summary, tag("summary")),
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| ErrorKind::InvalidMetricKind {
             input: input.to_owned(),
         })?;
@@ -349,7 +361,7 @@ impl Line {
         };
 
         if let Ok((input, _)) = char::<_, NomErrorType>('#')(input) {
-            if tuple::<_, _, NomErrorType, _>((sp, tag("TYPE")))(input).is_ok() {
+            if (sp, tag::<_, _, NomErrorType>("TYPE")).parse(input).is_ok() {
                 return Err(header_error);
             }
             Ok(None)
@@ -365,7 +377,8 @@ fn parse_name(input: &str) -> IResult<String> {
     let (input, (a, b)) = pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_' || c == ':'),
-    )(input)
+    )
+    .parse(input)
     .map_err(|_: NomError| ErrorKind::ParseNameError {
         input: input.to_owned(),
     })?;
@@ -373,7 +386,7 @@ fn parse_name(input: &str) -> IResult<String> {
 }
 
 fn trim_space(input: &str) -> &str {
-    input.trim_start_matches(|c| c == ' ' || c == '\t')
+    input.trim_start_matches([' ', '\t'])
 }
 
 fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {
@@ -382,7 +395,7 @@ fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, 
 
 fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
     move |input| {
-        preceded(sp, char(c))(input).map_err(|_: NomError| {
+        preceded(sp, char(c)).parse(input).map_err(|_: NomError| {
             ErrorKind::ExpectedChar {
                 expected: c,
                 input: input.to_owned(),
@@ -401,7 +414,7 @@ mod test {
     #[test]
     fn test_parse_escaped_string() {
         fn wrap(s: &str) -> String {
-            format!("  \t \"{}\"  .", s)
+            format!("  \t \"{s}\"  .")
         }
 
         // parser should not consume more that it needed
@@ -441,7 +454,7 @@ mod test {
     #[test]
     fn test_parse_name() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -467,7 +480,7 @@ mod test {
     #[test]
     fn test_parse_header() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -541,7 +554,7 @@ mod test {
     #[test]
     fn test_parse_value() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -609,7 +622,7 @@ mod test {
     #[test]
     fn test_parse_labels() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -667,6 +680,24 @@ mod test {
         assert_eq!(Metric::parse_timestamp(""), Ok(("", None)));
         assert_eq!(Metric::parse_timestamp("123"), Ok(("", Some(123))));
         assert_eq!(Metric::parse_timestamp(" -23"), Ok(("", Some(-23))));
+        // Edge cases
+        assert_eq!(
+            Metric::parse_timestamp("9223372036854775807"),
+            Ok(("", Some(9223372036854775807i64)))
+        );
+        assert_eq!(
+            Metric::parse_timestamp("-9223372036854775808"),
+            Ok(("", Some(-9223372036854775808i64)))
+        );
+        // overflow
+        assert_eq!(
+            Metric::parse_timestamp("9223372036854775809"),
+            Ok(("9223372036854775809", None))
+        );
+        assert_eq!(
+            Metric::parse_timestamp("-9223372036854775809"),
+            Ok(("-9223372036854775809", None))
+        );
     }
 
     #[test]

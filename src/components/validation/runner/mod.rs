@@ -188,13 +188,11 @@ impl Runner {
             .insert(validator_name.to_string(), validator)
             .is_some()
         {
-            panic!(
-                "attempted to add duplicate validator '{}' to runner",
-                validator_name
-            );
+            panic!("attempted to add duplicate validator '{validator_name}' to runner");
         }
     }
 
+    #[allow(clippy::print_stdout)]
     pub async fn run_validation(self) -> Result<Vec<RunnerResults>, vector_lib::Error> {
         // Initialize our test environment.
         initialize_test_environment();
@@ -205,8 +203,8 @@ impl Runner {
 
         let test_cases = load_component_test_cases(&self.test_case_data_path)?;
         for test_case in test_cases {
-            println!("");
-            println!("");
+            println!();
+            println!();
             info!(
                 "Running test '{}' case for component '{}' (type: {:?})...",
                 test_case.name,
@@ -322,6 +320,7 @@ impl Runner {
                 &runner_metrics,
                 maybe_runner_encoder.as_ref().cloned(),
                 self.configuration.component_type,
+                self.configuration.log_namespace(),
             );
 
             // the number of events we expect to receive from the output.
@@ -431,18 +430,10 @@ impl Runner {
 /// returned explaining the cause.
 fn load_component_test_cases(test_case_data_path: &PathBuf) -> Result<Vec<TestCase>, String> {
     std::fs::File::open(test_case_data_path)
-        .map_err(|e| {
-            format!(
-                "I/O error during open of component validation test cases file: {}",
-                e
-            )
-        })
+        .map_err(|e| format!("I/O error during open of component validation test cases file: {e}"))
         .and_then(|file| {
             serde_yaml::from_reader(file).map_err(|e| {
-                format!(
-                    "Deserialization error for component validation test cases file: {}",
-                    e
-                )
+                format!("Deserialization error for component validation test cases file: {e}")
             })
         })
 }
@@ -498,6 +489,7 @@ fn build_external_resource(
                 output_task_coordinator,
                 test_case.events.clone(),
                 runner_metrics,
+                configuration.log_namespace(),
             )?;
 
             Ok((
@@ -567,10 +559,10 @@ fn spawn_input_driver(
     runner_metrics: &Arc<Mutex<RunnerMetrics>>,
     mut maybe_encoder: Option<Encoder<encoding::Framer>>,
     component_type: ComponentType,
+    log_namespace: LogNamespace,
 ) -> JoinHandle<()> {
     let input_runner_metrics = Arc::clone(runner_metrics);
 
-    let log_namespace = LogNamespace::Legacy;
     let now = Utc::now();
 
     tokio::spawn(async move {
@@ -593,7 +585,7 @@ fn spawn_input_driver(
                 }
             }
 
-            let (failure_case, event) = input_event.clone().get();
+            let (failure_case, mut event) = input_event.clone().get();
 
             if let Some(encoder) = maybe_encoder.as_mut() {
                 let mut buffer = BytesMut::new();
@@ -613,6 +605,29 @@ fn spawn_input_driver(
 
             if !failure_case || component_type == ComponentType::Sink {
                 input_runner_metrics.sent_events_total += 1;
+
+                // Convert unix timestamp in input events to the Datetime string.
+                // This is necessary when a source expects the incoming event to have a
+                // unix timestamp but we convert it into a datetime string in the source.
+                // For example, the `datadog_agent` source. This only takes effect when
+                // the test case YAML file defining the event, constructs it with the log
+                // builder variant, and specifies an integer in milliseconds for the timestamp.
+                if component_type == ComponentType::Source {
+                    if let Event::Log(ref mut log) = event {
+                        if let Some(ts) = log.remove_timestamp() {
+                            let ts = match ts.as_integer() {
+                                Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
+                                    .unwrap_or_else(|| {
+                                        panic!("invalid timestamp in input test event {ts}")
+                                    })
+                                    .into(),
+                                None => ts,
+                            };
+                            log.parse_path_and_insert("timestamp", ts)
+                                .expect("failed to insert timestamp");
+                        }
+                    }
+                }
 
                 // This particular metric is tricky because a component can run the
                 // EstimatedJsonSizeOf calculation on a single event or an array of

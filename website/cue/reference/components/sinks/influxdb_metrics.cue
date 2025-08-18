@@ -43,7 +43,7 @@ components: sinks: influxdb_metrics: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.influxdb_metrics.configuration
+	configuration: generated.components.sinks.influxdb_metrics.configuration
 
 	input: {
 		logs: false
@@ -176,7 +176,7 @@ components: sinks: influxdb_metrics: {
 				summary: {
 					quantiles: [
 						{upper_limit: 0.01, value: 1.5},
-						{upper_limit: 0.5, value:  2.0},
+						{upper_limit: 0.5, value: 2.0},
 						{upper_limit: 0.99, value: 3.0},
 					]
 					count: 6

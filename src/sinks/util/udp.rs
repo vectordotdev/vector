@@ -5,29 +5,25 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::BytesMut;
 use futures::{stream::BoxStream, FutureExt, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle, Protocol, Registered};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{BytesSent, Protocol, Registered};
 
-use super::SinkBuildError;
+use super::{
+    datagram::{send_datagrams, DatagramSocket},
+    SinkBuildError,
+};
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
-    event::{Event, EventStatus, Finalizable},
-    internal_events::{
-        SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError,
-        UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError,
-    },
+    event::Event,
+    internal_events::{UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError},
     net,
-    sinks::{
-        util::{retries::ExponentialBackoff, StreamSink},
-        Healthcheck, VectorSink,
-    },
+    sinks::{util::StreamSink, Healthcheck, VectorSink},
 };
 
 #[derive(Debug, Snafu)]
@@ -198,56 +194,19 @@ where
 
         let mut encoder = self.encoder.clone();
         while Pin::new(&mut input).peek().await.is_some() {
-            let mut socket = self.connector.connect_backoff().await;
-            while let Some(mut event) = input.next().await {
-                let byte_size = event.estimated_json_encoded_size_of();
-
-                self.transformer.transform(&mut event);
-
-                let finalizers = event.take_finalizers();
-                let mut bytes = BytesMut::new();
-
-                // Errors are handled by `Encoder`.
-                if encoder.encode(event, &mut bytes).is_err() {
-                    continue;
-                }
-
-                match udp_send(&mut socket, &bytes).await {
-                    Ok(()) => {
-                        emit!(SocketEventsSent {
-                            mode: SocketMode::Udp,
-                            count: 1,
-                            byte_size,
-                        });
-
-                        self.bytes_sent.emit(ByteSize(bytes.len()));
-                        finalizers.update_status(EventStatus::Delivered);
-                    }
-                    Err(error) => {
-                        emit!(SocketSendError {
-                            mode: SocketMode::Udp,
-                            error
-                        });
-                        finalizers.update_status(EventStatus::Errored);
-                        break;
-                    }
-                }
-            }
+            let socket = self.connector.connect_backoff().await;
+            send_datagrams(
+                &mut input,
+                DatagramSocket::Udp(socket),
+                &self.transformer,
+                &mut encoder,
+                &self.bytes_sent,
+            )
+            .await;
         }
 
         Ok(())
     }
-}
-
-async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
-    let sent = socket.send(buf).await?;
-    if sent != buf.len() {
-        emit!(UdpSendIncompleteError {
-            data_size: buf.len(),
-            sent,
-        });
-    }
-    Ok(())
 }
 
 pub(super) const fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {

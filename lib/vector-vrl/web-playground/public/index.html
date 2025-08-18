@@ -2,7 +2,6 @@
 <html lang="en-US">
   <head>
     <meta charset="utf-8" />
-    <!-- the below line lets monaco editor to appear nicely in mobile view -->
     <meta content="width=device-width, initial-scale=1" name="viewport" />
     <title>VRL playground</title>
     <link rel="icon" type="image/x-icon" href="https://vector.dev/favicon.ico">
@@ -22,44 +21,66 @@
   </head>
 
   <body>
-    <div class="headers-grid">
-      <div class="headers-grid-item">
-        <h2>VRL Playground</h2>
-      </div>
-      <div class="headers-grid-item">
-        <table>
-          <tr>
-            <td>Vector Version: </td>
-            <td><a id="vector-version-link"></a></td>
-          </tr>
-          <tr>
-            <td>VRL Version: </td>
-            <td><a id="vrl-version-link"></a></td>
-          </tr>
-        </table>
-      </div>
-      <div class="headers-grid-item" id="description-cell">
-          <p id="description-paragraph" >
+      <div class="top-bar-wrapper">
+      <div class="headers-grid">
+        <div class="headers-grid-item title-section">
+          <img id="logo" src="assets/dd_icon_rgb.svg" alt="Datadog Logo">
+          <h2>VRL Playground</h2>
+        </div>
+        <div class="headers-grid-item" id="description-cell">
+          <p id="description-paragraph">
             <a href="https://vector.dev/docs/reference/vrl/functions/">Vector Remap Language (VRL)</a> is an expression-oriented language designed for transforming
             observability data. This playground lets you write a program, run it against an event or
             events, share it, and see how the events are transformed.
           </p>
+        </div>
+        <div class="headers-grid-item version-info">
+          <table>
+            <tr>
+              <td>Vector Version: </td>
+              <td><a id="vector-version-link"></a></td>
+            </tr>
+            <tr>
+              <td>VRL Version: </td>
+              <td><a id="vrl-version-link"></a></td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>
     <div id="App">
-
-
       <div id="toolbar-section">
         <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
         <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
-      </div>
-
+        <div class="timezone-container">
+          <label for="timezone-input" id="timezone-label">Select Timezone</label>
+          <input
+            type="text"
+            id="timezone-input"
+            name="timezone"
+            list="timezone-list"
+            value="Default"
+          >
+          <datalist id="timezone-list">
+            <option value="Default"></option>
+            <option value="Etc/UTC"></option>
+            <option value="America/New_York"></option>
+            <option value="America/Chicago"></option>
+            <option value="America/Denver"></option>
+            <option value="America/Los_Angeles"></option>
+            <option value="Europe/London"></option>
+            <option value="Europe/Paris"></option>
+            <option value="Asia/Tokyo"></option>
+            <option value="Asia/Dubai"></option>
+            <option value="Australia/Sydney"></option>
+          </datalist>
+        </div>
+        </div>
       <div id="input-section">
         <div id="cell">
           <div id="input-cell-title">
             <p class="cell-title">Program</p>
           </div>
-
           <div id="container-program"></div>
         </div>
       </div>
@@ -74,7 +95,10 @@
 
         <div id="output-cell">
           <div id="output-cell-title">
-            <p class="cell-title">Output</p>
+            <p class="cell-title">
+              <span>Output</span>
+              <code id="elapsed-time"></code>
+            </p>
           </div>
           <div id="container-output"></div>
         </div>

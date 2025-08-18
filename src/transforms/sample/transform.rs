@@ -1,20 +1,113 @@
+use std::{borrow::Cow, collections::HashMap, fmt};
 use vector_lib::config::LegacyKey;
-use vrl::event_path;
 
 use crate::{
     conditions::Condition,
     event::Event,
     internal_events::SampleEventDiscarded,
+    sinks::prelude::TemplateRenderingError,
+    template::Template,
     transforms::{FunctionTransform, OutputBuffer},
 };
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::OwnedTargetPath;
+
+/// Exists only for backwards compatability purposes so that the value of sample_rate_key is
+/// consistent after the internal implementation of the Sample class was modified to work in terms
+/// of percentages
+#[derive(Clone, Debug)]
+pub enum SampleMode {
+    Rate {
+        rate: u64,
+        counters: HashMap<Option<String>, u64>,
+    },
+    Ratio {
+        ratio: f64,
+        values: HashMap<Option<String>, f64>,
+        hash_ratio_threshold: u64,
+    },
+}
+
+impl SampleMode {
+    pub fn new_rate(rate: u64) -> Self {
+        Self::Rate {
+            rate,
+            counters: HashMap::default(),
+        }
+    }
+
+    pub fn new_ratio(ratio: f64) -> Self {
+        Self::Ratio {
+            ratio,
+            values: HashMap::default(),
+            // Supports the 'key_field' option, assuming an equal distribution of values for a given
+            // field, hashing its contents this component should output events according to the
+            // configured ratio.
+            //
+            // To do one option would be to convert the hash to a number between 0 and 1 and compare
+            // to the ratio. However to address issues with precision, here the ratio is scaled to
+            // meet the width of the type of the hash.
+            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
+        }
+    }
+
+    fn increment(&mut self, group_by_key: &Option<String>, value: &Option<Cow<'_, str>>) -> bool {
+        let threshold_exceeded = match self {
+            Self::Rate { rate, counters } => {
+                let counter_value = counters.entry(group_by_key.clone()).or_default();
+                let old_counter_value = *counter_value;
+                *counter_value += 1;
+                old_counter_value % *rate == 0
+            }
+            Self::Ratio { ratio, values, .. } => {
+                let value = values.entry(group_by_key.clone()).or_insert(1.0 - *ratio);
+                let increment: f64 = *value + *ratio;
+                *value = if increment >= 1.0 {
+                    increment - 1.0
+                } else {
+                    increment
+                };
+                increment >= 1.0
+            }
+        };
+        if let Some(value) = value {
+            self.hash_within_ratio(value.as_bytes())
+        } else {
+            threshold_exceeded
+        }
+    }
+
+    fn hash_within_ratio(&self, value: &[u8]) -> bool {
+        let hash = seahash::hash(value);
+        match self {
+            Self::Rate { rate, .. } => hash % rate == 0,
+            Self::Ratio {
+                hash_ratio_threshold,
+                ..
+            } => hash <= *hash_ratio_threshold,
+        }
+    }
+}
+
+impl fmt::Display for SampleMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Avoids the print of an additional '.0' which was not performed in the previous
+        // implementation
+        match self {
+            Self::Rate { rate, .. } => write!(f, "{rate}"),
+            Self::Ratio { ratio, .. } => write!(f, "{ratio}"),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Sample {
     name: String,
-    rate: u64,
+    rate: SampleMode,
     key_field: Option<String>,
+    group_by: Option<Template>,
     exclude: Option<Condition>,
-    count: u64,
+    sample_rate_key: OptionalValuePath,
 }
 
 impl Sample {
@@ -23,16 +116,27 @@ impl Sample {
     #![allow(dead_code)]
     pub const fn new(
         name: String,
-        rate: u64,
+        rate: SampleMode,
         key_field: Option<String>,
+        group_by: Option<Template>,
         exclude: Option<Condition>,
+        sample_rate_key: OptionalValuePath,
     ) -> Self {
         Self {
             name,
             rate,
             key_field,
+            group_by,
             exclude,
-            count: 0,
+            sample_rate_key,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn ratio(&self) -> f64 {
+        match self.rate {
+            SampleMode::Rate { rate, .. } => 1.0f64 / rate as f64,
+            SampleMode::Ratio { ratio, .. } => ratio,
         }
     }
 }
@@ -69,253 +173,53 @@ impl FunctionTransform for Sample {
             })
             .map(|v| v.to_string_lossy());
 
-        let num = if let Some(value) = value {
-            seahash::hash(value.as_bytes())
-        } else {
-            self.count
-        };
+        // Fetch actual field value if group_by option is set.
+        let group_by_key = self.group_by.as_ref().and_then(|group_by| match &event {
+            Event::Log(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
+                    })
+                })
+                .ok(),
+            Event::Trace(event) => group_by
+                .render_string(event)
+                .map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("group_by"),
+                        drop_event: false,
+                    })
+                })
+                .ok(),
+            Event::Metric(_) => panic!("component can never receive metric events"),
+        });
 
-        self.count = (self.count + 1) % self.rate;
-
-        if num % self.rate == 0 {
-            match event {
-                Event::Log(ref mut event) => {
-                    event.namespace().insert_source_metadata(
-                        self.name.as_str(),
-                        event,
-                        Some(LegacyKey::Overwrite(vrl::path!("sample_rate"))),
-                        vrl::path!("sample_rate"),
-                        self.rate.to_string(),
-                    );
-                }
-                Event::Trace(ref mut event) => {
-                    event.insert(event_path!("sample_rate"), self.rate.to_string());
-                }
-                Event::Metric(_) => panic!("component can never receive metric events"),
-            };
+        let should_sample = self.rate.increment(&group_by_key, &value);
+        if should_sample {
+            if let Some(path) = &self.sample_rate_key.path {
+                match event {
+                    Event::Log(ref mut event) => {
+                        event.namespace().insert_source_metadata(
+                            self.name.as_str(),
+                            event,
+                            Some(LegacyKey::Overwrite(path)),
+                            path,
+                            self.rate.to_string(),
+                        );
+                    }
+                    Event::Trace(ref mut event) => {
+                        event.insert(&OwnedTargetPath::event(path.clone()), self.rate.to_string());
+                    }
+                    Event::Metric(_) => panic!("component can never receive metric events"),
+                };
+            }
             output.push(event);
         } else {
             emit!(SampleEventDiscarded);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::{
-        conditions::{Condition, ConditionalConfig, VrlConfig},
-        config::log_schema,
-        event::{Event, LogEvent, TraceEvent},
-        test_util::random_lines,
-        transforms::test::transform_one,
-        transforms::OutputBuffer,
-    };
-    use approx::assert_relative_eq;
-
-    fn condition_contains(key: &str, needle: &str) -> Condition {
-        let vrl_config = VrlConfig {
-            source: format!(r#"contains!(."{}", "{}")"#, key, needle),
-            runtime: Default::default(),
-        };
-
-        vrl_config
-            .build(&Default::default())
-            .expect("should not fail to build VRL condition")
-    }
-
-    #[test]
-    fn hash_samples_at_roughly_the_configured_rate() {
-        let num_events = 10000;
-
-        let events = random_events(num_events);
-        let mut sampler = Sample::new(
-            "sample".to_string(),
-            2,
-            log_schema().message_key().map(ToString::to_string),
-            Some(condition_contains(
-                log_schema().message_key().unwrap().to_string().as_str(),
-                "na",
-            )),
-        );
-        let total_passed = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.into_events().next()
-            })
-            .count();
-        let ideal = 1.0f64 / 2.0f64;
-        let actual = total_passed as f64 / num_events as f64;
-        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
-
-        let events = random_events(num_events);
-        let mut sampler = Sample::new(
-            "sample".to_string(),
-            25,
-            log_schema().message_key().map(ToString::to_string),
-            Some(condition_contains(
-                log_schema().message_key().unwrap().to_string().as_str(),
-                "na",
-            )),
-        );
-        let total_passed = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.into_events().next()
-            })
-            .count();
-        let ideal = 1.0f64 / 25.0f64;
-        let actual = total_passed as f64 / num_events as f64;
-        assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
-    }
-
-    #[test]
-    fn hash_consistently_samples_the_same_events() {
-        let events = random_events(1000);
-        let mut sampler = Sample::new(
-            "sample".to_string(),
-            2,
-            log_schema().message_key().map(ToString::to_string),
-            Some(condition_contains(
-                log_schema().message_key().unwrap().to_string().as_str(),
-                "na",
-            )),
-        );
-
-        let first_run = events
-            .clone()
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.into_events().next()
-            })
-            .collect::<Vec<_>>();
-        let second_run = events
-            .into_iter()
-            .filter_map(|event| {
-                let mut buf = OutputBuffer::with_capacity(1);
-                sampler.transform(&mut buf, event);
-                buf.into_events().next()
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(first_run, second_run);
-    }
-
-    #[test]
-    fn always_passes_events_matching_pass_list() {
-        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
-            let event = Event::Log(LogEvent::from("i am important"));
-            let mut sampler = Sample::new(
-                "sample".to_string(),
-                0,
-                key_field.clone(),
-                Some(condition_contains(
-                    log_schema().message_key().unwrap().to_string().as_str(),
-                    "important",
-                )),
-            );
-            let iterations = 0..1000;
-            let total_passed = iterations
-                .filter_map(|_| {
-                    transform_one(&mut sampler, event.clone())
-                        .map(|result| assert_eq!(result, event))
-                })
-                .count();
-            assert_eq!(total_passed, 1000);
-        }
-    }
-
-    #[test]
-    fn handles_key_field() {
-        for key_field in &[None, Some("other_field".into())] {
-            let mut event = Event::Log(LogEvent::from("nananana"));
-            let log = event.as_mut_log();
-            log.insert("other_field", "foo");
-            let mut sampler = Sample::new(
-                "sample".to_string(),
-                0,
-                key_field.clone(),
-                Some(condition_contains("other_field", "foo")),
-            );
-            let iterations = 0..1000;
-            let total_passed = iterations
-                .filter_map(|_| {
-                    transform_one(&mut sampler, event.clone())
-                        .map(|result| assert_eq!(result, event))
-                })
-                .count();
-            assert_eq!(total_passed, 1000);
-        }
-    }
-
-    #[test]
-    fn sampler_adds_sampling_rate_to_event() {
-        for key_field in &[None, log_schema().message_key().map(ToString::to_string)] {
-            let events = random_events(10000);
-            let message_key = log_schema().message_key().unwrap().to_string();
-            let mut sampler = Sample::new(
-                "sample".to_string(),
-                10,
-                key_field.clone(),
-                Some(condition_contains(&message_key, "na")),
-            );
-            let passing = events
-                .into_iter()
-                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
-                .find_map(|event| transform_one(&mut sampler, event))
-                .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "10".into());
-
-            let events = random_events(10000);
-            let mut sampler = Sample::new(
-                "sample".to_string(),
-                25,
-                key_field.clone(),
-                Some(condition_contains(&message_key, "na")),
-            );
-            let passing = events
-                .into_iter()
-                .filter(|s| !s.as_log()[&message_key].to_string_lossy().contains("na"))
-                .find_map(|event| transform_one(&mut sampler, event))
-                .unwrap();
-            assert_eq!(passing.as_log()["sample_rate"], "25".into());
-
-            // If the event passed the regex check, don't include the sampling rate
-            let mut sampler = Sample::new(
-                "sample".to_string(),
-                25,
-                key_field.clone(),
-                Some(condition_contains(&message_key, "na")),
-            );
-            let event = Event::Log(LogEvent::from("nananana"));
-            let passing = transform_one(&mut sampler, event).unwrap();
-            assert!(passing.as_log().get("sample_rate").is_none());
-        }
-    }
-
-    #[test]
-    fn handles_trace_event() {
-        let event: TraceEvent = LogEvent::from("trace").into();
-        let trace = Event::Trace(event);
-        let mut sampler = Sample::new("sample".to_string(), 2, None, None);
-        let iterations = 0..2;
-        let total_passed = iterations
-            .filter_map(|_| transform_one(&mut sampler, trace.clone()))
-            .count();
-        assert_eq!(total_passed, 1);
-    }
-
-    fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10)
-            .take(n)
-            .map(|e| Event::Log(LogEvent::from(e)))
-            .collect()
     }
 }

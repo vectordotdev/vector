@@ -17,7 +17,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
-use std::io::stdout;
+use std::{io::stdout, time::Duration};
 use tokio::sync::oneshot;
 
 use super::{
@@ -71,7 +71,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::decimal(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}"),
             },
         }
     }
@@ -83,7 +83,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::binary(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}B", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}B"),
             },
         }
     }
@@ -164,7 +164,13 @@ impl<'a> Widgets<'a> {
     }
 
     /// Renders a title and the URL the dashboard is currently connected to.
-    fn title(&'a self, f: &mut Frame, area: Rect, connection_status: &ConnectionStatus) {
+    fn title(
+        &'a self,
+        f: &mut Frame,
+        area: Rect,
+        connection_status: &ConnectionStatus,
+        uptime: Duration,
+    ) {
         let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
@@ -174,6 +180,10 @@ impl<'a> Widgets<'a> {
             Span::from(" | "),
         ];
         text.extend(connection_status.as_ui_spans());
+        text.extend(vec![Span::from(format!(
+            " | Uptime: {}",
+            humantime::format_duration(uptime)
+        ))]);
 
         let text = vec![Line::from(text)];
 
@@ -202,10 +212,12 @@ impl<'a> Widgets<'a> {
         for (_, r) in state.components.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
-                (!r.has_displayable_outputs())
-                    .then_some("--")
-                    .unwrap_or_default()
-                    .to_string(),
+                if !r.has_displayable_outputs() {
+                    "--"
+                } else {
+                    Default::default()
+                }
+                .to_string(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];
@@ -322,12 +334,12 @@ impl<'a> Widgets<'a> {
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
     fn draw(&self, f: &mut Frame, state: state::State) {
-        let size = f.size();
+        let size = f.area();
         let rects = Layout::default()
             .constraints(self.constraints.clone())
             .split(size);
 
-        self.title(f, rects[0], &state.connection_status);
+        self.title(f, rects[0], &state.connection_status, state.uptime);
 
         // Require a minimum of 80 chars of line width to display the table
         if size.width >= 80 {

@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Verifies vector packages have been installed correctly
+#   Verifies vector packages have been built and installed correctly
 
 package="${1:?must pass package as argument}"
 
@@ -38,3 +38,5 @@ getent group vector || (echo "vector group  missing" && exit 1)
 vector --version || (echo "vector --version failed" && exit 1)
 grep -q "FOO=bar" "/etc/default/vector" || (echo "/etc/default/vector has incorrect contents" && exit 1)
 grep -q "foo: bar" "/etc/vector/vector.yaml" || (echo "/etc/vector/vector.yaml has incorrect contents" && exit 1)
+
+dd-pkg lint "$package"

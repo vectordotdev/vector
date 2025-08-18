@@ -5,8 +5,7 @@ use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snap::raw::Decoder as SnappyDecoder;
 use warp::http::StatusCode;
 
-use super::error::ErrorMessage;
-use crate::internal_events::HttpDecompressError;
+use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
 pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
@@ -37,7 +36,7 @@ pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessa
                 encoding => {
                     return Err(ErrorMessage::new(
                         StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                        format!("Unsupported encoding {}", encoding),
+                        format!("Unsupported encoding {encoding}"),
                     ))
                 }
             }
@@ -54,6 +53,6 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", encoding),
+        format!("Failed decompressing payload with {encoding} decoder."),
     )
 }

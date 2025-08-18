@@ -53,7 +53,7 @@ async fn get_sqs_client() -> aws_sdk_sqs::Client {
     let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(
             AwsAuthentication::test_auth()
-                .credentials_provider(Region::new("custom"), &Default::default(), &None)
+                .credentials_provider(Region::new("custom"), &Default::default(), None)
                 .await
                 .unwrap(),
         )
@@ -113,7 +113,7 @@ pub(crate) async fn test() {
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             }
         }
         assert!(expected_messages.is_empty());
@@ -122,5 +122,5 @@ pub(crate) async fn test() {
 }
 
 fn calculate_message(index: u32) -> String {
-    format!("Test message: {}", index)
+    format!("Test message: {index}")
 }

@@ -143,7 +143,7 @@ pub fn read_set_values(metrics: &SplitMetrics, series: MetricSeries) -> Option<H
 
 #[macro_export]
 macro_rules! series {
-	($name:expr) => {
+	($name:expr_2021) => {
 		vector_lib::event::metric::MetricSeries {
 			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
@@ -152,7 +152,7 @@ macro_rules! series {
 			tags: None,
 		}
 	};
-	($name:expr, $($tk:expr => $tv:expr),*) => {
+	($name:expr_2021, $($tk:expr_2021 => $tv:expr_2021),*) => {
 		vector_lib::event::metric::MetricSeries {
 			name: vector_lib::event::metric::MetricName {
 				name: $name.into(),
@@ -165,29 +165,23 @@ macro_rules! series {
 
 pub fn assert_counter(metrics: &SplitMetrics, series: MetricSeries, expected: f64) {
     let actual_counter = read_counter_value(metrics, series.clone());
-    assert!(
-        actual_counter.is_some(),
-        "counter '{}' was not found",
-        series
-    );
+    assert!(actual_counter.is_some(), "counter '{series}' was not found");
 
     let actual_counter_value = actual_counter.expect("counter must be valid");
     assert_eq!(
         actual_counter_value, expected,
-        "expected {} for '{}', got {} instead",
-        expected, series, actual_counter_value
+        "expected {expected} for '{series}', got {actual_counter_value} instead"
     );
 }
 
 pub fn assert_gauge(metrics: &SplitMetrics, series: MetricSeries, expected: f64) {
     let actual_gauge = read_gauge_value(metrics, series.clone());
-    assert!(actual_gauge.is_some(), "gauge '{}' was not found", series);
+    assert!(actual_gauge.is_some(), "gauge '{series}' was not found");
 
     let actual_gauge_value = actual_gauge.expect("gauge must be valid");
     assert_eq!(
         actual_gauge_value, expected,
-        "expected {} for '{}', got {} instead",
-        expected, series, actual_gauge_value
+        "expected {expected} for '{series}', got {actual_gauge_value} instead"
     );
 }
 
@@ -199,7 +193,7 @@ pub fn assert_distribution(
     expected_bounds: &[(f64, u32)],
 ) {
     let samples = read_distribution_samples(metrics, series.clone());
-    assert!(samples.is_some(), "distribution '{}' was not found", series);
+    assert!(samples.is_some(), "distribution '{series}' was not found");
 
     let samples = samples.expect("distribution must be valid");
 
@@ -219,13 +213,11 @@ pub fn assert_distribution(
 
     assert_eq!(
         actual_sum, expected_sum,
-        "expected sum of '{}' to equal {}, got {} instead",
-        series, expected_sum, actual_sum
+        "expected sum of '{series}' to equal {expected_sum}, got {actual_sum} instead"
     );
     assert_eq!(
         actual_count, expected_count,
-        "expected count of '{}' to equal {}, got {} instead",
-        series, expected_count, actual_count
+        "expected count of '{series}' to equal {expected_count}, got {actual_count} instead"
     );
 
     for (i, (bound, count)) in expected_bounds.iter().enumerate() {
@@ -239,7 +231,7 @@ pub fn assert_distribution(
 
 pub fn assert_set(metrics: &SplitMetrics, series: MetricSeries, expected_values: &[&str]) {
     let actual_values = read_set_values(metrics, series.clone());
-    assert!(actual_values.is_some(), "set '{}' was not found", series);
+    assert!(actual_values.is_some(), "set '{series}' was not found");
 
     let actual_values = actual_values.expect("set must be valid");
     let expected_values = expected_values

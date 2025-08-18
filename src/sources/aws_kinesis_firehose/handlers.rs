@@ -7,6 +7,7 @@ use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::constants::GZIP_MAGIC;
 use vector_lib::codecs::StreamDecodingError;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 use vector_lib::{
@@ -77,20 +78,21 @@ pub(super) async fn firehose(
                         events.estimated_json_encoded_size_of(),
                     ));
 
-                    let (batch, receiver) = context
-                        .acknowledgements
-                        .then(|| {
+                    let (batch, receiver) = if context.acknowledgements {
+                        {
                             let (batch, receiver) = BatchNotifier::new_with_receiver();
                             (Some(batch), Some(receiver))
-                        })
-                        .unwrap_or((None, None));
+                        }
+                    } else {
+                        (None, None)
+                    };
 
                     let now = Utc::now();
                     for event in &mut events {
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(batch.clone());
                         }
-                        if let Event::Log(ref mut log) = event {
+                        if let Event::Log(log) = event {
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),
@@ -219,22 +221,30 @@ fn decode_record(
             compression: compression.to_owned(),
         }),
         Compression::Auto => {
-            match infer::get(&buf) {
-                Some(filetype) => match filetype.mime_type() {
-                    "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
-                            compression: Compression::Gzip,
-                            error
-                        });
-                        Ok(Bytes::from(buf))
-                    }),
-                    // only support gzip for now
-                    _ => Ok(Bytes::from(buf)),
-                },
-                None => Ok(Bytes::from(buf)),
+            if is_gzip(&buf) {
+                decode_gzip(&buf[..]).or_else(|error| {
+                    emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        compression: Compression::Gzip,
+                        error
+                    });
+                    Ok(Bytes::from(buf))
+                })
+            } else {
+                // only support gzip for now
+                Ok(Bytes::from(buf))
             }
         }
     }
+}
+
+fn is_gzip(data: &[u8]) -> bool {
+    // The header length of a GZIP file is 10 bytes. The first two bytes of the constant comes from
+    // the GZIP file format specification, which is the fixed member header identification bytes.
+    // The third byte is the compression method, of which only one is defined which is 8 for the
+    // deflate algorithm.
+    //
+    // Reference: https://datatracker.ietf.org/doc/html/rfc1952 Section 2.3
+    data.starts_with(GZIP_MAGIC)
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
@@ -244,4 +254,23 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
     gz.read_to_end(&mut decoded)?;
 
     Ok(Bytes::from(decoded))
+}
+
+#[cfg(test)]
+mod tests {
+    use flate2::{write::GzEncoder, Compression};
+    use std::io::Write as _;
+
+    use super::*;
+
+    const CONTENT: &[u8] = b"Example";
+
+    #[test]
+    fn correctly_detects_gzipped_content() {
+        assert!(!is_gzip(CONTENT));
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        encoder.write_all(CONTENT).unwrap();
+        let compressed = encoder.finish().unwrap();
+        assert!(is_gzip(&compressed));
+    }
 }

@@ -9,7 +9,7 @@ use crate::{
 pub struct GenericSourceMetrics(Vec<Metric>);
 
 impl GenericSourceMetrics {
-    pub fn new(metrics: Vec<Metric>) -> Self {
+    pub const fn new(metrics: Vec<Metric>) -> Self {
         Self(metrics)
     }
 }

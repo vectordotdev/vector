@@ -15,7 +15,7 @@ use crate::http::Auth;
 #[serde(try_from = "String", into = "String")]
 pub struct UriSerde {
     pub uri: Uri,
-    pub(crate) auth: Option<Auth>,
+    pub auth: Option<Auth>,
 }
 
 impl UriSerde {
@@ -47,7 +47,7 @@ impl UriSerde {
         let uri = self.uri.to_string();
         let self_path = uri.trim_end_matches('/');
         let other_path = path.trim_start_matches('/');
-        let path = format!("{}/{}", self_path, other_path);
+        let path = format!("{self_path}/{other_path}");
         let uri = path.parse::<Uri>()?;
         Ok(Self {
             uri,
@@ -80,7 +80,7 @@ impl fmt::Display for UriSerde {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match (self.uri.authority(), &self.auth) {
             (Some(authority), Some(Auth::Basic { user, password })) => {
-                let authority = format!("{}:{}@{}", user, password, authority);
+                let authority = format!("{user}:{password}@{authority}");
                 let authority =
                     Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
                 let mut parts = self.uri.clone().into_parts();
@@ -119,7 +119,7 @@ impl From<Uri> for UriSerde {
 
 fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
     // We get a valid `Authority` as input, therefore cannot fail here.
-    let mut url = url::Url::parse(&format!("http://{}", authority)).expect("invalid authority");
+    let mut url = url::Url::parse(&format!("http://{authority}")).expect("invalid authority");
 
     let user = url.username();
     if !user.is_empty() {
@@ -164,7 +164,7 @@ pub fn protocol_endpoint(uri: Uri) -> (String, String) {
         let host = auth.host();
         match auth.port() {
             None => host.to_string(),
-            Some(port) => format!("{}:{}", host, port),
+            Some(port) => format!("{host}:{port}"),
         }
         .parse()
         .unwrap_or_else(|_| unreachable!())

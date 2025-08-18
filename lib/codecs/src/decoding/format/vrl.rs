@@ -37,7 +37,7 @@ pub struct VrlDeserializerOptions {
     /// time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
     /// to indicate system local time.
     ///
-    /// If not set, `local` will be used.
+    /// If not set, `local` is used.
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]

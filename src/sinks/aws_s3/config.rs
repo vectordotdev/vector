@@ -4,9 +4,7 @@ use vector_lib::codecs::{
     encoding::{Framer, FramingConfig},
     TextSerializerConfig,
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::sink::VectorSink;
-use vector_lib::TimeZone;
+use vector_lib::{configurable::configurable_component, sink::VectorSink, TimeZone};
 
 use super::sink::S3RequestOptions;
 use crate::{
@@ -16,7 +14,7 @@ use crate::{
     sinks::{
         s3_common::{
             self,
-            config::{S3Options, S3RetryLogic},
+            config::{RetryStrategy, S3Options},
             partitioner::S3KeyPartitioner,
             service::S3Service,
             sink::S3Sink,
@@ -139,6 +137,20 @@ pub struct S3SinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
+
+    /// Specifies which addressing style to use.
+    ///
+    /// This controls if the bucket name is in the hostname or part of the URL.
+    #[serde(default = "crate::serde::default_true")]
+    pub force_path_style: bool,
+
+    /// Specifies errors to retry
+    ///
+    /// By default, the sink only retries attempts it deems possible to retry.
+    /// These settings extend the default behavior.
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub retry_strategy: RetryStrategy,
 }
 
 pub(super) fn default_key_prefix() -> String {
@@ -167,6 +179,8 @@ impl GenerateConfig for S3SinkConfig {
             auth: AwsAuthentication::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            force_path_style: Default::default(),
+            retry_strategy: Default::default(),
         })
         .unwrap()
     }
@@ -202,8 +216,9 @@ impl S3SinkConfig {
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
         let request_limits = self.request.into_settings();
+        let retry_strategy = self.retry_strategy.clone();
         let service = ServiceBuilder::new()
-            .settings(request_limits, S3RetryLogic)
+            .settings(request_limits, retry_strategy)
             .service(service);
 
         let offset = self
@@ -224,7 +239,7 @@ impl S3SinkConfig {
             .map(|ssekms_key_id| Template::try_from(ssekms_key_id.as_str()))
             .transpose()?;
 
-        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id);
+        let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
@@ -251,7 +266,14 @@ impl S3SinkConfig {
     }
 
     pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
+        s3_common::config::create_service(
+            &self.region,
+            &self.auth,
+            proxy,
+            self.tls.as_ref(),
+            self.force_path_style,
+        )
+        .await
     }
 }
 

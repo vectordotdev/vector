@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"b","interval_ms":2637187655,"kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":725312.0,"value":392768.0},{"quantile":647040.0,"value":-864448.0},{"quantile":862208.0,"value":-319168.0},{"quantile":811776.0,"value":-190336.0},{"quantile":520448.0,"value":-510656.0},{"quantile":-644352.0,"value":-400256.0}],"count":13914714733429326677,"sum":-181312.0}}}

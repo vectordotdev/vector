@@ -16,7 +16,7 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
-    http::HttpClient,
+    http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         util::{auth::Auth, BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
@@ -66,7 +66,15 @@ impl ElasticsearchCommon {
                 Auth::Aws {
                     credentials_provider: provider,
                     region,
-                } => sign_request(&mut request, provider, &Some(region.clone())).await?,
+                } => {
+                    sign_request(
+                        &OpenSearchServiceType::Managed,
+                        &mut request,
+                        provider,
+                        Some(region),
+                    )
+                    .await?
+                }
             }
         }
 
@@ -125,7 +133,10 @@ async fn ensure_pipeline_in_params() {
         .await
         .expect("Config error");
 
-    assert_eq!(common.query_params["pipeline"], pipeline);
+    assert_eq!(
+        common.query_params["pipeline"],
+        QueryParameterValue::SingleParam(ParameterValue::String(pipeline))
+    );
 }
 
 #[tokio::test]
@@ -199,7 +210,7 @@ async fn structures_events_correctly() {
     flush(common).await.unwrap();
 
     let response = reqwest::Client::new()
-        .get(&format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -669,7 +680,7 @@ async fn run_insert_tests_with_config(
 
     let client = create_http_client();
     let mut response = client
-        .get(&format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .basic_auth("elastic", Some("vector"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
@@ -698,7 +709,7 @@ async fn run_insert_tests_with_config(
         // https://github.com/rust-lang/rust-clippy/issues/6909
         let input = input
             .into_iter()
-            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+            .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
             .collect::<Vec<_>>();
 
         for hit in hits {
@@ -758,7 +769,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let mut total = 0;
     for base_url in base_urls {
         if let Ok(response) = client
-            .get(&format!("{}/{}/_search", base_url, index))
+            .get(format!("{base_url}/{index}/_search"))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }

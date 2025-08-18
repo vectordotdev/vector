@@ -1,4 +1,13 @@
-#[cfg(all(test, feature = "vector-unit-test-tests"))]
+// should match vector-unit-test-tests feature
+#[cfg(all(
+    test,
+    feature = "sources-demo_logs",
+    feature = "transforms-remap",
+    feature = "transforms-route",
+    feature = "transforms-filter",
+    feature = "transforms-reduce",
+    feature = "sinks-console"
+))]
 mod tests;
 mod unit_test_components;
 
@@ -9,7 +18,6 @@ use std::{
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
-use ordered_float::NotNan;
 use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
@@ -30,9 +38,9 @@ use crate::{
     conditions::Condition,
     config::{
         self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestInputValue, TestOutput,
+        TestDefinition, TestInput, TestOutput,
     },
-    event::{Event, EventMetadata, LogEvent, Value},
+    event::{Event, EventMetadata, LogEvent},
     signal,
     topology::{builder::TopologyPieces, RunningTopology},
 };
@@ -74,15 +82,29 @@ impl UnitTest {
     }
 }
 
+/// Loads Log Schema from configurations and sets global schema.
+/// Once this is done, configurations can be correctly loaded using
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
+fn init_log_schema_from_paths(
+    config_paths: &[ConfigPath],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
+    let builder = config::loading::load_builder_from_paths(config_paths)?;
+    vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
+    Ok(())
+}
+
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, false)?;
-    let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
-    let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
+    init_log_schema_from_paths(paths, false)?;
+    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
+    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
         let resolved_secrets = secrets_backends_loader
             .retrieve(&mut signal_handler.subscribe())
+            .await
             .map_err(|e| vec![e])?;
         loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
     } else {
@@ -117,7 +139,7 @@ pub async fn build_unit_tests(
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
                 test_error = test_error.replace('\n', "\n  ");
-                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                test_error.insert_str(0, &format!("Failed to build test '{test_name}':\n  "));
                 build_errors.push(test_error);
             }
         }
@@ -363,6 +385,10 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
         transform_only_config.schema,
+        transform_only_config
+            .global
+            .wildcard_matching
+            .unwrap_or_default(),
     );
     let test = test.resolve_outputs(&transform_only_graph)?;
 
@@ -379,6 +405,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         config_builder.schema,
+        config_builder.global.wildcard_matching.unwrap_or_default(),
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -410,6 +437,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         config_builder.schema,
+        config_builder.global.wildcard_matching.unwrap_or_default(),
     );
     let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
@@ -540,8 +568,7 @@ fn build_outputs(
             match condition.build(&Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
-                    "failed to create test condition '{}': {}",
-                    index, error
+                    "failed to create test condition '{index}': {error}"
                 )),
             }
         }
@@ -599,16 +626,8 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
             if let Some(log_fields) = &input.log_fields {
                 let mut event = LogEvent::from_str_legacy("");
                 for (path, value) in log_fields {
-                    let value: Value = match value {
-                        TestInputValue::String(s) => Value::from(s.to_owned()),
-                        TestInputValue::Boolean(b) => Value::from(*b),
-                        TestInputValue::Integer(i) => Value::from(*i),
-                        TestInputValue::Float(f) => Value::from(
-                            NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
-                        ),
-                    };
                     event
-                        .parse_path_and_insert(path, value)
+                        .parse_path_and_insert(path, value.clone())
                         .map_err(|e| e.to_string())?;
                 }
                 Ok(event.into())

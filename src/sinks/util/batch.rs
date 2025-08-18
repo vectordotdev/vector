@@ -101,7 +101,7 @@ where
     /// The maximum size of a batch that is processed by a sink.
     ///
     /// This is based on the uncompressed size of the batched events, before they are
-    /// serialized/compressed.
+    /// serialized or compressed.
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
@@ -285,8 +285,8 @@ pub struct BatchSize<B> {
 impl<B> BatchSize<B> {
     pub const fn const_default() -> Self {
         BatchSize {
-            bytes: usize::max_value(),
-            events: usize::max_value(),
+            bytes: usize::MAX,
+            events: usize::MAX,
             _type_marker: PhantomData,
         }
     }

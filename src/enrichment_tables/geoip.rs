@@ -7,8 +7,8 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use maxminddb::{
-    geoip2::{City, ConnectionType, Isp},
-    MaxMindDBError, Reader,
+    geoip2::{AnonymousIp, City, ConnectionType, Isp},
+    Reader,
 };
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
@@ -18,8 +18,7 @@ use vrl::value::{ObjectMap, Value};
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
 
 // MaxMind GeoIP database files have a type field we can use to recognize specific
-// products. If we encounter one of these two types, we look for ASN/ISP information;
-// otherwise we expect to be working with a City database.
+// products. If it is an unknown type, an error will be returned.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum DatabaseKind {
@@ -27,15 +26,20 @@ pub enum DatabaseKind {
     Isp,
     ConnectionType,
     City,
+    AnonymousIp,
 }
 
-impl From<&str> for DatabaseKind {
-    fn from(v: &str) -> Self {
-        match v {
-            "GeoLite2-ASN" => Self::Asn,
-            "GeoIP2-ISP" => Self::Isp,
-            "GeoIP2-Connection-Type" => Self::ConnectionType,
-            _ => Self::City,
+impl TryFrom<&str> for DatabaseKind {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "GeoLite2-ASN" => Ok(Self::Asn),
+            "GeoIP2-ISP" => Ok(Self::Isp),
+            "GeoIP2-Connection-Type" => Ok(Self::ConnectionType),
+            "GeoIP2-City" | "GeoLite2-City" => Ok(Self::City),
+            "GeoIP2-Anonymous-IP" => Ok(Self::AnonymousIp),
+            _ => Err(()),
         }
     }
 }
@@ -48,6 +52,7 @@ pub struct GeoipConfig {
     /// (**GeoLite2-City.mmdb**).
     ///
     /// Other databases, such as the country database, are not supported.
+    /// `mmdb` enrichment table can be used for other databases.
     ///
     /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
     /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
@@ -89,7 +94,6 @@ impl GenerateConfig for GeoipConfig {
     }
 }
 
-#[async_trait::async_trait]
 impl EnrichmentTableConfig for GeoipConfig {
     async fn build(
         &self,
@@ -112,7 +116,13 @@ impl Geoip {
     /// Creates a new GeoIP struct from the provided config.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
-        let dbkind = DatabaseKind::from(dbreader.metadata.database_type.as_str());
+        let dbkind =
+            DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|_| {
+                format!(
+                    "Unsupported MMDB database type ({}). Use `mmdb` enrichment table instead.",
+                    dbreader.metadata.database_type
+                )
+            })?;
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
@@ -120,10 +130,11 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            DatabaseKind::AnonymousIp => dbreader.lookup::<AnonymousIp>(ip).map(|_| ()),
         };
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Geoip {
+            Ok(_) => Ok(Geoip {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 dbkind,
@@ -145,14 +156,14 @@ impl Geoip {
         };
 
         macro_rules! add_field {
-            ($k:expr, $v:expr) => {
+            ($k:expr_2021, $v:expr_2021) => {
                 add_field($k, $v.map(Into::into))
             };
         }
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = self.dbreader.lookup::<Isp>(ip).ok()?;
+                let data = self.dbreader.lookup::<Isp>(ip).ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -163,7 +174,7 @@ impl Geoip {
                 add_field!("organization", data.organization);
             }
             DatabaseKind::City => {
-                let data = self.dbreader.lookup::<City>(ip).ok()?;
+                let data = self.dbreader.lookup::<City>(ip).ok()??;
 
                 add_field!(
                     "city_name",
@@ -213,9 +224,19 @@ impl Geoip {
                 add_field!("postal_code", data.postal.and_then(|p| p.code));
             }
             DatabaseKind::ConnectionType => {
-                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
+                let data = self.dbreader.lookup::<ConnectionType>(ip).ok()??;
 
                 add_field!("connection_type", data.connection_type);
+            }
+            DatabaseKind::AnonymousIp => {
+                let data = self.dbreader.lookup::<AnonymousIp>(ip).ok()??;
+
+                add_field!("is_anonymous", data.is_anonymous);
+                add_field!("is_anonymous_vpn", data.is_anonymous_vpn);
+                add_field!("is_hosting_provider", data.is_hosting_provider);
+                add_field!("is_public_proxy", data.is_public_proxy);
+                add_field!("is_residential_proxy", data.is_residential_proxy);
+                add_field!("is_tor_exit_node", data.is_tor_exit_node);
             }
         }
 
@@ -243,9 +264,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -262,6 +284,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -444,6 +467,37 @@ mod tests {
         assert!(values.is_none());
     }
 
+    #[test]
+    fn custom_mmdb_type_error() {
+        let result = Geoip::new(GeoipConfig {
+            path: "tests/data/custom-type.mmdb".to_string(),
+            locale: default_locale(),
+        });
+
+        assert!(result.is_err());
+    }
+    #[test]
+    fn anonymous_ip_lookup() {
+        let values = find("101.99.92.179", "tests/data/GeoIP2-Anonymous-IP-Test.mmdb").unwrap();
+
+        let mut expected = ObjectMap::new();
+        expected.insert("is_anonymous".into(), true.into());
+        expected.insert("is_anonymous_vpn".into(), true.into());
+        expected.insert("is_hosting_provider".into(), true.into());
+        expected.insert("is_tor_exit_node".into(), true.into());
+        expected.insert("is_public_proxy".into(), Value::Null);
+        expected.insert("is_residential_proxy".into(), Value::Null);
+
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn anonymous_ip_lookup_no_results() {
+        let values = find("10.1.12.1", "tests/data/GeoIP2-Anonymous-IP-Test.mmdb");
+
+        assert!(values.is_none());
+    }
+
     fn find(ip: &str, database: &str) -> Option<ObjectMap> {
         find_select(ip, database, None)
     }
@@ -461,6 +515,7 @@ mod tests {
                 value: ip.into(),
             }],
             select,
+            None,
             None,
         )
         .unwrap()

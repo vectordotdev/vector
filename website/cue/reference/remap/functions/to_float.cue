@@ -5,7 +5,6 @@ remap: functions: to_float: {
 	description: """
 		Coerces the `value` into a float.
 		"""
-
 	arguments: [
 		{
 			name: "value"

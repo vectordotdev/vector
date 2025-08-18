@@ -14,7 +14,8 @@ use crate::config::EnrichmentTableConfig;
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-enum Encoding {
+#[configurable(metadata(docs::enum_tag_description = "File encoding type."))]
+pub enum Encoding {
     /// Decodes the file as a [CSV][csv] (comma-separated values) file.
     ///
     /// [csv]: https://wikipedia.org/wiki/Comma-separated_values
@@ -46,24 +47,26 @@ impl Default for Encoding {
 /// File-specific settings.
 #[configurable_component]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct FileSettings {
+pub struct FileSettings {
     /// The path of the enrichment table file.
     ///
     /// Currently, only [CSV][csv] files are supported.
     ///
     /// [csv]: https://en.wikipedia.org/wiki/Comma-separated_values
-    path: PathBuf,
+    pub path: PathBuf,
 
+    /// File encoding configuration.
     #[configurable(derived)]
-    encoding: Encoding,
+    pub encoding: Encoding,
 }
 
 /// Configuration for the `file` enrichment table.
 #[configurable_component(enrichment_table("file"))]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
+    /// File-specific settings.
     #[configurable(derived)]
-    file: FileSettings,
+    pub file: FileSettings,
 
     /// Key/value pairs representing mapped log field names and types.
     ///
@@ -74,7 +77,7 @@ pub struct FileConfig {
     /// 1. One of the built-in-formats listed in the `Timestamp Formats` table below.
     /// 2. The [time format specifiers][chrono_fmt] from Rust’s `chrono` library.
     ///
-    /// ### Types
+    /// Types
     ///
     /// - **`bool`**
     /// - **`string`**
@@ -83,7 +86,7 @@ pub struct FileConfig {
     /// - **`date`**
     /// - **`timestamp`** (see the table below for formats)
     ///
-    /// ### Timestamp Formats
+    /// Timestamp Formats
     ///
     /// | Format               | Description                                                                      | Example                          |
     /// |----------------------|----------------------------------------------------------------------------------|----------------------------------|
@@ -109,7 +112,10 @@ pub struct FileConfig {
     /// [rfc3339]: https://tools.ietf.org/html/rfc3339
     /// [chrono_fmt]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
     #[serde(default)]
-    schema: HashMap<String, String>,
+    #[configurable(metadata(
+        docs::additional_props_description = "Represents mapped log field names and types."
+    ))]
+    pub schema: HashMap<String, String>,
 }
 
 const fn default_delimiter() -> char {
@@ -137,10 +143,7 @@ impl FileConfig {
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
                                     .map_err(|_| {
-                                        format!(
-                                            "unable to parse date {} found in row {}",
-                                            value, row
-                                        )
+                                        format!("unable to parse date {value} found in row {row}")
                                     })?
                                     .and_hms_opt(0, 0, 0)
                                     .expect("invalid timestamp"),
@@ -153,10 +156,7 @@ impl FileConfig {
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, format)
                                     .map_err(|_| {
-                                        format!(
-                                            "unable to parse date {} found in row {}",
-                                            value, row
-                                        )
+                                        format!("unable to parse date {value} found in row {row}")
                                     })?
                                     .and_hms_opt(0, 0, 0)
                                     .expect("invalid timestamp"),
@@ -168,9 +168,7 @@ impl FileConfig {
                             Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
                         conversion
                             .convert(Bytes::copy_from_slice(value.as_bytes()))
-                            .map_err(|_| {
-                                format!("unable to parse {} found in row {}", value, row)
-                            })?
+                            .map_err(|_| format!("unable to parse {value} found in row {row}"))?
                     }
                 }
             }
@@ -178,10 +176,8 @@ impl FileConfig {
         })
     }
 
-    fn load_file(
-        &self,
-        timezone: TimeZone,
-    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
+    /// Load the configured file into memory. Required to create a new file enrichment table.
+    pub fn load_file(&self, timezone: TimeZone) -> crate::Result<FileData> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -192,6 +188,7 @@ impl FileConfig {
             .delimiter(delimiter as u8)
             .from_path(&self.file.path)?;
 
+        let first_row = reader.records().next();
         let headers = if include_headers {
             reader
                 .headers()?
@@ -201,14 +198,15 @@ impl FileConfig {
         } else {
             // If there are no headers in the datafile we make headers as the numerical index of
             // the column.
-            match reader.records().next() {
-                Some(Ok(row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
+            match first_row {
+                Some(Ok(ref row)) => (0..row.len()).map(|idx| idx.to_string()).collect(),
                 _ => Vec::new(),
             }
         };
 
-        let data = reader
-            .records()
+        let data = first_row
+            .into_iter()
+            .chain(reader.records())
             .map(|row| {
                 Ok(row?
                     .iter()
@@ -224,25 +222,39 @@ impl FileConfig {
             headers
         );
 
-        let modified = fs::metadata(&self.file.path)?.modified()?;
+        let file = reader.into_inner();
 
-        Ok((headers, data, modified))
+        Ok(FileData {
+            headers,
+            data,
+            modified: file.metadata()?.modified()?,
+        })
     }
 }
 
-#[async_trait::async_trait]
 impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        let (headers, data, modified) = self.load_file(globals.timezone())?;
-
-        Ok(Box::new(File::new(self.clone(), modified, data, headers)))
+        Ok(Box::new(File::new(
+            self.clone(),
+            self.load_file(globals.timezone())?,
+        )))
     }
 }
 
 impl_generate_config_from_default!(FileConfig);
+
+/// The data resulting from loading a configured file.
+pub struct FileData {
+    /// The ordered set of headers of the data columns.
+    pub headers: Vec<String>,
+    /// The data contained in the file.
+    pub data: Vec<Vec<Value>>,
+    /// The last modified time of the file.
+    pub modified: SystemTime,
+}
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a CSV file.
 #[derive(Clone)]
@@ -260,17 +272,12 @@ pub struct File {
 
 impl File {
     /// Creates a new [File] based on the provided config.
-    pub fn new(
-        config: FileConfig,
-        last_modified: SystemTime,
-        data: Vec<Vec<Value>>,
-        headers: Vec<String>,
-    ) -> Self {
+    pub fn new(config: FileConfig, data: FileData) -> Self {
         Self {
             config,
-            last_modified,
-            data,
-            headers,
+            last_modified: data.modified,
+            data: data.data,
+            headers: data.headers,
             indexes: Vec::new(),
         }
     }
@@ -280,25 +287,79 @@ impl File {
     }
 
     /// Does the given row match all the conditions specified?
-    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Value]) -> bool {
+    fn row_equals(
+        &self,
+        case: Case,
+        condition: &[Condition],
+        row: &[Value],
+        wildcard: Option<&Value>,
+    ) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match (case, &row[idx], value) {
-                    (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
-                        match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
-                            (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
-                            (Err(_), Err(_)) => bytes1 == bytes2,
-                            _ => false,
+                Some(idx) => {
+                    let current_row_value = &row[idx];
+
+                    // Helper closure for comparing current_row_value with another value,
+                    // respecting the specified case for Value::Bytes.
+                    let compare_values = |val_to_compare: &Value| -> bool {
+                        match (case, current_row_value, val_to_compare) {
+                            (
+                                Case::Insensitive,
+                                Value::Bytes(bytes_row),
+                                Value::Bytes(bytes_cmp),
+                            ) => {
+                                // Perform case-insensitive comparison for byte strings.
+                                // If both are valid UTF-8, compare their lowercase versions.
+                                // If both are non-UTF-8 bytes, compare them directly.
+                                // If one is UTF-8 and the other is not, they are considered not equal.
+                                match (
+                                    std::str::from_utf8(bytes_row),
+                                    std::str::from_utf8(bytes_cmp),
+                                ) {
+                                    (Ok(s_row), Ok(s_cmp)) => {
+                                        s_row.to_lowercase() == s_cmp.to_lowercase()
+                                    }
+                                    (Err(_), Err(_)) => bytes_row == bytes_cmp,
+                                    _ => false,
+                                }
+                            }
+                            // For Case::Sensitive, or for Case::Insensitive with non-Bytes types,
+                            // perform a direct equality check.
+                            _ => current_row_value == val_to_compare,
                         }
+                    };
+
+                    // First, check if the row value matches the condition's value.
+                    if compare_values(value) {
+                        true
+                    } else if let Some(wc_val) = wildcard {
+                        // If not, and a wildcard is provided, check if the row value matches the wildcard.
+                        compare_values(wc_val)
+                    } else {
+                        // Otherwise, no match.
+                        false
                     }
-                    (_, value1, value2) => value1 == value2,
-                },
+                }
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
                 None => false,
                 Some(idx) => match row[idx] {
                     Value::Timestamp(date) => from <= &date && &date <= to,
+                    _ => false,
+                },
+            },
+            Condition::FromDate { field, from } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => from <= &date,
+                    _ => false,
+                },
+            },
+            Condition::ToDate { field, to } => match self.column_index(field) {
+                None => false,
+                Some(idx) => match row[idx] {
+                    Value::Timestamp(date) => &date <= to,
                     _ => false,
                 },
             },
@@ -347,7 +408,7 @@ impl File {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            Err(format!("field(s) '{}' missing from dataset", missing))
+            Err(format!("field(s) '{missing}' missing from dataset"))
         } else {
             Ok(normalized)
         }
@@ -393,12 +454,13 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
+        wildcard: Option<&'a Value>,
     ) -> impl Iterator<Item = ObjectMap> + 'a
     where
         I: Iterator<Item = &'a Vec<Value>> + 'a,
     {
         data.filter_map(move |row| {
-            if self.row_equals(case, condition, row) {
+            if self.row_equals(case, condition, row, wildcard) {
                 Some(self.add_columns(select, row))
             } else {
                 None
@@ -429,6 +491,32 @@ impl File {
 
         let IndexHandle(handle) = handle;
         Ok(self.indexes[handle].2.get(&key))
+    }
+
+    fn indexed_with_wildcard<'a>(
+        &'a self,
+        case: Case,
+        wildcard: &'a Value,
+        condition: &'a [Condition<'a>],
+        handle: IndexHandle,
+    ) -> Result<Option<&'a Vec<usize>>, String> {
+        if let Some(result) = self.indexed(case, condition, handle)? {
+            return Ok(Some(result));
+        }
+
+        // If lookup fails and a wildcard is provided, compute hash for the wildcard
+        let mut wildcard_hash = seahash::SeaHasher::default();
+        for header in self.headers.iter() {
+            if condition.iter().any(
+                |condition| matches!(condition, Condition::Equals { field, .. } if field == header),
+            ) {
+                hash_value(&mut wildcard_hash, case, wildcard)?;
+            }
+        }
+
+        let wildcard_key = wildcard_hash.finish();
+        let IndexHandle(handle) = handle;
+        Ok(self.indexes[handle].2.get(&wildcard_key))
     }
 }
 
@@ -477,22 +565,26 @@ impl Table for File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
-                single_or_err(self.sequential(self.data.iter(), case, condition, select))
+                single_or_err(self.sequential(self.data.iter(), case, condition, select, wildcard))
             }
             Some(handle) => {
-                let result = self
-                    .indexed(case, condition, handle)?
-                    .ok_or_else(|| "no rows found in index".to_string())?
-                    .iter()
-                    .map(|idx| &self.data[*idx]);
+                let result = if let Some(wildcard) = wildcard {
+                    self.indexed_with_wildcard(case, wildcard, condition, handle)?
+                } else {
+                    self.indexed(case, condition, handle)?
+                }
+                .ok_or_else(|| "no rows found in index".to_string())?
+                .iter()
+                .map(|idx| &self.data[*idx]);
 
                 // Perform a sequential scan over the indexed result.
-                single_or_err(self.sequential(result, case, condition, select))
+                single_or_err(self.sequential(result, case, condition, select, wildcard))
             }
         }
     }
@@ -502,25 +594,33 @@ impl Table for File {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&'a [String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
                 Ok(self
-                    .sequential(self.data.iter(), case, condition, select)
+                    .sequential(self.data.iter(), case, condition, select, wildcard)
                     .collect())
             }
             Some(handle) => {
                 // Perform a sequential scan over the indexed result.
+                let indexed_result = if let Some(wildcard) = wildcard {
+                    self.indexed_with_wildcard(case, wildcard, condition, handle)?
+                } else {
+                    self.indexed(case, condition, handle)?
+                };
+
                 Ok(self
                     .sequential(
-                        self.indexed(case, condition, handle)?
+                        indexed_result
                             .iter()
                             .flat_map(|results| results.iter().map(|idx| &self.data[*idx])),
                         case,
                         condition,
                         select,
+                        wildcard,
                     )
                     .collect())
             }
@@ -588,6 +688,64 @@ mod tests {
     use chrono::{TimeZone, Timelike};
 
     use super::*;
+
+    #[test]
+    fn parse_file_with_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "foo,bar\na,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: true,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["foo".to_string(), "bar".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
+
+    #[test]
+    fn parse_file_no_headers() {
+        let dir = tempfile::tempdir().expect("Unable to create tempdir for enrichment table");
+        let path = dir.path().join("table.csv");
+        fs::write(path.clone(), "a,1\nb,2").expect("Failed to write enrichment table");
+
+        let config = FileConfig {
+            file: FileSettings {
+                path,
+                encoding: Encoding::Csv {
+                    include_headers: false,
+                    delimiter: default_delimiter(),
+                },
+            },
+            schema: HashMap::new(),
+        };
+        let data = config
+            .load_file(Default::default())
+            .expect("Failed to parse csv");
+        assert_eq!(vec!["0".to_string(), "1".to_string()], data.headers);
+        assert_eq!(
+            vec![
+                vec![Value::from("a"), Value::from("1")],
+                vec![Value::from("b"), Value::from("2")],
+            ],
+            data.data
+        );
+    }
 
     #[test]
     fn parse_column() {
@@ -697,12 +855,14 @@ mod tests {
     fn finds_row() {
         let file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let condition = Condition::Equals {
@@ -715,7 +875,37 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None, None)
+        );
+    }
+
+    #[test]
+    fn finds_row_with_wildcard() {
+        let file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let wildcard = Value::from("zirp");
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("nonexistent"),
+        };
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
+            ])),
+            file.find_table_row(Case::Sensitive, &[condition], None, Some(&wildcard), None)
         );
     }
 
@@ -723,13 +913,15 @@ mod tests {
     fn duplicate_indexes() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            Vec::new(),
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: Vec::new(),
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let handle1 = file.add_index(Case::Sensitive, &["field2", "field3"]);
@@ -743,13 +935,15 @@ mod tests {
     fn errors_on_missing_columns() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            Vec::new(),
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: Vec::new(),
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let error = file.add_index(Case::Sensitive, &["apples", "field2", "bananas"]);
@@ -763,12 +957,14 @@ mod tests {
     fn finds_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -783,7 +979,44 @@ mod tests {
                 ("field1".into(), Value::from("zirp")),
                 ("field2".into(), Value::from("zurp")),
             ])),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_with_index_case_sensitive_and_wildcard() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let wildcard = Value::from("zirp");
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("nonexistent"),
+        };
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zirp")),
+                ("field2".into(), Value::from("zurp")),
+            ])),
+            file.find_table_row(
+                Case::Sensitive,
+                &[condition],
+                None,
+                Some(&wildcard),
+                Some(handle)
+            )
         );
     }
 
@@ -791,13 +1024,15 @@ mod tests {
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-                vec!["zip".into(), "zoop".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -820,6 +1055,7 @@ mod tests {
                     value: Value::from("zip"),
                 }],
                 None,
+                None,
                 Some(handle)
             )
         );
@@ -833,6 +1069,7 @@ mod tests {
                     value: Value::from("ZiP"),
                 }],
                 None,
+                None,
                 Some(handle)
             )
         );
@@ -842,17 +1079,19 @@ mod tests {
     fn selects_columns() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into(), "zoop".into()],
-                vec!["zirp".into(), "zurp".into(), "zork".into()],
-                vec!["zip".into(), "zoop".into(), "zibble".into()],
-            ],
-            vec![
-                "field1".to_string(),
-                "field2".to_string(),
-                "field3".to_string(),
-            ],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into(), "zoop".into()],
+                    vec!["zirp".into(), "zurp".into(), "zork".into()],
+                    vec!["zip".into(), "zoop".into(), "zibble".into()],
+                ],
+                headers: vec![
+                    "field1".to_string(),
+                    "field2".to_string(),
+                    "field3".to_string(),
+                ],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -877,6 +1116,7 @@ mod tests {
                 Case::Sensitive,
                 &[condition],
                 Some(&["field1".to_string(), "field3".to_string()]),
+                None,
                 Some(handle)
             )
         );
@@ -886,13 +1126,15 @@ mod tests {
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-                vec!["zip".into(), "zoop".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
@@ -914,6 +1156,7 @@ mod tests {
                     field: "field1",
                     value: Value::from("zip"),
                 }],
+                None,
                 None,
                 Some(handle)
             )
@@ -937,37 +1180,104 @@ mod tests {
                     value: Value::from("ZiP"),
                 }],
                 None,
+                None,
                 Some(handle)
             )
         );
     }
 
     #[test]
-    fn finds_row_with_dates() {
+    fn finds_rows_with_index_case_insensitive_and_wildcard() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec![
-                    "zip".into(),
-                    Value::Timestamp(
-                        chrono::Utc
-                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
-                            .single()
-                            .expect("invalid timestamp"),
-                    ),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                    vec!["zip".into(), "zoop".into()],
                 ],
-                vec![
-                    "zip".into(),
-                    Value::Timestamp(
-                        chrono::Utc
-                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
-                            .single()
-                            .expect("invalid timestamp"),
-                    ),
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Insensitive, &["field1"]).unwrap();
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("nonexistent"),
+                }],
+                None,
+                Some(&Value::from("zip")),
+                Some(handle)
+            )
+        );
+
+        assert_eq!(
+            Ok(vec![
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zup")),
+                ]),
+                ObjectMap::from([
+                    ("field1".into(), Value::from("zip")),
+                    ("field2".into(), Value::from("zoop")),
+                ]),
+            ]),
+            file.find_table_rows(
+                Case::Insensitive,
+                &[Condition::Equals {
+                    field: "field1",
+                    value: Value::from("ZiP"),
+                }],
+                None,
+                Some(&Value::from("ZiP")),
+                Some(handle)
+            )
+        );
+    }
+
+    #[test]
+    fn finds_row_between_dates() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
                 ],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -1003,7 +1313,133 @@ mod tests {
                     )
                 )
             ])),
-            file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
+            file.find_table_row(Case::Sensitive, &conditions, None, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_from_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::FromDate {
+                field: "field2",
+                from: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn finds_row_to_date() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                    vec![
+                        "zip".into(),
+                        Value::Timestamp(
+                            chrono::Utc
+                                .with_ymd_and_hms(2016, 12, 7, 0, 0, 0)
+                                .single()
+                                .expect("invalid timestamp"),
+                        ),
+                    ],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+
+        let conditions = [
+            Condition::Equals {
+                field: "field1",
+                value: "zip".into(),
+            },
+            Condition::ToDate {
+                field: "field2",
+                to: chrono::Utc
+                    .with_ymd_and_hms(2016, 1, 1, 0, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            },
+        ];
+
+        assert_eq!(
+            Ok(ObjectMap::from([
+                ("field1".into(), Value::from("zip")),
+                (
+                    "field2".into(),
+                    Value::Timestamp(
+                        chrono::Utc
+                            .with_ymd_and_hms(2015, 12, 7, 0, 0, 0)
+                            .single()
+                            .expect("invalid timestamp")
+                    )
+                )
+            ])),
+            file.find_table_row(Case::Sensitive, &conditions, None, None, Some(handle))
         );
     }
 
@@ -1011,12 +1447,14 @@ mod tests {
     fn doesnt_find_row() {
         let file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let condition = Condition::Equals {
@@ -1026,7 +1464,7 @@ mod tests {
 
         assert_eq!(
             Err("no rows found".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, None)
+            file.find_table_row(Case::Sensitive, &[condition], None, None, None)
         );
     }
 
@@ -1034,12 +1472,14 @@ mod tests {
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            SystemTime::now(),
-            vec![
-                vec!["zip".into(), "zup".into()],
-                vec!["zirp".into(), "zurp".into()],
-            ],
-            vec!["field1".to_string(), "field2".to_string()],
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
         );
 
         let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
@@ -1051,7 +1491,41 @@ mod tests {
 
         assert_eq!(
             Err("no rows found in index".to_string()),
-            file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
+            file.find_table_row(Case::Sensitive, &[condition], None, None, Some(handle))
+        );
+    }
+
+    #[test]
+    fn doesnt_find_row_with_index_and_wildcard() {
+        let mut file = File::new(
+            Default::default(),
+            FileData {
+                modified: SystemTime::now(),
+                data: vec![
+                    vec!["zip".into(), "zup".into()],
+                    vec!["zirp".into(), "zurp".into()],
+                ],
+                headers: vec!["field1".to_string(), "field2".to_string()],
+            },
+        );
+
+        let handle = file.add_index(Case::Sensitive, &["field1"]).unwrap();
+        let wildcard = Value::from("nonexistent");
+
+        let condition = Condition::Equals {
+            field: "field1",
+            value: Value::from("zorp"),
+        };
+
+        assert_eq!(
+            Err("no rows found in index".to_string()),
+            file.find_table_row(
+                Case::Sensitive,
+                &[condition],
+                None,
+                Some(&wildcard),
+                Some(handle)
+            )
         );
     }
 }

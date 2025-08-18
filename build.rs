@@ -20,7 +20,7 @@ impl TrackedEnv {
 
     pub fn emit_rerun_stanzas(&self) {
         for env_var in &self.tracked {
-            println!("cargo:rerun-if-env-changed={}", env_var);
+            println!("cargo:rerun-if-env-changed={env_var}");
         }
     }
 }
@@ -33,9 +33,9 @@ enum ConstantValue {
 impl ConstantValue {
     pub fn as_parts(&self) -> (&'static str, String) {
         match &self {
-            ConstantValue::Required(value) => ("&str", format!("\"{}\"", value)),
+            ConstantValue::Required(value) => ("&str", format!("\"{value}\"")),
             ConstantValue::Optional(value) => match value {
-                Some(value) => ("Option<&str>", format!("Some(\"{}\")", value)),
+                Some(value) => ("Option<&str>", format!("Some(\"{value}\")")),
                 None => ("Option<&str>", "None".to_string()),
             },
         }
@@ -79,10 +79,8 @@ impl BuildConstants {
 
         for (name, desc, value) in self.values {
             let (const_type, const_val) = value.as_parts();
-            let full = format!(
-                "#[doc=r#\"{}\"#]\npub const {}: {} = {};\n",
-                desc, name, const_type, const_val
-            );
+            let full =
+                format!("#[doc=r#\"{desc}\"#]\npub const {name}: {const_type} = {const_val};\n");
             output_file.write_all(full.as_ref())?;
         }
 
@@ -116,13 +114,12 @@ fn main() {
 
     #[cfg(feature = "protobuf-build")]
     {
-        println!("cargo:rerun-if-changed=proto/dd_trace.proto");
-        println!("cargo:rerun-if-changed=proto/dnstap.proto");
-        println!("cargo:rerun-if-changed=proto/ddsketch_full.proto");
-        println!("cargo:rerun-if-changed=proto/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
-        println!("cargo:rerun-if-changed=proto/google/rpc/status.proto");
-        println!("cargo:rerun-if-changed=proto/vector.proto");
+        println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
+        println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
+        println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
+        println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
+        println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
+        println!("cargo:rerun-if-changed=proto/vector/vector.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
         //
@@ -144,15 +141,18 @@ fn main() {
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
-                    "proto/dnstap.proto",
-                    "proto/ddsketch_full.proto",
-                    "proto/dd_metric.proto",
-                    "proto/dd_trace.proto",
-                    "proto/google/pubsub/v1/pubsub.proto",
-                    "proto/google/rpc/status.proto",
-                    "proto/vector.proto",
+                    "proto/vector/ddsketch_full.proto",
+                    "proto/vector/dd_metric.proto",
+                    "proto/vector/dd_trace.proto",
+                    "proto/third-party/google/pubsub/v1/pubsub.proto",
+                    "proto/third-party/google/rpc/status.proto",
+                    "proto/vector/vector.proto",
                 ],
-                &["proto/", "lib/vector-core/proto/"],
+                &[
+                    "proto/third-party",
+                    "proto/vector",
+                    "lib/vector-core/proto/",
+                ],
             )
             .unwrap();
     }
@@ -200,10 +200,7 @@ fn main() {
         .map_err(|e| {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!(
-                    "Unable to determine git short hash from rev-parse command: {}",
-                    e
-                );
+                eprintln!("Unable to determine git short hash from rev-parse command: {e}");
             }
         })
         .expect("git hash detection failed");

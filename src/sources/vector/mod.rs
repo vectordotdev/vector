@@ -57,7 +57,7 @@ impl proto::Service for Service {
 
         let now = Utc::now();
         for event in &mut events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     VectorConfig::NAME,
@@ -137,7 +137,7 @@ pub struct VectorConfig {
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 impl VectorConfig {
@@ -172,7 +172,7 @@ impl GenerateConfig for VectorConfig {
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_settings = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
@@ -200,7 +200,10 @@ impl SourceConfig for VectorConfig {
             .schema_definition(log_namespace)
             .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_logs(DataType::all(), schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -285,7 +288,7 @@ mod tests {
     use vector_lib::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
@@ -321,7 +324,7 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         run_test(&config, addr).await;
     }
 
@@ -330,9 +333,8 @@ mod tests {
         let addr = test_util::next_addr();
 
         let config = format!(
-            r#"address = "{}"
-            compression=true"#,
-            addr
+            r#"address = "{addr}"
+            compression=true"#
         );
         run_test(&config, addr).await;
     }

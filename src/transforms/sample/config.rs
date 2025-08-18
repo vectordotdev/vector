@@ -1,6 +1,7 @@
+use snafu::Snafu;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
-use vrl::owned_value_path;
+use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vrl::value::Kind;
 
 use crate::{
@@ -10,10 +11,28 @@ use crate::{
         TransformOutput,
     },
     schema,
+    template::Template,
     transforms::Transform,
 };
 
-use super::transform::Sample;
+use super::transform::{Sample, SampleMode};
+
+#[derive(Debug, Snafu)]
+pub enum SampleError {
+    // Errors from `determine_sample_mode`
+    #[snafu(display(
+        "Only positive, non-zero numbers are allowed values for `ratio`, value: {ratio}"
+    ))]
+    InvalidRatio { ratio: f64 },
+
+    #[snafu(display("Only non-zero numbers are allowed values for `rate`"))]
+    InvalidRate,
+
+    #[snafu(display(
+        "Exactly one value must be provided for either 'rate' or 'ratio', but not both"
+    ))]
+    InvalidConfiguration,
+}
 
 /// Configuration for the `sample` transform.
 #[configurable_component(transform(
@@ -26,9 +45,20 @@ pub struct SampleConfig {
     /// The rate at which events are forwarded, expressed as `1/N`.
     ///
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
-    /// dropped.
+    /// dropped. This differs from `ratio` which allows more precise control over the number of events
+    /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
     #[configurable(metadata(docs::examples = 1500))]
-    pub rate: u64,
+    pub rate: Option<u64>,
+
+    /// The rate at which events are forwarded, expressed as a percentage
+    ///
+    /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
+    /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
+    /// precision value and also the ability to retain values of greater than 50% of all events. It is
+    /// an error to provide a value for both `rate` and `ratio`.
+    #[configurable(metadata(docs::examples = 0.13))]
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    pub ratio: Option<f64>,
 
     /// The name of the field whose value is hashed to determine if the event should be
     /// sampled.
@@ -44,16 +74,56 @@ pub struct SampleConfig {
     #[configurable(metadata(docs::examples = "message"))]
     pub key_field: Option<String>,
 
+    /// The event key in which the sample rate is stored. If set to an empty string, the sample rate will not be added to the event.
+    #[configurable(metadata(docs::examples = "sample_rate"))]
+    #[serde(default = "default_sample_rate_key")]
+    pub sample_rate_key: OptionalValuePath,
+
+    /// The value to group events into separate buckets to be sampled independently.
+    ///
+    /// If left unspecified, or if the event doesn't have `group_by`, then the event is not
+    /// sampled separately.
+    #[configurable(metadata(
+        docs::examples = "{{ service }}",
+        docs::examples = "{{ hostname }}-{{ service }}"
+    ))]
+    pub group_by: Option<Template>,
+
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
+}
+
+impl SampleConfig {
+    fn sample_rate(&self) -> Result<SampleMode, SampleError> {
+        match (self.rate, self.ratio) {
+            (None, Some(ratio)) => {
+                if ratio <= 0.0 {
+                    Err(SampleError::InvalidRatio { ratio })
+                } else {
+                    Ok(SampleMode::new_ratio(ratio))
+                }
+            }
+            (Some(rate), None) => {
+                if rate == 0 {
+                    Err(SampleError::InvalidRate)
+                } else {
+                    Ok(SampleMode::new_rate(rate))
+                }
+            }
+            _ => Err(SampleError::InvalidConfiguration),
+        }
+    }
 }
 
 impl GenerateConfig for SampleConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            rate: 10,
+            rate: None,
+            ratio: Some(0.1),
             key_field: None,
+            group_by: None,
             exclude: None::<AnyCondition>,
+            sample_rate_key: default_sample_rate_key(),
         })
         .unwrap()
     }
@@ -65,17 +135,25 @@ impl TransformConfig for SampleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
             Self::NAME.to_string(),
-            self.rate,
+            self.sample_rate()?,
             self.key_field.clone(),
+            self.group_by.clone(),
             self.exclude
                 .as_ref()
                 .map(|condition| condition.build(&context.enrichment_tables))
                 .transpose()?,
+            self.sample_rate_key.clone(),
         )))
     }
 
     fn input(&self) -> Input {
         Input::new(DataType::Log | DataType::Trace)
+    }
+
+    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+        self.sample_rate()
+            .map(|_| ())
+            .map_err(|e| vec![e.to_string()])
     }
 
     fn outputs(
@@ -105,41 +183,16 @@ impl TransformConfig for SampleConfig {
     }
 }
 
+pub fn default_sample_rate_key() -> OptionalValuePath {
+    OptionalValuePath::from(owned_value_path!("sample_rate"))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        event::LogEvent, test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
-    };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
+    use crate::transforms::sample::config::SampleConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
-    }
-
-    #[tokio::test]
-    async fn emits_internal_events() {
-        assert_transform_compliance(async move {
-            let config = SampleConfig {
-                rate: 1,
-                key_field: None,
-                exclude: None,
-            };
-            let (tx, rx) = mpsc::channel(1);
-            let (topology, mut out) = create_topology(ReceiverStream::new(rx), config).await;
-
-            let log = LogEvent::from("hello world");
-            tx.send(log.into()).await.unwrap();
-
-            _ = out.recv().await;
-
-            drop(tx);
-            topology.stop().await;
-            assert_eq!(out.recv().await, None);
-        })
-        .await
     }
 }

@@ -51,6 +51,9 @@ pub struct NatsSourceConfig {
     /// If the port is not specified it defaults to 4222.
     #[configurable(metadata(docs::examples = "nats://demo.nats.io"))]
     #[configurable(metadata(docs::examples = "nats://127.0.0.1:4242"))]
+    #[configurable(metadata(
+        docs::examples = "nats://localhost:4222,nats://localhost:5222,nats://localhost:6222"
+    ))]
     url: String,
 
     /// A [name][nats_connection_name] assigned to the NATS connection.
@@ -116,7 +119,7 @@ fn default_subject_key_field() -> OptionalValuePath {
 }
 
 const fn default_subscription_capacity() -> usize {
-    4096
+    65536
 }
 
 impl GenerateConfig for NatsSourceConfig {
@@ -171,7 +174,7 @@ impl SourceConfig for NatsSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -185,7 +188,21 @@ impl SourceConfig for NatsSourceConfig {
 impl NatsSourceConfig {
     async fn connect(&self) -> Result<async_nats::Client, BuildError> {
         let options: async_nats::ConnectOptions = self.try_into().context(ConfigSnafu)?;
-        options.connect(&self.url).await.context(ConnectSnafu)
+
+        let server_addrs = self.parse_server_addresses()?;
+        options.connect(server_addrs).await.context(ConnectSnafu)
+    }
+
+    fn parse_server_addresses(&self) -> Result<Vec<async_nats::ServerAddr>, BuildError> {
+        self.url
+            .split(',')
+            .map(|url| {
+                url.parse::<async_nats::ServerAddr>()
+                    .map_err(|_| BuildError::Connect {
+                        source: async_nats::ConnectErrorKind::ServerParse.into(),
+                    })
+            })
+            .collect()
     }
 }
 
@@ -438,8 +455,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -471,8 +487,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -504,8 +519,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -536,8 +550,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -568,8 +581,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -601,8 +613,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -634,8 +645,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Config, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Config, got: {r:?}"
         );
     }
 
@@ -668,8 +678,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -696,8 +705,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -732,8 +740,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -766,8 +773,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
         );
     }
 
@@ -804,8 +810,7 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             r.is_ok(),
-            "publish_and_check failed, expected Ok(()), got: {:?}",
-            r
+            "publish_and_check failed, expected Ok(()), got: {r:?}"
         );
     }
 
@@ -842,8 +847,57 @@ mod integration_tests {
         let r = publish_and_check(conf).await;
         assert!(
             matches!(r, Err(BuildError::Connect { .. })),
-            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
-            r
+            "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_multiple_urls_valid() {
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "nats://nats:4222,nats://demo.nats.io:4222".to_string(),
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: None,
+            log_namespace: None,
+            subject_key_field: default_subject_key_field(),
+            ..Default::default()
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed for multiple URLs, expected Ok(()), got: {r:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_multiple_urls_invalid() {
+        let subject = format!("test-{}", random_string(10));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url: "http://invalid-url,nats://:invalid@localhost:4222".to_string(),
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: None,
+            log_namespace: None,
+            subject_key_field: default_subject_key_field(),
+            ..Default::default()
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed for bad URLs, expected BuildError::Connect, got: {r:?}"
         );
     }
 }

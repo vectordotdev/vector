@@ -34,7 +34,7 @@ subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 c
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
-display_banner = true # Whether to display the top banner in layouts/partials/banner.html
+display_banner = false # Whether to display the top banner in layouts/partials/banner.html
 favicon = "favicon.ico"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
@@ -45,13 +45,16 @@ site_generation = 2
 
 # Search
 [params.search]
-algolia_app_id = "EOIG7V0A2O"
-# Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
-algolia_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
-
-algolia_index_prod = "vector_docs_prod"
-algolia_index_staging = "vector_docs_staging"
 algolia_autocomplete_theme = "classic"
+typesense_index = "vector_docs"
+
+# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
+typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
+typesense_dev_host = "dnm1k9zrpctsvjowp"
+
+# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
+typesense_public_prod_apikey = "BdepvpnczVgPL008lqhuBlkZo5s0rrWE"
+typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
 
@@ -153,38 +156,38 @@ weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
-name = "About"
-identifier = "about"
+name = "Abount"
+identifier = "introduction"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "What is Vector?"
-url = "/docs/about"
-parent = "about"
+name = "Vector"
+url = "/docs/introduction"
+parent = "introduction"
 weight = 1
-
-[[languages.en.menus.footer]]
-name = "What is Observability Pipelines?"
-url = "/docs/about/what-is-observability-pipelines"
-parent = "about"
-weight = 2
 
 [[languages.en.menus.footer]]
 name = "Contact us"
 url = "/community"
-parent = "about"
+parent = "introduction"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "The Team"
+url = "https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team"
+parent = "introduction"
 weight = 3
 
 [[languages.en.menus.footer]]
 name = "Privacy"
 url = "https://www.datadoghq.com/legal/privacy/"
-parent = "about"
+parent = "introduction"
 weight = 4
 
 [[languages.en.menus.footer]]
 name = "Cookies"
 url = "https://www.datadoghq.com/legal/cookies/"
-parent = "about"
+parent = "introduction"
 weight = 5
 
 [[languages.en.menus.footer]]

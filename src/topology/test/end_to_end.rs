@@ -66,7 +66,7 @@ pub fn http_client(
 
     let sender = tokio::spawn(async move {
         let result = reqwest::Client::new()
-            .post(&format!("http://{}/", address))
+            .post(format!("http://{address}/"))
             .body(body)
             .send()
             .await
@@ -96,8 +96,6 @@ inputs = ["in"]
 encoding.codec = "json"
 uri = "http://{address2}/"
 "#,
-            address1 = address1,
-            address2 = address2,
         ),
         Format::Toml,
     )

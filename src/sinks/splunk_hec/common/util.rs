@@ -43,7 +43,7 @@ pub enum HealthcheckError {
 }
 
 pub fn create_client(
-    tls: &Option<TlsConfig>,
+    tls: Option<&TlsConfig>,
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
@@ -92,7 +92,7 @@ pub async fn build_healthcheck(
         .context(UriParseSnafu)?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
+        .header("Authorization", format!("Splunk {token}"))
         .body(Body::empty())
         .unwrap();
 
@@ -135,12 +135,6 @@ pub fn build_uri(
     uri.parse::<Uri>()
 }
 
-pub fn config_host_key_target_path() -> OptionalTargetPath {
-    OptionalTargetPath {
-        path: crate::config::log_schema().host_key_target_path().cloned(),
-    }
-}
-
 pub fn config_host_key() -> OptionalValuePath {
     OptionalValuePath {
         path: crate::config::log_schema().host_key().cloned(),
@@ -152,12 +146,6 @@ pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
         path: crate::config::log_schema()
             .timestamp_key_target_path()
             .cloned(),
-    }
-}
-
-pub fn config_timestamp_key() -> OptionalValuePath {
-    OptionalValuePath {
-        path: crate::config::log_schema().timestamp_key().cloned(),
     }
 }
 
@@ -208,7 +196,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert!(healthcheck.await.is_ok())
@@ -225,7 +213,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -245,7 +233,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -265,7 +253,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(mock_server.uri(), "token".to_string(), client);
 
         assert_eq!(
@@ -425,7 +413,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_ok() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let address = splunk_hec_address();
         let token = get_token().await;
 
@@ -439,7 +427,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_server_not_listening() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(
             "http://localhost:1111/".to_string(),
             get_token().await,
@@ -451,7 +439,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck_server_unavailable() {
-        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let client = create_client(None, &ProxyConfig::default()).unwrap();
         let healthcheck = build_healthcheck(
             "http://localhost:5503/".to_string(),
             get_token().await,

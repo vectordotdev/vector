@@ -15,8 +15,6 @@ on:
         type: string
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   CONTAINER_TOOL: "docker"
@@ -30,26 +28,26 @@ env:
 
 jobs:
   test-integration:
-    runs-on: [linux, ubuntu-20.04-4core]
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     if: inputs.if || github.event_name == 'workflow_dispatch'
     steps:
       - name: (PR comment) Get PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
         id: comment-branch
 
       - name: (PR comment) Checkout PR branch
         if: ${{ github.event_name == 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'issue_comment' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - run: bash scripts/environment/prepare.sh --modules=rustup,datadog-ci
 
       - run: make test-integration-${{ inputs.test_name }}
         env:

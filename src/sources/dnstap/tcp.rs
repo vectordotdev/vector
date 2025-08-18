@@ -46,9 +46,7 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     pub port_key: OptionalValuePath,
 
-    /// List of allowed origin IP networks
-    ///
-    /// By default, all origins are allowed
+    #[configurable(derived)]
     permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
@@ -161,9 +159,7 @@ impl<T: FrameHandler + Clone> DnstapFrameHandler<T> {
             receive_buffer_bytes: config.receive_buffer_bytes,
             max_connection_duration_secs: config.max_connection_duration_secs,
             max_connections: config.connection_limit,
-            allowlist: config
-                .permit_origin
-                .map(|p| p.0.iter().map(|net| net.0).collect()),
+            allowlist: config.permit_origin.map(Into::into),
             log_namespace,
         }
     }

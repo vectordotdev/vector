@@ -10,6 +10,8 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
+use rand::distr::{Alphanumeric, SampleString};
+use rand::rng;
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -21,28 +23,21 @@ pub fn init() {
 }
 
 pub fn get_namespace() -> String {
-    use rand::Rng;
-
-    // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique
-    // names.
+    // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique names.
     // There is a 36 ^ 5 chance of a name collision, which is likely to be an acceptable risk.
-    let id: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(5)
-        .map(|num| (num as char).to_ascii_lowercase())
-        .collect();
+    let id = Alphanumeric.sample_string(&mut rng(), 5).to_lowercase();
 
-    format!("vector-{}", id)
+    format!("vector-{id}")
 }
 
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
-    format!("{}-{}", namespace, suffix)
+    format!("{namespace}-{suffix}")
 }
 
 /// Gets a name we can use for roles to prevent them conflicting with other tests.
 /// Uses the provided namespace as the root.
 pub fn get_override_name(namespace: &str, suffix: &str) -> String {
-    format!("{}-{}", namespace, suffix)
+    format!("{namespace}-{suffix}")
 }
 
 /// Is the MULTINODE environment variable set?
@@ -54,7 +49,7 @@ pub fn is_multinode() -> bool {
 /// to be run against the same cluster without the role names clashing.
 pub fn config_override_name(name: &str, cleanup: bool) -> String {
     let vectordir = if is_multinode() {
-        format!("{}-vector", name)
+        format!("{name}-vector")
     } else {
         "vector".to_string()
     };
@@ -241,9 +236,7 @@ pub async fn smoke_check_first_line(log_reader: &mut Reader) {
     let expected_pat = "INFO vector::app:";
     assert!(
         first_line.contains(expected_pat),
-        "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
-        expected_pat,
-        first_line
+        "Expected a line ending with {expected_pat:?} but got {first_line:?}; vector might be malfunctioning"
     );
 }
 
@@ -307,7 +300,7 @@ where
     Ok(())
 }
 
-/// Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+/// Create a pod for our other pods to have an affinity to ensure they are all deployed on
 /// the same node.
 pub async fn create_affinity_pod(
     framework: &Framework,

@@ -1,13 +1,12 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use rand::{
-    distributions::{Distribution, Uniform},
-    seq::SliceRandom,
-};
+use rand::distr::Distribution;
+use rand::{distr::Uniform, seq::SliceRandom};
 use vector::{event::metric::Sample, sinks::util::statistic::DistributionStatistic};
 
 fn generate_samples(mut size: u32, max_bin_count: u32) -> Vec<Sample> {
-    let mut rng = rand::thread_rng();
-    let range = Uniform::from(1..=max_bin_count);
+    let mut rng = rand::rng();
+    // Fix Uniform usage for inclusive range
+    let range = Uniform::new_inclusive(1, max_bin_count).unwrap();
     let mut value = 1.0;
     let mut samples = Vec::new();
     while size > 0 {
@@ -28,7 +27,7 @@ fn bench_statistic(c: &mut Criterion) {
 
     let sizes = [5, 10, 50, 100, 200, 500, 1000];
     for &size in &sizes {
-        group.bench_function(format!("small-bin-{}", size), |b| {
+        group.bench_function(format!("small-bin-{size}"), |b| {
             b.iter_batched(
                 move || generate_samples(size, 3),
                 |samples| {
@@ -41,7 +40,7 @@ fn bench_statistic(c: &mut Criterion) {
 
     let sizes = [50, 100, 200, 500, 1000];
     for &size in &sizes {
-        group.bench_function(format!("large-bin-{}", size), |b| {
+        group.bench_function(format!("large-bin-{size}"), |b| {
             b.iter_batched(
                 move || generate_samples(size, 20),
                 |samples| {

@@ -57,7 +57,7 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
                         buf,
                         &name,
                         tags.as_deref(),
-                        format!("{:+}", value),
+                        format!("{value:+}"),
                         "g",
                         None,
                     ),
@@ -117,7 +117,7 @@ fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
         .iter_all()
         .map(|(name, tag_value)| match tag_value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.to_owned(),
         })
         .collect();
@@ -136,7 +136,7 @@ fn encode_and_write_single_event<V: Display>(
 ) {
     let mut writer = buf.writer();
 
-    write!(&mut writer, "{}:{}|{}", metric_name, val, metric_type).unwrap();
+    write!(&mut writer, "{metric_name}:{val}|{metric_type}").unwrap();
 
     if let Some(sample_rate) = sample_rate {
         if sample_rate != 1 {
@@ -145,7 +145,7 @@ fn encode_and_write_single_event<V: Display>(
     };
 
     if let Some(t) = metric_tags {
-        write!(&mut writer, "|#{}", t).unwrap();
+        write!(&mut writer, "|#{t}").unwrap();
     };
 
     writeln!(&mut writer).unwrap();
@@ -177,11 +177,16 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
-        use crate::sources::statsd::parser::parse as statsd_parse;
+        use crate::sources::statsd::{parser::Parser, ConversionUnit};
+        let statsd_parser = Parser::new(true, ConversionUnit::Seconds);
 
         let s = std::str::from_utf8(metric).unwrap().trim();
         s.split('\n')
-            .map(|packet| statsd_parse(packet).expect("should not fail to parse statsd packet"))
+            .map(|packet| {
+                statsd_parser
+                    .parse(packet)
+                    .expect("should not fail to parse statsd packet")
+            })
             .collect()
     }
 

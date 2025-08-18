@@ -7,6 +7,7 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg), deny(rustdoc::broken_intra_doc_links))]
+#![allow(async_fn_in_trait)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -20,12 +21,17 @@
 
 //! The main library to support building Vector.
 
+#[cfg(all(unix, feature = "sinks-socket"))]
 #[macro_use]
-extern crate tracing;
+extern crate cfg_if;
 #[macro_use]
 extern crate derivative;
 #[macro_use]
+extern crate tracing;
+#[macro_use]
 extern crate vector_lib;
+
+pub use indoc::indoc;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
@@ -129,25 +135,12 @@ pub use vector_lib::{shutdown, Error, Result};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
-/// Flag denoting whether or not enterprise features are enabled.
-#[cfg(feature = "enterprise")]
-pub static ENTERPRISE_ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-
 /// The name used to identify this Vector application.
 ///
 /// This can be set at compile-time through the VECTOR_APP_NAME env variable.
 /// Defaults to "Vector".
 pub fn get_app_name() -> &'static str {
-    #[cfg(not(feature = "enterprise"))]
-    let app_name = "Vector";
-    #[cfg(feature = "enterprise")]
-    let app_name = if *ENTERPRISE_ENABLED.get().unwrap_or(&false) {
-        "Vector Enterprise"
-    } else {
-        "Vector"
-    };
-
-    option_env!("VECTOR_APP_NAME").unwrap_or(app_name)
+    option_env!("VECTOR_APP_NAME").unwrap_or("Vector")
 }
 
 /// Returns a slugified version of the name used to identify this Vector application.
@@ -194,12 +187,12 @@ pub fn get_version() -> String {
     // or full debug symbols. See the Cargo Book profiling section for value meaning:
     // https://doc.rust-lang.org/cargo/reference/profiles.html#debug
     let build_string = match built_info::DEBUG {
-        "1" => format!("{} debug=line", build_string),
-        "2" | "true" => format!("{} debug=full", build_string),
+        "1" => format!("{build_string} debug=line"),
+        "2" | "true" => format!("{build_string} debug=full"),
         _ => build_string,
     };
 
-    format!("{} ({})", pkg_version, build_string)
+    format!("{pkg_version} ({build_string})")
 }
 
 /// Includes information about the current build.
@@ -209,8 +202,13 @@ pub mod built_info {
 }
 
 /// Returns the host name of the current system.
+/// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
-    Ok(hostname::get()?.to_string_lossy().into())
+    Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
+        hostname.to_string()
+    } else {
+        hostname::get()?.to_string_lossy().into_owned()
+    })
 }
 
 /// Spawn a task with the given name. The name is only used if

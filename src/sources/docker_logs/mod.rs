@@ -1,18 +1,19 @@
-use std::{
-    collections::HashMap, convert::TryFrom, future::ready, pin::Pin, sync::Arc, time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
 
+use bollard::query_parameters::{
+    EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
+};
 use bollard::{
-    container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
+    container::LogOutput,
     errors::Error as DockerError,
+    query_parameters::InspectContainerOptions,
     service::{ContainerInspectResponse, EventMessage},
-    system::EventsOptions,
     Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
@@ -55,9 +56,9 @@ const CONTAINER: &str = "container_id";
 // Prevent short hostname from being wrongly recognized as a container's short ID.
 const MIN_HOSTNAME_LENGTH: usize = 6;
 
-static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
-static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
-static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
+static STDERR: LazyLock<Bytes> = LazyLock::new(|| "stderr".into());
+static STDOUT: LazyLock<Bytes> = LazyLock::new(|| "stdout".into());
+static CONSOLE: LazyLock<Bytes> = LazyLock::new(|| "console".into());
 
 /// Configuration for the `docker_logs` source.
 #[serde_as]
@@ -70,8 +71,7 @@ pub struct DockerLogsConfig {
     /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Docker host to connect to.
     ///
@@ -171,7 +171,7 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: default_host_key(),
+            host_key: None,
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -185,10 +185,6 @@ impl Default for DockerLogsConfig {
             log_namespace: None,
         }
     }
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 fn default_partial_event_marker_field() -> Option<String> {
@@ -273,7 +269,12 @@ impl SourceConfig for DockerLogsConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let host_key = self.host_key.clone().path.map(LegacyKey::Overwrite);
+        let host_key = self
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into())
+            .path
+            .map(LegacyKey::Overwrite);
 
         let schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
@@ -349,7 +350,10 @@ impl SourceConfig for DockerLogsConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -395,7 +399,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send + use<> {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -424,11 +428,12 @@ impl DockerLogsSourceCore {
             filters.insert("image".to_owned(), include_images.clone());
         }
 
-        self.docker.events(Some(EventsOptions {
-            since: Some(self.now_timestamp),
-            until: None,
-            filters,
-        }))
+        self.docker.events(Some(
+            EventsOptionsBuilder::new()
+                .since(&self.now_timestamp.timestamp().to_string())
+                .filters(&filters)
+                .build(),
+        ))
     }
 }
 
@@ -465,7 +470,10 @@ impl DockerLogsSource {
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
-        let host_key = config.host_key.clone();
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or(log_schema().host_key().cloned().into());
         let hostname = crate::get_hostname().ok();
 
         // Only logs created at, or after this moment are logged.
@@ -523,11 +531,12 @@ impl DockerLogsSource {
         self.esb
             .core
             .docker
-            .list_containers(Some(ListContainersOptions {
-                all: false, // only running containers
-                filters,
-                ..Default::default()
-            }))
+            .list_containers(Some(
+                ListContainersOptionsBuilder::new()
+                    .all(false)
+                    .filters(&filters)
+                    .build(),
+            ))
             .await?
             .into_iter()
             .for_each(|container| {
@@ -732,14 +741,15 @@ impl EventStreamBuilder {
 
     async fn run_event_stream(mut self, mut info: ContainerLogInfo) {
         // Establish connection
-        let options = Some(LogsOptions::<String> {
-            follow: true,
-            stdout: true,
-            stderr: true,
-            since: info.log_since(),
-            timestamps: true,
-            ..Default::default()
-        });
+        let options = Some(
+            LogsOptionsBuilder::new()
+                .follow(true)
+                .stdout(true)
+                .stderr(true)
+                .since(info.log_since() as i32) // 2038 bug (I think)
+                .timestamps(true)
+                .build(),
+        );
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
         emit!(DockerLogsContainerWatch {
@@ -900,12 +910,12 @@ impl ContainerState {
         }
     }
 
-    fn running(&mut self) {
+    const fn running(&mut self) {
         self.running = true;
         self.generation += 1;
     }
 
-    fn stopped(&mut self) {
+    const fn stopped(&mut self) {
         self.running = false;
     }
 
@@ -997,8 +1007,9 @@ impl ContainerLogInfo {
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
                 match self.last_log.as_ref() {
-                    Some(&(last, gen)) => {
-                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                    Some(&(last, generation)) => {
+                        if last < timestamp || (last == timestamp && generation == self.generation)
+                        {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.
@@ -1271,7 +1282,7 @@ impl ContainerMetadata {
             name: name.as_str().trim_start_matches('/').to_owned().into(),
             name_str: name,
             image: config.image.unwrap().into(),
-            created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
+            created_at: created.with_timezone(&Utc),
         })
     }
 }

@@ -141,24 +141,18 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, true)
+    let builder = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
+    config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
-    let (config, build_warnings) = builder
+    let (config, warnings) = builder
         .build_with_warnings()
         .map_err(&mut report_error)
         .ok()?;
 
     // Warnings
-    let warnings = load_warnings
-        .into_iter()
-        .chain(build_warnings)
-        .collect::<Vec<_>>();
     if !warnings.is_empty() {
         if opts.deny_warnings {
             report_error(warnings);
@@ -177,10 +171,11 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
-        pieces
-    } else {
-        return false;
+    let mut pieces = match validate_components(config, &diff, fmt).await {
+        Some(pieces) => pieces,
+        _ => {
+            return false;
+        }
     };
     opts.skip_healthchecks || validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
@@ -236,17 +231,17 @@ async fn validate_healthchecks(
                     .healthcheck()
                     .enabled
                 {
-                    fmt.success(format!("Health check \"{}\"", id));
+                    fmt.success(format!("Health check \"{id}\""));
                 } else {
-                    fmt.warning(format!("Health check disabled for \"{}\"", id));
+                    fmt.warning(format!("Health check disabled for \"{id}\""));
                     validated &= !opts.deny_warnings;
                 }
             }
-            Ok(Err(e)) => failed(format!("Health check for \"{}\" failed: {}", id, e)),
+            Ok(Err(e)) => failed(format!("Health check for \"{id}\" failed: {e}")),
             Err(error) if error.is_cancelled() => {
-                failed(format!("Health check for \"{}\" was cancelled", id))
+                failed(format!("Health check for \"{id}\" was cancelled"))
             }
-            Err(_) => failed(format!("Health check for \"{}\" panicked", id)),
+            Err(_) => failed(format!("Health check for \"{id}\" panicked")),
         }
         trace!("Healthcheck for {id} done.");
     }

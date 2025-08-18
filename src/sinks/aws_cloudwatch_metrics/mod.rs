@@ -119,7 +119,7 @@ struct CloudwatchMetricsClientBuilder;
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
     type Client = aws_sdk_cloudwatch::client::Client;
 
-    fn build(config: &aws_types::SdkConfig) -> Self::Client {
+    fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
         aws_sdk_cloudwatch::client::Client::new(config)
     }
 }
@@ -172,11 +172,13 @@ impl CloudWatchMetricsSinkConfig {
         };
 
         create_client::<CloudwatchMetricsClientBuilder>(
+            &CloudwatchMetricsClientBuilder {},
             &self.auth,
             region,
             self.region.endpoint(),
             proxy,
-            &self.tls,
+            self.tls.as_ref(),
+            None,
         )
         .await
     }
@@ -242,7 +244,6 @@ impl CloudWatchMetricsSvc {
                     normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
-                            .take()
                             .unwrap_or_else(|| default_namespace.clone());
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(metric, namespace),

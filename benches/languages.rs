@@ -233,7 +233,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
 ///
 /// * `criterion` - Criterion benchmark manager
 /// * `benchmark_name` - The name of the benchmark
-/// * `configs' - Vec of tuples of (config_name, config_snippet)
+/// * `configs` - Vec of tuples of (config_name, config_snippet)
 /// * `input_name` - Name of the input to the first transform
 /// * `output_name` - Name of the last transform
 /// * `input` - Line to use as input
@@ -256,11 +256,9 @@ fn benchmark_configs(
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let lines: Vec<_> = ::std::iter::repeat(input.to_string())
-        .take(num_lines)
-        .collect();
+    let lines: Vec<_> = std::iter::repeat_n(input.to_string(), num_lines).collect();
 
-    let mut group = criterion.benchmark_group(format!("languages/{}", benchmark_name));
+    let mut group = criterion.benchmark_group(format!("languages/{benchmark_name}"));
     group.sampling_mode(SamplingMode::Flat);
 
     let source_config = format!(
@@ -286,15 +284,15 @@ fn benchmark_configs(
 
     for (name, transform_config) in configs.into_iter() {
         group.throughput(Throughput::Elements(num_lines as u64));
-        group.bench_function(name.clone(), |b| {
+        group.bench_function(name, |b| {
             b.iter_batched(
                 || {
                     let mut config = source_config.clone();
-                    config.push_str(&transform_config);
+                    config.push_str(transform_config);
                     config.push_str(&sink_config);
 
                     let config = config::load_from_str(&config, config::Format::Toml)
-                        .expect(&format!("invalid TOML configuration: {}", &config));
+                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {}", &config));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -322,7 +320,7 @@ fn benchmark_configs(
                                 // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
                                 for (key, value) in output.iter() {
-                                    assert_eq!(Some(value), actual.get(key), "for key {}", key,);
+                                    assert_eq!(Some(value), actual.get(key), "for key {key}",);
                                 }
                             }
                         }

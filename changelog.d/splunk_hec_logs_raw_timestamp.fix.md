@@ -1,1 +1,0 @@
-The `splunk_hec_logs` sink when configured with the `raw` endpoint target, was removing the timestamp from the event. This was due to a bug in the handling of the `auto_extract_timestamp` configuration option, which is only supposed to apply to the `event` endpoint target.

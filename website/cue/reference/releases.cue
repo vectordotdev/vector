@@ -37,6 +37,7 @@ releases: {
 
 		commits?: [#Commit, ...#Commit]
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
+		vrl_changelog?: string
 		whats_next: #Any | *[]
 	}
 

@@ -11,7 +11,7 @@ pub struct HerokuLogplexRequestReceived<'a> {
     pub drain_token: &'a str,
 }
 
-impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
+impl InternalEvent for HerokuLogplexRequestReceived<'_> {
     fn emit(self) {
         debug!(
             message = "Handling logplex request.",
@@ -36,13 +36,14 @@ impl InternalEvent for HerokuLogplexRequestReadError {
             error_type = error_type::READER_FAILED,
             error_code = io_error_code(&self.error),
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::READER_FAILED,
             "error_code" => io_error_code(&self.error),
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }

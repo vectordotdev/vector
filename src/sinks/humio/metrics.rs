@@ -84,7 +84,8 @@ pub struct HumioMetricsConfig {
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
-    /// By default, the [global `log_schema.host_key` option][global_host_key] is used.
+    /// By default, the [global `log_schema.host_key` option][global_host_key] is used if log
+    /// events are Legacy namespaced, or the semantic meaning of "host" is used, if defined.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key")]
@@ -283,7 +284,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -349,7 +350,7 @@ mod tests {
         let addr = test_util::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 

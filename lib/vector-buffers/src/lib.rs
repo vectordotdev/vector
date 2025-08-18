@@ -9,6 +9,7 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 #![allow(clippy::must_use_candidate)]
+#![allow(async_fn_in_trait)]
 
 #[macro_use]
 extern crate tracing;
@@ -16,7 +17,7 @@ extern crate tracing;
 mod buffer_usage_data;
 
 pub mod config;
-pub use config::{BufferConfig, BufferType};
+pub use config::{BufferConfig, BufferType, MemoryBufferSize};
 use encoding::Encodable;
 use vector_config::configurable_component;
 
@@ -30,6 +31,7 @@ mod internal_events;
 pub mod test;
 pub mod topology;
 
+mod cast_utils;
 pub(crate) mod variants;
 
 use std::fmt::Debug;
@@ -74,7 +76,7 @@ pub enum WhenFull {
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
         // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
-        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // supports handling it, and will be defaulted to using "block" if they encounter
         // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
@@ -121,7 +123,7 @@ where
     }
 }
 
-impl<'a, T> EventCount for &'a T
+impl<T> EventCount for &T
 where
     T: EventCount,
 {

@@ -2,4 +2,4 @@ version: '3'
 
 services:
   humio:
-    image: docker.io/humio/humio:${CONFIG_VERSION}
+    image: docker.io/humio/humio-single-node-demo:${CONFIG_VERSION}

@@ -68,7 +68,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
             encoder
                 .encode(event, &mut body)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode event"))?;
+                .map_err(|_| io::Error::other("unable to encode event"))?;
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {

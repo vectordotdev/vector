@@ -66,12 +66,11 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let blob_name = {
-            let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
-
-            self.blob_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
-                .unwrap_or_else(|| formatted_ts.to_string())
+        let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
+        let blob_name = if self.blob_append_uuid {
+            format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+        } else {
+            formatted_ts.to_string()
         };
 
         let extension = self.compression.extension();

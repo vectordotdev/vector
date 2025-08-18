@@ -8,32 +8,32 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-anyhow = "1.0.81"
-cached = "0.49.2"
+anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
-clap-verbosity-flag = "2.2.0"
-clap_complete = "4.5.1"
-confy = "0.6.1"
-directories = "5.0.1"
+clap-verbosity-flag = "3.0.3"
+clap_complete = "4.5.55"
+confy = "1.0.0"
+directories = "6.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
-dunce = "1.0.4"
-glob = { version = "0.3.1", default-features = false }
+dunce = "1.0.5"
+glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.17.8", features = ["improved_unicode"] }
-itertools = "0.12.1"
-log = "0.4.21"
-once_cell = "1.19"
-os_info = { version = "3.7.0", default-features = false }
+indicatif = { version = "0.18.0", features = ["improved_unicode"] }
+itertools.workspace = true
+log = "0.4.27"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.0.0", features = ["supports-colors"] }
-paste = "1.0.14"
-regex = { version = "1.10.3", default-features = false, features = ["std", "perf"] }
+owo-colors = { version = "4.2.2", features = ["supports-colors"] }
+paste.workspace = true
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11", features = ["json", "blocking"] }
 serde.workspace = true
 serde_json.workspace = true
-serde_yaml = "0.9.32"
-sha2 = "0.10.8"
-tempfile = "3.10.1"
+serde_yaml = "0.9.34"
+sha2 = "0.10.9"
+tempfile.workspace = true
 toml.workspace = true
+semver.workspace = true
+indoc.workspace = true
+git2 = { version = "0.20.2" }

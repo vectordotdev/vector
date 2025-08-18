@@ -2,12 +2,11 @@ use std::{
     cmp,
     io::{self, Write},
     mem,
-    sync::{Arc, OnceLock},
+    sync::{Arc, LazyLock, OnceLock},
 };
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
 use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
@@ -34,7 +33,7 @@ pub(super) const ORIGIN_CATEGORY_VALUE: u32 = 11;
 
 const DEFAULT_DD_ORIGIN_PRODUCT_VALUE: u32 = 14;
 
-pub(super) static ORIGIN_PRODUCT_VALUE: Lazy<u32> = Lazy::new(|| {
+pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
     option_env!("DD_ORIGIN_PRODUCT")
         .map(|p| {
             p.parse::<u32>()
@@ -237,7 +236,7 @@ impl DatadogMetricsEncoder {
         // for `SketchPayload` with a single sketch looks just like as if we literally wrote out a
         // single value for the given field.
         //
-        // Similary, `MetricPayload` has a single repeated `series` field.
+        // Similarly, `MetricPayload` has a single repeated `series` field.
 
         match self.endpoint {
             // V1 Series metrics are encoded via JSON, in an incremental fashion.
@@ -694,7 +693,7 @@ fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter_all()
         .map(|(name, value)| match value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.into(),
         })
         .collect();

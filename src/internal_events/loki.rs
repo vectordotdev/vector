@@ -12,15 +12,15 @@ impl InternalEvent for LokiEventUnlabeledError {
             error_code = "unlabeled_event",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "unlabeled_event",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -38,7 +38,6 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
             error_code = "out_of_order",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -47,11 +46,12 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
         });
 
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "out_of_order",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -66,8 +66,33 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             message = "Timestamps rewritten.",
             count = self.count,
             reason = "out_of_order",
-            internal_log_rate_limit = true,
         );
-        counter!("rewritten_timestamp_events_total", self.count as u64);
+        counter!("rewritten_timestamp_events_total").increment(self.count as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct LokiTimestampNonParsableEventsDropped;
+
+impl InternalEvent for LokiTimestampNonParsableEventsDropped {
+    fn emit(self) {
+        let reason = "Dropping timestamp non-parsable event(s).";
+
+        error!(
+            message = "Event timestamp non-parsable.",
+            error_code = "non-parsable_timestamp",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+
+        emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+
+        counter!(
+            "component_errors_total",
+            "error_code" => "non-parsable_timestamp",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
     }
 }

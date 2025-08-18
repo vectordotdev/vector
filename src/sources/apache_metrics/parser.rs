@@ -1,11 +1,10 @@
-use std::{collections::HashMap, error, fmt, iter, num};
+use std::{collections::HashMap, error, fmt, iter, num, sync::LazyLock};
 
 use chrono::{DateTime, Utc};
-use once_cell::sync::Lazy;
 
 use crate::event::metric::{Metric, MetricKind, MetricTags, MetricValue};
 
-static SCOREBOARD: Lazy<HashMap<char, &'static str>> = Lazy::new(|| {
+static SCOREBOARD: LazyLock<HashMap<char, &'static str>> = LazyLock::new(|| {
     vec![
         ('_', "waiting"),
         ('S', "starting"),
@@ -113,7 +112,7 @@ pub fn parse(
     namespace: Option<&str>,
     now: DateTime<Utc>,
     tags: Option<&MetricTags>,
-) -> impl Iterator<Item = Result<Metric, ParseError>> {
+) -> impl Iterator<Item = Result<Metric, ParseError>> + use<> {
     // We use a HashMap rather than a Vector as mod_status has
     // BusyWorkers/IdleWorkers repeated
     // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
@@ -489,7 +488,7 @@ mod test {
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
     fn test_not_extended() {
-        let payload = r##"
+        let payload = r"
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -514,7 +513,7 @@ ConnsAsyncWriting: 0
 ConnsAsyncKeepAlive: 0
 ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 
@@ -673,7 +672,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
     #[test]
     fn test_extended() {
-        let payload = r##"
+        let payload = r"
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -711,7 +710,7 @@ ConnsAsyncWriting: 0
 ConnsAsyncKeepAlive: 0
 ConnsAsyncClosing: 0
 Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W__________________.....................................................................................................................................................................................................................................................................................................................................
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 
@@ -928,10 +927,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
     #[test]
     fn test_parse_failure() {
-        let payload = r##"
+        let payload = r"
 ServerUptimeSeconds: not a number
 ConnsTotal: 1
-            "##;
+            ";
 
         let (now, metrics, errors) = parse_sort(payload);
 

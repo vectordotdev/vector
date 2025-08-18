@@ -12,11 +12,11 @@ use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, 
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::EstimatedJsonEncodedSizeOf;
 
+use crate::common::http::ErrorMessage;
 use crate::{
     event::{Event, ObjectMap, TraceEvent, Value},
-    sources::{
-        datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-        util::ErrorMessage,
+    sources::datadog_agent::{
+        ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource,
     },
     SourceSender,
 };
@@ -72,7 +72,7 @@ fn build_trace_filter(
                         .map_err(|error| {
                             ErrorMessage::new(
                                 StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {:?}", error),
+                                format!("Error decoding Datadog traces: {error:?}"),
                             )
                         })
                     });

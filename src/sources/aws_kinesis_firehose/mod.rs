@@ -179,7 +179,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             log_namespace,
         );
 
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let listener = tls.bind(&self.address).await?;
 
         let keepalive_settings = self.keepalive.clone();
@@ -232,7 +232,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -389,7 +389,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(format!("http://{}", address))
+            .post(format!("http://{address}"))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",

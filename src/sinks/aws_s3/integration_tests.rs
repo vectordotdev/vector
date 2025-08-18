@@ -388,7 +388,11 @@ async fn s3_healthchecks() {
         .create_service(&ProxyConfig::from_env())
         .await
         .unwrap();
-    config.build_healthcheck(service.client()).unwrap();
+    config
+        .build_healthcheck(service.client())
+        .unwrap()
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -434,6 +438,8 @@ async fn s3_flush_on_exhaustion() {
             auth: Default::default(),
             acknowledgements: Default::default(),
             timezone: Default::default(),
+            force_path_style: true,
+            retry_strategy: Default::default(),
         }
     };
     let prefix = config.key_prefix.clone();
@@ -485,12 +491,18 @@ async fn client() -> S3Client {
     let region = RegionOrEndpoint::with_both("us-east-1", s3_address());
     let proxy = ProxyConfig::default();
     let tls_options = None;
+    let force_path_style_value: bool = true;
+
     create_client::<S3ClientBuilder>(
+        &S3ClientBuilder {
+            force_path_style: Some(force_path_style_value),
+        },
         &auth,
         region.region(),
         region.endpoint(),
         &proxy,
-        &tls_options,
+        tls_options.as_ref(),
+        None,
     )
     .await
     .unwrap()
@@ -517,6 +529,8 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         auth: Default::default(),
         acknowledgements: Default::default(),
         timezone: Default::default(),
+        force_path_style: true,
+        retry_strategy: Default::default(),
     }
 }
 
@@ -547,9 +561,9 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
         Err(err) => match err {
             SdkError::ServiceError(inner) => match &inner.err() {
                 CreateBucketError::BucketAlreadyOwnedByYou(_) => {}
-                err => panic!("Failed to create bucket: {:?}", err),
+                err => panic!("Failed to create bucket: {err:?}"),
             },
-            err => panic!("Failed to create bucket: {:?}", err),
+            err => panic!("Failed to create bucket: {err:?}"),
         },
     }
 }

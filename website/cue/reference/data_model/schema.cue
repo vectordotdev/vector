@@ -237,7 +237,7 @@ data_model: schema: {
 
 				"namespace": {
 					description: "The metric namespace. Depending on the service, this will prepend the name or use native namespacing facilities."
-					required:    true
+					required:    false
 					type: string: {
 						examples: ["host", "apache", "nginx"]
 					}

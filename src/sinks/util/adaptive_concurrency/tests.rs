@@ -5,7 +5,7 @@ use core::task::Context;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
-    fs::{read_dir, File},
+    fs::File,
     future::pending,
     io::Read,
     path::PathBuf,
@@ -19,8 +19,9 @@ use futures::{
     future::{self, BoxFuture},
     stream, FutureExt, SinkExt,
 };
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use rand_distr::Exp1;
+use rstest::*;
 use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, sleep, Duration, Instant};
@@ -29,6 +30,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
 
 use super::controller::ControllerStatistics;
+use super::AdaptiveConcurrencySettings;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
@@ -136,6 +138,10 @@ struct TestParams {
     #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
 const fn default_interval() -> f64 {
@@ -189,7 +195,7 @@ impl SinkConfig for TestConfig {
             .with_flat_map(|event| {
                 stream::iter(Some(Ok(EncodedEvent::new(event, 0, JsonSize::zero()))))
             })
-            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
+            .sink_map_err(|error| panic!("Fatal test sink error: {error}"));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
@@ -230,7 +236,7 @@ impl TestSink {
 
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
-            * thread_rng().sample::<f64, _>(Exp1).mul_add(
+            * rng().sample::<f64, _>(Exp1).mul_add(
                 self.params.jitter,
                 1.0 + self.params.concurrency_limit_params.scale(in_flight)
                     + self.params.rate.scale(rate),
@@ -418,6 +424,7 @@ async fn run_test(params: TestParams) -> TestResults {
             rate_limit_num: 9999,
             timeout_secs: 1,
             retry_jitter_mode: JitterMode::None,
+            adaptive_concurrency: params.adaptive_concurrency,
             ..Default::default()
         },
         params,
@@ -518,14 +525,14 @@ impl Range {
     fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value: value as f64,
                 reference: self.0,
             })
         } else if value > self.1 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value: value as f64,
                 reference: self.1,
@@ -538,14 +545,14 @@ impl Range {
     fn assert_f64(&self, value: f64, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value,
                 reference: self.0,
             })
         } else if value > self.1 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value,
                 reference: self.1,
@@ -617,9 +624,7 @@ struct TestInput {
     controller: ControllerResults,
 }
 
-async fn run_compare(file_path: PathBuf, input: TestInput) {
-    eprintln!("Running test in {:?}", file_path);
-
+async fn run_compare(input: TestInput) {
     let results = run_test(input.params).await;
 
     let mut failures = Vec::new();
@@ -664,45 +669,26 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
             failure.stat_name, failure.value, mode, failure.reference
         );
     }
-    assert!(failures.is_empty(), "{:#?}", results);
+    assert!(failures.is_empty(), "{results:#?}");
 }
 
+#[rstest]
 #[tokio::test]
-async fn all_tests() {
-    const PATH: &str = "tests/data/adaptive-concurrency";
-
-    // Read and parse everything first
-    let mut entries = read_dir(PATH)
-        .expect("Could not open data directory")
-        .map(|entry| entry.expect("Could not read data directory").path())
-        .filter_map(|file_path| {
-            if (file_path.extension().map(|ext| ext == "toml")).unwrap_or(false) {
-                let mut data = String::new();
-                File::open(&file_path)
-                    .unwrap()
-                    .read_to_string(&mut data)
-                    .unwrap();
-                let input: TestInput = toml::from_str(&data)
-                    .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
-                Some((file_path, input))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    entries.sort_unstable_by_key(|entry| entry.0.to_string_lossy().to_string());
+async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path: PathBuf) {
+    let mut data = String::new();
+    File::open(&file_path)
+        .unwrap()
+        .read_to_string(&mut data)
+        .unwrap();
+    let input: TestInput = toml::from_str(&data)
+        .unwrap_or_else(|error| panic!("Invalid TOML in {file_path:?}: {error:?}"));
 
     time::pause();
 
-    // The first delay takes just slightly longer than all the rest,
-    // which causes the first test to run differently than all the
-    // others. Throw in a dummy delay to take up this delay "slack".
+    // The first delay takes just slightly longer than all the rest, which causes the first
+    // statistic to be inaccurate. Throw in a dummy delay to take up this delay "slack".
     sleep(Duration::from_millis(1)).await;
     time::advance(Duration::from_millis(1)).await;
 
-    // Then run all the tests
-    for (file_path, input) in entries {
-        run_compare(file_path, input).await;
-    }
+    run_compare(input).await;
 }

@@ -53,6 +53,7 @@ impl MetaDescriptive for MqttRequest {
 pub(super) struct MqttService {
     pub(super) client: AsyncClient,
     pub(super) quality_of_service: MqttQoS,
+    pub(super) retain: bool,
 }
 
 #[derive(Debug, Snafu)]
@@ -72,13 +73,14 @@ impl Service<MqttRequest> for MqttService {
 
     fn call(&mut self, req: MqttRequest) -> Self::Future {
         let quality_of_service = self.quality_of_service;
+        let retain = self.retain;
         let client = self.client.clone();
 
         Box::pin(async move {
             let byte_size = req.body.len();
 
             let res = client
-                .publish(&req.topic, quality_of_service.into(), false, req.body)
+                .publish(&req.topic, quality_of_service.into(), retain, req.body)
                 .await;
             match res {
                 Ok(()) => Ok(MqttResponse {

@@ -28,7 +28,7 @@ impl Record for KinesisFirehoseRecord {
     fn encoded_length(&self) -> usize {
         let data_len = self.record.data.as_ref().len();
         // data is simply base64 encoded, quoted, and comma separated
-        (data_len + 2) / 3 * 4 + 3
+        data_len.div_ceil(3) * 4 + 3
     }
 
     fn get(self) -> Self::T {
@@ -41,7 +41,6 @@ pub struct KinesisFirehoseClient {
     pub client: KinesisClient,
 }
 
-#[async_trait::async_trait]
 impl SendRecord for KinesisFirehoseClient {
     type T = KinesisRecord;
     type E = KinesisError;

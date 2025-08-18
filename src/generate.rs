@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{map::Map, Value};
 use vector_lib::configurable::component::{
-    ExampleError, SinkDescription, SourceDescription, TransformDescription,
+    SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
@@ -119,7 +119,7 @@ pub(crate) fn generate_example(
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = opts
         .expression
-        .split(|c| c == '|' || c == '/')
+        .split(['|', '/'])
         .map(|s| {
             s.split(',')
                 .map(|s| s.trim().to_string())
@@ -140,8 +140,7 @@ pub(crate) fn generate_example(
             let (name, source_type) = if let Some(c_index) = source_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate source '{}': empty name is not allowed",
-                        source_expr
+                        "failed to generate source '{source_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -151,19 +150,14 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("source{}", i), source_expr.clone())
+                (format!("source{i}"), source_expr.clone())
             };
             source_names.push(name.clone());
 
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate source '{}': {}",
-                            source_type, err
-                        ));
-                    }
+                    errs.push(format!("failed to generate source '{source_type}': {err}"));
                     Value::Table(Map::new())
                 }
             };
@@ -188,8 +182,7 @@ pub(crate) fn generate_example(
             let (name, transform_type) = if let Some(c_index) = transform_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate transform '{}': empty name is not allowed",
-                        transform_expr
+                        "failed to generate transform '{transform_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -199,7 +192,7 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("transform{}", i), transform_expr.clone())
+                (format!("transform{i}"), transform_expr.clone())
             };
             transform_names.push(name.clone());
 
@@ -221,12 +214,9 @@ pub(crate) fn generate_example(
             let mut example = match TransformDescription::example(&transform_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!(
-                            "failed to generate transform '{}': {}",
-                            transform_type, err
-                        ));
-                    }
+                    errs.push(format!(
+                        "failed to generate transform '{transform_type}': {err}"
+                    ));
                     Value::Table(Map::new())
                 }
             };
@@ -256,8 +246,7 @@ pub(crate) fn generate_example(
             let (name, sink_type) = if let Some(c_index) = sink_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate sink '{}': empty name is not allowed",
-                        sink_expr
+                        "failed to generate sink '{sink_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -267,15 +256,13 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("sink{}", i), sink_expr.clone())
+                (format!("sink{i}"), sink_expr.clone())
             };
 
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    if err != ExampleError::MissingExample {
-                        errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
-                    }
+                    errs.push(format!("failed to generate sink '{sink_type}': {err}"));
                     Value::Table(Map::new())
                 }
             };
@@ -360,7 +347,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
-                println!("{}", s);
+                println!("{s}");
             }
             exitcode::OK
         }
@@ -417,15 +404,15 @@ mod tests {
     #[test]
     fn generate_all(#[case] format: Format) {
         for name in SourceDescription::types() {
-            generate_and_deserialize(format!("{}//", name), format);
+            generate_and_deserialize(format!("{name}//"), format);
         }
 
         for name in TransformDescription::types() {
-            generate_and_deserialize(format!("/{}/", name), format);
+            generate_and_deserialize(format!("/{name}/"), format);
         }
 
         for name in SinkDescription::types() {
-            generate_and_deserialize(format!("//{}", name), format);
+            generate_and_deserialize(format!("//{name}"), format);
         }
     }
 
@@ -489,6 +476,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -526,6 +516,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -557,6 +550,9 @@ mod tests {
                 [sinks.sink0.encoding]
                 codec = "json"
 
+                [sinks.sink0.encoding.json]
+                pretty = false
+
                 [sinks.sink0.healthcheck]
                 enabled = true
 
@@ -580,6 +576,9 @@ mod tests {
 
                 [sinks.sink0.encoding]
                 codec = "json"
+
+                [sinks.sink0.encoding.json]
+                pretty = false
 
                 [sinks.sink0.healthcheck]
                 enabled = true
@@ -661,18 +660,18 @@ mod tests {
 
         assert_eq!(
             generate_example(&opts, TransformInputsStrategy::Auto).unwrap(),
-            indoc::indoc! {r#"
+            indoc::indoc! {r"
             data_dir: /var/lib/vector/
             sources:
               source0:
                 count: 9223372036854775807
-                format: json
-                interval: 1.0
-                type: demo_logs
                 decoding:
                   codec: bytes
+                format: json
                 framing:
                   method: bytes
+                interval: 1.0
+                type: demo_logs
             transforms:
               transform0:
                 inputs:
@@ -687,10 +686,12 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
-                target: stdout
-                type: console
                 encoding:
                   codec: json
+                  json:
+                    pretty: false
+                target: stdout
+                type: console
                 healthcheck:
                   enabled: true
                   uri: null
@@ -698,7 +699,7 @@ mod tests {
                   type: memory
                   max_events: 500
                   when_full: block
-            "#}
+            "}
         );
     }
 
@@ -724,15 +725,15 @@ mod tests {
               "sources": {
                 "source0": {
                   "count": 9223372036854775807,
-                  "format": "json",
-                  "interval": 1.0,
-                  "type": "demo_logs",
                   "decoding": {
                     "codec": "bytes"
                   },
+                  "format": "json",
                   "framing": {
                     "method": "bytes"
-                  }
+                  },
+                  "interval": 1.0,
+                  "type": "demo_logs"
                 }
               },
               "transforms": {
@@ -753,11 +754,14 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
+                  "encoding": {
+                    "codec": "json",
+                    "json": {
+                      "pretty": false
+                    }
+                  },
                   "target": "stdout",
                   "type": "console",
-                  "encoding": {
-                    "codec": "json"
-                  },
                   "healthcheck": {
                     "enabled": true,
                     "uri": null

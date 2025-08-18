@@ -1,6 +1,5 @@
 use std::fmt;
 
-use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
 
 use crate::{BoxedSubscription, QueryResult};
@@ -32,12 +31,10 @@ pub struct ComponentAddedSubscription;
 )]
 pub struct ComponentRemovedSubscription;
 
-#[async_trait]
 pub trait ComponentsQueryExt {
     async fn components_query(&self, first: i64) -> crate::QueryResult<ComponentsQuery>;
 }
 
-#[async_trait]
 impl ComponentsQueryExt for crate::Client {
     async fn components_query(&self, first: i64) -> QueryResult<ComponentsQuery> {
         let request_body = ComponentsQuery::build_query(components_query::Variables { first });
@@ -50,7 +47,6 @@ pub trait ComponentsSubscriptionExt {
     fn component_removed(&self) -> crate::BoxedSubscription<ComponentRemovedSubscription>;
 }
 
-#[async_trait]
 impl ComponentsSubscriptionExt for crate::SubscriptionClient {
     /// Subscription for when a component has been added
     fn component_added(&self) -> BoxedSubscription<ComponentAddedSubscription> {
@@ -185,7 +181,7 @@ impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {
             components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(_) => "sink",
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -203,7 +199,7 @@ impl fmt::Display for component_added_subscription::ComponentAddedSubscriptionCo
             }
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -223,6 +219,6 @@ impl fmt::Display
             }
         };
 
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }

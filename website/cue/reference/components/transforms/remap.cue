@@ -4,7 +4,7 @@ components: transforms: "remap": {
 	title: "Remap"
 
 	description: """
-		Is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
+		This is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
 		observability data (logs and metrics) in a safe and performant manner.
 
@@ -13,7 +13,7 @@ components: transforms: "remap": {
 
 	classes: {
 		commonly_used: true
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -34,7 +34,7 @@ components: transforms: "remap": {
 		notices: []
 	}
 
-	configuration: base.components.transforms.remap.configuration
+	configuration: generated.components.transforms.remap.configuration
 
 	input: {
 		logs: true
@@ -46,7 +46,19 @@ components: transforms: "remap": {
 			set:          true
 			summary:      true
 		}
-		traces: false
+		traces: true
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
+		traces: "": {
+			description: "The modified input `trace` event."
+		}
 	}
 
 	examples: [
@@ -79,7 +91,12 @@ components: transforms: "remap": {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				You can use the `remap` transform to handle both log and metric events.
+				You can use the remap transform to handle all event types (log, metric, trace).
+				The `remap` transform cannot convert from one event type to another, the input type must match the output type.
+				For example, a log event can only be remap-ed and outputted as a log event and cannot be converted to a metric.
+
+				For converting from one type to another, please see [Log to Metric](\(urls.vector_log_to_metric_transform)) and
+				[Metric to Log](\(urls.vector_metric_to_log_transform)) transforms.
 
 				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
 				which means that the transform has access to the whole event and no restrictions on how the event can be
@@ -93,7 +110,8 @@ components: transforms: "remap": {
 				`type` | Read only |
 				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
 				`name` | Read/write |
-				`timestamp` | Read/write/delete | You assign only a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`timestamp` | Read/write/delete | You can only assign a valid [VRL timestamp](\(urls.vrl_expressions)/#timestamp) value, not a [VRL string](\(urls.vrl_expressions)/#string).
+				`interval_ms` | Read/write/delete | You can assign it a non zero 32 byte unsigned interval
 				`namespace` | Read/write/delete |
 				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
 

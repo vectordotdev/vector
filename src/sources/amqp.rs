@@ -27,7 +27,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
     config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
-    event::Event,
+    event::{Event, LogEvent},
     EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{
@@ -42,8 +42,6 @@ enum BuildError {
     AmqpCreateError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-    #[snafu(display("Could not subscribe to AMQP queue: {}", source))]
-    AmqpSubscribeError { source: lapin::Error },
 }
 
 /// Configuration for the `amqp` source.
@@ -180,7 +178,7 @@ impl SourceConfig for AmqpSourceConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -238,14 +236,12 @@ struct Keys<'a> {
 }
 
 /// Populates the decoded event with extra metadata.
-fn populate_event(
-    event: &mut Event,
+fn populate_log_event(
+    log: &mut LogEvent,
     timestamp: Option<chrono::DateTime<Utc>>,
     keys: &Keys<'_>,
     log_namespace: LogNamespace,
 ) {
-    let log = event.as_mut_log();
-
     log_namespace.insert_source_metadata(
         AmqpSourceConfig::NAME,
         log,
@@ -350,10 +346,12 @@ async fn receive_event(
                     ));
 
                     for mut event in events {
-                        populate_event(&mut event,
-                                       timestamp,
-                                       &keys,
-                                       log_namespace);
+                        if let Event::Log(ref mut log) = event {
+                            populate_log_event(log,
+                                        timestamp,
+                                        &keys,
+                                        log_namespace);
+                        }
 
                         yield event;
                     }
@@ -513,8 +511,7 @@ pub mod test {
         let pass = std::env::var("AMQP_PASSWORD").unwrap_or_else(|_| "guest".to_string());
         let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let vhost = std::env::var("AMQP_VHOST").unwrap_or_else(|_| "%2f".to_string());
-        config.connection.connection_string =
-            format!("amqp://{}:{}@{}:5672/{}", user, pass, host, vhost);
+        config.connection.connection_string = format!("amqp://{user}:{pass}@{host}:5672/{vhost}");
 
         config
     }
@@ -530,8 +527,7 @@ pub mod test {
         let host = std::env::var("AMQP_HOST").unwrap_or_else(|_| "rabbitmq".to_string());
         let ca_file =
             std::env::var("AMQP_CA_FILE").unwrap_or_else(|_| "/certs/ca.cert.pem".to_string());
-        config.connection.connection_string =
-            format!("amqps://{}:{}@{}/{}", user, pass, host, vhost);
+        config.connection.connection_string = format!("amqps://{user}:{pass}@{host}/{vhost}");
         let tls = TlsConfig {
             ca_file: Some(ca_file.as_str().into()),
             ..Default::default()

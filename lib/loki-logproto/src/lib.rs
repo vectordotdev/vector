@@ -15,17 +15,34 @@ pub mod util {
 
     const NANOS_RANGE: i64 = 1_000_000_000;
 
-    // (<Timestamp in nanos>, <Line>)
-    pub struct Entry(pub i64, pub String);
+    // (<name>, <value>)
+    impl From<(String, String)> for logproto::LabelPairAdapter {
+        fn from(pair: (String, String)) -> Self {
+            logproto::LabelPairAdapter {
+                name: pair.0,
+                value: pair.1,
+            }
+        }
+    }
+
+    // (<Timestamp in nanos>, <Line>, <Structured metadata>)
+    pub struct Entry(pub i64, pub String, pub Vec<(String, String)>);
 
     impl From<Entry> for logproto::EntryAdapter {
         fn from(entry: Entry) -> Self {
+            let line = entry.1;
+            let structured_metadata: Vec<logproto::LabelPairAdapter> =
+                entry.2.into_iter().map(|entry| entry.into()).collect();
+
             logproto::EntryAdapter {
                 timestamp: Some(prost_types::Timestamp {
                     seconds: entry.0 / NANOS_RANGE,
                     nanos: (entry.0 % NANOS_RANGE) as i32,
                 }),
-                line: entry.1,
+                line,
+                structured_metadata,
+                parsed: vec![], // TODO: Remove when Loki's proto doesn't require this in the
+                                // write-path anymore.
             }
         }
     }
@@ -66,7 +83,7 @@ pub mod util {
         let mut labels: Vec<String> = labels
             .iter()
             .filter(|(k, _)| !RESERVED_LABELS.contains(&k.as_str()))
-            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+            .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect();
         labels.sort();
         format!("{{{}}}", labels.join(", "))
@@ -104,6 +121,7 @@ mod tests {
         let entry1 = Entry(
             ts1.timestamp_nanos_opt().expect("Timestamp out of range"),
             "hello".into(),
+            vec![],
         );
         let ts2 = Utc
             .timestamp_opt(1640244791, 0)
@@ -112,6 +130,7 @@ mod tests {
         let entry2 = Entry(
             ts2.timestamp_nanos_opt().expect("Timestamp out of range"),
             "world".into(),
+            vec![],
         );
         let labels = vec![("source".into(), "protobuf-test".into())]
             .into_iter()

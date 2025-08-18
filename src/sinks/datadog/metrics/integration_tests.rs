@@ -8,7 +8,7 @@ use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 use vector_lib::{
     config::{init_telemetry, Tags, Telemetry},
@@ -46,7 +46,7 @@ fn generate_counters() -> Vec<Event> {
             let ts = timestamp + (std::time::Duration::from_secs(2) * index);
             Event::Metric(
                 Metric::new(
-                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: index as f64,
@@ -123,7 +123,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();

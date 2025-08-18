@@ -21,6 +21,6 @@ impl InternalEvent for ApiStarted {
             graphql = %if self.graphql { graphql } else { "off" }
 
         );
-        counter!("api_started_total", 1);
+        counter!("api_started_total").increment(1);
     }
 }

@@ -67,7 +67,7 @@ impl SourceConfig for TripwireSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             DataType::Log,
             Definition::default_legacy_namespace(),
         )]

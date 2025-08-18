@@ -1,42 +1,27 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use futures::future::ready;
 use futures::stream;
 
-use vector_lib::config::proxy::ProxyConfig;
+use databend_client::{APIClient as DatabendAPIClient, Page};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
-use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::util::test::load_sink;
 use crate::{
     config::{SinkConfig, SinkContext},
-    http::{Auth, HttpClient},
     sinks::util::UriSerde,
     test_util::{
         components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        random_string, trace_init,
+        random_table_name, trace_init,
     },
 };
 
-use super::{
-    api::{DatabendAPIClient, DatabendHttpRequest, DatabendHttpResponse},
-    config::DatabendConfig,
-};
+use super::config::DatabendConfig;
 
 fn databend_endpoint() -> String {
-    std::env::var("DATABEND_ENDPOINT").unwrap_or_else(|_| "http://localhost:8000".into())
-}
-
-fn databend_user() -> String {
-    std::env::var("DATABEND_USER").unwrap_or_else(|_| "vector".into())
-}
-
-fn databend_password() -> String {
-    std::env::var("DATABEND_PASSWORD").unwrap_or_else(|_| "vector".into())
-}
-
-fn gen_table() -> String {
-    format!("test_{}", random_string(10).to_lowercase())
+    std::env::var("DATABEND_ENDPOINT")
+        .unwrap_or_else(|_| "databend://vector:vector@databend:8000?sslmode=disable".into())
 }
 
 fn make_event() -> (Event, BatchStatusReceiver) {
@@ -46,29 +31,22 @@ fn make_event() -> (Event, BatchStatusReceiver) {
     (event.into(), receiver)
 }
 
-fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAPIClient) {
+async fn prepare_config(
+    codec: &str,
+    compression: &str,
+) -> (String, String, Arc<DatabendAPIClient>) {
     trace_init();
 
-    let table = gen_table();
-    let endpoint: UriSerde = databend_endpoint().parse().unwrap();
-    let auth = Some(Auth::Basic {
-        user: databend_user(),
-        password: SensitiveString::from(databend_password()),
-    });
+    let table = random_table_name();
+    let endpoint = databend_endpoint();
+    let _endpoint: UriSerde = endpoint.parse().unwrap();
 
     let mut cfg = format!(
         r#"
-            endpoint = "{}"
-            table = "{}"
-            auth.strategy = "basic"
-            auth.user = "{}"
-            auth.password = "{}"
+            endpoint = "{endpoint}"
+            table = "{table}"
             batch.max_events = 1
         "#,
-        endpoint,
-        table,
-        databend_user(),
-        databend_password(),
     );
     match codec {
         "json" => {
@@ -106,22 +84,17 @@ fn prepare_config(codec: &str, compression: &str) -> (String, String, DatabendAP
         _ => panic!("unsupported codec"),
     }
 
-    let proxy = ProxyConfig::default();
-    let http_client = HttpClient::new(None, &proxy).unwrap();
-    let client = DatabendAPIClient::new(http_client, endpoint, auth);
+    let client = DatabendAPIClient::new(&endpoint, Some("vector/integration-test".to_string()))
+        .await
+        .unwrap();
 
     (cfg, table, client)
 }
 
-async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPIClient) {
-    let create_table_sql = format!(
-        "create table `{}` (host String, timestamp String, message String)",
-        table
-    );
-    client
-        .query(DatabendHttpRequest::new(create_table_sql))
-        .await
-        .unwrap();
+async fn insert_event_with_cfg(cfg: String, table: String, client: Arc<DatabendAPIClient>) {
+    let create_table_sql =
+        format!("create table `{table}` (host String, timestamp String, message String)");
+    client.query_all(&create_table_sql).await.unwrap();
 
     let (config, _) = load_sink::<DatabendConfig>(&cfg).unwrap();
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
@@ -134,11 +107,8 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
     )
     .await;
 
-    let select_all_sql = format!("select * from `{}`", table);
-    let resp = client
-        .query(DatabendHttpRequest::new(select_all_sql))
-        .await
-        .unwrap();
+    let select_all_sql = format!("select * from `{table}`");
+    let resp = client.query_all(&select_all_sql).await.unwrap();
     assert_eq!(1, resp.data.len());
 
     // drop input_event after comparing with response
@@ -155,29 +125,29 @@ async fn insert_event_with_cfg(cfg: String, table: String, client: DatabendAPICl
 
 #[tokio::test]
 async fn insert_event_json() {
-    let (cfg, table, client) = prepare_config("json", "none");
+    let (cfg, table, client) = prepare_config("json", "none").await;
     insert_event_with_cfg(cfg, table, client).await;
 }
 
 #[tokio::test]
 async fn insert_event_json_gzip() {
-    let (cfg, table, client) = prepare_config("json", "gzip");
+    let (cfg, table, client) = prepare_config("json", "gzip").await;
     insert_event_with_cfg(cfg, table, client).await;
 }
 
 #[tokio::test]
 async fn insert_event_csv() {
-    let (cfg, table, client) = prepare_config("csv", "none");
+    let (cfg, table, client) = prepare_config("csv", "none").await;
     insert_event_with_cfg(cfg, table, client).await;
 }
 
 #[tokio::test]
 async fn insert_event_csv_gzip() {
-    let (cfg, table, client) = prepare_config("csv", "gzip");
+    let (cfg, table, client) = prepare_config("csv", "gzip").await;
     insert_event_with_cfg(cfg, table, client).await;
 }
 
-fn response_to_map(resp: &DatabendHttpResponse) -> Vec<BTreeMap<String, String>> {
+fn response_to_map(resp: &Page) -> Vec<BTreeMap<String, Option<String>>> {
     let mut result = Vec::new();
     for row in &resp.data {
         let mut map = BTreeMap::new();

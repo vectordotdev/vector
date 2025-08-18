@@ -1,20 +1,17 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::{
-    error::Error as _, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll,
-    time::Duration,
-};
+use std::sync::{Arc, LazyLock};
+use std::{error::Error as _, future::Future, pin::Pin, task::Context, task::Poll, time::Duration};
 
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use derivative::Derivative;
 use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
-use once_cell::sync::Lazy;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
-    metadata::{errors::InvalidMetadataValue, MetadataValue},
+    metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
@@ -94,31 +91,21 @@ mod proto {
 
 #[derive(Debug, Snafu)]
 pub(crate) enum PubsubError {
-    #[snafu(display("Could not parse credentials metadata: {}", source))]
-    Metadata { source: InvalidMetadataValue },
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
     #[snafu(display("Could not create endpoint: {}", source))]
     Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
-    #[snafu(display("Could not connect: {}", source))]
-    Connect { source: tonic::transport::Error },
-    #[snafu(display("Could not pull data from remote: {}", source))]
-    Pull { source: Status },
     #[snafu(display(
         "`ack_deadline_secs` is outside the valid range of {} to {}",
         MIN_ACK_DEADLINE_SECS,
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
-    #[snafu(display("Cannot set both `ack_deadline_secs` and `ack_deadline_seconds`"))]
-    BothAckDeadlineSecsAndSeconds,
-    #[snafu(display("Cannot set both `retry_delay_secs` and `retry_delay_seconds`"))]
-    BothRetryDelaySecsAndSeconds,
 }
 
-static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
+static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
@@ -282,7 +269,7 @@ impl SourceConfig for PubsubConfig {
         let mut uri: Uri = self.endpoint.parse().context(UriSnafu)?;
         auth.apply_uri(&mut uri);
 
-        let tls = TlsSettings::from_options(&self.tls)?;
+        let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
         let mut tls_config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = tls.identity_pem() {
@@ -363,7 +350,10 @@ impl SourceConfig for PubsubConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -489,7 +479,9 @@ impl PubsubSource {
                 }
                 Ok(req)
             },
-        );
+        )
+        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
+        .max_decoding_message_size(usize::MAX);
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
@@ -574,7 +566,7 @@ impl PubsubSource {
     fn request_stream(
         &self,
         ack_ids: mpsc::Receiver<Vec<String>>,
-    ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
+    ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static + use<> {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_secs.as_secs() as i32;
@@ -675,9 +667,7 @@ impl PubsubSource {
             "gcp_pubsub",
             &message.data,
             message.publish_time.map(|dt| {
-                NaiveDateTime::from_timestamp_opt(dt.seconds, dt.nanos as u32)
-                    .expect("invalid timestamp")
-                    .and_utc()
+                DateTime::from_timestamp(dt.seconds, dt.nanos as u32).expect("invalid timestamp")
             }),
             batch,
             log_namespace,
@@ -727,7 +717,7 @@ fn is_reset(error: &Status) -> bool {
         .and_then(|source| source.downcast_ref::<hyper::Error>())
         .and_then(|error| error.source())
         .and_then(|source| source.downcast_ref::<h2::Error>())
-        .map_or(false, |error| error.is_remote() && error.is_reset())
+        .is_some_and(|error| error.is_remote() && error.is_reset())
 }
 
 #[pin_project::pin_project]
@@ -838,13 +828,13 @@ mod tests {
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
     use std::collections::{BTreeMap, HashSet};
+    use std::sync::LazyLock;
 
     use base64::prelude::{Engine as _, BASE64_STANDARD};
     use chrono::{DateTime, Utc};
     use futures::{Stream, StreamExt};
     use http::method::Method;
     use hyper::{Request, StatusCode};
-    use once_cell::sync::Lazy;
     use serde_json::{json, Value};
     use tokio::time::{Duration, Instant};
     use vrl::btreemap;
@@ -856,13 +846,13 @@ mod integration_tests {
     use crate::{event::EventStatus, gcp, http::HttpClient, shutdown, SourceSender};
 
     const PROJECT: &str = "sourceproject";
-    static PROJECT_URI: Lazy<String> =
-        Lazy::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
-    static ACK_DEADLINE: Lazy<Duration> = Lazy::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
+    static PROJECT_URI: LazyLock<String> =
+        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+    static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[tokio::test]
     async fn oneshot() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
@@ -885,7 +875,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn shuts_down_after_data_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -908,7 +898,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn streams_data() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
                 let test_data = tester.send_test_events(9, BTreeMap::new()).await;
@@ -921,7 +911,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn sends_attributes() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             let attributes = btreemap![
                 random_string(8) => random_string(88),
@@ -937,7 +927,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn acks_received() {
-        assert_source_compliance(&SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async move {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
             let test_data = tester.send_test_events(1, BTreeMap::new()).await;
@@ -992,7 +982,7 @@ mod integration_tests {
     ) {
         components::init_test();
 
-        let tls_settings = TlsSettings::from_options(&None).unwrap();
+        let tls_settings = TlsSettings::from_options(None).unwrap();
         let client = HttpClient::new(tls_settings, &ProxyConfig::default()).unwrap();
         let tester = Tester::new(client).await;
 
@@ -1004,9 +994,7 @@ mod integration_tests {
     fn now_trunc() -> DateTime<Utc> {
         let start = Utc::now().timestamp();
         // Truncate the milliseconds portion, the hard way.
-        NaiveDateTime::from_timestamp_opt(start, 0)
-            .expect("invalid timestamp")
-            .and_utc()
+        DateTime::from_timestamp(start, 0).expect("invalid timestamp")
     }
 
     struct Tester {
@@ -1120,7 +1108,7 @@ mod integration_tests {
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
             let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            serde_json::from_str(&String::from_utf8(body.to_vec()).unwrap()).unwrap()
+            serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 
         async fn shutdown_check(&self, shutdown: shutdown::SourceShutdownCoordinator) {

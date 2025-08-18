@@ -1,5 +1,5 @@
 use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
-use metrics::{register_counter, Counter};
+use metrics::{counter, Counter};
 
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
@@ -10,7 +10,7 @@ pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub reason: &'a str,
 }
 
-impl<'a, const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'a, INTENTIONAL> {
+impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTENTIONAL> {
     fn emit(self) {
         let count = self.count;
         self.register().emit(Count(count));
@@ -33,7 +33,7 @@ impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     type Handle = DroppedHandle<'a, INTENTIONAL>;
     fn register(self) -> Self::Handle {
         Self::Handle {
-            discarded_events: register_counter!(
+            discarded_events: counter!(
                 "component_discarded_events_total",
                 "intentional" => if INTENTIONAL { "true" } else { "false" },
             ),
@@ -48,7 +48,7 @@ pub struct DroppedHandle<'a, const INTENDED: bool> {
     reason: &'a str,
 }
 
-impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDED> {
+impl<const INTENDED: bool> InternalEventHandle for DroppedHandle<'_, INTENDED> {
     type Data = Count;
     fn emit(&self, data: Self::Data) {
         let message = "Events dropped";
@@ -58,7 +58,6 @@ impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDE
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
-                internal_log_rate_limit = true,
             );
         } else {
             error!(
@@ -66,7 +65,6 @@ impl<'a, const INTENDED: bool> InternalEventHandle for DroppedHandle<'a, INTENDE
                 intentional = INTENDED,
                 count = data.0,
                 reason = self.reason,
-                internal_log_rate_limit = true,
             );
         }
         self.discarded_events.increment(data.0 as u64);

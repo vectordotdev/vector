@@ -1,100 +1,15 @@
-docs/ @vectordotdev/ux-team
-lib/dnsmsg-parser/ @vectordotdev/integrations-team
-lib/file-source/ @vectordotdev/integrations-team
-lib/k8s-e2e-tests/ @vectordotdev/integrations-team
-lib/k8s-test-framework/ @vectordotdev/integrations-team
-lib/opentelemetry-proto/ @vectordotdev/integrations-team
-lib/vector-common/ @vectordotdev/core-team
-lib/vector-config/ @vectordotdev/core-team
-lib/vector-config-common/ @vectordotdev/core-team
-lib/vector-config-macros/ @vectordotdev/core-team
-lib/vector-core/ @vectordotdev/core-team
-lib/vector-vrl-functions/ @vectordotdev/processing-team
-lib/vrl/ @vectordotdev/processing-team
-src/config/ @vectordotdev/core-team
-src/internal_telemetry/ @vectordotdev/core-team
-src/sinks/ @vectordotdev/integrations-team
-src/sinks/amqp/ @StephenWakely @vectordotdev/integrations-team
-src/sinks/appsignal/ @neuronull @vectordotdev/integrations-team
-src/sinks/aws_cloudwatch_logs/ @vectordotdev/integrations-team
-src/sinks/aws_cloudwatch_metrics/ @vectordotdev/integrations-team
-src/sinks/aws_kinesis/ @vectordotdev/integrations-team # sink_aws_kinesis_firehose,sink_aws_kinesis_stream
-src/sinks/aws_s3/ @vectordotdev/integrations-team
-src/sinks/aws_sqs/ @vectordotdev/integrations-team
-src/sinks/axiom.rs @vectordotdev/integrations-team
-src/sinks/azure_blob/ @dsmith3197 @vectordotdev/integrations-team
-src/sinks/azure_monitor_logs.rs @dsmith3197 @vectordotdev/integrations-team
-src/sinks/blackhole/ @dsmith3197 @vectordotdev/integrations-team
-src/sinks/clickhouse/ @dsmith3197 @vectordotdev/integrations-team
-src/sinks/console/ @dsmith3197 @vectordotdev/integrations-team
-src/sinks/databend/ @vectordotdev/integrations-team
-src/sinks/datadog_events/ @neuronull @vectordotdev/integrations-team
-src/sinks/datadog_logs/ @neuronull @vectordotdev/integrations-team
-src/sinks/datadog_metrics/ @neuronull @vectordotdev/integrations-team
-src/sinks/datadog_traces/ @neuronull @vectordotdev/integrations-team
-src/sinks/elasticsearch/ @vectordotdev/integrations-team
-src/sinks/file/ @vectordotdev/integrations-team
-src/sinks/gcp/ @StephenWakely @vectordotdev/integrations-team # sink_gcp_chronicle_unstructured,sink_gcp_cloud_storage,sink_gcp_pubsub,sink_gcp_stackdriver_logs,sink_gcp_stackdriver_metrics
-src/sinks/honeycomb.rs @vectordotdev/integrations-team
-src/sinks/http.rs @neuronull @vectordotdev/integrations-team
-src/sinks/humio/ @StephenWakely @vectordotdev/integrations-team # sink_humio_logs,sink_humio_metrics
-src/sinks/influxdb/ @dsmith3197 @vectordotdev/integrations-team # sink_influxdb_logs,sink_influxdb_metrics
-src/sinks/kafka/ @dsmith3197 @vectordotdev/integrations-team
-src/sinks/logdna.rs @neuronull @vectordotdev/integrations-team
-src/sinks/loki/ @vectordotdev/integrations-team
-src/sinks/nats.rs @StephenWakely @vectordotdev/integrations-team
-src/sinks/new_relic/ @dsmith3197 @vectordotdev/integrations-team # sink_newrelix,sink_newrelic_logs
-src/sinks/papertrail.rs @StephenWakely @vectordotdev/integrations-team
-src/sinks/prometheus/ @StephenWakely @vectordotdev/integrations-team # sink_prometheus_exporter,sink_prometheus_remote_write
-src/sinks/pulsar.rs @dsmith3197 @vectordotdev/integrations-team
-src/sinks/redis.rs @StephenWakely @vectordotdev/integrations-team
-src/sinks/sematext/ @vectordotdev/integrations-team # sink_sematext_logs,sink_sematext_metrics
-src/sinks/socket.rs @neuronull @vectordotdev/integrations-team
-src/sinks/splunk_hec/ @StephenWakely @vectordotdev/integrations-team # sink_splunk_hec_logs,sink_splunk_hec_metrics
-src/sinks/statsd.rs @neuronull @vectordotdev/integrations-team
-src/sinks/vector/ @neuronull @vectordotdev/integrations-team
-src/sinks/websocket/ @neuronull @vectordotdev/integrations-team
-src/source_sender/ @vectordotdev/core-team
-src/sources/ @vectordotdev/integrations-team
-src/sources/amqp.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/apache_metrics/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/aws_ecs_metrics/ @vectordotdev/integrations-team
-src/sources/aws_kinesis_firehose/ @vectordotdev/integrations-team
-src/sources/aws_s3/ @vectordotdev/integrations-team
-src/sources/aws_sqs/ @vectordotdev/integrations-team
-src/sources/datadog_agent/ @neuronull @vectordotdev/integrations-team
-src/sources/demo_logs.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/dnstap/ @StephenWakely @vectordotdev/integrations-team
-src/sources/docker_logs/ @vectordotdev/integrations-team
-src/sources/eventstoredb_metrics/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/exec/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/file.rs @vectordotdev/integrations-team
-src/sources/file_descriptors/ @dsmith3197 @vectordotdev/integrations-team # source_file_descriptor,source_stdin
-src/sources/fluent/ @neuronull @vectordotdev/integrations-team
-src/sources/gcp_pubsub.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/heroku_logs.rs @vectordotdev/integrations-team
-src/sources/host_metrics/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/http_client/ @neuronull @vectordotdev/integrations-team
-src/sources/http_server.rs @neuronull @vectordotdev/integrations-team
-src/sources/internal_logs.rs @neuronull @vectordotdev/integrations-team
-src/sources/internal_metrics.rs @neuronull @vectordotdev/integrations-team
-src/sources/journald.rs @vectordotdev/integrations-team
-src/sources/kafka.rs @dsmith3197 @vectordotdev/integrations-team
-src/sources/kubernetes_logs/ @vectordotdev/integrations-team
-src/sources/logstash.rs @neuronull @vectordotdev/integrations-team
-src/sources/mongodb_metrics/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/nats.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/nginx_metrics/ @dsmith3197 @vectordotdev/integrations-team
-src/sources/opentelemetry/ @vectordotdev/integrations-team
-src/sources/postgresql_metrics.rs @dsmith3197 @vectordotdev/integrations-team
-src/sources/prometheus/ @StephenWakely @vectordotdev/integrations-team # source_prometheus_remote_write,source_prometheus_scrape
-src/sources/redis/ @StephenWakely @vectordotdev/integrations-team
-src/sources/socket/ @neuronull @vectordotdev/integrations-team
-src/sources/splunk_hec/ @StephenWakely @vectordotdev/integrations-team
-src/sources/statsd/ @neuronull @vectordotdev/integrations-team
-src/sources/syslog.rs @StephenWakely @vectordotdev/integrations-team
-src/sources/vector/ @neuronull @vectordotdev/integrations-team
-src/test_util/ @vectordotdev/core-team
-src/topology/ @vectordotdev/core-team
-src/transforms/ @vectordotdev/processing-team
-website/ @vectordotdev/ux-team @vectordotdev/documentation
+* @vectordotdev/vector
+
+.github/workflows/regression.yml @vectordotdev/vector @vectordotdev/single-machine-performance
+regression/config.yaml @vectordotdev/vector @vectordotdev/single-machine-performance
+
+docs/ @vectordotdev/vector @vectordotdev/ux-team @vectordotdev/documentation
+website/ @vectordotdev/vector @vectordotdev/ux-team
+website/content @vectordotdev/vector @vectordotdev/documentation
+website/cue/reference @vectordotdev/vector @vectordotdev/documentation
+
+website/js @vectordotdev/vector @vectordotdev/vector-website
+website/layouts @vectordotdev/vector @vectordotdev/vector-website
+website/scripts @vectordotdev/vector @vectordotdev/vector-website
+website/data @vectordotdev/vector @vectordotdev/vector-website
+website/* @vectordotdev/vector @vectordotdev/vector-website

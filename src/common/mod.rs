@@ -1,11 +1,10 @@
-//! Modules that are common between sources and sinks.
+//! Modules that are common between sources, transforms, and sinks.
 #[cfg(any(
     feature = "sources-datadog_agent",
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
     feature = "sinks-datadog_metrics",
     feature = "sinks-datadog_traces",
-    feature = "enterprise"
 ))]
 pub mod datadog;
 
@@ -18,3 +17,20 @@ pub(crate) mod sqs;
 
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod s3;
+
+#[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
+pub(crate) mod websocket;
+
+pub(crate) mod backoff;
+#[cfg(any(feature = "sources-mqtt", feature = "sinks-mqtt",))]
+/// Common MQTT configuration shared by MQTT components.
+pub mod mqtt;
+
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+pub(crate) mod expansion;
+
+#[cfg(any(
+    feature = "sources-utils-http-auth",
+    feature = "sources-utils-http-error"
+))]
+pub mod http;

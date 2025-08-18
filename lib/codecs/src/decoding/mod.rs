@@ -10,8 +10,9 @@ use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
-    GelfDeserializerConfig, GelfDeserializerOptions, JsonDeserializer, JsonDeserializerConfig,
-    JsonDeserializerOptions, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
+    GelfDeserializerConfig, GelfDeserializerOptions, InfluxdbDeserializer,
+    InfluxdbDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, JsonDeserializerOptions,
+    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
     ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
@@ -19,10 +20,11 @@ pub use format::{
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder,
-    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, FramingError,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
-    NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
-    OctetCountingDecoderConfig, OctetCountingDecoderOptions,
+    CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions, ChunkedGelfDecoder,
+    ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
+    NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
+    OctetCountingDecoderOptions,
 };
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -49,8 +51,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({error})"),
         }
     }
 }
@@ -89,7 +91,7 @@ pub enum FramingConfig {
     CharacterDelimited(CharacterDelimitedDecoderConfig),
 
     /// Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length.
-    LengthDelimited,
+    LengthDelimited(LengthDelimitedDecoderConfig),
 
     /// Byte frames which are delimited by a newline character.
     NewlineDelimited(NewlineDelimitedDecoderConfig),
@@ -98,6 +100,11 @@ pub enum FramingConfig {
     ///
     /// [octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
     OctetCounting(OctetCountingDecoderConfig),
+
+    /// Byte frames which are chunked GELF messages.
+    ///
+    /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
+    ChunkedGelf(ChunkedGelfDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -113,8 +120,8 @@ impl From<CharacterDelimitedDecoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedDecoderConfig> for FramingConfig {
-    fn from(_: LengthDelimitedDecoderConfig) -> Self {
-        Self::LengthDelimited
+    fn from(config: LengthDelimitedDecoderConfig) -> Self {
+        Self::LengthDelimited(config)
     }
 }
 
@@ -130,17 +137,22 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
     }
 }
 
+impl From<ChunkedGelfDecoderConfig> for FramingConfig {
+    fn from(config: ChunkedGelfDecoderConfig) -> Self {
+        Self::ChunkedGelf(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited => {
-                Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
-            }
+            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
+            FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
         }
     }
 }
@@ -160,6 +172,8 @@ pub enum Framer {
     OctetCounting(OctetCountingDecoder),
     /// Uses an opaque `Framer` implementation for framing.
     Boxed(BoxedFramer),
+    /// Uses a `ChunkedGelfDecoder` for framing.
+    ChunkedGelf(ChunkedGelfDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -174,6 +188,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode(src),
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
+            Framer::ChunkedGelf(framer) => framer.decode(src),
         }
     }
 
@@ -185,15 +200,16 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::NewlineDelimited(framer) => framer.decode_eof(src),
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
+            Framer::ChunkedGelf(framer) => framer.decode_eof(src),
         }
     }
 }
 
-/// Deserializer configuration.
+/// Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
+/// type (log, metric, trace).
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
-#[configurable(description = "Configures how events are decoded from raw bytes.")]
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for decoding events."))]
 pub enum DeserializerConfig {
     /// Uses the raw bytes as-is.
@@ -221,6 +237,8 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
     ///
+    /// This decoder can output all types of events (logs, metrics, traces).
+    ///
     /// This codec is **[experimental][experimental]**.
     ///
     /// [vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
@@ -228,6 +246,8 @@ pub enum DeserializerConfig {
     Native,
 
     /// Decodes the raw bytes as [native JSON format][vector_native_json].
+    ///
+    /// This decoder can output all types of events (logs, metrics, traces).
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -240,7 +260,7 @@ pub enum DeserializerConfig {
     /// This codec is experimental for the following reason:
     ///
     /// The GELF specification is more strict than the actual Graylog receiver.
-    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// Vector's decoder adheres more strictly to the GELF spec, with
     /// the exception that some characters such as `@`  are allowed in field names.
     ///
     /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
@@ -248,11 +268,15 @@ pub enum DeserializerConfig {
     ///
     /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
     /// the codec may continue to relax the enforcement of specification.
-
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfDeserializerConfig),
+
+    /// Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
+    ///
+    /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
+    Influxdb(InfluxdbDeserializerConfig),
 
     /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
     ///
@@ -305,6 +329,12 @@ impl From<NativeJsonDeserializerConfig> for DeserializerConfig {
     }
 }
 
+impl From<InfluxdbDeserializerConfig> for DeserializerConfig {
+    fn from(config: InfluxdbDeserializerConfig) -> Self {
+        Self::Influxdb(config)
+    }
+}
+
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<Deserializer> {
@@ -325,6 +355,7 @@ impl DeserializerConfig {
             }
             DeserializerConfig::NativeJson(config) => Ok(Deserializer::NativeJson(config.build())),
             DeserializerConfig::Gelf(config) => Ok(Deserializer::Gelf(config.build())),
+            DeserializerConfig::Influxdb(config) => Ok(Deserializer::Influxdb(config.build())),
             DeserializerConfig::Vrl(config) => Ok(Deserializer::Vrl(config.build()?)),
         }
     }
@@ -333,10 +364,10 @@ impl DeserializerConfig {
     pub fn default_stream_framing(&self) -> FramingConfig {
         match self {
             DeserializerConfig::Avro { .. } => FramingConfig::Bytes,
-            DeserializerConfig::Native => FramingConfig::LengthDelimited,
+            DeserializerConfig::Native => FramingConfig::LengthDelimited(Default::default()),
             DeserializerConfig::Bytes
             | DeserializerConfig::Json(_)
-            | DeserializerConfig::Gelf(_)
+            | DeserializerConfig::Influxdb(_)
             | DeserializerConfig::NativeJson(_) => {
                 FramingConfig::NewlineDelimited(Default::default())
             }
@@ -344,6 +375,17 @@ impl DeserializerConfig {
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
+            DeserializerConfig::Gelf(_) => {
+                FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig::new(0))
+            }
+        }
+    }
+
+    /// Returns an appropriate default framing config for the given deserializer with message based inputs.
+    pub fn default_message_based_framing(&self) -> FramingConfig {
+        match self {
+            DeserializerConfig::Gelf(_) => FramingConfig::ChunkedGelf(Default::default()),
+            _ => FramingConfig::Bytes,
         }
     }
 
@@ -363,6 +405,7 @@ impl DeserializerConfig {
             DeserializerConfig::NativeJson(config) => config.output_type(),
             DeserializerConfig::Gelf(config) => config.output_type(),
             DeserializerConfig::Vrl(config) => config.output_type(),
+            DeserializerConfig::Influxdb(config) => config.output_type(),
         }
     }
 
@@ -381,6 +424,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::NativeJson(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Gelf(config) => config.schema_definition(log_namespace),
+            DeserializerConfig::Influxdb(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Vrl(config) => config.schema_definition(log_namespace),
         }
     }
@@ -413,6 +457,7 @@ impl DeserializerConfig {
                 | DeserializerConfig::NativeJson(_)
                 | DeserializerConfig::Bytes
                 | DeserializerConfig::Gelf(_)
+                | DeserializerConfig::Influxdb(_)
                 | DeserializerConfig::Vrl(_),
                 _,
             ) => "text/plain",
@@ -423,6 +468,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.
@@ -444,6 +490,8 @@ pub enum Deserializer {
     Boxed(BoxedDeserializer),
     /// Uses a `GelfDeserializer` for deserialization.
     Gelf(GelfDeserializer),
+    /// Uses a `InfluxdbDeserializer` for deserialization.
+    Influxdb(InfluxdbDeserializer),
     /// Uses a `VrlDeserializer` for deserialization.
     Vrl(VrlDeserializer),
 }
@@ -465,7 +513,28 @@ impl format::Deserializer for Deserializer {
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Gelf(deserializer) => deserializer.parse(bytes, log_namespace),
+            Deserializer::Influxdb(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Vrl(deserializer) => deserializer.parse(bytes, log_namespace),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gelf_stream_default_framing_is_null_delimited() {
+        let deserializer_config = DeserializerConfig::from(GelfDeserializerConfig::default());
+        let framing_config = deserializer_config.default_stream_framing();
+        assert!(matches!(
+            framing_config,
+            FramingConfig::CharacterDelimited(CharacterDelimitedDecoderConfig {
+                character_delimited: CharacterDelimitedDecoderOptions {
+                    delimiter: 0,
+                    max_length: None,
+                }
+            })
+        ));
     }
 }

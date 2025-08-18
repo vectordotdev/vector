@@ -16,8 +16,7 @@ remap: functions: remove_secret: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: [
-	]
+	internal_failure_reasons: []
 	return: types: ["null"]
 
 	examples: [

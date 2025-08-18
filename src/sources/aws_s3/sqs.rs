@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc};
+use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
 
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -7,7 +7,8 @@ use aws_sdk_sqs::operation::delete_message_batch::{
     DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
 use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
-use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
+use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry};
 use aws_sdk_sqs::Client as SqsClient;
 use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
 use aws_smithy_runtime_api::client::result::SdkError;
@@ -15,7 +16,6 @@ use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::serde_as;
 use smallvec::SmallVec;
@@ -31,7 +31,11 @@ use vector_lib::internal_event::{
 
 use crate::codecs::Decoder;
 use crate::event::{Event, LogEvent};
+use crate::internal_events::{
+    SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
+};
 use crate::{
+    aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
     internal_events::{
@@ -50,8 +54,29 @@ use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
 use vector_lib::event::MaybeAsLogMut;
 use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
-static SUPPORTED_S3_EVENT_VERSION: Lazy<semver::VersionReq> =
-    Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
+static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
+    LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
+
+/// Configuration for deferring events based on their age.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DeferredConfig {
+    /// The URL of the queue to forward events to when they are older than `max_age_secs`.
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
+    #[configurable(validation(format = "uri"))]
+    pub(super) queue_url: String,
+
+    /// Event must have been emitted within the last `max_age_secs` seconds to be processed.
+    ///
+    /// If the event is older, it is forwarded to the `queue_url` for later processing.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 3600))]
+    pub(super) max_age_secs: u64,
+}
 
 /// SQS configuration options.
 //
@@ -122,10 +147,35 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 5))]
     pub(super) client_concurrency: Option<NonZeroUsize>,
 
+    /// Maximum number of messages to poll from SQS in a batch
+    ///
+    /// Defaults to 10
+    ///
+    /// Should be set to a smaller value when the files are large to help prevent the ingestion of
+    /// one file from causing the other files to exceed the visibility_timeout. Valid values are 1 - 10
+    // NOTE: We restrict this to u32 for safe conversion to i32 later.
+    #[serde(default = "default_max_number_of_messages")]
+    #[derivative(Default(value = "default_max_number_of_messages()"))]
+    #[configurable(metadata(docs::human_name = "Max Messages"))]
+    #[configurable(metadata(docs::examples = 1))]
+    pub(super) max_number_of_messages: u32,
+
     #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
+
+    // Client timeout configuration for SQS operations. Take care when configuring these settings
+    // to allow enough time for the polling interval configured in `poll_secs`.
+    #[configurable(derived)]
+    #[derivative(Default)]
+    #[serde(default)]
+    #[serde(flatten)]
+    pub(super) timeout: Option<AwsTimeout>,
+
+    /// Configuration for deferring events to another queue based on their age.
+    #[configurable(derived)]
+    pub(super) deferred: Option<DeferredConfig>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -136,17 +186,18 @@ const fn default_visibility_timeout_secs() -> u32 {
     300
 }
 
+const fn default_max_number_of_messages() -> u32 {
+    10
+}
+
 const fn default_true() -> bool {
     true
 }
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
-    InvalidVisibilityTimeout {
-        source: std::num::TryFromIntError,
-        timeout: u64,
-    },
+    #[snafu(display("Invalid value for max_number_of_messages {}", messages))]
+    InvalidNumberOfMessages { messages: u32 },
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -192,8 +243,28 @@ pub enum ProcessingError {
     },
     #[snafu(display("Unsupported S3 event version: {}.", version,))]
     UnsupportedS3EventVersion { version: semver::Version },
-    #[snafu(display("Sink reported an error sending events"))]
-    ErrorAcknowledgement,
+    #[snafu(display(
+        "Sink reported an error sending events for an s3 object in region {}: s3://{}/{}",
+        region,
+        bucket,
+        key
+    ))]
+    ErrorAcknowledgement {
+        region: String,
+        bucket: String,
+        key: String,
+    },
+    #[snafu(display(
+        "File s3://{}/{} too old.  Forwarded to deferred queue {}",
+        bucket,
+        key,
+        deferred_queue
+    ))]
+    FileTooOld {
+        bucket: String,
+        key: String,
+        deferred_queue: String,
+    },
 }
 
 pub struct State {
@@ -207,11 +278,14 @@ pub struct State {
 
     queue_url: String,
     poll_secs: i32,
+    max_number_of_messages: i32,
     client_concurrency: usize,
     visibility_timeout_secs: i32,
     delete_message: bool,
     delete_failed_message: bool,
     decoder: Decoder,
+
+    deferred: Option<DeferredConfig>,
 }
 
 pub(super) struct Ingestor {
@@ -228,6 +302,11 @@ impl Ingestor {
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
+        if config.max_number_of_messages < 1 || config.max_number_of_messages > 10 {
+            return Err(IngestorNewError::InvalidNumberOfMessages {
+                messages: config.max_number_of_messages,
+            });
+        }
         let state = Arc::new(State {
             region,
 
@@ -239,6 +318,7 @@ impl Ingestor {
 
             queue_url: config.queue_url,
             poll_secs: config.poll_secs as i32,
+            max_number_of_messages: config.max_number_of_messages as i32,
             client_concurrency: config
                 .client_concurrency
                 .map(|n| n.get())
@@ -247,6 +327,8 @@ impl Ingestor {
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
             decoder,
+
+            deferred: config.deferred,
         });
 
         Ok(Ingestor { state })
@@ -331,19 +413,18 @@ impl IngestorProcess {
     async fn run_once(&mut self) {
         let messages = self.receive_messages().await;
         let messages = messages
-            .map(|messages| {
+            .inspect(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-                messages
             })
-            .map_err(|err| {
-                emit!(SqsMessageReceiveError { error: &err });
-                err
+            .inspect_err(|err| {
+                emit!(SqsMessageReceiveError { error: err });
             })
             .unwrap_or_default();
 
         let mut delete_entries = Vec::new();
+        let mut deferred_entries = Vec::new();
         for message in messages {
             let receipt_handle = match message.receipt_handle {
                 None => {
@@ -360,15 +441,20 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
-            match self.handle_sqs_message(message).await {
+            match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
+                        trace!(
+                            message = "Queued SQS message for deletion.",
+                            id = message_id,
+                            receipt_handle = receipt_handle,
+                        );
                         delete_entries.push(
                             DeleteMessageBatchRequestEntry::builder()
-                                .id(message_id)
+                                .id(message_id.clone())
                                 .receipt_handle(receipt_handle)
                                 .build()
                                 .expect("all required builder params specified"),
@@ -376,14 +462,89 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageProcessingError {
-                        message_id: &message_id,
-                        error: &err,
-                    });
+                    match err {
+                        ProcessingError::FileTooOld { .. } => {
+                            emit!(SqsMessageProcessingSucceeded {
+                                message_id: &message_id
+                            });
+                            if let Some(deferred) = &self.state.deferred {
+                                trace!(
+                                    message = "Forwarding message to deferred queue.",
+                                    id = message_id,
+                                    receipt_handle = receipt_handle,
+                                    deferred_queue = deferred.queue_url,
+                                );
+
+                                deferred_entries.push(
+                                    SendMessageBatchRequestEntry::builder()
+                                        .id(message_id.clone())
+                                        .message_body(message.body.unwrap_or_default())
+                                        .build()
+                                        .expect("all required builder params specified"),
+                                );
+                            }
+                            //  maybe delete the message from current queue since we have processed it
+                            if self.state.delete_message {
+                                trace!(
+                                    message = "Queued SQS message for deletion.",
+                                    id = message_id,
+                                    receipt_handle = receipt_handle,
+                                );
+                                delete_entries.push(
+                                    DeleteMessageBatchRequestEntry::builder()
+                                        .id(message_id)
+                                        .receipt_handle(receipt_handle)
+                                        .build()
+                                        .expect("all required builder params specified"),
+                                );
+                            }
+                        }
+                        _ => {
+                            emit!(SqsMessageProcessingError {
+                                message_id: &message_id,
+                                error: &err,
+                            });
+                        }
+                    }
                 }
             }
         }
 
+        // Should consider removing failed deferrals from the delete_entries
+        if !deferred_entries.is_empty() {
+            let Some(deferred) = &self.state.deferred else {
+                warn!(
+                    message = "Deferred queue not configured, but received deferred entries.",
+                    internal_log_rate_limit = true
+                );
+                return;
+            };
+            let cloned_entries = deferred_entries.clone();
+            match self
+                .send_messages(deferred_entries, deferred.queue_url.clone())
+                .await
+            {
+                Ok(result) => {
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageSentSucceeded {
+                            message_ids: result.successful,
+                        })
+                    }
+
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageSentPartialError {
+                            entries: result.failed
+                        })
+                    }
+                }
+                Err(err) => {
+                    emit!(SqsMessageSendBatchError {
+                        entries: cloned_entries,
+                        error: err,
+                    });
+                }
+            }
+        }
         if !delete_entries.is_empty() {
             // We need these for a correct error message if the batch fails overall.
             let cloned_entries = delete_entries.clone();
@@ -475,6 +636,17 @@ impl IngestorProcess {
             });
         }
 
+        if let Some(deferred) = &self.state.deferred {
+            let delta = Utc::now() - s3_event.event_time;
+            if delta.num_seconds() > deferred.max_age_secs as i64 {
+                return Err(ProcessingError::FileTooOld {
+                    bucket: s3_event.s3.bucket.name.clone(),
+                    key: s3_event.s3.object.key.clone(),
+                    deferred_queue: deferred.queue_url.clone(),
+                });
+            }
+        }
+
         let object_result = self
             .state
             .s3_client
@@ -489,6 +661,12 @@ impl IngestorProcess {
             });
 
         let object = object_result?;
+
+        debug!(
+            message = "Got S3 object from SQS notification.",
+            bucket = s3_event.s3.bucket.name,
+            key = s3_event.s3.object.key,
+        );
 
         let metadata = object.metadata;
 
@@ -526,9 +704,8 @@ impl IngestorProcess {
         let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
             FramedRead::new(object_reader, self.state.decoder.framer.clone())
                 .map(|res| {
-                    res.map(|bytes| {
+                    res.inspect(|bytes| {
                         bytes_received.emit(ByteSize(bytes.len()));
-                        bytes
                     })
                     .map_err(|err| {
                         read_error = Some(err);
@@ -615,13 +792,34 @@ impl IngestorProcess {
                 Some(receiver) => {
                     let result = receiver.await;
                     match result {
-                        BatchStatus::Delivered => Ok(()),
-                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
+                        BatchStatus::Delivered => {
+                            debug!(
+                                message = "S3 object from SQS delivered.",
+                                bucket = s3_event.s3.bucket.name,
+                                key = s3_event.s3.object.key,
+                            );
+                            Ok(())
+                        }
+                        BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement {
+                            bucket: s3_event.s3.bucket.name,
+                            key: s3_event.s3.object.key,
+                            region: s3_event.aws_region,
+                        }),
                         BatchStatus::Rejected => {
                             if self.state.delete_failed_message {
+                                warn!(
+                                    message =
+                                        "S3 object from SQS was rejected. Deleting failed message.",
+                                    bucket = s3_event.s3.bucket.name,
+                                    key = s3_event.s3.object.key,
+                                );
                                 Ok(())
                             } else {
-                                Err(ProcessingError::ErrorAcknowledgement)
+                                Err(ProcessingError::ErrorAcknowledgement {
+                                    bucket: s3_event.s3.bucket.name,
+                                    key: s3_event.s3.object.key,
+                                    region: s3_event.aws_region,
+                                })
                             }
                         }
                     }
@@ -637,7 +835,7 @@ impl IngestorProcess {
             .sqs_client
             .receive_message()
             .queue_url(self.state.queue_url.clone())
-            .max_number_of_messages(10)
+            .max_number_of_messages(self.state.max_number_of_messages)
             .visibility_timeout(self.state.visibility_timeout_secs)
             .wait_time_seconds(self.state.poll_secs)
             .send()
@@ -653,6 +851,20 @@ impl IngestorProcess {
             .sqs_client
             .delete_message_batch()
             .queue_url(self.state.queue_url.clone())
+            .set_entries(Some(entries))
+            .send()
+            .await
+    }
+
+    async fn send_messages(
+        &mut self,
+        entries: Vec<SendMessageBatchRequestEntry>,
+        queue_url: String,
+    ) -> Result<SendMessageBatchOutput, SdkError<SendMessageBatchError, HttpResponse>> {
+        self.state
+            .sqs_client
+            .send_message_batch()
+            .queue_url(queue_url.clone())
             .set_entries(Some(entries))
             .send()
             .await
@@ -735,6 +947,7 @@ fn handle_single_log(
 #[serde(rename_all = "PascalCase")]
 pub struct SnsNotification {
     pub message: String,
+    pub timestamp: DateTime<Utc>,
 }
 
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
@@ -767,6 +980,7 @@ pub struct S3EventRecord {
     pub event_source: String,
     pub aws_region: String,
     pub event_name: S3EventName,
+    pub event_time: DateTime<Utc>,
 
     pub s3: S3Message,
 }
@@ -899,7 +1113,7 @@ mod urlencoded_string {
         use serde::de::Error;
 
         serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
-            let decoded = if s.iter().any(|c| *c == b'+') {
+            let decoded = if s.contains(&b'+') {
                 // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
                 let s = s
                     .iter()
@@ -910,9 +1124,8 @@ mod urlencoded_string {
                 percent_decode(s).decode_utf8().map(Into::into)
             };
 
-            decoded.map_err(|err| {
-                D::Error::custom(format!("error url decoding S3 object key: {}", err))
-            })
+            decoded
+                .map_err(|err| D::Error::custom(format!("error url decoding S3 object key: {err}")))
         })
     }
 
@@ -982,10 +1195,72 @@ fn test_s3_sns_testevent() {
      }"#,
     ).unwrap();
 
+    assert_eq!(
+        sns_value.timestamp,
+        DateTime::parse_from_rfc3339("2012-03-29T05:12:16.901Z")
+            .unwrap()
+            .to_utc()
+    );
+
     let value: S3TestEvent = serde_json::from_str(sns_value.message.as_ref()).unwrap();
 
     assert_eq!(value.service, "Amazon S3".to_string());
     assert_eq!(value.bucket, "bucketname".to_string());
     assert_eq!(value.event.kind, "s3".to_string());
     assert_eq!(value.event.name, "TestEvent".to_string());
+}
+
+#[test]
+fn parse_sqs_config() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.deferred.is_none());
+
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+            max_age_secs = 3600
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    let Some(deferred) = config.deferred else {
+        panic!("Expected deferred config");
+    };
+    assert_eq!(
+        deferred.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    );
+    assert_eq!(deferred.max_age_secs, 3600);
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            max_age_secs = 3600
+        "#,
+    );
+    assert!(test.is_err());
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+        "#,
+    );
+    assert!(test.is_err());
 }

@@ -22,7 +22,7 @@ pub struct K8sPathsProvider {
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
-    pub fn new(
+    pub const fn new(
         pod_state: Store<Pod>,
         namespace_state: Store<Namespace>,
         include_paths: Vec<glob::Pattern>,
@@ -171,7 +171,7 @@ where
         })
 }
 
-fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
+fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> + use<> {
     glob::glob_with(
         pattern,
         glob::MatchOptions {

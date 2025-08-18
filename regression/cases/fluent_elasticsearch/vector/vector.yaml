@@ -31,7 +31,7 @@ sinks:
   elasticsearch:
     type:        "elasticsearch"
     inputs: [ "fluent" ]
-    endpoint:    "http://localhost:8080"
+    endpoint:    "http://0.0.0.0:8080"
     mode:        "bulk"
     pipeline:    "pipeline-name"
     compression: "none"

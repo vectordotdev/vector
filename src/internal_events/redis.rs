@@ -23,13 +23,14 @@ impl InternalEvent for RedisReceiveEventError {
             error_code = %self.error_code,
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => self.error_code,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }

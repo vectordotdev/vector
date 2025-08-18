@@ -15,14 +15,15 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
             error_code = "decoder_frame",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "decoder_frame",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -31,7 +32,7 @@ pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for DecoderDeserializeError<'a> {
+impl InternalEvent for DecoderDeserializeError<'_> {
     fn emit(self) {
         error!(
             message = "Failed deserializing frame.",
@@ -39,14 +40,15 @@ impl<'a> InternalEvent for DecoderDeserializeError<'a> {
             error_code = "decoder_deserialize",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "decoder_deserialize",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -55,7 +57,7 @@ pub struct EncoderFramingError<'a> {
     pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
 }
 
-impl<'a> InternalEvent for EncoderFramingError<'a> {
+impl InternalEvent for EncoderFramingError<'_> {
     fn emit(self) {
         let reason = "Failed framing bytes.";
         error!(
@@ -64,14 +66,15 @@ impl<'a> InternalEvent for EncoderFramingError<'a> {
             error_code = "encoder_frame",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "encoder_frame",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
@@ -81,7 +84,7 @@ pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
 }
 
-impl<'a> InternalEvent for EncoderSerializeError<'a> {
+impl InternalEvent for EncoderSerializeError<'_> {
     fn emit(self) {
         let reason = "Failed serializing frame.";
         error!(
@@ -90,14 +93,15 @@ impl<'a> InternalEvent for EncoderSerializeError<'a> {
             error_code = "encoder_serialize",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_code" => "encoder_serialize",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
@@ -116,13 +120,14 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::ENCODER_FAILED,
             "stage" => error_stage::SENDING,
-        );
+        )
+        .increment(1);
         if self.count > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,

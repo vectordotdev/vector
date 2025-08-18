@@ -27,8 +27,8 @@ services:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent
     volumes:
-    # The Agent config file
-    - ${PWD}/tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+      # The Agent config file
+      - ../../../tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
 
   # Sends metric data received from the Emitter to the `vector` service
   datadog-agent-vector:
@@ -39,8 +39,8 @@ services:
     - DD_API_KEY=${TEST_DATADOG_API_KEY:?TEST_DATADOG_API_KEY required}
     - DD_HOSTNAME=datadog-agent-vector
     volumes:
-    # The Agent config file
-    - ${PWD}/tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+      # The Agent config file
+      - ../../../tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
 
   # Receives metric data from the `datadog-agent-vector` service and sends
   # to the `fakeintake-vector` service.
@@ -48,7 +48,7 @@ services:
     depends_on:
       - fakeintake-vector
     build:
-      context: ${PWD}
+      context: ../../..
     # re-using the integration test runner image since it already has
     # compiled vector on it.
     image: ${CONFIG_VECTOR_IMAGE}
@@ -62,17 +62,19 @@ services:
       - "-c"
       - "/home/vector/tests/data/e2e/datadog/metrics/vector.toml"
     volumes:
-      - ${PWD}:/home/vector
+      - ../../..:/home/vector
 
   # Receives metric data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
-    image: docker.io/datadog/fakeintake:latest
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:v77a06f2b
 
   # Receives metric data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
-    image: docker.io/datadog/fakeintake:latest
+    # TODO: temporarily pegging the image as latest results in failures
+    image: docker.io/datadog/fakeintake:v77a06f2b
 
 networks:
   default:

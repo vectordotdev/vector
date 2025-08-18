@@ -85,7 +85,7 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 
 impl AppsignalConfig {
     pub(super) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let client = HttpClient::new(tls, proxy)?;
         Ok(client)
     }
@@ -146,7 +146,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
+    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {

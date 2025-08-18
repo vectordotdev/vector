@@ -5,9 +5,6 @@ use tokio::process::Command;
 use super::Result;
 use crate::util::run_command_output;
 
-#[derive(Debug)]
-pub struct CommandBuilder {}
-
 fn prepare_base_command<Cmd, NS, Pod>(
     kubectl_command: Cmd,
     namespace: NS,

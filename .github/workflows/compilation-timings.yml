@@ -13,50 +13,50 @@ env:
 jobs:
   release-build-optimized:
     name: "Release Build (optimized)"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
   release-build-normal:
     name: "Release Build (normal)"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-24.04-8core
     env:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
       # with full LTO / single codegen unit.
       PROFILE: debug
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
   debug-build:
     name: "Debug Build"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
 
   debug-rebuild:
     name: "Debug Rebuild"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
       - run: touch src/app.rs
@@ -64,11 +64,11 @@ jobs:
 
   check:
     name: "Cargo Check"
-    runs-on: [linux, ubuntu-20.04-8core]
+    runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo check

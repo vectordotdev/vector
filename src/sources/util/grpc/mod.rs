@@ -7,10 +7,8 @@ use futures::FutureExt;
 use http::{Request, Response};
 use hyper::Body;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
-use tonic::{
-    body::BoxBody,
-    transport::server::{NamedService, Server},
-};
+use tonic::transport::server::Routes;
+use tonic::{body::BoxBody, server::NamedService, transport::server::Server};
 use tower::Service;
 use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
@@ -55,6 +53,33 @@ where
         // crates are sufficiently flexible for us to craft a better design.
         .layer(DecompressionAndMetricsLayer)
         .add_service(service)
+        .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
+        .await?;
+
+    drop(rx.await);
+
+    Ok(())
+}
+
+// This is a bit of a ugly hack to allow us to run two services on the same port.
+// I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+pub async fn run_grpc_server_with_routes(
+    address: SocketAddr,
+    tls_settings: MaybeTlsSettings,
+    routes: Routes,
+    shutdown: ShutdownSignal,
+) -> crate::Result<()> {
+    let span = Span::current();
+    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
+    let listener = tls_settings.bind(&address).await?;
+    let stream = listener.accept_stream();
+
+    info!(%address, "Building gRPC server.");
+
+    Server::builder()
+        .layer(build_grpc_trace_layer(span.clone()))
+        .layer(DecompressionAndMetricsLayer)
+        .add_routes(routes)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 

@@ -14,13 +14,14 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
             error = ?self.error,
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::RECEIVING,
             "error_type" => error_type::REQUEST_FAILED,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -36,12 +37,13 @@ impl InternalEvent for EventStoreDbStatsParsingError {
             error = ?self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
-        );
+        )
+        .increment(1);
     }
 }

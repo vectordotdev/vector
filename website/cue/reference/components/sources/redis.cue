@@ -58,30 +58,38 @@ components: sources: redis: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.redis.configuration
+	configuration: generated.components.sources.redis.configuration
 
-	output: logs: record: {
-		description: "An individual Redis record"
-		fields: {
-			host:      fields._local_host
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["redis"]
+	output: {
+		logs: record: {
+			description: "An individual Redis record"
+			fields: {
+				host:      fields._local_host
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["redis"]
+					}
+				}
+				redis_key: {
+					description: "The Redis key the event came from"
+					required:    false
+					common:      false
+					type: string: {
+						examples: ["some_key"]
+						default: null
+					}
 				}
 			}
-			redis_key: {
-				description: "The Redis key the event came from"
-				required:    false
-				common:      false
-				type: string: {
-					examples: ["some_key"]
-					default: null
-				}
-			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

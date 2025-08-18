@@ -6,13 +6,28 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use serde::de;
+use serde::{de, Deserialize, Serialize};
+use vector_config_macros::Configurable;
 
 /// A type alias to better capture the semantics.
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(
+    Debug,
+    Default,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    Serialize,
+    Deserialize,
+    Configurable,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Format {
     /// TOML format is used.
     #[default]
@@ -31,7 +46,7 @@ impl FromStr for Format {
             "toml" => Ok(Format::Toml),
             "yaml" => Ok(Format::Yaml),
             "json" => Ok(Format::Json),
-            _ => Err(format!("Invalid format: {}", s)),
+            _ => Err(format!("Invalid format: {s}")),
         }
     }
 }
@@ -43,7 +58,7 @@ impl fmt::Display for Format {
             Format::Json => "json",
             Format::Yaml => "yaml",
         };
-        write!(f, "{}", format)
+        write!(f, "{format}")
     }
 }
 
@@ -66,7 +81,12 @@ where
 {
     match format {
         Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
-        Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
+        Format::Yaml => serde_yaml::from_str::<serde_yaml::Value>(content)
+            .and_then(|mut v| {
+                v.apply_merge()?;
+                serde_yaml::from_value(v)
+            })
+            .map_err(|e| vec![e.to_string()]),
         Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
     }
 }
@@ -143,7 +163,7 @@ mod tests {
 
         for (input, expected) in cases {
             let output = Format::from_path(std::path::PathBuf::from(input));
-            assert_eq!(expected, output.ok(), "{}", input)
+            assert_eq!(expected, output.ok(), "{input}")
         }
     }
 
@@ -159,7 +179,7 @@ mod tests {
         use crate::config::ConfigBuilder;
 
         macro_rules! concat_with_newlines {
-            ($($e:expr,)*) => { concat!( $($e, "\n"),+ ) };
+            ($($e:expr_2021,)*) => { concat!( $($e, "\n"),+ ) };
         }
 
         const SAMPLE_TOML: &str = r#"
@@ -171,6 +191,10 @@ mod tests {
             type = "socket"
             mode = "tcp"
             address = "127.0.0.1:1235"
+            [sources.in2]
+            type = "socket"
+            mode = "tcp"
+            address = "127.0.0.1:1234"
             [transforms.sample]
             type = "sample"
             inputs = ["in"]
@@ -208,10 +232,13 @@ mod tests {
                     r#"      encoding:"#,
                     r#"        type: "csv""#,
                     r#"sources:"#,
-                    r#"  in:"#,
+                    r#"  in: &a"#,
                     r#"    type: "socket""#,
-                    r#"    mode: "tcp""#,
+                    r#"    mode: &b "tcp""#,
                     r#"    address: "127.0.0.1:1235""#,
+                    r#"  in2:"#,
+                    r#"    <<: *a"#,
+                    r#"    address: "127.0.0.1:1234""#,
                     r#"transforms:"#,
                     r#"  sample:"#,
                     r#"    type: "sample""#,
@@ -220,7 +247,7 @@ mod tests {
                     r#"sinks:"#,
                     r#"  out:"#,
                     r#"    type: "socket""#,
-                    r#"    mode: "tcp""#,
+                    r#"    mode: *b"#,
                     r#"    inputs: ["sample"]"#,
                     r#"    encoding:"#,
                     r#"      codec: "text""#,
@@ -248,6 +275,11 @@ mod tests {
                             "type": "socket",
                             "mode": "tcp",
                             "address": "127.0.0.1:1235"
+                        },
+                        "in2": {
+                            "type": "socket",
+                            "mode": "tcp",
+                            "address": "127.0.0.1:1234"
                         }
                     },
                     "transforms": {
@@ -284,23 +316,20 @@ mod tests {
                 Ok(expected) => {
                     #[allow(clippy::expect_fun_call)] // false positive
                     let output: ConfigBuilder = output.expect(&format!(
-                        "expected Ok, got Err with format {:?} and input {:?}",
-                        format, input
+                        "expected Ok, got Err with format {format:?} and input {input:?}"
                     ));
                     let output_json = serde_json::to_value(output).unwrap();
                     let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
-                    assert_eq!(expected_json, output_json, "{}", input)
+                    assert_eq!(expected_json, output_json, "{input}")
                 }
                 Err(expected) => assert_eq!(
                     expected,
                     output.expect_err(&format!(
-                        "expected Err, got Ok with format {:?} and input {:?}",
-                        format, input
+                        "expected Err, got Ok with format {format:?} and input {input:?}"
                     )),
-                    "{}",
-                    input
+                    "{input}"
                 ),
             }
         }

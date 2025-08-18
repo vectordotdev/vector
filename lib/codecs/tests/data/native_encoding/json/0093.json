@@ -1,1 +1,1 @@
-{"metric":{"name":"a","namespace":"e","kind":"absolute","gauge":{"value":-808448.0}}}
+{"metric":{"name":"n","kind":"incremental","gauge":{"value":-375872.0}}}

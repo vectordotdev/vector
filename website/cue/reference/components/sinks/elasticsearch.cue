@@ -74,12 +74,19 @@ components: sinks: elasticsearch: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.elasticsearch.configuration
+	configuration: generated.components.sinks.elasticsearch.configuration
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 
 	how_it_works: {
@@ -91,6 +98,9 @@ components: sinks: elasticsearch: {
 				inserted via the `index` action, which replaces documents if an existing
 				one has the same `id`. If `bulk.action` is configured with `create`, Elasticsearch
 				does _not_ replace an existing document and instead returns a conflict error.
+				When `bulk.action` is set to `update`, the document is updated with several constraints.
+				The message must be added in `.doc` and have `.doc_as_upsert` to true.
+				The `update` operation requires the `id_key` to be set, and the `encoding` field should specify `doc` and `doc_as_upsert` as values.
 				"""
 		}
 
@@ -129,6 +139,24 @@ components: sinks: elasticsearch: {
 
 				By default, partial failures are not retried. To enable retries, set `request_retry_partial`. Once enabled it will
 				retry whole partially failed requests. As such it is advised to use `id_key` to avoid duplicates.
+				"""
+		}
+
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				Query params can either be single key value pair or a key with multiple values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							field: value
+							fruit:
+								- mango
+								- papaya
+								- kiwi
+				```
 				"""
 		}
 

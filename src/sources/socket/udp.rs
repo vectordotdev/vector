@@ -1,3 +1,6 @@
+use std::net::{Ipv4Addr, SocketAddr};
+
+use super::default_host_key;
 use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
@@ -17,13 +20,13 @@ use vector_lib::{
 
 use crate::{
     codecs::Decoder,
-    config::log_schema,
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
+        SocketReceiveError, StreamClosedError,
     },
     net,
-    serde::{default_decoding, default_framing_message_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
         socket::SocketConfig,
@@ -41,6 +44,21 @@ pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
 
+    /// List of IPv4 multicast groups to join on socket's binding process.
+    ///
+    /// In order to read multicast packets, this source's listening address should be set to `0.0.0.0`.
+    /// If any other address is used (such as `127.0.0.1` or an specific interface address), the
+    /// listening interface will filter out all multicast packets received,
+    /// as their target IP would be the one of the multicast group
+    /// and it will not match the socket's bound IP.
+    ///
+    /// Note that this setting will only work if the source's address
+    /// is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
+    /// with multicast groups).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "['224.0.0.2', '224.0.0.4']"))]
+    pub(super) multicast_groups: Vec<Ipv4Addr>,
+
     /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
@@ -57,8 +75,7 @@ pub struct UdpConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
@@ -75,21 +92,16 @@ pub struct UdpConfig {
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
-    #[serde(default = "default_framing_message_based")]
-    pub(super) framing: FramingConfig,
+    pub(super) framing: Option<FramingConfig>,
 
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub(super) decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
     pub log_namespace: Option<bool>,
-}
-
-fn default_host_key() -> OptionalValuePath {
-    log_schema().host_key().cloned().into()
 }
 
 fn default_port_key() -> OptionalValuePath {
@@ -101,15 +113,15 @@ fn default_max_length() -> usize {
 }
 
 impl UdpConfig {
-    pub(super) const fn host_key(&self) -> &OptionalValuePath {
-        &self.host_key
+    pub(super) fn host_key(&self) -> OptionalValuePath {
+        self.host_key.clone().unwrap_or(default_host_key())
     }
 
     pub const fn port_key(&self) -> &OptionalValuePath {
         &self.port_key
     }
 
-    pub(super) const fn framing(&self) -> &FramingConfig {
+    pub(super) const fn framing(&self) -> &Option<FramingConfig> {
         &self.framing
     }
 
@@ -124,17 +136,18 @@ impl UdpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
+            multicast_groups: Vec::new(),
             max_length: default_max_length(),
-            host_key: default_host_key(),
+            host_key: None,
             port_key: default_port_key(),
             receive_buffer_bytes: None,
-            framing: default_framing_message_based(),
+            framing: None,
             decoding: default_decoding(),
             log_namespace: None,
         }
     }
 
-    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+    pub const fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
         self.log_namespace = val;
         self
     }
@@ -158,6 +171,35 @@ pub(super) fn udp(
                 })
             })?;
 
+        if !config.multicast_groups.is_empty() {
+            socket.set_multicast_loop_v4(true).unwrap();
+            let listen_addr = match config.address() {
+                SocketListenAddr::SocketAddr(SocketAddr::V4(addr)) => addr,
+                SocketListenAddr::SocketAddr(SocketAddr::V6(_)) => {
+                    // We could support Ipv6 multicast with the
+                    // https://doc.rust-lang.org/std/net/struct.UdpSocket.html#method.join_multicast_v6 method
+                    // and specifying the interface index as `0`, in order to bind all interfaces.
+                    unimplemented!("IPv6 multicast is not supported")
+                }
+                SocketListenAddr::SystemdFd(_) => {
+                    unimplemented!("Multicast for systemd fd sockets is not supported")
+                }
+            };
+            for group_addr in config.multicast_groups {
+                let interface = *listen_addr.ip();
+                socket
+                    .join_multicast_v4(group_addr, interface)
+                    .map_err(|error| {
+                        emit!(SocketMulticastGroupJoinError {
+                            error,
+                            group_addr,
+                            interface,
+                        })
+                    })?;
+                info!(message = "Joined multicast group.", group = %group_addr);
+            }
+        }
+
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
             if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
                 warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
@@ -173,7 +215,6 @@ pub(super) fn udp(
         let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
         info!(message = "Listening.", address = %config.address);
-
         // We add 1 to the max_length in order to determine if the received data has been truncated.
         let mut buf = BytesMut::with_capacity(max_length + 1);
         loop {
@@ -190,7 +231,6 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
@@ -204,10 +244,8 @@ pub(super) fn udp(
                     };
 
                     bytes_received.emit(ByteSize(byte_size));
-
                     let payload = buf.split_to(byte_size);
                     let truncated = byte_size == max_length + 1;
-
                     let mut stream = FramedRead::new(payload.as_ref(), decoder.clone()).peekable();
 
                     while let Some(result) = stream.next().await {
@@ -220,7 +258,6 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
-                                        internal_log_rate_limit = true
                                     );
                                 }
 
@@ -238,14 +275,18 @@ pub(super) fn udp(
                                 let now = Utc::now();
 
                                 for event in &mut events {
-                                    if let Event::Log(ref mut log) = event {
+                                    if let Event::Log(log) = event {
                                         log_namespace.insert_standard_vector_source_metadata(
                                             log,
                                             SocketConfig::NAME,
                                             now,
                                         );
 
-                                        let legacy_host_key = config.host_key.clone().path;
+                                        let legacy_host_key = config
+                                            .host_key
+                                            .clone()
+                                            .unwrap_or(default_host_key())
+                                            .path;
 
                                         log_namespace.insert_source_metadata(
                                             SocketConfig::NAME,

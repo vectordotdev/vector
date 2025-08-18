@@ -13,7 +13,7 @@ pub struct GrpcServerRequestReceived;
 
 impl InternalEvent for GrpcServerRequestReceived {
     fn emit(self) {
-        counter!("grpc_server_messages_received_total", 1);
+        counter!("grpc_server_messages_received_total").increment(1);
     }
 }
 
@@ -23,7 +23,7 @@ pub struct GrpcServerResponseSent<'a, B> {
     pub latency: Duration,
 }
 
-impl<'a, B> InternalEvent for GrpcServerResponseSent<'a, B> {
+impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
     fn emit(self) {
         let grpc_code = self
             .response
@@ -34,8 +34,8 @@ impl<'a, B> InternalEvent for GrpcServerResponseSent<'a, B> {
         let grpc_code = grpc_code_to_name(grpc_code);
 
         let labels = &[(GRPC_STATUS_LABEL, grpc_code)];
-        counter!("grpc_server_messages_sent_total", 1, labels);
-        histogram!("grpc_server_handler_duration_seconds", self.latency, labels);
+        counter!("grpc_server_messages_sent_total", labels).increment(1);
+        histogram!("grpc_server_handler_duration_seconds", labels).record(self.latency);
     }
 }
 
@@ -54,10 +54,11 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 
@@ -79,10 +80,11 @@ where
             internal_log_rate_limit = true
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        );
+        )
+        .increment(1);
     }
 }
 

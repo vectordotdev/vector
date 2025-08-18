@@ -15,7 +15,6 @@ use crate::{
 };
 
 pub struct HecMetricsSink<S> {
-    pub context: SinkContext,
     pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,

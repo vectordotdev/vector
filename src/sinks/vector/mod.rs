@@ -84,7 +84,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -156,7 +156,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -222,7 +222,6 @@ mod tests {
         .await
         .into_iter()
         .flatten()
-        .map(Into::into)
         .collect()
     }
 

@@ -25,12 +25,18 @@ components: transforms: reduce: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.reduce.configuration
+	configuration: generated.components.transforms.reduce.configuration
 
 	input: {
 		logs:    true
 		metrics: null
 		traces:  false
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
 	}
 
 	examples: [
@@ -88,6 +94,8 @@ components: transforms: reduce: {
 				group_by: ["host", "pid", "tid"]
 				merge_strategies: {
 					message: "concat_newline"
+					"pid":   "discard"
+					"tid":   "discard"
 				}
 				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
@@ -124,21 +132,23 @@ components: transforms: reduce: {
 			configuration: {}
 
 			input: [
-				{log: {timestamp: "2020-10-07T12:33:21.223543Z", message: "Received GET /path", request_id:                     "abcd1234", request_path:    "/path", request_params: {"key":          "val"}}},
-				{log: {timestamp: "2020-10-07T12:33:21.832345Z", message: "Executed query in 5.2ms", request_id:                "abcd1234", query:           "SELECT * FROM table", query_duration_ms: 5.2}},
-				{log: {timestamp: "2020-10-07T12:33:22.457423Z", message: "Rendered partial _partial.erb in 2.3ms", request_id: "abcd1234", template:        "_partial.erb", render_duration_ms:       2.3}},
-				{log: {timestamp: "2020-10-07T12:33:22.543323Z", message: "Executed query in 7.8ms", request_id:                "abcd1234", query:           "SELECT * FROM table", query_duration_ms: 7.8}},
-				{log: {timestamp: "2020-10-07T12:33:22.742322Z", message: "Sent 200 in 15.2ms", request_id:                     "abcd1234", response_status: 200, response_duration_ms:                5.2}},
+				{log: {timestamp: "2020-10-07T12:33:21.223543Z", message: "Received GET /path", request_id: "abcd1234", request_path: "/path", request_params: {"key": "val"}}},
+				{log: {timestamp: "2020-10-07T12:33:21.832345Z", message: "Executed query in 5.2ms", request_id: "abcd1234", query: "SELECT * FROM table", query_duration_ms: 5.2}},
+				{log: {timestamp: "2020-10-07T12:33:22.457423Z", message: "Rendered partial _partial.erb in 2.3ms", request_id: "abcd1234", template: "_partial.erb", render_duration_ms: 2.3}},
+				{log: {timestamp: "2020-10-07T12:33:22.543323Z", message: "Executed query in 7.8ms", request_id: "abcd1234", query: "SELECT * FROM table", query_duration_ms: 7.8}},
+				{log: {timestamp: "2020-10-07T12:33:22.742322Z", message: "Sent 200 in 15.2ms", request_id: "abcd1234", response_status: 200, response_duration_ms: 5.2}},
 			]
 			output: log: {
-				timestamp:     "2020-10-07T12:33:21.223543Z"
-				timestamp_end: "2020-10-07T12:33:22.742322Z"
-				request_id:    "abcd1234"
-				request_path:  "/path"
+				message:      "Received GET /path"
+				timestamp:    "2020-10-07T12:33:21.223543Z"
+				request_id:   "abcd1234"
+				request_path: "/path"
+				template:     "_partial.erb"
 				request_params: {"key": "val"}
+				query:                "SELECT * FROM table"
 				query_duration_ms:    13.0
 				render_duration_ms:   2.3
-				status:               200
+				response_status:      200
 				response_duration_ms: 5.2
 			}
 		},

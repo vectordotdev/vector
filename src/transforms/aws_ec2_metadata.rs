@@ -1,11 +1,11 @@
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin, sync::Arc};
+use std::sync::{Arc, LazyLock};
+use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
@@ -44,21 +44,22 @@ const VPC_ID_KEY: &str = "vpc-id";
 const ROLE_NAME_KEY: &str = "role-name";
 const TAGS_KEY: &str = "tags";
 
-static AVAILABILITY_ZONE: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
-static LOCAL_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
-static LOCAL_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
-static PUBLIC_HOSTNAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
-static PUBLIC_IPV4: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
-static ROLE_NAME: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
-static MAC: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
-static DYNAMIC_DOCUMENT: Lazy<PathAndQuery> =
-    Lazy::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
+static AVAILABILITY_ZONE: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/placement/availability-zone"));
+static LOCAL_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-hostname"));
+static LOCAL_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/local-ipv4"));
+static PUBLIC_HOSTNAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-hostname"));
+static PUBLIC_IPV4: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/public-ipv4"));
+static ROLE_NAME: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/"));
+static MAC: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/meta-data/mac"));
+static DYNAMIC_DOCUMENT: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/dynamic/instance-identity/document"));
 static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     AMI_ID_KEY,
     AVAILABILITY_ZONE_KEY,
@@ -73,8 +74,9 @@ static DEFAULT_FIELD_ALLOWLIST: &[&str] = &[
     VPC_ID_KEY,
     ROLE_NAME_KEY,
 ];
-static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/latest/api/token"));
-static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
+static API_TOKEN: LazyLock<PathAndQuery> =
+    LazyLock::new(|| PathAndQuery::from_static("/latest/api/token"));
+static TOKEN_HEADER: LazyLock<Bytes> = LazyLock::new(|| Bytes::from("X-aws-ec2-metadata-token"));
 
 /// Configuration for the `aws_ec2_metadata` transform.
 #[serde_as]
@@ -507,10 +509,8 @@ impl MetadataClient {
                     let mac = String::from_utf8_lossy(&mac[..]);
 
                     if self.fields.contains(SUBNET_ID_KEY) {
-                        let subnet_path = format!(
-                            "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                            mac
-                        );
+                        let subnet_path =
+                            format!("/latest/meta-data/network/interfaces/macs/{mac}/subnet-id");
 
                         let subnet_path = subnet_path.parse().context(ParsePathSnafu {
                             value: subnet_path.clone(),
@@ -523,7 +523,7 @@ impl MetadataClient {
 
                     if self.fields.contains(VPC_ID_KEY) {
                         let vpc_path =
-                            format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+                            format!("/latest/meta-data/network/interfaces/macs/{mac}/vpc-id");
 
                         let vpc_path = vpc_path.parse().context(ParsePathSnafu {
                             value: vpc_path.clone(),
@@ -560,7 +560,7 @@ impl MetadataClient {
             }
 
             for tag in self.tags.clone() {
-                let tag_path = format!("/latest/meta-data/tags/instance/{}", tag);
+                let tag_path = format!("/latest/meta-data/tags/instance/{tag}");
 
                 let tag_path = tag_path.parse().context(ParsePathSnafu {
                     value: tag_path.clone(),
@@ -637,11 +637,6 @@ fn create_metric_namespace(namespace: &OwnedTargetPath) -> String {
             }
             OwnedSegment::Index(i) => {
                 output += &i.to_string();
-            }
-            OwnedSegment::Coalesce(fields) => {
-                if let Some(first) = fields.first() {
-                    output += first;
-                }
             }
         }
     }
@@ -909,7 +904,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             ..Default::default()
         };
@@ -940,7 +935,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             required: false,
             ..Default::default()
@@ -1019,10 +1014,10 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
+            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
+            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{}\"", TAGS_KEY).as_str(),
+                format!("\"{TAGS_KEY}\"").as_str(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),

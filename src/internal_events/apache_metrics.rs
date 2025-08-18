@@ -15,18 +15,20 @@ pub struct ApacheMetricsEventsReceived<'a> {
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for ApacheMetricsEventsReceived<'a> {
+impl InternalEvent for ApacheMetricsEventsReceived<'_> {
     // ## skip check-duplicate-events ##
     fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
         counter!(
-            "component_received_events_total", self.count as u64,
+            "component_received_events_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total", self.byte_size.get() as u64,
+            "component_received_event_bytes_total",
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(self.byte_size.get() as u64);
     }
 }
 
@@ -44,13 +46,14 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
             endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
+
         );
         counter!(
-            "component_errors_total", 1,
+            "component_errors_total",
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_owned(),
-        );
+        )
+        .increment(1);
     }
 }

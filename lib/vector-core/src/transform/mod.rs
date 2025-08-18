@@ -114,7 +114,7 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a
-/// `TaskTransform` or vice versa.
+///   `TaskTransform` or vice versa.
 pub trait TaskTransform<T: EventContainer + 'static>: Send + 'static {
     fn transform(
         self: Box<Self>,
@@ -376,7 +376,6 @@ impl TransformOutputsBuf {
     /// # Panics
     ///
     /// Panics if there is no default output.
-    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.primary_buffer
             .as_mut()
@@ -389,7 +388,6 @@ impl TransformOutputsBuf {
     /// # Panics
     ///
     /// Panics if there is no output with the given name.
-    #[cfg(any(feature = "test", test))]
     pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
         self.named_buffers
             .get_mut(name)
@@ -402,12 +400,10 @@ impl TransformOutputsBuf {
     /// # Panics
     ///
     /// Panics if there is no default output.
-    #[cfg(any(feature = "test", test))]
     pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
 
-    #[cfg(any(feature = "test", test))]
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
@@ -482,7 +478,6 @@ impl OutputBuffer {
         })
     }
 
-    #[cfg(any(feature = "test", test))]
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
@@ -522,7 +517,7 @@ impl EventDataEq<Vec<Event>> for OutputBuffer {
     fn event_data_eq(&self, other: &Vec<Event>) -> bool {
         struct Comparator<'a>(EventRef<'a>);
 
-        impl<'a> PartialEq<&Event> for Comparator<'a> {
+        impl PartialEq<&Event> for Comparator<'_> {
             fn eq(&self, that: &&Event) -> bool {
                 self.0.event_data_eq(that)
             }

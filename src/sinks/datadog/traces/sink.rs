@@ -61,10 +61,10 @@ impl Partitioner for EventPartitioner {
                     .map(|s| s.to_string_lossy().into_owned()),
                 target_tps: t
                     .get(event_path!("target_tps"))
-                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                    .and_then(|tps| tps.as_integer()),
                 error_tps: t
                     .get(event_path!("error_tps"))
-                    .and_then(|tps| tps.as_integer().map(Into::into)),
+                    .and_then(|tps| tps.as_integer()),
             },
         }
     }

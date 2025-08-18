@@ -13,6 +13,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::show::exec(&self.integration, INTEGRATION_TESTS_DIR)
+        crate::commands::compose_tests::show::exec(self.integration.as_ref(), INTEGRATION_TESTS_DIR)
     }
 }

@@ -1,4 +1,4 @@
-use crate::sinks::pulsar::{config::PulsarSinkConfig, sink::PulsarSink};
+use crate::sinks::pulsar::{config::PulsarSinkConfig, config::PulsarTlsOptions, sink::PulsarSink};
 use futures::StreamExt;
 use pulsar::SubType;
 
@@ -9,10 +9,15 @@ use crate::test_util::{
     components::{assert_sink_compliance, SINK_TAGS},
     random_lines_with_stream, random_string, trace_init,
 };
+use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
 use bytes::Bytes;
 
-fn pulsar_address() -> String {
-    std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
+fn pulsar_host() -> String {
+    std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())
+}
+
+fn pulsar_address(scheme: &str, port: u16) -> String {
+    format!("{}://{}:{}", scheme, pulsar_host(), port)
 }
 
 async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
@@ -70,7 +75,7 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     for line in input {
         let msg = match consumer.next().await.unwrap() {
             Ok(msg) => msg,
-            Err(error) => panic!("{:?}", error),
+            Err(error) => panic!("{error:?}"),
         };
         consumer.ack(&msg).await.unwrap();
         assert_eq!(String::from_utf8_lossy(&msg.payload.data), line);
@@ -80,7 +85,23 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
 #[tokio::test]
 async fn pulsar_happy() {
     let cnf = PulsarSinkConfig {
-        endpoint: pulsar_address(),
+        endpoint: pulsar_address("pulsar", 6650),
+        // overriden by test
+        ..Default::default()
+    };
+
+    pulsar_happy_reuse(cnf).await
+}
+
+#[tokio::test]
+async fn pulsar_happy_tls() {
+    let cnf = PulsarSinkConfig {
+        endpoint: pulsar_address("pulsar+ssl", 6651),
+        tls: Some(PulsarTlsOptions {
+            ca_file: TEST_PEM_INTERMEDIATE_CA_PATH.into(),
+            verify_certificate: None,
+            verify_hostname: None,
+        }),
         // overriden by test
         ..Default::default()
     };

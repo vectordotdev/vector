@@ -1,3 +1,5 @@
+use vector_lib::config::LogNamespace;
+
 use crate::{
     components::validation::{
         component_names::*,
@@ -31,9 +33,9 @@ impl TopologyBuilder {
         let component_configuration = configuration
             .component_configuration_for_test_case(config_name)
             .ok_or(format!(
-                "No test case name defined for configuration {:?}.",
-                config_name
+                "No test case name defined for configuration {config_name:?}."
             ))?;
+
         Ok(match component_configuration {
             ComponentConfiguration::Source(source) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Source);
@@ -41,11 +43,11 @@ impl TopologyBuilder {
             }
             ComponentConfiguration::Transform(transform) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Transform);
-                Self::from_transform(transform)
+                Self::from_transform(transform, configuration.log_namespace)
             }
             ComponentConfiguration::Sink(sink) => {
                 debug_assert_eq!(configuration.component_type(), ComponentType::Sink);
-                Self::from_sink(sink)
+                Self::from_sink(sink, configuration.log_namespace)
             }
         })
     }
@@ -65,8 +67,8 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_transform(transform: BoxedTransform) -> Self {
-        let (input_edge, input_source) = build_input_edge();
+    fn from_transform(transform: BoxedTransform, log_namespace: LogNamespace) -> Self {
+        let (input_edge, input_source) = build_input_edge(log_namespace);
         let (output_edge, output_sink) = build_output_edge();
 
         let mut config_builder = ConfigBuilder::default();
@@ -81,8 +83,8 @@ impl TopologyBuilder {
         }
     }
 
-    fn from_sink(sink: BoxedSink) -> Self {
-        let (input_edge, input_source) = build_input_edge();
+    fn from_sink(sink: BoxedSink, log_namespace: LogNamespace) -> Self {
+        let (input_edge, input_source) = build_input_edge(log_namespace);
 
         let mut config_builder = ConfigBuilder::default();
         config_builder.add_source(TEST_INPUT_SOURCE_NAME, input_source);
@@ -123,11 +125,14 @@ impl TopologyBuilder {
     }
 }
 
-fn build_input_edge() -> (InputEdge, impl Into<BoxedSource>) {
+fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
     let input_listen_addr = GrpcAddress::from(next_addr());
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
-    let input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
+    let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
+
+    input_source.log_namespace = Some(log_namespace == LogNamespace::Vector);
+
     let input_edge = InputEdge::from_address(input_listen_addr);
 
     (input_edge, input_source)

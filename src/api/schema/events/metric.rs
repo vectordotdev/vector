@@ -2,12 +2,10 @@ use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use vector_lib::encode_logfmt;
+use vector_lib::event;
+use vector_lib::tap::topology::TapOutput;
 
 use super::EventEncodingType;
-use crate::{
-    event::{self, KeyString},
-    topology::TapOutput,
-};
 
 #[derive(Debug, Clone)]
 pub struct Metric {
@@ -128,7 +126,7 @@ impl Metric {
                     .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
                 match json {
                     Value::Object(map) => encode_logfmt::encode_map(
-                        &map.into_iter().map(|(k,v)| (KeyString::from(k), v)).collect(),
+                        &map.into_iter().map(|(k,v)| (event::KeyString::from(k), v)).collect(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),
                     _ => panic!("logfmt serialization of metric event failed: metric converted to unexpected serde Value. Please report."),

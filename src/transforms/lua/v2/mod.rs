@@ -54,7 +54,7 @@ pub enum BuildError {
 pub struct LuaConfig {
     /// The Lua program to initialize the transform with.
     ///
-    /// The program can be used to to import external dependencies, as well as define the functions
+    /// The program can be used to import external dependencies, as well as define the functions
     /// used for the various lifecycle hooks. However, it's not strictly required, as the lifecycle
     /// hooks can be configured directly with inline Lua source for each respective hook.
     #[configurable(metadata(
@@ -251,16 +251,16 @@ impl Lua {
         let mut timers = Vec::new();
 
         if !additional_paths.is_empty() {
-            let package = lua.globals().get::<_, mlua::Table<'_>>("package")?;
+            let package = lua.globals().get::<mlua::Table>("package")?;
             let current_paths = package
-                .get::<_, String>("path")
+                .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths)?;
         }
 
         if let Some(source) = &config.source {
-            lua.load(source).eval().context(InvalidSourceSnafu)?;
+            lua.load(source).eval::<()>().context(InvalidSourceSnafu)?;
         }
 
         let hook_init_code = config.hooks.init.as_ref();
@@ -358,14 +358,11 @@ impl Lua {
 }
 
 // A helper that reduces code duplication.
-fn wrap_emit_fn<'lua, 'scope, F: 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn wrap_emit_fn<'scope, 'env, F: 'scope + FnMut(Event)>(
+    scope: &'scope mlua::Scope<'scope, 'env>,
     mut emit_fn: F,
     source_id: Arc<ComponentKey>,
-) -> mlua::Result<mlua::Function<'lua>>
-where
-    F: FnMut(Event),
-{
+) -> mlua::Result<mlua::Function> {
     scope.create_function_mut(move |_, mut event: Event| -> mlua::Result<()> {
         event.set_source_id(Arc::clone(&source_id));
         emit_fn(event);
@@ -1004,8 +1001,7 @@ mod tests {
             "#,
             |tx, out| async move {
                 let n: usize = 10;
-                let events =
-                    (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
+                let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
                 for event in events {
                     tx.send(event).await.unwrap();
                     assert!(out.lock().await.recv().await.is_some());

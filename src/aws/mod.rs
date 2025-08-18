@@ -1,12 +1,15 @@
 //! Shared functionality for the AWS components.
 pub mod auth;
 pub mod region;
+pub mod timeout;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
-use aws_config::{meta::region::ProvideRegion, retry::RetryConfig, Region, SdkConfig};
+use aws_config::{
+    meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
+};
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{SignableBody, SignableRequest, SigningSettings},
+    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -30,7 +33,6 @@ use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::time::SystemTime;
 use std::{
     error::Error,
     pin::Pin,
@@ -39,7 +41,9 @@ use std::{
         Arc, OnceLock,
     },
     task::{Context, Poll},
+    time::{Duration, SystemTime},
 };
+pub use timeout::AwsTimeout;
 
 use crate::config::ProxyConfig;
 use crate::http::{build_proxy_connector, build_tls_connector, status};
@@ -100,7 +104,7 @@ fn check_response(res: &HttpResponse) -> bool {
 /// have turned off as we want to consistently use openssl.
 fn connector(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
 ) -> crate::Result<SharedHttpClient> {
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
@@ -119,13 +123,14 @@ pub trait ClientBuilder {
     type Client;
 
     /// Build the client using the given config settings.
-    fn build(config: &SdkConfig) -> Self::Client;
+    fn build(&self, config: &SdkConfig) -> Self::Client;
 }
 
-fn region_provider(
+/// Provides the configured AWS region.
+pub fn region_provider(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
-) -> crate::Result<impl ProvideRegion> {
+    tls_options: Option<&TlsConfig>,
+) -> crate::Result<impl ProvideRegion + use<>> {
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 
@@ -142,7 +147,7 @@ fn region_provider(
 
 async fn resolve_region(
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
+    tls_options: Option<&TlsConfig>,
     region: Option<Region>,
 ) -> crate::Result<Region> {
     match region {
@@ -157,26 +162,36 @@ async fn resolve_region(
 }
 
 /// Create the SDK client using the provided settings.
-pub async fn create_client<T: ClientBuilder>(
+pub async fn create_client<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
-) -> crate::Result<T::Client> {
-    create_client_and_region::<T>(auth, region, endpoint, proxy, tls_options)
+    tls_options: Option<&TlsConfig>,
+    timeout: Option<&AwsTimeout>,
+) -> crate::Result<T::Client>
+where
+    T: ClientBuilder,
+{
+    create_client_and_region::<T>(builder, auth, region, endpoint, proxy, tls_options, timeout)
         .await
         .map(|(client, _)| client)
 }
 
 /// Create the SDK client and resolve the region using the provided settings.
-pub async fn create_client_and_region<T: ClientBuilder>(
+pub async fn create_client_and_region<T>(
+    builder: &T,
     auth: &AwsAuthentication,
     region: Option<Region>,
     endpoint: Option<String>,
     proxy: &ProxyConfig,
-    tls_options: &Option<TlsConfig>,
-) -> crate::Result<(T::Client, Region)> {
+    tls_options: Option<&TlsConfig>,
+    timeout: Option<&AwsTimeout>,
+) -> crate::Result<(T::Client, Region)>
+where
+    T: ClientBuilder,
+{
     let retry_config = RetryConfig::disabled();
 
     // The default credentials chains will look for a region if not given but we'd like to
@@ -208,6 +223,10 @@ pub async fn create_client_and_region<T: ClientBuilder>(
 
     if let Some(endpoint_override) = endpoint {
         config_builder = config_builder.endpoint_url(endpoint_override);
+    } else if let Some(endpoint_from_config) =
+        aws_config::default_provider::endpoint_url::endpoint_url_provider(&provider_config).await
+    {
+        config_builder = config_builder.endpoint_url(endpoint_from_config);
     }
 
     if let Some(use_fips) =
@@ -216,9 +235,24 @@ pub async fn create_client_and_region<T: ClientBuilder>(
         config_builder = config_builder.use_fips(use_fips);
     }
 
+    if let Some(timeout) = timeout {
+        let mut timeout_config_builder = TimeoutConfig::builder();
+
+        let operation_timeout = timeout.operation_timeout();
+        let connect_timeout = timeout.connect_timeout();
+        let read_timeout = timeout.read_timeout();
+
+        timeout_config_builder
+            .set_operation_timeout(operation_timeout.map(Duration::from_secs))
+            .set_connect_timeout(connect_timeout.map(Duration::from_secs))
+            .set_read_timeout(read_timeout.map(Duration::from_secs));
+
+        config_builder = config_builder.timeout_config(timeout_config_builder.build());
+    }
+
     let config = config_builder.build();
 
-    Ok((T::build(&config), region))
+    Ok((T::build(builder, &config), region))
 }
 
 #[derive(Snafu, Debug)]
@@ -233,7 +267,8 @@ pub async fn sign_request(
     service_name: &str,
     request: &mut http::Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
-    region: &Option<Region>,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
     let headers = request
         .headers()
@@ -255,12 +290,21 @@ pub async fn sign_request(
 
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
+
+    let mut signing_settings = SigningSettings::default();
+
+    // Include the x-amz-content-sha256 header when calculating the AWS v4 signature;
+    // this is required by some AWS services, e.g. S3 and OpenSearch Serverless
+    if payload_checksum_sha256 {
+        signing_settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+    }
+
     let signing_params_builder = v4::SigningParams::builder()
         .identity(&identity)
         .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
         .name(service_name)
         .time(SystemTime::now())
-        .settings(SigningSettings::default());
+        .settings(signing_settings);
 
     let signing_params = signing_params_builder
         .build()
@@ -342,7 +386,7 @@ struct MeasuredBody {
 }
 
 impl MeasuredBody {
-    fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
+    const fn new(body: SdkBody, shared_bytes_sent: Arc<AtomicUsize>) -> Self {
         Self {
             inner: body,
             shared_bytes_sent,

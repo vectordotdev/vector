@@ -52,7 +52,7 @@ components: sources: http_client: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.http_client.configuration & {
+	configuration: generated.components.sources.http_client.configuration & {
 		endpoint: warnings: ["You must explicitly add the path to your endpoint."]
 	}
 
@@ -124,7 +124,7 @@ components: sources: http_client: {
 				tags: _extra_tags
 			}
 		}
-		traces: {
+		traces: trace: {
 			description: "A trace received through an HTTP request."
 			fields: {
 				source_type: {
@@ -141,5 +141,25 @@ components: sources: http_client: {
 	telemetry: metrics: {
 		http_client_responses_total:      components.sources.internal_metrics.output.metrics.http_client_responses_total
 		http_client_response_rtt_seconds: components.sources.internal_metrics.output.metrics.http_client_response_rtt_seconds
+	}
+
+	how_it_works: {
+		query_params_structure: {
+			title: "Query params structure"
+			body: """
+				Query params can either be single key value pair or a key with multiple values
+
+				```yaml
+				sources:
+					source0:
+						query:
+							field: value
+							fruit:
+								- mango
+								- papaya
+								- kiwi
+				```
+				"""
+		}
 	}
 }

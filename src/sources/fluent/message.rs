@@ -96,8 +96,7 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
 
                 if tag != 0 {
                     return Err(serde::de::Error::custom(format!(
-                        "expected extension type 0 for fluent timestamp, got {}",
-                        tag
+                        "expected extension type 0 for fluent timestamp, got {tag}"
                     )));
                 }
 
@@ -249,7 +248,7 @@ mod test {
 
     quickcheck! {
         fn from_u64(input: u64) -> () {
-            if input > i64::max_value() as u64 {
+            if input > i64::MAX as u64 {
                 assert_eq!(Value::from(FluentValue(rmpv::Value::Integer(rmpv::Integer::from(input)))),
                            Value::Bytes(input.to_string().into()))
             } else {

@@ -34,7 +34,7 @@ pub(super) fn build_pod_logs_directory(
 ///
 /// Inspired by <https://github.com/kubernetes/kubernetes/blob/31305966789525fca49ec26c289e565467d1f1c4/pkg/kubelet/kuberuntime/helpers.go#L186>
 pub(super) fn parse_log_file_path(path: &str) -> Option<LogFileInfo<'_>> {
-    let mut components = path.rsplit('/');
+    let mut components = path.rsplit(std::path::MAIN_SEPARATOR);
 
     let _log_file_name = components.next()?;
     let container_name = components.next()?;
@@ -69,12 +69,25 @@ mod tests {
 
     #[test]
     fn test_build_pod_logs_directory() {
+        let path = format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
         let cases = vec![
             // Valid inputs.
-            (
-                ("sandbox0-ns", "sandbox0-name", "sandbox0-uid"),
-                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid",
-            ),
+            (("sandbox0-ns", "sandbox0-name", "sandbox0-uid"), s_path),
             // Invalid inputs.
             (("", "", ""), "/var/log/pods/__"),
         ];
@@ -89,10 +102,28 @@ mod tests {
 
     #[test]
     fn test_parse_log_file_path() {
+        let path = format!(
+            "{}{}",
+            std::path::MAIN_SEPARATOR,
+            [
+                "var",
+                "log",
+                "pods",
+                "sandbox0-ns_sandbox0-name_sandbox0-uid",
+                "sandbox0-container0-name",
+                "1.log",
+            ]
+            .iter()
+            .collect::<PathBuf>()
+            .into_os_string()
+            .into_string()
+            .unwrap()
+        );
+        let s_path = path.as_str();
         let cases = vec![
             // Valid inputs.
             (
-                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
+                s_path,
                 Some(LogFileInfo {
                     pod_namespace: "sandbox0-ns",
                     pod_name: "sandbox0-name",

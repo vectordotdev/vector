@@ -9,13 +9,13 @@ license = "MPL-2.0"
 [dependencies]
 tracing-core = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
-dashmap = { version = "5.5.3", default-features = false }
+dashmap = { version = "6.1.0", default-features = false }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.7"
 tracing = "0.1.34"
-mock_instant = { version = "0.3" }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = ["env-filter", "fmt"] }
+mock_instant = { version = "0.6" }
+tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt"] }
 
 [[bench]]
 name = "limit"

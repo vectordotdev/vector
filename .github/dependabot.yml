@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: deps"
@@ -12,6 +12,13 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      patches:
+        applies-to: version-updates
+        patterns:
+        - "*"
+        update-types:
+        - "patch"
+
       amq:
         patterns:
         - "amq-*"
@@ -34,6 +41,11 @@ updates:
         patterns:
         - "futures"
         - "futures-util"
+      metrics:
+        patterns:
+        - "metrics"
+        - "metrics-tracing-context"
+        - "metrics-util"
       graphql:
         patterns:
         - "async-graphql*"
@@ -48,6 +60,10 @@ updates:
         patterns:
         - "tonic"
         - "tonic-*"
+      tower:
+        patterns:
+        - "tower"
+        - "tower-*"
       wasm-bindgen:
         patterns:
         - "wasm-bindgen-*"
@@ -57,7 +73,7 @@ updates:
   - package-ecosystem: "docker"
     directory: "/distribution/docker/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
       time: "04:00" # UTC
     labels:
       - "domain: releasing"
@@ -68,7 +84,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "monthly"
     labels:
       - "domain: ci"
       - "no-changelog"
@@ -79,3 +95,19 @@ updates:
         patterns:
         - "actions/download-artifact"
         - "actions/upload-artifact"
+  - package-ecosystem: "npm"
+    directory: "website/"
+    schedule:
+      interval: "monthly"
+      time: "05:00" # UTC
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(website deps)"
+    open-pull-requests-limit: 50
+    groups:
+      npm_and_yarn:
+        patterns:
+          - "*"

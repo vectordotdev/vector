@@ -10,6 +10,7 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
+use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::config::LogNamespace;
@@ -34,6 +35,9 @@ mod disk;
 mod filesystem;
 mod memory;
 mod network;
+mod process;
+#[cfg(target_os = "linux")]
+mod tcp;
 
 /// Collector types.
 #[serde_as]
@@ -48,6 +52,9 @@ pub enum Collector {
 
     /// Metrics related to CPU utilization.
     Cpu,
+
+    /// Metrics related to Process utilization.
+    Process,
 
     /// Metrics related to disk I/O utilization.
     Disk,
@@ -66,6 +73,9 @@ pub enum Collector {
 
     /// Metrics related to network utilization.
     Network,
+
+    /// Metrics related to TCP connections.
+    TCP,
 }
 
 /// Filtering configuration.
@@ -125,6 +135,10 @@ pub struct HostMetricsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub process: process::ProcessConfig,
 }
 
 /// Options for the cgroups (controller groups) metrics collector.
@@ -170,7 +184,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 8] {
+const fn example_collectors() -> [&'static str; 9] {
     [
         "cgroups",
         "cpu",
@@ -180,6 +194,7 @@ const fn example_collectors() -> [&'static str; 8] {
         "host",
         "memory",
         "network",
+        "tcp",
     ]
 }
 
@@ -192,15 +207,18 @@ fn default_collectors() -> Option<Vec<Collector>> {
         Collector::Host,
         Collector::Memory,
         Collector::Network,
+        Collector::Process,
     ];
 
     #[cfg(target_os = "linux")]
     {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
     if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
         collectors.push(Collector::CGroups);
+        collectors.push(Collector::TCP);
     }
 
     Some(collectors)
@@ -214,6 +232,20 @@ fn example_devices() -> FilterList {
 }
 
 fn default_all_devices() -> FilterList {
+    FilterList {
+        includes: Some(vec!["*".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
+fn example_processes() -> FilterList {
+    FilterList {
+        includes: Some(vec!["docker".try_into().unwrap()]),
+        excludes: None,
+    }
+}
+
+fn default_all_processes() -> FilterList {
     FilterList {
         includes: Some(vec!["*".try_into().unwrap()]),
         excludes: None,
@@ -261,6 +293,9 @@ impl SourceConfig for HostMetricsConfig {
             if self.cgroups.is_some() || self.has_collector(Collector::CGroups) {
                 return Err("CGroups collector is only available on Linux systems".into());
             }
+            if self.has_collector(Collector::TCP) {
+                return Err("TCP collector is only available on Linux systems".into());
+            }
         }
 
         let mut config = self.clone();
@@ -288,7 +323,7 @@ impl HostMetricsConfig {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
-        let generator = HostMetrics::new(self);
+        let mut generator = HostMetrics::new(self);
 
         let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
@@ -308,13 +343,14 @@ impl HostMetricsConfig {
     fn has_collector(&self, collector: Collector) -> bool {
         match &self.collectors {
             None => true,
-            Some(collectors) => collectors.iter().any(|&c| c == collector),
+            Some(collectors) => collectors.contains(&collector),
         }
     }
 }
 
 pub struct HostMetrics {
     config: HostMetricsConfig,
+    system: System,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -325,6 +361,7 @@ impl HostMetrics {
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
+            system: System::new(),
             events_received: register!(EventsReceived),
         }
     }
@@ -335,6 +372,7 @@ impl HostMetrics {
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
+            system: System::new(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
@@ -344,7 +382,7 @@ impl HostMetrics {
         MetricsBuffer::new(self.config.namespace.clone())
     }
 
-    async fn capture_metrics(&self) -> Vec<Metric> {
+    async fn capture_metrics(&mut self) -> Vec<Metric> {
         let mut buffer = self.buffer();
 
         #[cfg(target_os = "linux")]
@@ -353,6 +391,9 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Cpu) {
             self.cpu_metrics(&mut buffer).await;
+        }
+        if self.config.has_collector(Collector::Process) {
+            self.process_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -372,6 +413,10 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Network) {
             self.network_metrics(&mut buffer).await;
+        }
+        #[cfg(target_os = "linux")]
+        if self.config.has_collector(Collector::TCP) {
+            self.tcp_metrics(&mut buffer).await;
         }
 
         let metrics = buffer.metrics;
@@ -708,6 +753,7 @@ mod tests {
             #[cfg(target_os = "linux")]
             Collector::CGroups,
             Collector::Cpu,
+            Collector::Process,
             Collector::Disk,
             Collector::Filesystem,
             Collector::Load,
@@ -724,8 +770,7 @@ mod tests {
 
             assert!(
                 all_metrics_count > some_metrics.len(),
-                "collector={:?}",
-                collector
+                "collector={collector:?}"
             );
         }
     }
@@ -859,7 +904,7 @@ mod tests {
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
             let key_prefix = &key[..key.len() - 1].to_string();
-            let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
+            let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
             let filter = FilterList {

@@ -179,6 +179,7 @@ components: {
 		let Args = _args
 
 		auto_generated: bool | *false
+		has_auth:       bool | *false
 
 		if Args.kind == "source" {
 			acknowledgements: bool
@@ -191,17 +192,19 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?: #FeaturesAggregate
-			convert?:   #FeaturesConvert
-			enrich?:    #FeaturesEnrich
-			filter?:    #FeaturesFilter
-			parse?:     #FeaturesParse
-			program?:   #FeaturesProgram
-			proxy?:     #FeaturesProxy
-			reduce?:    #FeaturesReduce
-			route?:     #FeaturesRoute
-			sanitize?:  #FeaturesSanitize
-			shape?:     #FeaturesShape
+			aggregate?:       #FeaturesAggregate
+			convert?:         #FeaturesConvert
+			enrich?:          #FeaturesEnrich
+			filter?:          #FeaturesFilter
+			parse?:           #FeaturesParse
+			program?:         #FeaturesProgram
+			proxy?:           #FeaturesProxy
+			reduce?:          #FeaturesReduce
+			route?:           #FeaturesRoute
+			exclusive_route?: #FeaturesExclusiveRoute
+			sanitize?:        #FeaturesSanitize
+			shape?:           #FeaturesShape
+			window?:          #FeaturesWindow
 		}
 
 		if Args.kind == "sink" {
@@ -218,7 +221,7 @@ components: {
 				uses_uri?: bool
 			}
 
-			exposes?:                      #FeaturesExpose
+			exposes?: #FeaturesExpose
 			send?: #FeaturesSend & {_args: Args}
 		}
 
@@ -227,8 +230,7 @@ components: {
 
 	#FeaturesAcknowledgements: bool
 
-	#FeaturesAggregate: {
-	}
+	#FeaturesAggregate: {}
 
 	#FeaturesCollect: {
 		checkpoint: {
@@ -245,8 +247,7 @@ components: {
 		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
 
-	#FeaturesConvert: {
-	}
+	#FeaturesConvert: {}
 
 	#FeaturesEnrich: {
 		from: service: {
@@ -265,11 +266,9 @@ components: {
 		}
 	}
 
-	#FeaturesFilter: {
-	}
+	#FeaturesFilter: {}
 
-	#FeaturesGenerate: {
-	}
+	#FeaturesGenerate: {}
 
 	#FeaturesSendBufferBytes: {
 		enabled:        bool
@@ -327,17 +326,17 @@ components: {
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
-	#FeaturesReduce: {
-	}
+	#FeaturesReduce: {}
 
-	#FeaturesRoute: {
-	}
+	#FeaturesRoute: {}
 
-	#FeaturesSanitize: {
-	}
+	#FeaturesExclusiveRoute: {}
 
-	#FeaturesShape: {
-	}
+	#FeaturesSanitize: {}
+
+	#FeaturesShape: {}
+
+	#FeaturesWindow: {}
 
 	#FeaturesSend: {
 		_args: {
@@ -440,20 +439,21 @@ components: {
 	}
 
 	#Input: {
-		logs:    bool
-		metrics: #MetricInput | null
-		traces:  bool
+		description?: string
+		logs:         bool
+		metrics:      #MetricInput | null
+		traces:       bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
-		name:        Name
-		fields:      #Schema
+		name?:       Name
+		fields?:     #Schema
 	}
 
-	#TraceOutput: {
+	#TraceOutput: [Name=string]: {
 		description: string
-		fields:      #Schema
+		fields?:     #Schema
 	}
 
 	#MetricInput: {
@@ -466,12 +466,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:       string
-		relevant_when?:    string
-		tags:              #MetricTags
-		name:              Name
-		type:              #MetricType
-		default_namespace: string
+		description:        string
+		relevant_when?:     string
+		tags?:              #MetricTags
+		name?:              Name
+		type?:              #MetricType
+		default_namespace?: string
 	}
 
 	#OutputData: {
@@ -627,7 +627,7 @@ components: {
 					enabled: {
 						common: false
 						description: """
-							Whether or not to require TLS for incoming/outgoing connections.
+							Whether to require TLS for incoming/outgoing connections.
 
 							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 							more information.
@@ -742,7 +742,7 @@ components: {
 						enabled: {
 							common: true
 							description: """
-								Whether or not to require TLS for incoming/outgoing connections.
+								Whether to require TLS for incoming/outgoing connections.
 
 								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 								more information.
@@ -1207,7 +1207,7 @@ components: {
 						}
 					}
 					type:              "counter"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_distribution: {
@@ -1220,7 +1220,7 @@ components: {
 						}
 					}
 					type:              "distribution"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_gauge: {
@@ -1233,7 +1233,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_histogram: {
@@ -1246,7 +1246,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_set: {
@@ -1259,7 +1259,7 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 
 				_passthrough_summary: {
@@ -1272,12 +1272,57 @@ components: {
 						}
 					}
 					type:              "gauge"
-					default_namespace: "vector"
+					default_namespace: string | *"vector"
 				}
 			}
 		}
 
 		how_it_works: {
+			if features.has_auth == true {
+				authorization: {
+					title: "Authorization configuration"
+					body:  """
+					This component has a server component that supports authorization. Authorization
+					supports multiple strategies. [Basic access authentication](\(urls.basic_auth)) is the default, which
+					supports defining a username and password to be used when connecting to the server.
+
+					Custom authorization provides a greater flexibility. It supports writing custom
+					authorization code using VRL. Here is an example that looks up the token in an
+					enrichment table backed by a CSV file.
+
+					Currently custom VRL auth has access to `headers`, `path`, and `address` (IP
+					address of the client).
+
+					```yaml
+					\(kind)s:
+					  \(Name)_\(kind):
+						type: "\(Name)"
+						# ...
+						auth:
+						  strategy: "custom"
+						  source: |-
+							# We can access request headers here
+							# Let's say that we expect a custom authorization header
+							# In format "Vector {uuid}"
+							parts = split!(.headers.authorization, " ", 2)
+							# We expect Authorization header in format "Vector {uuid}"
+							if parts[0] != "Vector" {
+							  # The header didn't start with Vector, reject
+							  # Returning false means that authentication should fail
+							  false
+							} else {
+							  # Look for uuid in enrichment table (let's say that it has a token column)
+							  # Any errors also reject requests
+							  # We could then do some additional checks on the result from the table
+							  result = get_enrichment_table_record!("auth_data", { "token": parts[1] })
+							  # No errors, so we can return true
+							  true
+							}
+						# ...
+					```
+					"""
+				}
+			}
 			state: {
 				title: "State"
 

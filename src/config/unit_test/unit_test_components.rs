@@ -46,8 +46,8 @@ impl SourceConfig for UnitTestSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
-            DataType::all(),
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
             schema::Definition::default_legacy_namespace(),
         )]
     }
@@ -103,8 +103,8 @@ impl SourceConfig for UnitTestStreamSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
-            DataType::all(),
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
             schema::Definition::default_legacy_namespace(),
         )]
     }
@@ -220,8 +220,7 @@ impl StreamSink<Event> for UnitTestSink {
                                         break;
                                     }
                                     Err(error) => {
-                                        condition_errors
-                                            .push(format!("  condition[{}]: {}", j, error));
+                                        condition_errors.push(format!("  condition[{j}]: {error}"));
                                     }
                                 }
                             }

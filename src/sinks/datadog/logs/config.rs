@@ -66,6 +66,13 @@ pub struct DatadogLogsConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    /// When enabled this sink will normalize events to conform to the Datadog Agent standard. This
+    /// also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
+    /// will be overidden as `true` if this header has already been set in the request.headers
+    /// configuration setting.
+    #[serde(default)]
+    pub conforms_as_agent: bool,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -86,10 +93,10 @@ impl DatadogLogsConfig {
             .clone()
             .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
 
-        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
+        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
     }
 
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
+    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
         self.get_uri(dd_common)
             .scheme_str()
             .unwrap_or("http")
@@ -114,33 +121,59 @@ impl DatadogLogsConfig {
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
+        let headers = {
+            let mut request_headers = self.request.headers.clone();
+            if self.conforms_as_agent {
+                request_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
+            }
+            request_headers
+        };
+
+        // conforms_as_agent is true if either the user supplied configuration parameter is enabled
+        // or the DD-PROTOCOL: agent-json header had already been manually set
+        let conforms_as_agent = if let Some(value) = headers.get("DD-PROTOCOL") {
+            value == "agent-json"
+        } else {
+            false
+        };
+
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
                 self.get_uri(dd_common),
-                self.request.headers.clone(),
+                headers,
                 dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
         let protocol = self.get_protocol(dd_common);
 
-        let sink = LogSinkBuilder::new(encoding, service, default_api_key, batch, protocol)
-            .compression(self.compression.unwrap_or_default())
-            .build();
+        let sink = LogSinkBuilder::new(
+            encoding,
+            service,
+            default_api_key,
+            batch,
+            protocol,
+            conforms_as_agent,
+        )
+        .compression(self.compression.unwrap_or_default())
+        .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
+        let default_tls_config;
+
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(
-                self.local_dd_common
-                    .tls
-                    .clone()
-                    .unwrap_or_else(TlsEnableableConfig::enabled),
-            ),
+            Some(match self.local_dd_common.tls.as_ref() {
+                Some(config) => config,
+                None => {
+                    default_tls_config = TlsEnableableConfig::enabled();
+                    &default_tls_config
+                }
+            }),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)
@@ -164,8 +197,8 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
-            .required_meaning(meaning::MESSAGE, Kind::bytes())
-            .required_meaning(meaning::TIMESTAMP, Kind::timestamp())
+            .optional_meaning(meaning::MESSAGE, Kind::bytes())
+            .optional_meaning(meaning::TIMESTAMP, Kind::timestamp())
             .optional_meaning(meaning::HOST, Kind::bytes())
             .optional_meaning(meaning::SOURCE, Kind::bytes())
             .optional_meaning(meaning::SEVERITY, Kind::bytes())
@@ -185,7 +218,10 @@ mod test {
     use super::*;
     use crate::codecs::EncodingConfigWithFraming;
     use crate::components::validation::prelude::*;
-    use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+    use vector_lib::{
+        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        config::LogNamespace,
+    };
 
     #[test]
     fn generate_config() {
@@ -206,7 +242,8 @@ mod test {
 
             let encoding = EncodingConfigWithFraming::new(
                 None,
-                JsonSerializerConfig::new(MetricTagValues::Full).into(),
+                JsonSerializerConfig::new(MetricTagValues::Full, JsonSerializerOptions::default())
+                    .into(),
                 config.encoding.clone(),
             );
 
@@ -223,6 +260,7 @@ mod test {
 
             ValidationConfiguration::from_sink(
                 Self::NAME,
+                LogNamespace::Legacy,
                 vec![ComponentTestCaseConfig::from_sink(
                     config,
                     None,

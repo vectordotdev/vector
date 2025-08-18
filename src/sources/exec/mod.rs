@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-    path::PathBuf,
-    process::ExitStatus,
-};
+use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -260,8 +255,7 @@ impl SourceConfig for ExecConfig {
             .framing
             .clone()
             .unwrap_or_else(|| self.decoding.default_stream_framing());
-        let decoder =
-            DecodingConfig::new(framing, self.decoding.clone(), LogNamespace::Legacy).build()?;
+        let decoder = DecodingConfig::new(framing, self.decoding.clone(), log_namespace).build()?;
 
         match &self.mode {
             Mode::Scheduled => {
@@ -335,7 +329,7 @@ impl SourceConfig for ExecConfig {
                 None,
             );
 
-        vec![SourceOutput::new_logs(
+        vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
             schema_definition,
         )]
@@ -481,9 +475,10 @@ async fn run_command(
 
     // Optionally include stderr
     if config.include_stderr {
-        let stderr = child.stderr.take().ok_or_else(|| {
-            Error::new(ErrorKind::Other, "Unable to take stderr of spawned process")
-        })?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| Error::other("Unable to take stderr of spawned process"))?;
 
         // Create stderr async reader
         let stderr_reader = BufReader::new(stderr);
@@ -494,7 +489,7 @@ async fn run_command(
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
+        .ok_or_else(|| Error::other("Unable to take stdout of spawned process"))?;
 
     // Create stdout async reader
     let stdout_reader = BufReader::new(stdout);

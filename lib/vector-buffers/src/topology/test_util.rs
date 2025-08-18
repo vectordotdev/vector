@@ -12,18 +12,39 @@ use crate::{
     Bufferable, EventCount, WhenFull,
 };
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(crate) struct Sample(pub u64);
+const SINGLE_VALUE_FLAG: u8 = 0;
+const HEAP_ALLOCATED_VALUES_FLAG: u8 = 1;
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) enum Sample {
+    SingleValue(u64),
+    HeapAllocatedValues(Vec<u64>),
+}
 
 impl From<u64> for Sample {
     fn from(v: u64) -> Self {
-        Self(v)
+        Self::SingleValue(v)
     }
 }
 
 impl From<Sample> for u64 {
-    fn from(s: Sample) -> Self {
-        s.0
+    fn from(v: Sample) -> Self {
+        match v {
+            Sample::SingleValue(sv) => sv,
+            Sample::HeapAllocatedValues(_) => {
+                panic!("Cannot use this API with other enum states of this type.")
+            }
+        }
+    }
+}
+
+impl Sample {
+    pub fn new(value: u64) -> Self {
+        Self::SingleValue(value)
+    }
+
+    pub fn new_with_heap_allocated_values(n: usize) -> Self {
+        Self::HeapAllocatedValues(vec![0; n])
     }
 }
 
@@ -35,7 +56,10 @@ impl AddBatchNotifier for Sample {
 
 impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
-        0
+        match self {
+            Self::SingleValue(_) => 0,
+            Self::HeapAllocatedValues(uints) => uints.len() * 8,
+        }
     }
 }
 
@@ -44,12 +68,29 @@ impl FixedEncodable for Sample {
     type EncodeError = BasicError;
     type DecodeError = BasicError;
 
+    // Serialization format:
+    // - Encode type flag
+    // - if single flag encode int value
+    // - otherwise encode array length and encode array contents
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
     where
         B: BufMut,
         Self: Sized,
     {
-        buffer.put_u64(self.0);
+        match self {
+            Self::SingleValue(uint) => {
+                buffer.put_u8(SINGLE_VALUE_FLAG);
+                buffer.put_u64(uint);
+            }
+            Self::HeapAllocatedValues(uints) => {
+                buffer.put_u8(HEAP_ALLOCATED_VALUES_FLAG);
+                // Prepend with array size
+                buffer.put_u32(u32::try_from(uints.len()).unwrap());
+                for v in uints {
+                    buffer.put_u64(v);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -57,10 +98,16 @@ impl FixedEncodable for Sample {
     where
         B: Buf,
     {
-        if buffer.remaining() >= 8 {
-            Ok(Self(buffer.get_u64()))
-        } else {
-            Err(BasicError("need 8 bytes minimum".to_string()))
+        match buffer.get_u8() {
+            SINGLE_VALUE_FLAG => Ok(Self::SingleValue(buffer.get_u64())),
+            HEAP_ALLOCATED_VALUES_FLAG => {
+                let length = buffer.get_u32();
+                let values = (0..length).map(|_| buffer.get_u64()).collect();
+                Ok(Self::HeapAllocatedValues(values))
+            }
+            _ => Err(BasicError(
+                "Unknown serialization flag observed".to_string(),
+            )),
         }
     }
 }
@@ -72,6 +119,7 @@ impl EventCount for Sample {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // The inner _is_ read by the `Debug` impl, but that's ignored
 pub struct BasicError(pub(crate) String);
 
 impl fmt::Display for BasicError {

@@ -564,7 +564,7 @@ pub trait Response: fmt::Debug {
 
 impl Response for () {}
 
-impl<'a> Response for &'a str {}
+impl Response for &str {}
 
 #[cfg(test)]
 mod tests {
@@ -1137,7 +1137,7 @@ mod tests {
 
     impl Partition<Bytes> for Partitions {
         fn partition(&self) -> Bytes {
-            format!("{:?}", self).into()
+            format!("{self:?}").into()
         }
     }
 

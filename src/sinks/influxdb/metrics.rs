@@ -2,7 +2,6 @@ use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, SinkExt};
-use serde::Serialize;
 use tower::Service;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
@@ -113,19 +112,13 @@ pub fn example_tags() -> HashMap<String, String> {
     HashMap::from([("region".to_string(), "us-west-1".to_string())])
 }
 
-// https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct InfluxDbRequest {
-    series: Vec<String>,
-}
-
 impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
@@ -224,9 +217,12 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 fn create_build_request(
     uri: http::Uri,
     token: &str,
-) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>> + Sync + Send + 'static
-{
-    let auth = format!("Token {}", token);
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>
+       + Sync
+       + Send
+       + 'static
+       + use<> {
+    let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(
             hyper::Request::post(uri.clone())
@@ -422,7 +418,7 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
             statistic
                 .quantiles
                 .iter()
-                .map(|&(p, val)| (format!("quantile_{:.2}", p).into(), Field::Float(val))),
+                .map(|&(p, val)| (format!("quantile_{p:.2}").into(), Field::Float(val))),
         )
         .collect(),
     )
@@ -1010,7 +1006,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.expect("error when building config");
         run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
-        let res = query_v1_json(url, &format!("show series on {}", database)).await;
+        let res = query_v1_json(url, &format!("show series on {database}")).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -1044,8 +1040,7 @@ mod integration_tests {
                 _ => unreachable!(),
             };
             let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
-            let res =
-                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+            let res = query_v1_json(url, &format!("select * from {database}..\"{name}\"")).await;
 
             assert_eq!(
                 res,
@@ -1127,7 +1122,7 @@ mod integration_tests {
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{metric}\")"));
         body.insert("type", "flux".to_owned());
 
         let client = reqwest::Client::builder()
@@ -1190,7 +1185,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(
             Metric::new(
-                format!("counter-{}", i),
+                format!("counter-{i}"),
                 MetricKind::Incremental,
                 MetricValue::Counter { value: i as f64 },
             )

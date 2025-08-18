@@ -233,13 +233,16 @@ impl DatadogMetricsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
+        let default_tls_config;
+
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(
-                self.local_dd_common
-                    .tls
-                    .clone()
-                    .unwrap_or_else(TlsEnableableConfig::enabled),
-            ),
+            Some(match self.local_dd_common.tls.as_ref() {
+                Some(config) => config,
+                None => {
+                    default_tls_config = TlsEnableableConfig::enabled();
+                    &default_tls_config
+                }
+            }),
             false,
         )?;
         let client = HttpClient::new(tls_settings, proxy)?;
@@ -286,7 +289,7 @@ impl DatadogMetricsConfig {
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{}{}", host, endpoint)
+    let result = format!("{host}{endpoint}")
         .parse::<Uri>()
         .context(UriParseSnafu)?;
     Ok(result)

@@ -1,7 +1,7 @@
-use std::{fs::File, io, os::unix::io::FromRawFd};
+use std::os::fd::{FromRawFd as _, IntoRawFd as _, RawFd};
+use std::{fs::File, io};
 
 use super::{outputs, FileDescriptorConfig};
-use indoc::indoc;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
@@ -67,11 +67,24 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
 
 impl GenerateConfig for FileDescriptorSourceConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            fd = 10
-        "#})
+        let fd = null_fd().unwrap();
+        toml::from_str(&format!(
+            r#"
+            fd = {fd}
+            "#
+        ))
         .unwrap()
     }
+}
+
+pub(crate) fn null_fd() -> crate::Result<RawFd> {
+    #[cfg(unix)]
+    const FILENAME: &str = "/dev/null";
+    #[cfg(windows)]
+    const FILENAME: &str = "C:\\NUL";
+    File::open(FILENAME)
+        .map_err(|error| format!("Could not open dummy file at {FILENAME:?}: {error}").into())
+        .map(|file| file.into_raw_fd())
 }
 
 #[async_trait::async_trait]
@@ -227,7 +240,6 @@ mod tests {
             let mut stream = rx;
 
             write(write_fd, b"hello world\nhello world again\n").unwrap();
-            close(write_fd).unwrap();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();

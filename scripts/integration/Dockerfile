@@ -1,4 +1,4 @@
-ARG RUST_VERSION
+ARG RUST_VERSION=1.85
 FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
   && rm -rf /var/lib/apt/lists/*
 
-RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.64 --locked
+RUN cargo install cargo-nextest --version 0.9.95 --locked
 
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs

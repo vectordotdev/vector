@@ -1,7 +1,13 @@
-name: Check minimum supported Rust version
+name: Check minimum supported Rust version (MSRV)
 
 on:
   workflow_call:
+  workflow_dispatch:
+    inputs:
+      checkout_ref:
+        description: "Git ref (branch, tag or SHA) to check out"
+        required: false
+        type: string
 
 env:
   RUST_BACKTRACE: full
@@ -13,10 +19,12 @@ env:
 
 jobs:
   check-msrv:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v3
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: cargo install cargo-msrv --version 0.15.1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.checkout_ref }}
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=cargo-msrv
       - run: cargo msrv verify

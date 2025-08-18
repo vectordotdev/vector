@@ -1,4 +1,4 @@
-cognitive-complexity-threshold = 75
+large-error-threshold = 256  # in bytes
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method
@@ -9,4 +9,6 @@ disallowed-methods = [
 disallowed-types = [
   { path = "once_cell::sync::OnceCell", reason = "Use `std::sync::OnceLock` instead." },
   { path = "once_cell::unsync::OnceCell", reason = "Use `std::cell::OnceCell` instead." },
+  { path = "once_cell::sync::Lazy", reason = "Use `std::sync::LazyLock` instead." },
+  { path = "once_cell::unsync::Lazy", reason = "Use `std::sync::LazyCell` instead." },
 ]

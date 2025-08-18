@@ -1,8 +1,9 @@
 use bytes::Bytes;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, TimestampSecondsWithFrac};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 use vector_config::configurable_component;
@@ -83,7 +84,7 @@ impl GelfDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub struct GelfDeserializerOptions {
-    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    /// Determines whether to replace invalid UTF-8 sequences instead of failing.
     ///
     /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
     ///
@@ -117,11 +118,9 @@ impl GelfDeserializer {
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if parsed.version != GELF_VERSION {
-            return Err(format!(
-                "{} does not match GELF spec version ({})",
-                VERSION, GELF_VERSION
-            )
-            .into());
+            return Err(
+                format!("{VERSION} does not match GELF spec version ({GELF_VERSION})").into(),
+            );
         }
 
         log.insert(&GELF_TARGET_PATHS.version, parsed.version.to_string());
@@ -133,12 +132,7 @@ impl GelfDeserializer {
 
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             if let Some(timestamp) = parsed.timestamp {
-                let naive = NaiveDateTime::from_timestamp_opt(
-                    f64::trunc(timestamp) as i64,
-                    f64::fract(timestamp) as u32,
-                )
-                .expect("invalid timestamp");
-                log.insert(timestamp_key, naive.and_utc());
+                log.insert(timestamp_key, timestamp);
                 // per GELF spec- add timestamp if not provided
             } else {
                 log.insert(timestamp_key, Utc::now());
@@ -170,16 +164,15 @@ impl GelfDeserializer {
                 // per GELF spec, Additional field names must be prefixed with an underscore
                 if !key.starts_with('_') {
                     return Err(format!(
-                        "'{}' field is invalid. \
-                                       Additional field names must be prefixed with an underscore.",
-                        key
+                        "'{key}' field is invalid. \
+                                       Additional field names must be prefixed with an underscore."
                     )
                     .into());
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
                 if !VALID_FIELD_REGEX.is_match(key) {
-                    return Err(format!("'{}' field contains invalid characters. Field names may \
-                                       contain only letters, numbers, underscores, dashes and dots.", key).into());
+                    return Err(format!("'{key}' field contains invalid characters. Field names may \
+                                       contain only letters, numbers, underscores, dashes and dots.").into());
                 }
 
                 // per GELF spec, Additional field values must be either strings or numbers
@@ -195,8 +188,8 @@ impl GelfDeserializer {
                         serde_json::Value::Array(_) => "array",
                         serde_json::Value::Object(_) => "object",
                     };
-                    return Err(format!("The value type for field {} is an invalid type ({}). Additional field values \
-                                       should be either strings or numbers.", key, type_).into());
+                    return Err(format!("The value type for field {key} is an invalid type ({type_}). Additional field values \
+                                       should be either strings or numbers.").into());
                 }
             }
         }
@@ -204,13 +197,15 @@ impl GelfDeserializer {
     }
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 struct GelfMessage {
     version: String,
     host: String,
     short_message: String,
     full_message: Option<String>,
-    timestamp: Option<f64>,
+    #[serde_as(as = "Option<TimestampSecondsWithFrac<f64>>")]
+    timestamp: Option<DateTime<Utc>>,
     level: Option<u8>,
     facility: Option<String>,
     line: Option<f64>,
@@ -239,7 +234,6 @@ impl Deserializer for GelfDeserializer {
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::NaiveDateTime;
     use lookup::event_path;
     use serde_json::json;
     use similar_asserts::assert_eq;
@@ -302,9 +296,8 @@ mod tests {
                 b"Backtrace here\n\nmore stuff"
             )))
         );
-        // Vector does not use the nanos
-        let naive = NaiveDateTime::from_timestamp_opt(1385053862, 0).expect("invalid timestamp");
-        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(naive.and_utc())));
+        let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
+        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),

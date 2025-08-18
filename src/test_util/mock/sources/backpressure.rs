@@ -45,7 +45,7 @@ impl SourceConfig for BackpressureSourceConfig {
             for i in 0.. {
                 let _result = cx
                     .out
-                    .send_event(Event::Log(LogEvent::from(format!("event-{}", i))))
+                    .send_event(Event::Log(LogEvent::from(format!("event-{i}"))))
                     .await;
                 counter.fetch_add(1, Ordering::AcqRel);
 
@@ -64,8 +64,8 @@ impl SourceConfig for BackpressureSourceConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        vec![SourceOutput::new_logs(
-            DataType::all(),
+        vec![SourceOutput::new_maybe_logs(
+            DataType::all_bits(),
             Definition::default_legacy_namespace(),
         )]
     }

@@ -40,9 +40,10 @@ async fn azure_blob_healthcheck_passed() {
     )
     .expect("Failed to create client");
 
-    let response = azure_common::config::build_healthcheck(config.container_name, client);
-
-    response.expect("Failed to pass healthcheck");
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
 }
 
 #[tokio::test]
@@ -54,7 +55,7 @@ async fn azure_blob_healthcheck_unknown_container() {
     };
     let client = azure_common::config::build_client(
         config.connection_string.map(Into::into),
-        config.storage_account.map(Into::into),
+        config.storage_account,
         config.container_name.clone(),
         config.endpoint.clone(),
     )
@@ -222,7 +223,7 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address).into()),
+                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
                 storage_account: None,
                 container_name: "logs".to_string(),
                 endpoint: None,
@@ -244,7 +245,7 @@ impl AzureBlobSinkConfig {
     fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
-            self.storage_account.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
             self.endpoint.clone(),
         )
@@ -263,7 +264,7 @@ impl AzureBlobSinkConfig {
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
-            self.storage_account.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
             self.endpoint.clone(),
         )
@@ -292,7 +293,7 @@ impl AzureBlobSinkConfig {
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
-            self.storage_account.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
             self.endpoint.clone(),
         )
@@ -329,7 +330,7 @@ impl AzureBlobSinkConfig {
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
-            self.storage_account.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
             self.endpoint.clone(),
         )
@@ -346,7 +347,7 @@ impl AzureBlobSinkConfig {
                     Ok(StatusCode::CONFLICT) => Ok(()),
                     _ => Err(format!("Unexpected status code {}", err.status())),
                 },
-                _ => Err(format!("Unexpected error {}", reason)),
+                _ => Err(format!("Unexpected error {reason}")),
             },
         };
 

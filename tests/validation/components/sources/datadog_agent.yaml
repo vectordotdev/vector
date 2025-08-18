@@ -1,0 +1,47 @@
+- name: happy path
+  expectation: success
+  events:
+    - log_builder:
+        message: simple message 1
+        status: great
+        timestamp: 1709923304470
+        hostname: the_best_host
+        service: could_be_better_tho
+        ddsource: happy_source
+        ddtags: tag1:value,bare,tag2:value
+    - log_builder:
+        message: simple message 2
+        status: ok
+        timestamp: 1709923304472
+        hostname: the_best_host
+        service: could_be_better_tho
+        ddsource: standard_source
+        ddtags: tag1:value,bare,tag2:value
+- name: sad path
+  expectation: partial_success
+  events:
+    - log_builder:
+        message: simple message 1
+        status: great
+        timestamp: 1709923304470
+        hostname: the_best_host
+        service: could_be_better_tho
+        ddsource: happy_source
+        ddtags: tag1:value,bare,tag2:value
+    - log_builder:
+        message: simple message 2
+        status: ok
+        timestamp: 1709923304472
+        hostname: the_best_host
+        service: could_be_better_tho
+        ddsource: standard_source
+        ddtags: tag1:value,bare,tag2:value
+    - fail_encoding_of:
+        log_builder:
+          message: simple message 3
+          status: sad
+          timestamp: 1709923304474
+          hostname: the_best_host
+          service: could_be_better_tho
+          ddsource: sad_source
+          ddtags: tag1:value,bare,tag2:value

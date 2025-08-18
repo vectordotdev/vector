@@ -119,6 +119,9 @@ define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
 endef
 endif
 
+# docker container id file needs to live in the host machine and is later mounted into the container
+CIDFILE := $(shell mktemp -u /tmp/vector-environment-docker-cid.XXXXXX)
+
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
@@ -134,11 +137,13 @@ define ENVIRONMENT_EXEC
 			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--cidfile $(CIDFILE),) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=$(CIDFILE)$(COMMA)target=/.docker-container-id,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
 			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
-			$(ENVIRONMENT_UPSTREAM)
+			$(ENVIRONMENT_UPSTREAM); rm -f $(CIDFILE)
 endef
 
 
@@ -369,7 +374,7 @@ test-integration: test-integration-databend test-integration-docker-logs test-in
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs
+test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
 test-integration-%-cleanup:
@@ -644,10 +649,6 @@ release-push: ## Push new Vector version
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
 	@cargo vdev release s3
-
-.PHONY: sync-install
-sync-install: ## Sync the install.sh script for access via sh.vector.dev
-	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
 .PHONY: sha256sum
 sha256sum: ## Generate SHA256 checksums of CI artifacts

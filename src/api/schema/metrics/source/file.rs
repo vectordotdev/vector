@@ -31,7 +31,7 @@ impl<'a> FileSourceMetricFile<'a> {
 }
 
 #[Object]
-impl<'a> FileSourceMetricFile<'a> {
+impl FileSourceMetricFile<'_> {
     /// File name
     async fn name(&self) -> &str {
         &*self.name
@@ -57,7 +57,7 @@ impl<'a> FileSourceMetricFile<'a> {
 pub struct FileSourceMetrics(Vec<Metric>);
 
 impl FileSourceMetrics {
-    pub fn new(metrics: Vec<Metric>) -> Self {
+    pub const fn new(metrics: Vec<Metric>) -> Self {
         Self(metrics)
     }
 
@@ -249,7 +249,7 @@ mod tests {
         sort::by_fields(&mut files, &fields);
 
         for (i, f) in ["1", "2", "3"].iter().enumerate() {
-            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{}", f));
+            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{f}"));
         }
     }
 
@@ -268,7 +268,7 @@ mod tests {
         sort::by_fields(&mut files, &fields);
 
         for (i, f) in ["3", "2", "1"].iter().enumerate() {
-            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{}", f));
+            assert_eq!(files[i].name.as_str(), format!("/path/to/file/{f}"));
         }
     }
 

@@ -35,7 +35,7 @@ impl NativeJsonDeserializerConfig {
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
-        DataType::all()
+        DataType::all_bits()
     }
 
     /// The schema produced by the deserializer.
@@ -57,7 +57,7 @@ impl NativeJsonDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub struct NativeJsonDeserializerOptions {
-    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    /// Determines whether to replace invalid UTF-8 sequences instead of failing.
     ///
     /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
     ///
@@ -97,7 +97,7 @@ impl Deserializer for NativeJsonDeserializer {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
-        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         let events = match json {
             serde_json::Value::Array(values) => values

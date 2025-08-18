@@ -46,8 +46,7 @@ pub struct TcpConfig {
     /// Set to `""` to suppress this key.
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
-    #[serde(default = "default_host_key")]
-    host_key: OptionalValuePath,
+    host_key: Option<OptionalValuePath>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.
     ///
@@ -59,9 +58,7 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
 
-    /// List of allowed origin IP networks
-    ///
-    /// By default, all origins are allowed
+    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     #[configurable(derived)]
@@ -108,7 +105,7 @@ impl TcpConfig {
             address,
             keepalive: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            host_key: default_host_key(),
+            host_key: None,
             port_key: default_port_key(),
             permit_origin: None,
             tls: None,
@@ -121,8 +118,8 @@ impl TcpConfig {
         }
     }
 
-    pub const fn host_key(&self) -> &OptionalValuePath {
-        &self.host_key
+    pub(super) fn host_key(&self) -> OptionalValuePath {
+        self.host_key.clone().unwrap_or(default_host_key())
     }
 
     pub const fn port_key(&self) -> &OptionalValuePath {
@@ -161,12 +158,12 @@ impl TcpConfig {
         self.max_connection_duration_secs
     }
 
-    pub fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
+    pub const fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
         self.max_connection_duration_secs = val;
         self
     }
 
-    pub fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
+    pub const fn set_shutdown_timeout_secs(&mut self, val: u64) -> &mut Self {
         self.shutdown_timeout_secs = Duration::from_secs(val);
         self
     }
@@ -176,7 +173,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_framing(&mut self, val: Option<FramingConfig>) -> &mut Self {
+    pub const fn set_framing(&mut self, val: Option<FramingConfig>) -> &mut Self {
         self.framing = val;
         self
     }
@@ -186,7 +183,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+    pub const fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
         self.log_namespace = val;
         self
     }
@@ -223,14 +220,19 @@ impl TcpSource for RawTcpSource {
         let now = Utc::now();
 
         for event in events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     SocketConfig::NAME,
                     now,
                 );
 
-                let legacy_host_key = self.config.host_key.clone().path;
+                let legacy_host_key = self
+                    .config
+                    .host_key
+                    .clone()
+                    .unwrap_or(default_host_key())
+                    .path;
 
                 self.log_namespace.insert_source_metadata(
                     SocketConfig::NAME,

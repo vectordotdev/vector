@@ -23,6 +23,9 @@ pub enum HttpMethod {
 
     /// HTTP DELETE method.
     Delete,
+
+    /// HTTP OPTIONS method.
+    Options,
 }
 
 impl From<HttpMethod> for Method {
@@ -34,6 +37,7 @@ impl From<HttpMethod> for Method {
             HttpMethod::Put => Self::PUT,
             HttpMethod::Patch => Self::PATCH,
             HttpMethod::Delete => Self::DELETE,
+            HttpMethod::Options => Self::OPTIONS,
         }
     }
 }

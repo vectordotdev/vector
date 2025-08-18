@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     process::Stdio,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, LazyLock},
     time::Duration,
 };
 
@@ -15,7 +15,6 @@ use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
-use once_cell::sync::Lazy;
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -71,14 +70,12 @@ const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
-static JOURNALCTL: Lazy<PathBuf> = Lazy::new(|| "journalctl".into());
+static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
-    #[snafu(display("Cannot use both `units` and `include_units`"))]
-    BothUnitsAndIncludeUnits,
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -399,7 +396,10 @@ impl SourceConfig for JournaldConfig {
         let schema_definition =
             self.schema_definition(global_log_namespace.merge(self.log_namespace));
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -683,7 +683,7 @@ impl StartJournalctl {
         }
 
         if let Some(namespace) = &self.journal_namespace {
-            command.arg(format!("--namespace={}", namespace));
+            command.arg(format!("--namespace={namespace}"));
         }
 
         if self.current_boot_only {
@@ -691,7 +691,7 @@ impl StartJournalctl {
         }
 
         if let Some(cursor) = checkpoint {
-            command.arg(format!("--after-cursor={}", cursor));
+            command.arg(format!("--after-cursor={cursor}"));
         } else if self.since_now {
             command.arg("--since=now");
         } else {
@@ -772,11 +772,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
-        .and_then(|ts| {
-            String::from_utf8_lossy(ts.as_bytes().unwrap())
-                .parse::<u64>()
-                .ok()
-        })
+        .and_then(|ts| ts.as_str().unwrap().parse::<u64>().ok())
         .map(|ts| {
             chrono::Utc
                 .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
@@ -850,7 +846,7 @@ fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
-        format!("{}.service", unit)
+        format!("{unit}.service")
     }
 }
 
@@ -884,7 +880,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
         .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
-                num if num <= u8::max_value() as u64 => Some(num as u8),
+                num if num <= u8::MAX as u64 => Some(num as u8),
                 _ => None,
             })
         })
@@ -992,6 +988,7 @@ impl Checkpointer {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(&filename)
             .await?;
         Ok(Checkpointer { file, filename })
@@ -999,7 +996,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file.write_all(format!("{}\n", token).as_bytes()).await
+        self.file.write_all(format!("{token}\n").as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -1094,7 +1091,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("first test\n"));
 
         checkpointer
@@ -1104,7 +1101,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("second\n"));
     }
 }
@@ -1491,7 +1488,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
@@ -1511,7 +1508,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
@@ -1529,7 +1526,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));
