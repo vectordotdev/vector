@@ -29,13 +29,15 @@ use vector_lib::opentelemetry::proto::{
         logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
         metrics::v1::{metrics_service_client::MetricsServiceClient, ExportMetricsServiceRequest},
     },
-    common::v1::{any_value, any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},
+    common::v1::{
+        any_value, any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue,
+    },
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     metrics::v1::{
-        exponential_histogram_data_point::Buckets, metric::Data, summary_data_point::ValueAtQuantile, AggregationTemporality,
-        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, Metric,
-        NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
-        Summary, SummaryDataPoint,
+        exponential_histogram_data_point::Buckets, metric::Data,
+        summary_data_point::ValueAtQuantile, AggregationTemporality, ExponentialHistogram,
+        ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, Metric,
+        NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum, Summary, SummaryDataPoint,
     },
     resource::v1::{Resource, Resource as OtelResource},
 };
@@ -204,7 +206,8 @@ async fn receive_grpc_logs_legacy_namespace() {
             .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .schema_definition(true).unwrap();
+            .schema_definition(true)
+            .unwrap();
 
         // send request via grpc client
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))

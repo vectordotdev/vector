@@ -164,9 +164,7 @@ fn build_warp_log_filter(
                 let events = if let Some(deserializer) = deserializer.as_ref() {
                     deserializer
                         .parse(body, log_namespace)
-                        .map(|result| {
-                            result.into_vec()
-                        })
+                        .map(|result| result.into_vec())
                         .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
                 } else {
                     decode(encoding_header.as_deref(), body)

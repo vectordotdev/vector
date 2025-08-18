@@ -92,7 +92,8 @@ impl ProtobufDeserializer {
 
     /// Creates a new deserializer instance using the descriptor bytes directly.
     pub fn new_from_bytes(desc_bytes: &[u8], message_type: &str) -> vector_common::Result<Self> {
-        let message_descriptor = vrl::protobuf::get_message_descriptor_from_bytes(desc_bytes, message_type)?;
+        let message_descriptor =
+            vrl::protobuf::get_message_descriptor_from_bytes(desc_bytes, message_type)?;
         Ok(Self { message_descriptor })
     }
 }

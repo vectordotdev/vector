@@ -42,9 +42,12 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
-pub const OTEL_PROTO_LOGS_REQUEST: &str = "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
-pub const OTEL_PROTO_TRACES_REQUEST: &str = "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
-pub const OTEL_PROTO_METRICS_REQUEST: &str = "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
+pub const OTEL_PROTO_LOGS_REQUEST: &str =
+    "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
+pub const OTEL_PROTO_TRACES_REQUEST: &str =
+    "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
+pub const OTEL_PROTO_METRICS_REQUEST: &str =
+    "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
 
 /// Configuration for the `opentelemetry` source.
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
@@ -154,11 +157,19 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
-    fn get_deserializer(&self, message_type: &str) -> vector_common::Result<Option<ProtobufDeserializer>> {
+    fn get_deserializer(
+        &self,
+        message_type: &str,
+    ) -> vector_common::Result<Option<ProtobufDeserializer>> {
         if self.use_oltp_decoding {
-            let deserializer = ProtobufDeserializer::new_from_bytes(vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES, message_type)?;
+            let deserializer = ProtobufDeserializer::new_from_bytes(
+                vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES,
+                message_type,
+            )?;
             Ok(Some(deserializer))
-        } else { Ok(None) }
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -191,9 +202,8 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metric_deserializer,
         })
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(usize::MAX);
-
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(usize::MAX);
 
         let trace_deserializer = self.get_deserializer(OTEL_PROTO_TRACES_REQUEST)?;
         let trace_service = TraceServiceServer::new(Service {
