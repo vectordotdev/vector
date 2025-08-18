@@ -107,11 +107,11 @@ pub struct Config {
     ))]
     extra_namespace_label_selector: String,
 
-    /// Specifies whether or not to enrich with namespace fields.
+    /// Specifies whether or not to enrich logs with namespace fields.
     ///
-    /// This can be useful to make Vector not pull in namespaces to reduce load on
-    /// kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
-    /// In the case that this is set to `false`, fields based on namespace labels will not
+    /// Setting to `false` prevents Vector from puling in namespaces, which helps reduce load on 
+    /// the kube-apiserver and lowers daemonset memory usage in clusters with many of namespaces.
+    /// Note: If set to `false`, fields based on namespace labels will not
     /// be available.
     ///
     #[serde(default = "default_add_namespace_fields")]

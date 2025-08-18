@@ -1,3 +1,3 @@
-Allow disabling listing of Kubernetes namespaces to reduce resource usage in clusters with large numbers of namespaces.
+Adds an option to disable listing Kubernetes namespaces, reducing resource usage in clusters with many namespaces.
 
 authors: imbstack

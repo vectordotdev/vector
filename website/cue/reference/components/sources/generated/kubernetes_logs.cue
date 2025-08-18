@@ -3,11 +3,11 @@ package metadata
 generated: components: sources: kubernetes_logs: configuration: {
 	add_namespace_fields: {
 		description: """
-			Specifies whether or not to enrich with namespace fields.
+			Specifies whether or not to enrich logs with namespace fields.
 
-			This can be useful to make Vector not pull in namespaces to reduce load on
-			kube-apiserver and daemonset memory usage in clusters with  lots of namespaces.
-			In the case that this is set to `false`, fields based on namespace labels will not
+			Setting this to `false` prevents Vector from pulling in namespaces, which helps reduce load on
+			the kube-apiserver and lowers daemonset memory usage in clusters with  lots of namespaces.
+			**Note**: If set to `false`, fields based on namespace labels will not
 			be available.
 			"""
 		required: false
