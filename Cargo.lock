@@ -12342,13 +12342,9 @@ name = "vector-tap"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
  "colored",
  "futures 0.3.31",
- "futures-util",
  "glob",
- "portpicker",
- "serde_json",
  "serde_yaml",
  "tokio",
  "tokio-stream",
