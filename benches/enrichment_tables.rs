@@ -1,13 +1,13 @@
 use std::time::SystemTime;
 
 use chrono::prelude::*;
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use vector::enrichment_tables::file::FileData;
 use vector::enrichment_tables::{
-    Condition, Table,
-    file::File,
-    geoip::{Geoip, GeoipConfig},
+    file::File, geoip::{Geoip, GeoipConfig},
     mmdb::{Mmdb, MmdbConfig},
+    Condition,
+    Table,
 };
 use vector_lib::enrichment::Case;
 use vrl::value::{ObjectMap, Value};
@@ -241,7 +241,7 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_geoip");
     let build = |path: &str| {
         Geoip::new(GeoipConfig {
-            path: path.to_string(),
+            path: path.into(),
             locale: "en".to_string(),
         })
         .unwrap()
@@ -320,12 +320,7 @@ fn benchmark_enrichment_tables_geoip(c: &mut Criterion) {
 
 fn benchmark_enrichment_tables_mmdb(c: &mut Criterion) {
     let mut group = c.benchmark_group("enrichment_tables_mmdb");
-    let build = |path: &str| {
-        Mmdb::new(MmdbConfig {
-            path: path.to_string(),
-        })
-        .unwrap()
-    };
+    let build = |path: &str| Mmdb::new(MmdbConfig { path: path.into() }).unwrap();
 
     group.bench_function("enrichment_tables/mmdb_isp", |b| {
         let table = build("tests/data/GeoIP2-ISP-Test.mmdb");
