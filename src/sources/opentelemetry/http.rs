@@ -45,6 +45,23 @@ use warp::{
     filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
 };
 
+use crate::common::http::ErrorMessage;
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
+use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::util::add_headers;
+use crate::{
+    event::Event,
+    http::build_http_trace_layer,
+    internal_events::{EventsReceived, StreamClosedError},
+    shutdown::ShutdownSignal,
+    sources::util::decode,
+    tls::MaybeTlsSettings,
+    SourceSender,
+};
+
+use super::{reply::protobuf, status::Status};
+use crate::sources::opentelemetry::config::{OpentelemetryConfig, LOGS, METRICS, TRACES};
+
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
     ServerShutdown,

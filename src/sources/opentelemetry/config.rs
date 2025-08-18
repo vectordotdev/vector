@@ -1,18 +1,30 @@
 use std::net::SocketAddr;
 
 use futures::FutureExt;
-use futures_util::future::join;
-use futures_util::TryFutureExt;
-use tonic::codec::CompressionEncoding;
-use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-use vector_lib::opentelemetry::logs::{
-    ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY, RESOURCE_KEY,
-    SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+use futures_util::{future::join, TryFutureExt};
+
+use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+
+use vector_lib::{
+    config::{log_schema, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{BytesReceived, EventsReceived, Protocol},
+    lookup::{owned_value_path, OwnedTargetPath},
+    opentelemetry::{
+        logs::{
+            ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
+            RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+        },
+        proto::collector::{
+            logs::v1::logs_service_server::LogsServiceServer,
+            metrics::v1::metrics_service_server::MetricsServiceServer,
+            trace::v1::trace_service_server::TraceServiceServer,
+        },
+    },
+    schema::Definition,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-use crate::sources::http_server::{build_param_matcher, remove_duplicates};
-use crate::sources::opentelemetry::grpc::Service;
-use crate::sources::opentelemetry::http::{build_warp_filter, run_http_server};
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -20,22 +32,17 @@ use crate::{
     },
     http::KeepaliveConfig,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server_with_routes, Source},
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    sources::{
+        http_server::{build_param_matcher, remove_duplicates},
+        opentelemetry::{
+            grpc::Service,
+            http::{build_warp_filter, run_http_server},
+        },
+        util::grpc::run_grpc_server_with_routes,
+        Source,
+    },
 };
-use tonic::transport::server::RoutesBuilder;
-use vector_lib::codecs::decoding::ProtobufDeserializer;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{BytesReceived, EventsReceived, Protocol};
-use vector_lib::opentelemetry::proto::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
-use vector_lib::{
-    config::{log_schema, LegacyKey, LogNamespace},
-    schema::Definition,
-};
+
 use vrl::value::{kind::Collection, Kind};
 
 pub const LOGS: &str = "logs";

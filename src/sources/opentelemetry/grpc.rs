@@ -1,6 +1,7 @@
 use crate::sources::opentelemetry::config::{LOGS, METRICS, TRACES};
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
+    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
     SourceSender,
 };
 use futures::TryFutureExt;
@@ -29,6 +30,8 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
 };
+
+
 
 #[derive(Clone)]
 pub(super) struct Service {
