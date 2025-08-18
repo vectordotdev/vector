@@ -17,12 +17,14 @@ use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
-use crate::{
+use file_source_common::{
     checkpointer::{Checkpointer, CheckpointsView},
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+};
+
+use crate::{
     file_watcher::{FileWatcher, RawLineResult},
-    fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
-    FileSourceInternalEvents, ReadFrom,
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
