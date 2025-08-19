@@ -1,0 +1,56 @@
+# Example configuration demonstrating varint framing for protobuf
+# This is compatible with tools like ClickHouse that use protobuf with varint length prefixes
+
+sources:
+  protobuf_source:
+    type: socket
+    mode: tcp
+    address: "0.0.0.0:8080"
+    decoding:
+      codec: protobuf
+      protobuf:
+        desc_file: "path/to/your/protobuf.desc"
+        message_type: "your.package.MessageType"
+    framing:
+      method: varint_length_delimited
+
+  socket_source:
+    type: socket
+    mode: tcp
+    address: "0.0.0.0:8081"
+    decoding:
+      codec: protobuf
+      protobuf:
+        desc_file: "input.desc"
+        message_type: "input.Message"
+    framing:
+      method: varint_length_delimited
+
+sinks:
+  protobuf_sink:
+    inputs:
+      - protobuf_source
+    type: socket
+    mode: tcp
+    address: "localhost:9090"
+    encoding:
+      codec: protobuf
+      protobuf:
+        desc_file: "path/to/your/protobuf.desc"
+        message_type: "your.package.MessageType"
+    framing:
+      method: varint_length_delimited
+
+  socket_output:
+    inputs:
+      - socket_source
+    type: socket
+    mode: tcp
+    address: "localhost:9090"
+    encoding:
+      codec: protobuf
+      protobuf:
+        desc_file: "output.desc"
+        message_type: "output.Message"
+    framing:
+      method: varint_length_delimited
