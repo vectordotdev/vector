@@ -552,8 +552,6 @@ mod test_utils {
 
                 let actual_kind = Kind::from(log.value());
                 if let Err(path) = self.event_kind.is_superset(&actual_kind) {
-                    println!("pavlos actual {actual_kind:#?}");
-                    println!("pavlos self {:#?}", self.event_kind);
                     return Result::Err(format!("Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
                         path,
                         actual_kind.at_path(&path).debug_info(),
@@ -562,8 +560,6 @@ mod test_utils {
                 }
 
                 let actual_metadata_kind = Kind::from(log.metadata().value());
-                println!("pavlos actual {actual_metadata_kind:#?}");
-                println!("pavlos self {:#?}", self.metadata_kind);
                 if let Err(path) = self.metadata_kind.is_superset(&actual_metadata_kind) {
                     // return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
                     //                            self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));

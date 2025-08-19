@@ -15,8 +15,8 @@ mod protobuf;
 mod syslog;
 mod vrl;
 
-pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use ::bytes::Bytes;
+pub use avro::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig, GelfDeserializerOptions};
 pub use influxdb::{InfluxdbDeserializer, InfluxdbDeserializerConfig};
