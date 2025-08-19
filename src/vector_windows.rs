@@ -2,13 +2,13 @@
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{
-    define_windows_service, service::{
+    Result, define_windows_service,
+    service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
     service_control_handler::ServiceControlHandlerResult,
     service_dispatcher,
-    Result,
 };
 
 use crate::{app::Application, signal::SignalTo};
@@ -24,12 +24,12 @@ pub mod service_control {
 
     use snafu::ResultExt;
     use windows_service::{
+        Result,
         service::{
             ServiceAccess, ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType,
             ServiceState, ServiceStatus,
         },
         service_manager::{ServiceManager, ServiceManagerAccess},
-        Result,
     };
 
     use crate::{
