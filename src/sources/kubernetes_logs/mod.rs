@@ -81,27 +81,7 @@ use self::pod_metadata_annotator::PodMetadataAnnotator;
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Thread-safe cache for Kubernetes metadata with composite-key indexing.
-///
-/// ## Design Overview
-/// - **Thread Safety**: Uses `Arc<Mutex<HashMap>>` for concurrent access
-/// - **Key Format**: Composite keys (e.g., `pod_uid|container_name`) prevent collisions
-/// - **Value Type**: `Arc<dyn Any + Send + Sync>` enables type-erasure and zero-copy sharing
-///
-/// ## Performance Notes
-/// - `get()`: Clones only `Arc` pointer (O(1) cost)
-/// - `insert()`: Short-term mutex lock during write
-///
-/// ## Example
-/// ```rust
-/// use k8s_metadata::K8sMetadataCache;
-///
-/// let cache = K8sMetadataCache::new();
-/// cache.insert("pod-123".to_string(), "nginx".to_string(), 8080);
-///
-/// if let Some(port) = cache.get("pod-123", "nginx").and_then(|v| v.downcast_ref::<i32>()) {
-///     println!("Container port: {}", port);
-/// }
-/// ```
+/// - Key Format: Composite keys (e.g., `pod_uid|container_name`) to prevent collisions
 pub struct K8sMetadataCache {
     cache: Arc<Mutex<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
 }
