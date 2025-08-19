@@ -53,7 +53,6 @@ where
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
-    pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
 }
 
@@ -80,7 +79,7 @@ where
     // `shutdown_checkpointer` is for finishing the background
     // checkpoint writer task, which has to wait for all
     // acknowledgements to be completed.
-    pub fn run<C, S1, S2>(
+    pub async fn run<C, S1, S2>(
         self,
         mut chans: C,
         mut shutdown_data: S1,
@@ -140,7 +139,7 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
+        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
             checkpointer,
             self.glob_minimum_cooldown,
             shutdown_checkpointer,
@@ -352,7 +351,8 @@ where
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
-            let result = self.handle.block_on(chans.send(to_send));
+
+            let result = chans.send(to_send).await;
             match result {
                 Ok(()) => {}
                 Err(error) => {
@@ -385,14 +385,14 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match self.handle.block_on(select(shutdown_data, sleep)) {
+            match select(shutdown_data, sleep).await {
                 Either::Left((_, _)) => {
-                    self.handle
-                        .block_on(chans.close())
+                    chans
+                        .close()
+                        .await
                         .expect("error closing file_server data channel.");
-                    let checkpointer = self
-                        .handle
-                        .block_on(checkpoint_task_handle)
+                    let checkpointer = checkpoint_task_handle
+                        .await
                         .expect("checkpoint task has panicked");
                     if let Err(error) = checkpointer.write_checkpoints() {
                         error!(?error, "Error writing checkpoints before shutdown");
