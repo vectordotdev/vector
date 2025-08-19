@@ -17,6 +17,7 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
+    internal_events::config::ConfigReloadRejected,
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -252,10 +253,17 @@ impl RunningTopology {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
-            error!(
-                message =
-                "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
-            );
+            match self.config.global.diff(&new_config.global) {
+                Ok(changed) => {
+                    emit!(ConfigReloadRejected::global_options_changed(changed));
+            }
+                Err(err) => {
+                    error!(
+                        message = "Failed to compute config diff; reload aborted.",
+                        %err
+                    );
+                }
+            }
             return Ok(false);
         }
 
