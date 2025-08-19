@@ -6,7 +6,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{task::noop_waker, Stream};
+use futures::{Stream, task::noop_waker};
 use vector::event::{Event, LogEvent};
 
 // == Streams ==

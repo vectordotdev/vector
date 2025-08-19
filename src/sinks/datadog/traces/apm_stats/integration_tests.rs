@@ -1,9 +1,9 @@
 use axum::{
+    Router,
     body::Body,
     extract::Extension,
-    http::{header::CONTENT_TYPE, Request},
+    http::{Request, header::CONTENT_TYPE},
     routing::{get, post},
-    Router,
 };
 use chrono::Utc;
 use flate2::read::GzDecoder;
@@ -12,11 +12,11 @@ use rmp_serde;
 use serde::Serialize;
 use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use crate::{
     config::ConfigBuilder,
-    sinks::datadog::traces::{apm_stats::StatsPayload, DatadogTracesConfig},
+    sinks::datadog::traces::{DatadogTracesConfig, apm_stats::StatsPayload},
     sources::datadog_agent::DatadogAgentConfig,
     test_util::{start_topology, trace_init},
     topology::{RunningTopology, ShutdownErrorReceiver},

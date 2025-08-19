@@ -2,7 +2,7 @@ pub mod logs;
 pub mod metrics;
 
 use reqwest::{Client, Method};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::Value;
 
 fn fake_intake_vector_address() -> String {

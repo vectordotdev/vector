@@ -1,5 +1,5 @@
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
 use flate2::read::ZlibDecoder;
 use std::io::Read;

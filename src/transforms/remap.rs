@@ -8,14 +8,14 @@ use std::{
 };
 
 use snafu::{ResultExt, Snafu};
+use vector_lib::TimeZone;
 use vector_lib::codecs::MetricTagValues;
 use vector_lib::compile_vrl;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::enrichment::TableRegistry;
-use vector_lib::lookup::{metadata_path, owned_value_path, PathPrefix};
+use vector_lib::lookup::{PathPrefix, metadata_path, owned_value_path};
 use vector_lib::schema::Definition;
-use vector_lib::TimeZone;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::state::ExternalEnv;
@@ -27,15 +27,15 @@ use vrl::value::{Kind, Value};
 
 use crate::config::OutputId;
 use crate::{
+    Result,
     config::{
-        log_schema, ComponentKey, DataType, Input, TransformConfig, TransformContext,
-        TransformOutput,
+        ComponentKey, DataType, Input, TransformConfig, TransformContext, TransformOutput,
+        log_schema,
     },
     event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
-    Result,
 };
 
 const DROPPED: &str = "dropped";
@@ -185,7 +185,7 @@ impl RemapConfig {
             .lock()
             .expect("Data poisoned")
             .iter()
-            .find(|v| v.0 .0 == enrichment_tables && v.0 .1 == merged_schema_definition)
+            .find(|v| v.0.0 == enrichment_tables && v.0.1 == merged_schema_definition)
         {
             return res.clone().map_err(Into::into);
         }
@@ -674,17 +674,17 @@ mod tests {
     use super::*;
     use crate::metrics::Controller;
     use crate::{
-        config::{build_unit_tests, ConfigBuilder},
+        config::{ConfigBuilder, build_unit_tests},
         event::{
-            metric::{MetricKind, MetricValue},
             LogEvent, Metric, Value,
+            metric::{MetricKind, MetricValue},
         },
         schema,
         test_util::components::{
-            assert_transform_compliance, init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS,
+            COMPONENT_MULTIPLE_OUTPUTS_TESTS, assert_transform_compliance, init_test,
         },
-        transforms::test::create_topology,
         transforms::OutputBuffer,
+        transforms::test::create_topology,
     };
     use chrono::DateTime;
     use tokio::sync::mpsc;

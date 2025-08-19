@@ -13,7 +13,7 @@ use vector_lib::{
         metric::{Bucket, Quantile},
     },
 };
-use vrl::path::{parse_target_path, PathParseError};
+use vrl::path::{PathParseError, parse_target_path};
 use vrl::{event_path, path};
 
 use crate::config::schema::Definition;
@@ -25,13 +25,13 @@ use crate::{
         TransformOutput,
     },
     event::{
-        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
     },
     internal_events::{
-        LogToMetricFieldNullError, LogToMetricParseFloatError,
+        DROP_EVENT, LogToMetricFieldNullError, LogToMetricParseFloatError,
         MetricMetadataInvalidFieldValueError, MetricMetadataMetricDetailsNotFoundError,
-        MetricMetadataParseError, ParserMissingFieldError, DROP_EVENT,
+        MetricMetadataParseError, ParserMissingFieldError,
     },
     schema,
     template::{Template, TemplateRenderingError},
@@ -621,7 +621,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         None => {
             return Err(TransformError::PathNotFound {
                 path: "distribution.statistic".to_string(),
-            })
+            });
         }
     };
     let statistic_kind = match statistic_str.as_str() {
@@ -794,7 +794,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         None => {
             return Err(TransformError::PathNotFound {
                 path: "name".to_string(),
-            })
+            });
         }
     };
 
@@ -814,7 +814,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         None => {
             return Err(TransformError::PathNotFound {
                 path: "kind".to_string(),
-            })
+            });
         }
     };
 
@@ -965,11 +965,11 @@ mod tests {
     use crate::{
         config::log_schema,
         event::{
-            metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, LogEvent,
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
         },
     };
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::mpsc;

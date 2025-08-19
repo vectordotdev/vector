@@ -4,8 +4,8 @@ use snafu::{ResultExt, Snafu};
 use crate::{
     internal_events::RedisReceiveEventError,
     sources::{
-        redis::{ConnectionInfo, InputHandler},
         Source,
+        redis::{ConnectionInfo, InputHandler},
     },
 };
 

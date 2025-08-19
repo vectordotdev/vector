@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use hyper::StatusCode;
 use indoc::indoc;
 use ordered_float::NotNan;
@@ -11,7 +11,7 @@ use rmp_serde;
 use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 use vrl::event_path;
 
-use super::{apm_stats::StatsPayload, dd_proto, ddsketch_full, DatadogTracesConfig};
+use super::{DatadogTracesConfig, apm_stats::StatsPayload, dd_proto, ddsketch_full};
 
 use crate::{
     common::datadog,
@@ -20,7 +20,7 @@ use crate::{
     extra_context::ExtraContext,
     sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
-        components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance, run_and_assert_sink_compliance},
         map_event_batch_stream, next_addr,
     },
 };
@@ -347,9 +347,10 @@ async fn global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "global-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "global-key")
+    );
 }
 
 #[tokio::test]
@@ -391,7 +392,8 @@ async fn override_global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "local-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "local-key")
+    );
 }
