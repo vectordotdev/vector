@@ -20,6 +20,7 @@ pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
     LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    VarintLengthDelimitedEncoder, VarintLengthDelimitedEncoderConfig,
 };
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
@@ -72,6 +73,11 @@ pub enum FramingConfig {
 
     /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
+
+    /// Event data is prefixed with its length in bytes as a varint.
+    ///
+    /// This is compatible with protobuf's length-delimited encoding.
+    VarintLengthDelimited(VarintLengthDelimitedEncoderConfig),
 }
 
 impl From<BytesEncoderConfig> for FramingConfig {
@@ -98,6 +104,12 @@ impl From<NewlineDelimitedEncoderConfig> for FramingConfig {
     }
 }
 
+impl From<VarintLengthDelimitedEncoderConfig> for FramingConfig {
+    fn from(config: VarintLengthDelimitedEncoderConfig) -> Self {
+        Self::VarintLengthDelimited(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
@@ -107,6 +119,9 @@ impl FramingConfig {
             FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
+            }
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
             }
         }
     }
@@ -123,6 +138,8 @@ pub enum Framer {
     LengthDelimited(LengthDelimitedEncoder),
     /// Uses a `NewlineDelimitedEncoder` for framing.
     NewlineDelimited(NewlineDelimitedEncoder),
+    /// Uses a `VarintLengthDelimitedEncoder` for framing.
+    VarintLengthDelimited(VarintLengthDelimitedEncoder),
     /// Uses an opaque `Encoder` implementation for framing.
     Boxed(BoxedFramer),
 }
@@ -151,6 +168,12 @@ impl From<NewlineDelimitedEncoder> for Framer {
     }
 }
 
+impl From<VarintLengthDelimitedEncoder> for Framer {
+    fn from(encoder: VarintLengthDelimitedEncoder) -> Self {
+        Self::VarintLengthDelimited(encoder)
+    }
+}
+
 impl From<BoxedFramer> for Framer {
     fn from(encoder: BoxedFramer) -> Self {
         Self::Boxed(encoder)
@@ -166,6 +189,7 @@ impl tokio_util::codec::Encoder<()> for Framer {
             Framer::CharacterDelimited(framer) => framer.encode((), buffer),
             Framer::LengthDelimited(framer) => framer.encode((), buffer),
             Framer::NewlineDelimited(framer) => framer.encode((), buffer),
+            Framer::VarintLengthDelimited(framer) => framer.encode((), buffer),
             Framer::Boxed(framer) => framer.encode((), buffer),
         }
     }
@@ -371,10 +395,11 @@ impl SerializerConfig {
             // we should do so accurately, even if practically it doesn't need to be.
             //
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
-            SerializerConfig::Avro { .. }
-            | SerializerConfig::Native
-            | SerializerConfig::Protobuf(_) => {
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            }
+            SerializerConfig::Protobuf(_) => {
+                FramingConfig::VarintLengthDelimited(VarintLengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Cef(_)
             | SerializerConfig::Csv(_)
