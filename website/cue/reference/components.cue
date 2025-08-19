@@ -192,20 +192,20 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?:       				#FeaturesAggregate
-			convert?:         				#FeaturesConvert
-			enrich?:          				#FeaturesEnrich
-			filter?:          				#FeaturesFilter
-			parse?:           				#FeaturesParse
-			program?:         				#FeaturesProgram
-			proxy?:           				#FeaturesProxy
-			reduce?:          				#FeaturesReduce
-			route?:           				#FeaturesRoute
-			exclusive_route?: 				#FeaturesExclusiveRoute
-			sanitize?:        				#FeaturesSanitize
-			shape?:           				#FeaturesShape
-			window?:          				#FeaturesWindow
-			incremental_to_absolute?:		#FeaturesIncrementalToAbsolute
+			aggregate?:               #FeaturesAggregate
+			convert?:                 #FeaturesConvert
+			enrich?:                  #FeaturesEnrich
+			filter?:                  #FeaturesFilter
+			parse?:                   #FeaturesParse
+			program?:                 #FeaturesProgram
+			proxy?:                   #FeaturesProxy
+			reduce?:                  #FeaturesReduce
+			route?:                   #FeaturesRoute
+			exclusive_route?:         #FeaturesExclusiveRoute
+			sanitize?:                #FeaturesSanitize
+			shape?:                   #FeaturesShape
+			window?:                  #FeaturesWindow
+			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
 		}
 
 		if Args.kind == "sink" {
