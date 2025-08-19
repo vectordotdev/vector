@@ -60,6 +60,6 @@ remap: functions: xxhash: {
 				xxhash("foo", "XXH3-128)
 				"""#
 			return: "161745101148472925293886522910304009610"
-		}
+		},
 	]
 }
