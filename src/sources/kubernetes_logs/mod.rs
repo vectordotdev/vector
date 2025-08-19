@@ -184,57 +184,7 @@ impl K8sMetadataCache {
     }
 }
 
-/// Converts a type-erased `Arc` pointer into a concrete [`vrl::value::Value`] instance.
-///
-/// This function attempts to downcast the input [`Arc<dyn Any + Send + Sync>`] to known types,
-/// producing a clone of the underlying data. It is designed for interoperability with
-/// type-erased metadata storage systems (e.g., Kubernetes metadata caches).
-///
-/// ## Behavior
-/// 1. **Priority Downcast Order**:
-///    - First attempts to downcast to `Arc<Value>` (common when storing pre-wrapped values)
-///    - Falls back to downcasting to `&Value` (direct value storage)
-///    - Returns [`vrl::value::Value::Null`] for unsupported types
-/// 2. **Cloning Semantics**:
-///    - Returns a **deep clone** of the underlying data ([`vrl::value::Value`] must be owned)
-///    - Avoids data duplication when input is `Arc<Value>` by unwrapping before cloning
-///
-/// ## Type Handling
-/// - Supported input types:
-///   - `Arc<vrl::value::Value>`
-///   - `vrl::value::Value` (as `&dyn Any`)
-/// - Unsupported types return [`vrl::value::Value::Null`]
-///
-/// ## Performance Notes
-/// - ⏱️ **Low Overhead for `Arc<Value>`**:  
-///   Single `Arc` dereference + `Value::clone()` (avoids double-indirection)
-/// - ⚠️ **Deep Copy for Direct `Value`**:  
-///   Full clone of the [``vrl::value::Value`] tree (consider storing `Arc<`vrl::value::Value>` in cache)
-///
-/// ## Example
-/// ```rust
-/// use std::sync::Arc;
-/// use std::any::Any;
-/// use vrl::value::Value;
-///
-/// let input = Value::Integer(42);
-///
-/// // Case 1: Stored as Arc<Value>
-/// let arc_val = Arc::new(input.clone());
-/// assert_eq!(any_to_value(Arc::clone(&arc_val)), input);
-///
-/// // Case 2: Stored as raw Value (less efficient)
-/// let raw_val: Arc<dyn Any + Send + Sync> = Arc::new(input.clone());
-/// assert_eq!(any_to_value(raw_val), input);
-///
-/// // Case 3: Unsupported type
-/// let unknown: Arc<dyn Any + Send + Sync> = Arc::new("string".to_string());
-/// assert_eq!(any_to_value(unknown), Value::Null);
-/// ```
-///
-/// ## Safety & Threading
-/// - ✅ **Thread-Safe**: Input requires [`Send + Sync`] bounds
-/// - ✅ **No Panics**: Gracefully handles downcast failures via [`vrl::value::Value::Null`]
+/// Converts into [`vrl::value::Value`] handling downcast failures via [`vrl::value::Value::Null`]
 pub fn any_to_value(any: Arc<dyn Any + Send + Sync>) -> vrl::value::Value {
     if let Some(arc_val) = any.downcast_ref::<Arc<vrl::value::Value>>() {
         return (**arc_val).clone();
