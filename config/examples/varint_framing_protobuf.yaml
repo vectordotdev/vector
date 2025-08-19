@@ -17,7 +17,7 @@ sources:
   socket_source:
     type: socket
     mode: tcp
-    address: "0.0.0.0:8080"
+    address: "0.0.0.0:8081"
     decoding:
       codec: protobuf
       protobuf:
@@ -28,7 +28,7 @@ sources:
 
 sinks:
   protobuf_sink:
-    input:
+    inputs:
       - protobuf_source
     type: socket
     mode: tcp
@@ -42,7 +42,7 @@ sinks:
       method: varint_length_delimited
 
   socket_output:
-    input:
+    inputs:
       - socket_source
     type: socket
     mode: tcp
