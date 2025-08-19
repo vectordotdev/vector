@@ -3768,6 +3768,28 @@ checksum = "a481586acf778f1b1455424c343f71124b048ffa5f4fc3f8f6ae9dc432dcb3c7"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.10.1",
+ "chrono",
+ "criterion",
+ "file-source-common",
+ "flate2",
+ "futures 0.3.31",
+ "glob",
+ "indexmap 2.10.0",
+ "libc",
+ "quickcheck",
+ "similar-asserts",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.41",
+ "vector-common",
+ "winapi",
+]
+
+[[package]]
+name = "file-source-common"
+version = "0.1.0"
+dependencies = [
  "bstr 1.12.0",
  "bytes 1.10.1",
  "chrono",
@@ -3775,9 +3797,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "flate2",
- "futures 0.3.31",
  "glob",
- "indexmap 2.10.0",
  "libc",
  "quickcheck",
  "scan_fmt",
@@ -3785,7 +3805,6 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "tempfile",
- "tokio",
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
@@ -12292,6 +12311,7 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
+ "file-source-common",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
@@ -12342,13 +12362,9 @@ name = "vector-tap"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
  "colored",
  "futures 0.3.31",
- "futures-util",
  "glob",
- "portpicker",
- "serde_json",
  "serde_yaml",
  "tokio",
  "tokio-stream",

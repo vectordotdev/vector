@@ -37,7 +37,6 @@ jobs:
             ci
             cli
             codecs
-            codecs protobuf
             compression
             config
             config provider

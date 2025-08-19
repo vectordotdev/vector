@@ -33,7 +33,7 @@ impl ProtobufDeserializerConfig {
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
-        DataType::all_bits()
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

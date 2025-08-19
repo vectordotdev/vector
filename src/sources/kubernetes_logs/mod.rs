@@ -23,9 +23,11 @@ use lifecycle::Lifecycle;
 use serde_with::serde_as;
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
+use vector_lib::file_source::file_server::{
+    calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown,
+};
+use vector_lib::file_source_common::{
+    Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
 };
 use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
 use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
