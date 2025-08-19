@@ -11,7 +11,7 @@ use crate::config::{ComponentKey, OutputId};
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
+    config::{self, CONFIG_PATHS, DataType, Input, TransformOutput},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -461,8 +461,8 @@ mod tests {
     use std::{future::Future, sync::Arc};
 
     use similar_asserts::assert_eq;
-    use tokio::sync::mpsc::{self, Receiver, Sender};
     use tokio::sync::Mutex;
+    use tokio::sync::mpsc::{self, Receiver, Sender};
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
@@ -470,8 +470,8 @@ mod tests {
     use crate::transforms::test::create_topology;
     use crate::{
         event::{
-            metric::{Metric, MetricKind, MetricValue},
             Event, LogEvent, Value,
+            metric::{Metric, MetricKind, MetricValue},
         },
         test_util,
     };

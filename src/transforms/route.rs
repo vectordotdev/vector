@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{LogNamespace, clone_input_definitions};
 use vector_lib::configurable::configurable_component;
 use vector_lib::transform::SyncTransform;
 
@@ -183,8 +183,8 @@ mod test {
 
     use super::*;
     use crate::{
-        config::{build_unit_tests, ConfigBuilder},
-        test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+        config::{ConfigBuilder, build_unit_tests},
+        test_util::components::{COMPONENT_MULTIPLE_OUTPUTS_TESTS, init_test},
     };
 
     #[test]

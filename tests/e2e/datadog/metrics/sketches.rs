@@ -6,8 +6,8 @@ mod ddmetric_proto {
 }
 
 use ddmetric_proto::{
-    sketch_payload::sketch::{Distribution, Dogsketch},
     SketchPayload,
+    sketch_payload::sketch::{Distribution, Dogsketch},
 };
 use tracing::info;
 

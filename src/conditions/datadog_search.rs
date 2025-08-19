@@ -5,7 +5,7 @@ use bytes::Bytes;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{Event, LogEvent, Value};
 use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
-use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
+use vrl::datadog_filter::{Filter, Matcher, Resolver, Run, build_matcher};
 use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
 
 use super::{Condition, Conditional, ConditionalConfig};
@@ -23,6 +23,12 @@ impl Default for DatadogSearchConfig {
         Self {
             source: QueryNode::MatchAllDocs,
         }
+    }
+}
+
+impl DatadogSearchConfig {
+    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<Event>>> {
+        Ok(as_log(build_matcher(&self.source, &EventFilter)?))
     }
 }
 
@@ -48,10 +54,22 @@ pub struct DatadogSearchRunner {
     matcher: Box<dyn Matcher<Event>>,
 }
 
+impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
+    type Error = crate::Error;
+    fn try_from(config: &DatadogSearchConfig) -> Result<Self, Self::Error> {
+        config.build_matcher().map(|matcher| Self { matcher })
+    }
+}
+
+impl DatadogSearchRunner {
+    pub fn matches(&self, event: &Event) -> bool {
+        self.matcher.run(event)
+    }
+}
+
 impl Conditional for DatadogSearchRunner {
-    fn check(&self, e: Event) -> (bool, Event) {
-        let result = self.matcher.run(&e);
-        (result, e)
+    fn check(&self, event: Event) -> (bool, Event) {
+        (self.matches(&event), event)
     }
 }
 
@@ -60,9 +78,7 @@ impl ConditionalConfig for DatadogSearchConfig {
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
     ) -> crate::Result<Condition> {
-        let matcher = as_log(build_matcher(&self.source, &EventFilter).map_err(|e| e.to_string())?);
-
-        Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
+        Ok(Condition::DatadogSearch(self.try_into()?))
     }
 }
 

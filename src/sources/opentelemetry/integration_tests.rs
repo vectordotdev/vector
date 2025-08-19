@@ -4,14 +4,14 @@ use itertools::Itertools;
 use serde_json::json;
 
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, log_schema},
     event::EventStatus,
     sources::opentelemetry::config::{
-        GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES,
+        GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig, TRACES,
     },
     test_util::{
         collect_n,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         retry_until, wait_for_tcp,
     },
 };
@@ -20,10 +20,10 @@ use prost::Message;
 use super::tests::new_source;
 use vector_lib::opentelemetry::proto::{
     collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
-    common::v1::{any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},
+    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
     metrics::v1::{
-        metric::Data, number_data_point::Value, Gauge, Metric, NumberDataPoint, ResourceMetrics,
-        ScopeMetrics,
+        Gauge, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
+        number_data_point::Value,
     },
     resource::v1::Resource,
     trace::v1::{ResourceSpans, ScopeSpans, Span},

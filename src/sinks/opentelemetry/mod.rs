@@ -4,8 +4,8 @@ use crate::sinks::http::config::{HttpMethod, HttpSinkConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use indoc::indoc;
 use vector_config::component::GenerateConfig;
-use vector_lib::codecs::encoding::{FramingConfig, SerializerConfig};
 use vector_lib::codecs::JsonSerializerConfig;
+use vector_lib::codecs::encoding::{FramingConfig, SerializerConfig};
 use vector_lib::configurable::configurable_component;
 
 /// Configuration for the `OpenTelemetry` sink.

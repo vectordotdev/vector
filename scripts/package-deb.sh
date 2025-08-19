@@ -71,6 +71,11 @@ cat LICENSE NOTICE >"$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this step should follow a build
 
+# TODO: Remove this after the Vector docker image contains a newer cargo-deb version.
+#       Temporary override of cargo-deb to support Rust 2024 edition.
+if [[ "$(cargo-deb --version 2>/dev/null)" != "2.9.3" ]]; then
+  cargo install cargo-deb --version 2.9.3 --force --locked
+fi
 cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip
 
 # Rename the resulting .deb file to remove TARGET from name.

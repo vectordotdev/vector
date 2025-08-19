@@ -6,6 +6,16 @@ releases: "0.49.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			The protobuf codecs do not support all telemetry types. Specifically, the following applies:
+			- Decoder: supports logs.
+			- Encoder: supports logs and traces.
+
+			Metrics are not supported. Any future updates will be noted in changelogs.
+			""",
+	]
+
 	description: """
 		The Vector team is excited to announce version `0.49.0`!
 
@@ -17,6 +27,7 @@ releases: "0.49.0": {
 		- The `http` sink's `uri` and `request.headers` config fields now support templating, enabling dynamic construction based on event data.
 		- The `--watch-config` flag now also watches for changes in enrichment table files.
 		- Fixed a race condition that could cause negative values in the `vector_buffer_byte_size` and `vector_buffer_events` gauges.
+		- The `prometheus_remote_write` sink now offers a `expire_metrics_secs` config option. This fixes an issue where incremental metrics were preserved for the lifetime of Vector's runtime causing indefinite memory growth.
 		"""
 
 	changelog: [

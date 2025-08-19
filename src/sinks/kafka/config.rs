@@ -12,7 +12,7 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
-        kafka::sink::{healthcheck, KafkaSink},
+        kafka::sink::{KafkaSink, healthcheck},
         prelude::*,
     },
 };

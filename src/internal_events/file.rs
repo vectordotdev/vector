@@ -108,7 +108,7 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::file_source::FileSourceInternalEvents;
+    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
     use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
 
     use super::{FileOpen, InternalEvent};
