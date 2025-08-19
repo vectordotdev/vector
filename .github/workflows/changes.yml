@@ -198,6 +198,8 @@ jobs:
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
+            - "lib/k8s-e2e-tests/**"
+            - "lib/k8s-test-framework/**"
           website:
             - "website/**"
           not_website:
