@@ -94,8 +94,8 @@ secret:
 
     # Optional: Explicit AWS authentication (if not using default credential chain)
     auth:
-      access_key_id: "AKIAIOSFODNN7EXAMPLE"
-      secret_access_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      access_key_id: "YOUR_ACCESS_KEY_ID"
+      secret_access_key: "YOUR_SECRET_ACCESS_KEY"
 ```
 
 ### 2. Use secrets in your Vector configuration
@@ -107,7 +107,7 @@ sources:
   my_database:
     type: postgresql_metrics
     endpoints:
-      - "postgresql://user:SECRET[my_aws_secrets.database_password]@localhost:5432/mydb"
+      - "postgresql://user:SECRET[my_aws_secrets.database_password]@localhost:5432/database"
 
 sinks:
   my_api_sink:
