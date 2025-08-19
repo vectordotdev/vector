@@ -9,7 +9,7 @@ use crate::{
     event::Event,
     internal_events::TemplateRenderingError,
     schema,
-    sinks::util::{tcp::TcpSinkConfig, UriSerde},
+    sinks::util::{UriSerde, tcp::TcpSinkConfig},
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
@@ -192,7 +192,7 @@ mod tests {
     use vector_lib::event::{Event, LogEvent};
 
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     };
 

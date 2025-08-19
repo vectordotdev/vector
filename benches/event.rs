@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group};
 use vector::event::LogEvent;
 use vrl::event_path;
 

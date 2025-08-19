@@ -7,7 +7,7 @@ use futures_util::TryFutureExt;
 
 use crate::sinks::prelude::*;
 
-use super::{config::NatsPublisher, request_builder::NatsRequest, NatsError};
+use super::{NatsError, config::NatsPublisher, request_builder::NatsRequest};
 
 #[derive(Clone)]
 pub(super) struct NatsService {

@@ -5,8 +5,8 @@ use crate::config::{
 };
 use crate::schema;
 use crate::sinks::prelude::configurable_component;
-use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use crate::transforms::Transform;
+use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use std::hash::{Hash, Hasher};
 use vector_lib::config::clone_input_definitions;
 

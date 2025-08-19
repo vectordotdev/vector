@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
 use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::telemetry};
 
 use super::sink::HecProcessedEvent;
 use crate::{

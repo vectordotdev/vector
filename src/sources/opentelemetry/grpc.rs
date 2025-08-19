@@ -3,26 +3,26 @@ use tonic::{Request, Response, Status};
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{
-        logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
+        ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
     },
     metrics::v1::{
-        metrics_service_server::MetricsService, ExportMetricsServiceRequest,
-        ExportMetricsServiceResponse,
+        ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+        metrics_service_server::MetricsService,
     },
     trace::v1::{
-        trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
+        ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
     },
 };
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
+    SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::config::{LOGS, METRICS, TRACES},
-    SourceSender,
 };
 
 #[derive(Clone)]

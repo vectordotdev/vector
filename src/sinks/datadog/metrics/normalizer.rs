@@ -39,7 +39,7 @@ impl MetricNormalize for DatadogMetricsNormalizer {
 #[cfg(test)]
 mod tests {
     use vector_lib::{
-        event::{metric::MetricSketch, Metric, MetricKind, MetricValue},
+        event::{Metric, MetricKind, MetricValue, metric::MetricSketch},
         metrics::AgentDDSketch,
     };
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     pin::Pin,
     time::Duration,
 };
@@ -370,8 +370,8 @@ mod tests {
     use crate::schema::Definition;
     use crate::{
         event::{
-            metric::{MetricKind, MetricValue},
             Event, Metric,
+            metric::{MetricKind, MetricValue},
         },
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,

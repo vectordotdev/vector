@@ -1,5 +1,5 @@
 use vector_lib::{
-    config::{clone_input_definitions, LogNamespace},
+    config::{LogNamespace, clone_input_definitions},
     configurable::configurable_component,
 };
 
@@ -14,8 +14,8 @@ use crate::{
 
 use super::{
     common::{
-        default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig,
-        TimedCacheConfig,
+        CacheConfig, FieldMatchConfig, TimedCacheConfig, default_cache_config,
+        fill_default_fields_match,
     },
     timed_transform::TimedDedupe,
     transform::Dedupe,

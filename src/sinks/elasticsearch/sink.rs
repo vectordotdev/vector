@@ -6,8 +6,8 @@ use vrl::path::PathPrefix;
 use crate::{
     sinks::{
         elasticsearch::{
-            encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
-            service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
+            BulkAction, ElasticsearchCommonMode, encoder::ProcessedEvent,
+            request_builder::ElasticsearchRequestBuilder, service::ElasticsearchRequest,
         },
         prelude::*,
     },
@@ -15,8 +15,8 @@ use crate::{
 };
 
 use super::{
-    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
     ElasticsearchCommon, ElasticsearchConfig, VersionType,
+    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
