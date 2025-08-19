@@ -21,7 +21,7 @@ use vector_lib::{
 
 use crate::{
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::{LOGS, METRICS, TRACES},
+    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
     SourceSender,
 };
 

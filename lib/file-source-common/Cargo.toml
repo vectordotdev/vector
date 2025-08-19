@@ -1,0 +1,32 @@
+[package]
+name = "file-source-common"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>"]
+edition = "2021"
+publish = false
+license = "MIT"
+
+[target.'cfg(windows)'.dependencies]
+libc = "0.2"
+winapi = { version = "0.3", features = ["winioctl"] }
+
+[dependencies]
+glob.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+crc = "3.3.0"
+scan_fmt = "0.2.6"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.142", default-features = false }
+bstr = { version = "1.12", default-features = false }
+bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
+dashmap = { version = "6.1", default-features = false }
+flate2 = { version = "1.1.2", default-features = false, features = ["rust_backend"] }
+vector-common = { path = "../vector-common", default-features = false }
+vector-config = { path = "../vector-config", default-features = false }
+
+[dev-dependencies]
+criterion = "0.7"
+quickcheck = "1"
+tempfile.workspace = true
+similar-asserts = "1.7.0"

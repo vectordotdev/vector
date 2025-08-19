@@ -156,7 +156,7 @@ weight = 7
 
 # Footer menu
 [[languages.en.menus.footer]]
-name = "Abount"
+name = "About"
 identifier = "introduction"
 weight = 1
 

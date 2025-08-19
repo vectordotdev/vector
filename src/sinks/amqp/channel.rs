@@ -41,7 +41,8 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         let channel = Self::new_channel(&self.config).await?;
         info!(
             message = "Created a new channel to the AMQP broker.",
-            id = channel.id()
+            id = channel.id(),
+            internal_log_rate_limit = true,
         );
         Ok(channel)
     }
