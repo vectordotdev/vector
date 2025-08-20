@@ -18,6 +18,7 @@ pub fn exec(
     let envs = config.environments();
 
     let active = EnvsDir::new(integration).active()?;
+    debug!("Active environment: {environment:#?}");
 
     match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {

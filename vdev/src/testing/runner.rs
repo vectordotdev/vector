@@ -252,6 +252,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(super) struct IntegrationTestRunner {
     // The integration is None when compiling the runner image with the `all-integration-tests` feature.
     integration: Option<String>,

@@ -16,13 +16,13 @@ use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ComposeTestKind {
     E2E,
     Integration,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct ComposeTestLocalConfig {
     pub(crate) kind: ComposeTestKind,
     pub(crate) directory: &'static str,
@@ -51,6 +51,7 @@ impl ComposeTestLocalConfig {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ComposeTest {
     local_config: ComposeTestLocalConfig,
     test_name: String,
@@ -94,7 +95,7 @@ impl ComposeTest {
 
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
-        Ok(ComposeTest {
+        let compose_test = ComposeTest {
             local_config,
             test_name,
             environment,
@@ -105,7 +106,9 @@ impl ComposeTest {
             env_config,
             build_all,
             retries,
-        })
+        };
+        trace!("Generated {compose_test:#?}");
+        Ok(compose_test)
     }
 
     pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
@@ -214,6 +217,7 @@ impl ComposeTest {
     }
 }
 
+#[derive(Debug)]
 struct Compose {
     original_path: PathBuf,
     test_dir: PathBuf,
