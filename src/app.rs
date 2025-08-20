@@ -10,13 +10,13 @@ use std::{
 use exitcode::ExitCode;
 use futures::StreamExt;
 use tokio::runtime::{self, Runtime};
-use tokio::sync::{broadcast::error::RecvError, MutexGuard};
+use tokio::sync::{MutexGuard, broadcast::error::RecvError};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
+    cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
@@ -158,7 +158,9 @@ impl ApplicationConfig {
                 }
             }
         } else {
-            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            info!(
+                message = "API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`."
+            );
             None
         }
     }
@@ -206,7 +208,9 @@ impl Application {
 
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
-            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+            debug!(
+                message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL."
+            );
         }
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
@@ -615,7 +619,10 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(message = "Internal log rate limit configured.",);
+    debug!(
+        message = "Internal log rate limit configured.",
+        internal_log_rate_secs = rate,
+    );
     info!(message = "Log level is enabled.", level = ?level);
 }
 

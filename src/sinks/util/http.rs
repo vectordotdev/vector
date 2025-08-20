@@ -3,9 +3,9 @@ use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
-use futures::{future::BoxFuture, Sink};
+use futures::{Sink, future::BoxFuture};
 use headers::HeaderName;
-use http::{header, HeaderValue, Request, Response, StatusCode};
+use http::{HeaderValue, Request, Response, StatusCode, header};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -37,7 +37,7 @@ impl PartialOrd for OrderedHeaderName {
         Some(self.cmp(other))
     }
 }
-use hyper::{body, Body};
+use hyper::{Body, body};
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -48,21 +48,22 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::Duration,
 };
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_lib::{
-    configurable::configurable_component, stream::batcher::limiter::ItemBatchSize, ByteSizeOf,
-    EstimatedJsonEncodedSizeOf,
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    stream::batcher::limiter::ItemBatchSize,
 };
 
 use super::{
+    Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    TowerRequestSettings,
     retries::{RetryAction, RetryLogic},
     sink::{self, Response as _},
-    uri, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    uri,
 };
 
 #[cfg(feature = "aws-core")]
@@ -942,10 +943,10 @@ where
 mod test {
     #![allow(clippy::print_stderr)] //tests
 
-    use futures::{future::ready, StreamExt};
+    use futures::{StreamExt, future::ready};
     use hyper::{
-        service::{make_service_fn, service_fn},
         Response, Server, Uri,
+        service::{make_service_fn, service_fn},
     };
 
     use super::*;
@@ -963,12 +964,16 @@ mod test {
         assert!(logic.should_retry_response(&response_429).is_retryable());
         assert!(logic.should_retry_response(&response_500).is_retryable());
         assert!(logic.should_retry_response(&response_408).is_retryable());
-        assert!(logic
-            .should_retry_response(&response_400)
-            .is_not_retryable());
-        assert!(logic
-            .should_retry_response(&response_501)
-            .is_not_retryable());
+        assert!(
+            logic
+                .should_retry_response(&response_400)
+                .is_not_retryable()
+        );
+        assert!(
+            logic
+                .should_retry_response(&response_501)
+                .is_not_retryable()
+        );
     }
 
     #[tokio::test]

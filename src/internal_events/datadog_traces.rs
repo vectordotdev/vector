@@ -1,6 +1,6 @@
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct DatadogTracesEncodingError {
@@ -18,7 +18,7 @@ impl InternalEvent for DatadogTracesEncodingError {
             error_reason = %self.error_reason,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -48,7 +48,7 @@ impl<E: std::fmt::Display> InternalEvent for DatadogTracesAPMStatsError<E> {
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

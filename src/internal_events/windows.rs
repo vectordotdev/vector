@@ -102,6 +102,7 @@ impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
             error_code = "service_missing",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

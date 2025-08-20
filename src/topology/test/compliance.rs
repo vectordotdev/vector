@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use tokio::sync::oneshot::{channel, Receiver};
+use tokio::sync::oneshot::{Receiver, channel};
 use vector_lib::config::ComponentKey;
 use vector_lib::config::OutputId;
 use vector_lib::event::{Event, EventArray, EventContainer, LogEvent};
 
 use crate::config::schema::Definition;
 use crate::{
-    config::{unit_test::UnitTestSourceConfig, ConfigBuilder},
+    config::{ConfigBuilder, unit_test::UnitTestSourceConfig},
     test_util::{
         components::assert_transform_compliance,
         mock::{

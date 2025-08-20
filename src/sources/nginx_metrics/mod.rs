@@ -5,15 +5,15 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt, future::join_all};
 use http::{Request, StatusCode};
-use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
+use hyper::{Body, Uri, body::to_bytes as body_to_bytes};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, metric_tags};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -280,7 +280,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::ProxyConfig,
-        test_util::components::{run_and_assert_source_compliance_advanced, HTTP_PULL_SOURCE_TAGS},
+        test_util::components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance_advanced},
     };
     use tokio::time::Duration;
 

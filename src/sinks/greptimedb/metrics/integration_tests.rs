@@ -2,7 +2,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{greptimedb::metrics::config::GreptimeDBMetricsConfig, util::test::load_sink},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         trace_init,
     },
 };

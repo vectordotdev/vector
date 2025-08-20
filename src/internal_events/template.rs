@@ -1,6 +1,6 @@
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type};
 use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use vector_lib::internal_event::{error_stage, error_type};
 
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
@@ -23,7 +23,7 @@ impl InternalEvent for TemplateRenderingError<'_> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-
+                internal_log_rate_limit = true,
             );
 
             counter!(
@@ -43,7 +43,7 @@ impl InternalEvent for TemplateRenderingError<'_> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-
+                internal_log_rate_limit = true,
             );
         }
     }

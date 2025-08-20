@@ -1,6 +1,6 @@
 use metrics::{counter, gauge};
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
 use crate::transforms::lua::v2::BuildError;
 
@@ -28,6 +28,7 @@ impl InternalEvent for LuaScriptError {
             error_code = mlua_error_code(&self.error),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -57,7 +58,7 @@ impl InternalEvent for LuaBuildError {
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

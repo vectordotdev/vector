@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use vector::{sinks::loki::valid_label_name, template::Template};
 
 const VALID: [&str; 4] = ["name", " name ", "bee_bop", "a09b"];

@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::FutureExt;
-use tokio::time::{sleep, Sleep};
+use tokio::time::{Sleep, sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 use vector_lib::configurable::configurable_component;
 
@@ -152,6 +152,7 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
+                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
@@ -197,7 +198,7 @@ where
                         error!(
                             message = "Non-retriable error; dropping the request.",
                             %error,
-
+                            internal_log_rate_limit = true,
                         );
                         None
                     }
@@ -211,6 +212,7 @@ where
                     error!(
                         message = "Unexpected error type; dropping the request.",
                         %error,
+                        internal_log_rate_limit = true
                     );
                     None
                 }
