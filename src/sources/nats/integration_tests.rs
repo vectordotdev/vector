@@ -402,8 +402,8 @@ async fn nats_tls_jwt_auth_invalid() {
 
     let r = publish_and_check(conf).await;
     assert!(
-        matches!(r, Err(BuildError::Connect { .. })),
-        "publish_and_check failed, expected BuildError::Connect, got: {r:?}"
+        matches!(r, Err(BuildError::Config { .. })),
+        "publish_and_check failed, expected BuildError::Config, got: {r:?}"
     );
 }
 
