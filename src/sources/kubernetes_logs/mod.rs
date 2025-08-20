@@ -36,7 +36,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     TimeZone,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{kind::Collection, Kind, Value};
 
 use crate::{
     built_info::{PKG_NAME, PKG_VERSION},
@@ -138,19 +138,6 @@ impl K8sMetadataCache {
     /// 1. Converts `value` into `Arc<T>`
     /// 2. Type-erases to `Arc<dyn Any + Send + Sync>`
     /// 3. Locks cache briefly for insertion
-    ///
-    /// ## Example: Storing Custom Metadata
-    /// ```rust
-    /// struct ContainerSpec {
-    ///     image: String,
-    ///     ports: Vec<i32>,
-    /// }
-    ///
-    /// cache.insert("pod-456", "redis", ContainerSpec {
-    ///     image: "redis:7.0".into(),
-    ///     ports: vec![6379],
-    /// });
-    /// ```
     pub fn insert<T: Any + Send + Sync + 'static>(
         &self,
         pod_uuid: String,
@@ -164,16 +151,16 @@ impl K8sMetadataCache {
     }
 }
 
-/// Converts into [`vrl::value::Value`] handling downcast failures via [`vrl::value::Value::Null`]
-pub fn any_to_value(any: Arc<dyn Any + Send + Sync>) -> vrl::value::Value {
-    if let Some(arc_val) = any.downcast_ref::<Arc<vrl::value::Value>>() {
+/// Converts into [`Value`] handling downcast failures via [`Value::Null`]
+pub fn any_to_value(any: Arc<dyn Any + Send + Sync>) -> Value {
+    if let Some(arc_val) = any.downcast_ref::<Arc<Value>>() {
         return (**arc_val).clone();
     }
 
-    if let Some(val) = any.downcast_ref::<vrl::value::Value>() {
+    if let Some(val) = any.downcast_ref::<Value>() {
         return val.clone();
     }
-    vrl::value::Value::Null
+    Value::Null
 }
 
 /// Configuration for the `kubernetes_logs` source.
@@ -994,10 +981,9 @@ impl Source {
             });
 
             let cached_metadata_point = metadata_cache.get(&pod_uid, &container_name);
-            let real_val =
-                cached_metadata_point.unwrap_or(Arc::new(vrl::value::Value::Null.clone()));
+            let real_val = cached_metadata_point.unwrap_or(Arc::new(Value::Null.clone()));
             let vrlvalue = any_to_value(real_val);
-            if vrlvalue != vrl::value::Value::Null {
+            if vrlvalue != Value::Null {
                 let logx = event.as_mut_log();
                 logx.insert("kubernetes", vrlvalue);
             } else {
