@@ -1,5 +1,5 @@
-#!/usr/bin/TEST_ENV bash
-#
+#!/usr/bin/env bash
+
 # Used in CI to run and stop an integration test and upload the results of it.
 # This is useful to allow retrying the integration test at a higher level than
 # nextest and reduce code duplication in the workflow file.
@@ -101,7 +101,7 @@ mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -
 if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
   echo "Environments found: ${#TEST_ENVIRONMENTS[@]}"
   for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
-    echo "$TEST_ENV"
+    echo "${TEST_ENV}"
   done
 fi
 
@@ -114,12 +114,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
   fi
 
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "$TEST_ENV" || true
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENV}" || true
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
   
   if [[ "$START_RET" -eq 0 ]]; then
-    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "$TEST_ENV"
+    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
   else
@@ -127,7 +127,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     RET=$START_RET
   fi
   
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "$TEST_ENV" || true
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "${TEST_ENV}" || true
 
   # Post-run cleanup
   if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
