@@ -29,7 +29,7 @@ components: sources: okta: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.okta.configuration
+	configuration: generated.components.sources.okta.configuration
 
 	output: logs: event: {
 		description: "An Okta system log event"
