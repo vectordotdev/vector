@@ -327,14 +327,12 @@ pub(crate) async fn run(
         .take_until(shutdown)
         .then(move |_| {
             let client = client.clone();
-            let timeout = timeout;
             let url_mutex = Arc::clone(&url_mutex);
             let token = token.clone();
             let decoder = decoder.clone();
 
             async move {
                 stream::unfold((), move |_| {
-                    let timeout = timeout;
                     let url_mutex = Arc::clone(&url_mutex);
                     let token = token.clone();
                     let decoder = decoder.clone();
