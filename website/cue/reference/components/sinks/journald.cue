@@ -100,7 +100,7 @@ components: sinks: journald: {
 			title: "Large Payloads"
 			body: """
 				For large payloads that exceed the Unix datagram size limit, the sink
-				automatically uses the memfd mechanism described in the journald native
+				automatically uses the `memfd` mechanism described in the journald native
 				protocol specification.
 				"""
 		}
