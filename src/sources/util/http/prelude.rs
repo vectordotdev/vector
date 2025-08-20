@@ -1,36 +1,36 @@
-use crate::common::http::{ErrorMessage, server_auth::HttpServerAuthConfig};
+use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
+use hyper::{service::make_service_fn, Server};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
-    Filter,
     filters::{
-        BoxedFilter,
         path::{FullPath, Tail},
+        BoxedFilter,
     },
     http::{HeaderMap, StatusCode},
     reject::Rejection,
+    Filter,
 };
 
 use crate::{
-    SourceSender,
     config::SourceContext,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
+    SourceSender,
 };
 
 use super::encoding::decode;
@@ -129,7 +129,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-                        println!("📦 Raw bytes (len={}): {:02x?}", body.len(), body);
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {

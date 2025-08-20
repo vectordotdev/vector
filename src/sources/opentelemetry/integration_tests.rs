@@ -4,14 +4,14 @@ use itertools::Itertools;
 use serde_json::json;
 
 use crate::{
-    config::{SourceConfig, SourceContext, log_schema},
+    config::{log_schema, SourceConfig, SourceContext},
     event::EventStatus,
     sources::opentelemetry::config::{
-        GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig, TRACES,
+        GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS, TRACES,
     },
     test_util::{
         collect_n,
-        components::{SOURCE_TAGS, assert_source_compliance},
+        components::{assert_source_compliance, SOURCE_TAGS},
         retry_until, wait_for_tcp,
     },
 };
@@ -20,10 +20,10 @@ use prost::Message;
 use super::tests::new_source;
 use vector_lib::opentelemetry::proto::{
     collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
-    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
+    common::v1::{any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue},
     metrics::v1::{
-        Gauge, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
-        number_data_point::Value,
+        metric::Data, number_data_point::Value, Gauge, Metric, NumberDataPoint, ResourceMetrics,
+        ScopeMetrics,
     },
     resource::v1::Resource,
     trace::v1::{ResourceSpans, ScopeSpans, Span},
@@ -63,7 +63,7 @@ async fn receive_logs_legacy_namespace() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
-            decoding: None,
+            use_oltp_decoding: false,
         };
 
         let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
@@ -162,7 +162,7 @@ async fn receive_trace() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
-            decoding: None,
+            use_oltp_decoding: false,
         };
 
         let (sender, trace_output, _) = new_source(EventStatus::Delivered, TRACES.to_string());
@@ -267,7 +267,7 @@ async fn receive_metric() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
-            decoding: None,
+            use_oltp_decoding: false,
         };
 
         let (sender, metrics_output, _) = new_source(EventStatus::Delivered, METRICS.to_string());
