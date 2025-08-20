@@ -95,11 +95,6 @@ case "$TEST_TYPE" in
     ;;
 esac
 
-if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-  find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete || true
-  chmod -R 777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" || true
-fi
-
 # Collect all available environments
 mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
 
@@ -111,6 +106,14 @@ if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
 fi
 
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
+  # Pre-run cleanup
+  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
+    # TODO use Docker compose volumes
+    find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
+    # Like 777, but users can only delete their own files. This allows the docker instances to write output files.
+    chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
+  fi
+
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "$TEST_ENV" || true
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
@@ -125,7 +128,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   fi
   
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "$TEST_ENV" || true
-  
+
+  # Post-run cleanup
+  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
+  chmod 0644 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
+fi
+
   # Only upload test results if CI is defined
   if [[ -n "${CI:-}" ]]; then
     ./scripts/upload-test-results.sh
