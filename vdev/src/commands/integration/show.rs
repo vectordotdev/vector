@@ -1,4 +1,4 @@
-use crate::commands::compose_tests::show;
+use crate::commands::compose_tests::show::{exec, exec_environments_only};
 use crate::testing::config::INTEGRATION_TESTS_DIR;
 use anyhow::Result;
 use clap::Args;
@@ -18,12 +18,12 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         if self.environments_only {
-            show::show_environments_only(
+            exec_environments_only(
                 &self.integration.expect("test name is required"),
                 INTEGRATION_TESTS_DIR,
             )
         } else {
-            show::exec(self.integration.as_ref(), INTEGRATION_TESTS_DIR)
+            exec(self.integration.as_ref(), INTEGRATION_TESTS_DIR)
         }
     }
 }

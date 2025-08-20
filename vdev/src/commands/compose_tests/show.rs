@@ -10,7 +10,7 @@ pub fn exec(integration: Option<&String>, path: &str) -> Result<()> {
 }
 
 /// Print only the environment names for a single integration, one per line.
-pub fn show_environments_only(integration: &str, path: &str) -> Result<()> {
+pub fn exec_environments_only(integration: &str, path: &str) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(path, integration)?;
     for environment in config.environments().keys() {
         println!("{environment}");

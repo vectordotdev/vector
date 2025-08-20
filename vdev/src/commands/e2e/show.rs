@@ -1,4 +1,4 @@
-use crate::commands::compose_tests::show;
+use crate::commands::compose_tests::show::{exec, exec_environments_only};
 use crate::testing::config::E2E_TESTS_DIR;
 use anyhow::Result;
 use clap::Args;
@@ -18,9 +18,9 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) -> Result<()> {
         if self.environments_only {
-            show::show_environments_only(&self.test.expect("test name is required"), E2E_TESTS_DIR)
+            exec_environments_only(&self.test.expect("test name is required"), E2E_TESTS_DIR)
         } else {
-            show::exec(self.test.as_ref(), E2E_TESTS_DIR)
+            exec(self.test.as_ref(), E2E_TESTS_DIR)
         }
     }
 }
