@@ -43,7 +43,7 @@ jobs:
     secrets: inherit
 
   check-secrets:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     outputs:
       can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
     steps:
@@ -61,7 +61,7 @@ jobs:
           fi
 
   integration-tests:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - changes
       - check-secrets
@@ -125,7 +125,7 @@ jobs:
 
   integration-test-suite:
     name: Integration Test Suite
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     if: always()
     needs:
       - integration-tests

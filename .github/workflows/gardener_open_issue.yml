@@ -9,7 +9,7 @@ on:
 jobs:
   add-to-project:
     name: Add issue to Gardener project board
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     steps:
       - uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2

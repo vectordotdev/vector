@@ -42,7 +42,7 @@ env:
 jobs:
 
   resolve-inputs:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       baseline-sha: ${{ steps.set_and_validate_shas.outputs.BASELINE_SHA }}
       comparison-sha: ${{ steps.set_and_validate_shas.outputs.COMPARISON_SHA }}
@@ -111,7 +111,7 @@ jobs:
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression.
   check-source-changed:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs: resolve-inputs
     outputs:
@@ -171,7 +171,7 @@ jobs:
           echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
 
   should-run-gate:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: check-source-changed
     if: ${{ needs.check-source-changed.outputs.source_changed }}
     steps:
@@ -184,7 +184,7 @@ jobs:
 
   build-baseline:
     name: Build baseline Vector container
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -223,7 +223,7 @@ jobs:
 
   build-comparison:
     name: Build comparison Vector container
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     needs:
       - should-run-gate
@@ -262,7 +262,7 @@ jobs:
 
   confirm-valid-credentials:
     name: Confirm AWS credentials are minimally valid
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs:
       - should-run-gate
@@ -285,7 +285,7 @@ jobs:
 
   upload-baseline-image-to-ecr:
     name: Upload baseline images to ECR
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs:
       - should-run-gate
@@ -325,7 +325,7 @@ jobs:
 
   upload-comparison-image-to-ecr:
     name: Upload comparison images to ECR
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs:
       - should-run-gate
@@ -365,7 +365,7 @@ jobs:
 
   submit-job:
     name: Submit regression job
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     needs:
       - should-run-gate
@@ -441,7 +441,7 @@ jobs:
 
   detect-regression:
     name: Determine regression status
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs:
       - submit-job
@@ -478,7 +478,7 @@ jobs:
 
   analyze-experiment:
     name: Download regression analysis & upload report
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     needs:
       - should-run-gate
@@ -530,7 +530,7 @@ jobs:
 
   regression-detection-suite:
     name: Set final result
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     if: always()
     needs:

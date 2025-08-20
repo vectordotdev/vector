@@ -30,7 +30,7 @@ jobs:
 
   check-fmt:
     name: Check code format
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -40,7 +40,7 @@ jobs:
 
   check-clippy:
     name: Check clippy
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
@@ -53,7 +53,7 @@ jobs:
 
   test:
     name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
@@ -78,7 +78,7 @@ jobs:
 
   check-version:
     name: Check version
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -88,7 +88,7 @@ jobs:
 
   check-scripts:
     name: Check scripts
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -96,7 +96,7 @@ jobs:
 
   check-events:
     name: Check events
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
@@ -107,7 +107,7 @@ jobs:
 
   check-licenses:
     name: Check that the 3rd-party license file is up to date
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: needs.changes.outputs.dependencies == 'true'
     needs: changes
     steps:
@@ -117,7 +117,7 @@ jobs:
 
   check-docs:
     name: Check Cue docs
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: needs.changes.outputs.cue == 'true'
     needs: changes
     steps:
@@ -127,7 +127,7 @@ jobs:
 
   check-markdown:
     name: Check Markdown
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: needs.changes.outputs.markdown == 'true'
     needs: changes
     steps:
@@ -137,7 +137,7 @@ jobs:
 
   check-component-docs:
     name: Check Component Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
     needs: changes
     steps:
@@ -149,7 +149,7 @@ jobs:
 
   check-rust-docs:
     name: Check Rust Docs
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
@@ -160,7 +160,7 @@ jobs:
 
   test-vrl:
     name: VRL - Linux
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
     needs: changes
     steps:
@@ -173,7 +173,7 @@ jobs:
 
   build-vrl-playground:
     name: Build VRL Playground
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
     needs: changes
     steps:
@@ -188,7 +188,7 @@ jobs:
 
   all-checks:
     name: Test Suite
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     if: always()
     needs:
       - changes

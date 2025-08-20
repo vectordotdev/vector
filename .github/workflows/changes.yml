@@ -132,7 +132,7 @@ env:
 jobs:
   # Detects changes that are not specific to integration tests
   source:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     if: ${{ inputs.source }}
     outputs:
@@ -207,7 +207,7 @@ jobs:
 
   # Detects changes that are specific to integration tests
   int_tests:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
     outputs:
@@ -319,7 +319,7 @@ jobs:
 
   # Detects changes that are specific to e2e tests
   e2e_tests:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
     outputs:
