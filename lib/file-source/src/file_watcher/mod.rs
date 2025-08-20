@@ -273,6 +273,7 @@ impl FileWatcher {
                         }))
                     }
                 } else {
+                    self.reached_eof = true;
                     if self.read_eof_linger_line && !self.buf.is_empty() {
                         // eof linger line read flag is set, get the linger line.
                         Ok(Some(RawLine {
