@@ -247,7 +247,7 @@ fn handle_response(
     decoder: Decoder,
     log_namespace: &LogNamespace,
     url: String,
-) -> Option<impl Stream<Item = Event> + Send> {
+) -> Option<impl Stream<Item = Event> + Send + use<>> {
     match response {
         Ok((header, body, _)) if header.status == hyper::StatusCode::OK => {
             let mut buf = BytesMut::new();
