@@ -22,7 +22,7 @@ jobs:
       contents: read
       pull-requests: none
 
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: blacksmith-2vcpu-ubuntu-2404
 
     env:
       NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
