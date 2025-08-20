@@ -159,6 +159,7 @@ jobs:
             kubernetes_logs source
             logstash source
             mongodb_metrics source
+            nats source
             new source
             nginx_metrics source
             opentelemetry source
