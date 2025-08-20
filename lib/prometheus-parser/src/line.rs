@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use nom::{
+    Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
     character::complete::{char, digit1},
@@ -11,7 +12,6 @@ use nom::{
     multi::fold_many0,
     number::complete::double,
     sequence::{delimited, pair, preceded},
-    Parser,
 };
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,

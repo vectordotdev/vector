@@ -5,8 +5,8 @@ use proptest::prelude::*;
 use crate::metrics::AgentDDSketch;
 
 use super::{
-    samples_to_buckets, Bucket, MetricSketch, MetricTags, MetricValue, Quantile, Sample,
-    StatisticKind, TagValue, TagValueSet,
+    Bucket, MetricSketch, MetricTags, MetricValue, Quantile, Sample, StatisticKind, TagValue,
+    TagValueSet, samples_to_buckets,
 };
 
 fn realistic_float() -> proptest::num::f64::Any {

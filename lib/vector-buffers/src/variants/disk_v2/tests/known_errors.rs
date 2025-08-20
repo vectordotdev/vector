@@ -15,12 +15,11 @@ use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
 use super::{create_buffer_v2_with_max_data_file_size, create_default_buffer_v2};
 use crate::{
-    assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
+    EventCount, assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
     assert_file_exists_async, assert_reader_writer_v2_file_positions, await_timeout,
     encoding::{AsMetadata, Encodable},
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, SizedRecord, UndecodableRecord},
-    variants::disk_v2::{backed_archive::BackedArchive, record::Record, ReaderError},
-    EventCount,
+    test::{SizedRecord, UndecodableRecord, acknowledge, install_tracing_helpers, with_temp_dir},
+    variants::disk_v2::{ReaderError, backed_archive::BackedArchive, record::Record},
 };
 
 impl AsMetadata for u32 {
@@ -29,11 +28,7 @@ impl AsMetadata for u32 {
     }
 
     fn from_u32(value: u32) -> Option<Self> {
-        if value < 32 {
-            Some(value)
-        } else {
-            None
-        }
+        if value < 32 { Some(value) } else { None }
     }
 }
 

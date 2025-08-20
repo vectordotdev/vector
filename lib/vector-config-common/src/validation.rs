@@ -4,7 +4,7 @@
 
 use darling::FromMeta;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{Expr, Lit, Meta};
 
 use crate::{
@@ -249,7 +249,7 @@ impl Validation {
                 (Some(min), Some(max)) if min > max => {
                     return Err(darling::Error::custom(
                         "minimum cannot be greater than maximum",
-                    ))
+                    ));
                 }
                 _ => {}
             }

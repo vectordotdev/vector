@@ -1,5 +1,5 @@
 use crate::gelf::GELF_TARGET_PATHS;
-use crate::{gelf_fields::*, VALID_FIELD_REGEX};
+use crate::{VALID_FIELD_REGEX, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{DataType, log_schema},
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };

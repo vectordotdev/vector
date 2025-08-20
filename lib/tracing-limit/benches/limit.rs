@@ -9,7 +9,7 @@ use std::{
     fmt,
     sync::{Mutex, MutexGuard},
 };
-use tracing::{field, span, subscriber::Interest, Event, Metadata, Subscriber};
+use tracing::{Event, Metadata, Subscriber, field, span, subscriber::Interest};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 

@@ -10,16 +10,16 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
-    future::{select, Either},
     Future, Sink, SinkExt,
+    future::{Either, select},
 };
 use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 use file_source_common::{
-    checkpointer::{Checkpointer, CheckpointsView},
     FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+    checkpointer::{Checkpointer, CheckpointsView},
 };
 
 use crate::{

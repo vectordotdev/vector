@@ -3,8 +3,8 @@ use std::{
     fmt::Debug,
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -13,7 +13,7 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
-use crate::{config::MemoryBufferSize, InMemoryBufferable};
+use crate::{InMemoryBufferable, config::MemoryBufferSize};
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -184,7 +184,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                 return match ae {
                     TryAcquireError::NoPermits => Err(TrySendError::InsufficientCapacity(item)),
                     TryAcquireError::Closed => Err(TrySendError::Disconnected(item)),
-                }
+                };
             }
         };
 
@@ -303,9 +303,9 @@ mod tests {
 
     use super::limited;
     use crate::{
+        MemoryBufferSize,
         test::MultiEventRecord,
         topology::{channel::limited_queue::SendError, test_util::Sample},
-        MemoryBufferSize,
     };
 
     #[tokio::test]
