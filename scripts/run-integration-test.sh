@@ -131,8 +131,8 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
 
   # Post-run cleanup
   if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-  chmod 0644 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
-fi
+    chmod 0755 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
+  fi
 
   # Only upload test results if CI is defined
   if [[ -n "${CI:-}" ]]; then
