@@ -39,7 +39,7 @@ components: sources: okta: {
 				required:    true
 				type: object: { examples: [{
 					"actor": {
-					"id": "00uttidj01jqL21aM1d6",
+					"id": "00util3j01jqL21aM1d6",
 					"type": "User",
 					"alternateId": "john.doe@example.com",
 					"displayName": "John Doe",
@@ -67,7 +67,7 @@ components: sources: okta: {
 					}
 					},
 					"device": {
-					"id": "guofdhyjex1feOgbN1d9",
+					"id": "gu1fd8yj3x1feOg3N1d9",
 					"name": "Mac15,6",
 					"os_platform": "OSX",
 					"os_version": "14.6.0",
@@ -86,8 +86,8 @@ components: sources: okta: {
 					"issuer": null,
 					"interface": null,
 					"authenticationStep": 0,
-					"rootSessionId": "idxBagel62CSveUkTxvgATonA",
-					"externalSessionId": "idxBagel62CSveUkTxvgATonA"
+					"rootSessionId": "idxBagel62CatsUkTankATonA",
+					"externalSessionId": "idxBagel62CatsUkTankATonA"
 					},
 					"displayMessage": "User login to Okta",
 					"eventType": "user.session.start",
@@ -114,7 +114,7 @@ components: sources: okta: {
 					"legacyEventType": "core.user_auth.login_success",
 					"transaction": {
 					"type": "WEB",
-					"id": "ab609228fe84ce59cdcbfa690bgc3016",
+					"id": "ab609228fe84ce59cat7fa690big3016",
 					"detail": null
 					},
 					"uuid": "dc9fd3c0-598c-11ef-8478-2b7584bf8d5a",
@@ -140,14 +140,14 @@ components: sources: okta: {
 					},
 					"target": [
 					{
-						"id": "p7d7dh1jf0HMbkP2e1d7",
+						"id": "p7d7dh1jf0HM0kP2e1d7",
 						"type": "AuthenticatorEnrollment",
 						"alternateId": "unknown",
 						"displayName": "Okta Verify",
 						"detailEntry": null
 					},
 					{
-						"id": "0oatxlef9sQvvqInq5d6",
+						"id": "0oatLeaf9sQv1qInq5d6",
 						"type": "AppInstance",
 						"alternateId": "Okta Admin Console",
 						"displayName": "Okta Admin Console",
