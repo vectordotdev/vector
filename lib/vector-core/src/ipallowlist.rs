@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use vector_config::GenerateError;
 
 use ipnet::IpNet;
-use vector_config::{configurable_component, Configurable, Metadata, ToValue};
+use vector_config::{Configurable, Metadata, ToValue, configurable_component};
 use vector_config_common::schema::{InstanceType, SchemaGenerator, SchemaObject};
 
 /// List of allowed origin IP networks. IP addresses must be in CIDR notation.

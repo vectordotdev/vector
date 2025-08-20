@@ -4,11 +4,11 @@ use std::fmt;
 
 use dashmap::DashMap;
 use tracing_core::{
+    Event, Metadata, Subscriber,
     callsite::Identifier,
-    field::{display, Field, Value, Visit},
+    field::{Field, Value, Visit, display},
     span,
     subscriber::Interest,
-    Event, Metadata, Subscriber,
 };
 use tracing_subscriber::layer::{Context, Layer};
 

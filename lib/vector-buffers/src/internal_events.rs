@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use metrics::{counter, gauge, histogram, Histogram};
+use metrics::{Histogram, counter, gauge, histogram};
 use vector_common::{
-    internal_event::{error_type, InternalEvent},
+    internal_event::{InternalEvent, error_type},
     registered_event,
 };
 

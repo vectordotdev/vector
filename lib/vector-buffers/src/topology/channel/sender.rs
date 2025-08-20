@@ -4,14 +4,14 @@ use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{register, InternalEventHandle, Registered};
+use vector_common::internal_event::{InternalEventHandle, Registered, register};
 
 use super::limited_queue::LimitedSender;
 use crate::{
+    Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
     variants::disk_v2::{self, ProductionFilesystem},
-    Bufferable, WhenFull,
 };
 
 /// Adapter for papering over various sender backends.

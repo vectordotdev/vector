@@ -10,8 +10,8 @@ use vrl::compiler::{ProgramInfo, SecretTarget, Target};
 use vrl::prelude::Collection;
 use vrl::value::{Kind, ObjectMap, Value};
 
-use super::{metric::TagValue, Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent};
-use crate::config::{log_schema, LogNamespace};
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, metric::TagValue};
+use crate::config::{LogNamespace, log_schema};
 use crate::schema::Definition;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
@@ -275,12 +275,12 @@ impl Target for VrlTarget {
         let path = &target_path.path;
         match target_path.prefix {
             PathPrefix::Event => match self {
-                VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     log.insert(path, value);
                     Ok(())
                 }
                 VrlTarget::Metric {
-                    ref mut metric,
+                    metric,
                     value: metric_value,
                     multi_value_tags,
                 } => {
@@ -344,7 +344,7 @@ impl Target for VrlTarget {
                                     path: &path.to_string(),
                                     expected: VALID_METRIC_PATHS_SET,
                                 }
-                                .to_string())
+                                .to_string());
                             }
                         }
 
@@ -404,11 +404,11 @@ impl Target for VrlTarget {
     ) -> Result<Option<vrl::value::Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
-                VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     Ok(log.remove(&target_path.path, compact))
                 }
                 VrlTarget::Metric {
-                    ref mut metric,
+                    metric,
                     value,
                     multi_value_tags: _,
                 } => {
@@ -441,7 +441,7 @@ impl Target for VrlTarget {
                                     path: &target_path.path.to_string(),
                                     expected: VALID_METRIC_PATHS_SET,
                                 }
-                                .to_string())
+                                .to_string());
                             }
                         };
 
@@ -678,7 +678,7 @@ enum MetricPathError<'a> {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
     use vrl::btreemap;

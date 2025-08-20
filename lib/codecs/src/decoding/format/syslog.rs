@@ -1,20 +1,20 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
-use lookup::{event_path, owned_value_path, OwnedTargetPath, OwnedValuePath};
-use smallvec::{smallvec, SmallVec};
+use lookup::{OwnedTargetPath, OwnedValuePath, event_path, owned_value_path};
+use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
 use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{DataType, log_schema},
     event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
-use super::{default_lossy, Deserializer};
+use super::{Deserializer, default_lossy};
 
 /// Config used to build a `SyslogDeserializer`.
 #[configurable_component]
@@ -481,7 +481,7 @@ fn insert_fields_from_syslog(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vector_core::config::{init_log_schema, log_schema, LogSchema};
+    use vector_core::config::{LogSchema, init_log_schema, log_schema};
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {

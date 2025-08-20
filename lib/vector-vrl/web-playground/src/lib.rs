@@ -1,9 +1,9 @@
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use vrl::compiler::runtime::{Runtime, Terminate};
 use vrl::compiler::TimeZone;
-use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
+use vrl::compiler::runtime::{Runtime, Terminate};
+use vrl::compiler::{CompileConfig, TargetValue, TypeState, compile_with_state};
 use vrl::diagnostic::DiagnosticList;
 use vrl::diagnostic::Formatter;
 use vrl::value::Secrets;
