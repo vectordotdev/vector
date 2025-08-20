@@ -372,7 +372,7 @@ impl AwsAuthentication {
                     service_region.clone(),
                     proxy,
                     tls_options,
-                    ImdsAuthentication::default()
+                    ImdsAuthentication::default(),
                 )
                 .await?,
             )),

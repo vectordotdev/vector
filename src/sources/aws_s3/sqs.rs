@@ -89,7 +89,6 @@ pub(super) struct DeferredConfig {
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
-
     /// AWS configuration options for SQS
     /// If not included, the values of the source's `auth` configuration will be used.
     /// Can be reverted to the AWS SDK's default authentication strategy by setting this to
