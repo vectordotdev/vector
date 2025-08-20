@@ -161,6 +161,7 @@ jobs:
             mongodb_metrics source
             new source
             nginx_metrics source
+            okta source
             opentelemetry source
             postgresql_metrics source
             prometheus_remote_write source
