@@ -27,7 +27,9 @@ print_compose_logs_on_failure() {
 }
 
 if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
+  # TODO use Docker compose volumes
   find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
+  # Like 777, but users can only delete their own files. This allows the docker instances to write output files.
   chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
 fi
 
@@ -45,6 +47,10 @@ else
 fi
 
 cargo vdev -v "${TEST_TYPE}" stop -a "${TEST_NAME}"
+
+if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
+  chmod 0644 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
+fi
 
 # Only upload test results if CI is defined
 if [[ -n "${CI:-}" ]]; then
