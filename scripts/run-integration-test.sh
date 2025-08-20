@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/TEST_ENV bash
 #
 # Used in CI to run and stop an integration test and upload the results of it.
 # This is useful to allow retrying the integration test at a higher level than
@@ -42,11 +42,8 @@ USAGE
 }
 
 # Parse options
-
-TEST_ENVIRONMENT=
-
 # Note: options must come before positional args (standard getopts behavior)
-while getopts ":hr:ve:" opt; do
+while getopts ":hr:v:" opt; do
   case "$opt" in
     h)
       usage
@@ -61,9 +58,6 @@ while getopts ":hr:ve:" opt; do
       ;;
     v)
       VERBOSITY+="v"
-      ;;
-    e)
-      TEST_ENVIRONMENT="$OPTARG"
       ;;
     \?)
       echo "error: unknown option: -$OPTARG" >&2
@@ -106,25 +100,36 @@ if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
   chmod -R 777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" || true
 fi
 
+# Collect all available environments
+mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
 
-cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENVIRONMENT}" || true
-START_RET=$?
-print_compose_logs_on_failure "$START_RET"
-
-if [[ "$START_RET" -eq 0 ]]; then
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "${TEST_ENVIRONMENT}"
-  RET=$?
-  print_compose_logs_on_failure "$RET"
-else
-  echo "Skipping test phase because 'vdev start' failed"
-  RET=$START_RET
+if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
+  echo "Environments found: ${#TEST_ENVIRONMENTS[@]}"
+  for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
+    echo "$TEST_ENV"
+  done
 fi
 
-cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "${TEST_ENVIRONMENT}" || true
-
-# Only upload test results if CI is defined
-if [[ -n "${CI:-}" ]]; then
-  ./scripts/upload-test-results.sh
-fi
+for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "$TEST_ENV" || true
+  START_RET=$?
+  print_compose_logs_on_failure "$START_RET"
+  
+  if [[ "$START_RET" -eq 0 ]]; then
+    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "$TEST_ENV"
+    RET=$?
+    print_compose_logs_on_failure "$RET"
+  else
+    echo "Skipping test phase because 'vdev start' failed"
+    RET=$START_RET
+  fi
+  
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "$TEST_ENV" || true
+  
+  # Only upload test results if CI is defined
+  if [[ -n "${CI:-}" ]]; then
+    ./scripts/upload-test-results.sh
+  fi
+done
 
 exit "$RET"
