@@ -87,11 +87,6 @@ pub struct K8sMetadataCache {
 }
 
 impl K8sMetadataCache {
-    /// Creates a new empty metadata cache.
-    ///
-    /// Initializes an internally synchronized `HashMap` wrapped in:
-    /// - `Mutex` for thread-safe mutation
-    /// - `Arc` for shared ownership across threads
     pub fn new() -> Self {
         K8sMetadataCache {
             cache: Arc::new(Mutex::new(HashMap::new())),
