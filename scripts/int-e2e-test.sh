@@ -28,7 +28,7 @@ print_compose_logs_on_failure() {
 
 if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
   find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
-  chmod -R 777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
+  chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
 fi
 
 cargo vdev -v "${TEST_TYPE}" start -a "${TEST_NAME}"
