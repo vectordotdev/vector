@@ -1,11 +1,11 @@
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::{Arc, atomic::AtomicUsize};
 
 use futures_util::Stream;
 use stream_cancel::Trigger;
 use tokio::sync::oneshot::Sender;
 use vector_lib::event::EventArray;
 
-use crate::{source_sender::SourceSenderItem, SourceSender};
+use crate::{SourceSender, source_sender::SourceSenderItem};
 
 use self::{
     sinks::{

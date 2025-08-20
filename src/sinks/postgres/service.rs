@@ -8,11 +8,11 @@ use snafu::{ResultExt, Snafu};
 use sqlx::types::Json;
 use sqlx::{Pool, Postgres};
 use tower::Service;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::event::{Event, EventFinalizers, EventStatus, Finalizable};
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 const POSTGRES_PROTOCOL: &str = "postgres";
 

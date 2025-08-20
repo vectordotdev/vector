@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
@@ -73,7 +73,7 @@ mod test {
     use super::*;
     use crate::{
         event::{Event, LogEvent},
-        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
+        test_util::components::{SINK_TAGS, run_and_assert_sink_compliance},
     };
 
     #[tokio::test]

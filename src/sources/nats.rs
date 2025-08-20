@@ -1,5 +1,5 @@
 use chrono::Utc;
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
@@ -9,21 +9,21 @@ use vector_lib::internal_event::{
 };
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 use vrl::value::Kind;
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::StreamClosedError,
-    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     tls::TlsEnableableConfig,
-    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -304,9 +304,9 @@ async fn create_subscription(
 mod tests {
     #![allow(clippy::print_stdout)] //tests
 
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
     use vector_lib::schema::Definition;
-    use vrl::value::{kind::Collection, Kind};
+    use vrl::value::{Kind, kind::Collection};
 
     use super::*;
 
@@ -386,7 +386,7 @@ mod integration_tests {
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::test_util::{
         collect_n,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         random_string,
     };
     use crate::tls::TlsConfig;

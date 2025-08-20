@@ -1,8 +1,8 @@
 use vector_lib::transform::SyncTransform;
 
 use crate::conditions::Condition;
-use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
 use crate::transforms::TransformOutputsBuf;
+use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
 use crate::{config::TransformContext, event::Event};
 
 #[derive(Clone)]

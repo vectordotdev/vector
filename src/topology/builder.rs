@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -22,24 +22,25 @@ use vector_lib::internal_event::{
 };
 use vector_lib::transform::update_runtime_schema_definition;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     buffers::{
+        BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
-        BufferType, WhenFull,
     },
     schema::Definition,
-    EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
+    BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
     schema,
     task::{Task, TaskOutput, TaskResult},
-    BuiltBuffer, ConfigDiff,
 };
 use crate::{
+    SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
@@ -48,12 +49,11 @@ use crate::{
     extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    source_sender::{SourceSenderItem, CHUNK_SIZE},
+    source_sender::{CHUNK_SIZE, SourceSenderItem},
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{wrap, UtilizationComponentSender, UtilizationEmitter},
-    SourceSender,
+    utilization::{UtilizationComponentSender, UtilizationEmitter, wrap},
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
