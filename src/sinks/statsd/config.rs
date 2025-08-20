@@ -12,11 +12,11 @@ use crate::{
     config::{SinkConfig, SinkContext},
     internal_events::SocketMode,
     sinks::{
-        util::{
-            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
-            BatchConfig, SinkBatchSettings,
-        },
         Healthcheck,
+        util::{
+            BatchConfig, SinkBatchSettings,
+            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
+        },
     },
 };
 

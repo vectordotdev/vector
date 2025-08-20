@@ -1,6 +1,6 @@
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use governor::{clock, Quota};
+use governor::{Quota, clock};
 use snafu::Snafu;
 use std::hash::Hash;
 use std::{num::NonZeroU32, pin::Pin, time::Duration};

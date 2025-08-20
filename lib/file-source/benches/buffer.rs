@@ -2,7 +2,7 @@ use std::{fmt, io::Cursor};
 
 use bytes::BytesMut;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use file_source::buffer::read_until_with_max_size;
+use file_source_common::buffer::read_until_with_max_size;
 
 struct Parameters {
     bytes: Vec<u8>,

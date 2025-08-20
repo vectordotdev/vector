@@ -1,3 +1,4 @@
+#![allow(dead_code)] // FIXME
 use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
@@ -11,11 +12,11 @@ use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{
+use file_source_common::{
     buffer::{read_until_with_max_size, ReadResult},
-    metadata_ext::PortableFileExt,
-    FilePosition, ReadFrom,
+    FilePosition, PortableFileExt, ReadFrom,
 };
+
 #[cfg(test)]
 mod tests;
 
@@ -25,7 +26,7 @@ mod tests;
 /// The offset field contains the byte offset of the beginning of the line within
 /// the file that it was read from.
 #[derive(Debug)]
-pub(super) struct RawLine {
+pub struct RawLine {
     pub offset: u64,
     pub bytes: Bytes,
 }

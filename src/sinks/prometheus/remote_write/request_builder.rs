@@ -9,7 +9,7 @@ use crate::sinks::{
     prometheus::{collector, collector::MetricCollector as _},
 };
 
-use super::{sink::EventCollection, PartitionKey};
+use super::{PartitionKey, sink::EventCollection};
 
 pub(crate) struct RemoteWriteEncoder {
     pub(super) default_namespace: Option<String>,

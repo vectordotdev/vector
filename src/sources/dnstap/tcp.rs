@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use serde_with::serde_as;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::configurable::configurable_component;
 use vector_lib::ipallowlist::IpAllowlistConfig;
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::tcp::TcpKeepaliveConfig;
 use vector_lib::tls::{CertificateMetadata, MaybeTlsSettings, TlsSourceConfig};
-use vector_lib::EstimatedJsonEncodedSizeOf;
 use vrl::path::OwnedValuePath;
 use vrl::value::ObjectMap;
 

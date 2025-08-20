@@ -175,12 +175,20 @@ impl<'a> Container<'a> {
                             // This allows untagged enums used for "(de)serialize as A, B, or C"
                             // purposes to avoid needless titles/descriptions when their fields will
                             // implicitly provide that.
-                            if variant.description().is_none() && tagging != Tagging::None {
+                            if variant.description().is_none()
+                                && tagging != Tagging::None
+                                && variant.tagging() != &Tagging::None
+                            {
                                 accumulator.push(
                                     darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION)
                                         .with_span(variant),
                                 );
                             }
+
+                            // Serde allows multiple untagged variants in a tagged enum. We do not
+                            // restrict their count or order here; ambiguity handling is done via
+                            // schema generation strategy (e.g., falling back to `anyOf`) and
+                            // discriminant hints when needed.
                         }
 
                         // If we're in untagged mode, there can be no duplicate variants.

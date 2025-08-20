@@ -1,4 +1,4 @@
-use redis::{aio::ConnectionManager, AsyncCommands, ErrorKind, RedisError, RedisResult};
+use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
 use snafu::{ResultExt, Snafu};
 use std::time::Duration;
 
