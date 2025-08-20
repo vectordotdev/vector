@@ -19,7 +19,7 @@ use vector_common::{
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
-pub use vrl_target::{TargetEvents, VrlTarget};
+pub use vrl_target::{ImmutableVrlTarget, TargetEvents, VrlTarget};
 
 use crate::config::LogNamespace;
 use crate::config::OutputId;
