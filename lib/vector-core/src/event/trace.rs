@@ -4,8 +4,8 @@ use lookup::lookup_v2::TargetPath;
 use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::{
-    byte_size_of::ByteSizeOf, internal_event::TaggedEventsSent, json_size::JsonSize,
-    request_metadata::GetEventCountTags, EventDataEq,
+    EventDataEq, byte_size_of::ByteSizeOf, internal_event::TaggedEventsSent, json_size::JsonSize,
+    request_metadata::GetEventCountTags,
 };
 use vrl::path::PathParseError;
 

@@ -7,23 +7,23 @@ use tokio::time::{Duration, Instant};
 
 use crate::sources::util::http::HttpMethod;
 use crate::{
+    SourceSender,
     config::{ComponentKey, SourceConfig, SourceContext},
     http::Auth,
     serde::default_decoding,
     serde::default_framing_message_based,
     tls,
     tls::TlsConfig,
-    SourceSender,
 };
 use vector_lib::codecs::decoding::DeserializerConfig;
 use vector_lib::config::log_schema;
 
 use super::{
-    tests::{run_compliance, INTERVAL, TIMEOUT},
     HttpClientConfig,
+    tests::{INTERVAL, TIMEOUT, run_compliance},
 };
 
-use crate::test_util::components::{run_and_assert_source_error, COMPONENT_ERROR_TAGS};
+use crate::test_util::components::{COMPONENT_ERROR_TAGS, run_and_assert_source_error};
 
 fn dufs_address() -> String {
     std::env::var("DUFS_ADDRESS").unwrap_or_else(|_| "http://localhost:5000".into())

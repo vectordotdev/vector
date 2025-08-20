@@ -13,8 +13,8 @@ use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
-        loading::{deserialize_table, prepare_input, process::Process, ComponentHint, Loader},
         SecretBackend,
+        loading::{ComponentHint, Loader, deserialize_table, prepare_input, process::Process},
     },
     secrets::SecretBackends,
     signal,

@@ -4,11 +4,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::event::LogEvent;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
@@ -33,7 +33,7 @@ impl ProtobufDeserializerConfig {
 
     /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
-        DataType::all_bits()
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

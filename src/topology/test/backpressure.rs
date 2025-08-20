@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio::time::Duration;
 use vector_lib::buffers::{BufferConfig, BufferType, MemoryBufferSize, WhenFull};

@@ -2,8 +2,8 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::header::{HeaderName, HeaderValue};
 use http::Uri;
+use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use snafu::ResultExt;
 use snafu::Snafu;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::configurable::configurable_component;
 use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::{request_metadata::RequestMetadata, TimeZone};
+use vector_lib::{TimeZone, request_metadata::RequestMetadata};
 
 use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::service::TowerRequestConfigDefaults;
@@ -21,23 +21,23 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{get_http_scheme_from_uri, HttpClient},
+    http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
+        Healthcheck, VectorSink,
         gcs_common::{
             config::{
-                build_healthcheck, default_endpoint, GcsPredefinedAcl, GcsRetryLogic,
-                GcsStorageClass,
+                GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, build_healthcheck,
+                default_endpoint,
             },
             service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         util::{
-            batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
-            timezone_to_offset, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
-            ServiceBuilderExt, TowerRequestConfig,
+            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
+            TowerRequestConfig, batch::BatchConfig, partitioner::KeyPartitioner,
+            request_builder::EncodeResult, timezone_to_offset,
         },
-        Healthcheck, VectorSink,
     },
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
@@ -446,17 +446,17 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 #[cfg(test)]
 mod tests {
     use futures_util::{future::ready, stream};
+    use vector_lib::EstimatedJsonEncodedSizeOf;
     use vector_lib::codecs::encoding::FramingConfig;
     use vector_lib::codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
     };
     use vector_lib::partition::Partitioner;
     use vector_lib::request_metadata::GroupedCountByteSize;
-    use vector_lib::EstimatedJsonEncodedSizeOf;
 
     use crate::event::LogEvent;
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     };
 

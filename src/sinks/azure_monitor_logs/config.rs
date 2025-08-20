@@ -1,5 +1,5 @@
 use openssl::{base64, pkey};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, OwnedValuePath};
+use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath};
 
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
@@ -7,10 +7,10 @@ use vector_lib::{config::log_schema, schema};
 use vrl::value::Kind;
 
 use crate::{
-    http::{get_http_scheme_from_uri, HttpClient},
+    http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
-        util::{http::HttpStatusRetryLogic, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpStatusRetryLogic},
     },
 };
 

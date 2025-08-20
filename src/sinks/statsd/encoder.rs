@@ -154,7 +154,7 @@ fn encode_and_write_single_event<V: Display>(
 #[cfg(test)]
 mod tests {
     use vector_lib::{
-        event::{metric::TagValue, MetricTags},
+        event::{MetricTags, metric::TagValue},
         metric_tags,
     };
 
@@ -177,7 +177,7 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
-        use crate::sources::statsd::{parser::Parser, ConversionUnit};
+        use crate::sources::statsd::{ConversionUnit, parser::Parser};
         let statsd_parser = Parser::new(true, ConversionUnit::Seconds);
 
         let s = std::str::from_utf8(metric).unwrap().trim();

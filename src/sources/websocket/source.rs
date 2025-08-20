@@ -1,34 +1,34 @@
 use crate::vector_lib::codecs::StreamDecodingError;
 use crate::{
+    SourceSender,
     codecs::Decoder,
-    common::websocket::{is_closed, PingInterval, WebSocketConnector},
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketBytesReceived, WebSocketConnectionError,
+        ConnectionOpen, OpenGauge, PROTOCOL, WebSocketBytesReceived, WebSocketConnectionError,
         WebSocketConnectionEstablished, WebSocketConnectionFailedError,
         WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
-        WebSocketReceiveError, WebSocketSendError, PROTOCOL,
+        WebSocketReceiveError, WebSocketSendError,
     },
     sources::websocket::config::WebSocketConfig,
-    SourceSender,
 };
 use chrono::Utc;
-use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
 use std::pin::Pin;
 use tokio::time;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, Message};
+use tokio_tungstenite::tungstenite::{Message, error::Error as TungsteniteError};
 use tokio_util::codec::FramedRead;
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{Event, LogEvent},
-    EstimatedJsonEncodedSizeOf,
 };
 
 macro_rules! fail_with_event {
-    ($context:expr) => {{
+    ($context:expr_2021) => {{
         emit!(WebSocketConnectionFailedError {
             error: Box::new($context.build())
         });
@@ -460,16 +460,16 @@ mod tests {
         sources::websocket::config::PongMessage,
         sources::websocket::config::WebSocketConfig,
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr,
         },
     };
-    use futures::{sink::SinkExt, StreamExt};
+    use futures::{StreamExt, sink::SinkExt};
     use std::borrow::Cow;
     use std::num::NonZeroU64;
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::tungstenite::{
-        protocol::frame::coding::CloseCode, protocol::frame::CloseFrame,
+        protocol::frame::CloseFrame, protocol::frame::coding::CloseCode,
     };
     use tokio_tungstenite::{accept_async, tungstenite::Message};
     use url::Url;

@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::lookup_v2::TargetPath;
-use lookup::{owned_value_path, OwnedTargetPath, OwnedValuePath, PathPrefix};
-use vrl::value::{kind::Collection, Kind};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, owned_value_path};
+use vrl::value::{Kind, kind::Collection};
 
-use crate::config::{log_schema, LegacyKey, LogNamespace};
+use crate::config::{LegacyKey, LogNamespace, log_schema};
 
 /// The definition of a schema.
 ///
@@ -552,7 +552,8 @@ mod test_utils {
 
                 let actual_kind = Kind::from(log.value());
                 if let Err(path) = self.event_kind.is_superset(&actual_kind) {
-                    return Result::Err(format!("Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
+                    return Result::Err(format!(
+                        "Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
                         path,
                         actual_kind.at_path(&path).debug_info(),
                         self.event_kind.at_path(&path).debug_info()

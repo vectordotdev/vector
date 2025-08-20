@@ -5,7 +5,7 @@ use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
 use vector_lib::{event::MetricTags, metric_tags};
 
-use super::{filter_result, HostMetrics};
+use super::{HostMetrics, filter_result};
 
 const MODE: &str = "mode";
 const CPU_SECS_TOTAL: &str = "cpu_seconds_total";

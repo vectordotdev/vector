@@ -2,7 +2,7 @@ use std::{
     collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path, sync::LazyLock,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use serde_json::Value;
 

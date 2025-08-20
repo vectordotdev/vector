@@ -473,6 +473,12 @@ generated: components: sources: nats: configuration: {
 					}
 				}
 			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
 			method: {
 				description: "The framing method."
 				required:    false
@@ -492,6 +498,10 @@ generated: components: sources: nats: configuration: {
 															Byte frames according to the [octet counting][octet_counting] format.
 
 															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
+						varint_length_delimited: """
+															Byte frames which are prefixed by a varint indicating the length.
+															This is compatible with protobuf's length-delimited encoding.
 															"""
 					}
 				}
@@ -527,6 +537,49 @@ generated: components: sources: nats: configuration: {
 					required:    false
 					type: uint: {}
 				}
+			}
+		}
+	}
+	jetstream: {
+		description: "Configuration for NATS JetStream."
+		required:    false
+		type: object: options: {
+			batch_config: {
+				description: """
+					Batch settings for a JetStream pull consumer.
+
+					By default, messages are pulled in batches of up to 200.
+					Each pull request expires after 30 seconds if not fulfilled.
+					There is no explicit maximum byte size per batch unless specified.
+
+					**Note:** These defaults follow the `async-nats` crate’s `StreamBuilder`.
+					"""
+				required: false
+				type: object: options: {
+					batch: {
+						description: "The maximum number of messages to pull in a single batch."
+						required:    false
+						type: uint: default: 200
+					}
+					max_bytes: {
+						description: """
+																The maximum total byte size for a batch. The pull request will be
+																fulfilled when either `size` or `max_bytes` is reached.
+																"""
+						required: false
+						type: uint: default: 0
+					}
+				}
+			}
+			consumer: {
+				description: "The name of the durable consumer to pull from."
+				required:    true
+				type: string: {}
+			}
+			stream: {
+				description: "The name of the stream to bind to."
+				required:    true
+				type: string: {}
 			}
 		}
 	}

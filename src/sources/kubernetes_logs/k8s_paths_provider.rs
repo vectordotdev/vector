@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use k8s_openapi::api::core::v1::{Namespace, Pod};
-use kube::runtime::reflector::{store::Store, ObjectRef};
+use kube::runtime::reflector::{ObjectRef, store::Store};
 use vector_lib::file_source::paths_provider::PathsProvider;
 
 use super::path_helpers::build_pod_logs_directory;
@@ -198,11 +198,7 @@ fn filter_paths<'a>(
                 },
             )
         });
-        if include {
-            m
-        } else {
-            !m
-        }
+        if include { m } else { !m }
     })
 }
 

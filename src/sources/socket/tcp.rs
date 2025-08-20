@@ -18,7 +18,7 @@ use crate::{
     tls::TlsSourceConfig,
 };
 
-use super::{default_host_key, SocketConfig};
+use super::{SocketConfig, default_host_key};
 
 /// TCP configuration for the `socket` source.
 #[serde_as]

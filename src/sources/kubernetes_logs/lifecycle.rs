@@ -1,15 +1,15 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures::{
+    FutureExt, StreamExt,
     channel::oneshot,
-    future::{select, BoxFuture, Either},
+    future::{BoxFuture, Either, select},
     pin_mut,
     stream::FuturesOrdered,
-    FutureExt, StreamExt,
 };
 
 use crate::shutdown::ShutdownSignal;

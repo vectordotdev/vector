@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use metrics::{counter, Counter};
+use metrics::{Counter, counter};
 use tracing::trace;
 
 use crate::config::ComponentKey;
