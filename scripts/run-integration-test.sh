@@ -117,7 +117,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENV}" || true
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
-  
+
   if [[ "$START_RET" -eq 0 ]]; then
     cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
@@ -126,7 +126,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     echo "Skipping test phase because 'vdev start' failed"
     RET=$START_RET
   fi
-  
+
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
 
   # Post-run cleanup
