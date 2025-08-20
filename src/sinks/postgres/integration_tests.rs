@@ -5,7 +5,7 @@ use crate::{
     sinks::{postgres::PostgresConfig, util::test::load_sink},
     test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance, run_and_assert_sink_error,
         },
         next_addr, random_table_name, trace_init,
     },
@@ -224,8 +224,9 @@ async fn insert_single_event() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    let create_table_sql =
-        format!("CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await
@@ -493,8 +494,9 @@ async fn insertion_fails_primary_key_violation() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    let create_table_sql =
-        format!("CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await

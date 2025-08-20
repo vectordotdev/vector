@@ -1,11 +1,11 @@
 use std::convert::TryFrom;
 
 use nom::{
+    Parser,
     bytes::complete::{tag, take_while_m_n},
     combinator::{all_consuming, map_res},
     error::ErrorKind,
     sequence::{preceded, terminated},
-    Parser,
 };
 use snafu::Snafu;
 

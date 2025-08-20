@@ -1,4 +1,4 @@
-use crate::config::{format, ConfigBuilder, Format};
+use crate::config::{ConfigBuilder, Format, format};
 use clap::Parser;
 use colored::*;
 use std::fs;
@@ -207,8 +207,8 @@ fn walk_dir_and_convert(
     feature = "sinks-console"
 ))]
 mod tests {
-    use crate::config::{format, ConfigBuilder, Format};
-    use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};
+    use crate::config::{ConfigBuilder, Format, format};
+    use crate::convert_config::{Opts, check_paths, walk_dir_and_convert};
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
     use std::{env, fs};

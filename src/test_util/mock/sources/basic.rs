@@ -1,15 +1,15 @@
 use std::{
     num::NonZeroUsize,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
 use async_trait::async_trait;
 use vector_lib::buffers::{
     config::MemoryBufferSize,
-    topology::channel::{limited, LimitedReceiver},
+    topology::channel::{LimitedReceiver, limited},
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::{config::LogNamespace, schema::Definition};

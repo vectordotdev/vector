@@ -1,6 +1,6 @@
 use redis::{
-    sentinel::{Sentinel, SentinelNodeConnectionInfo},
     ProtocolVersion, RedisConnectionInfo, TlsMode,
+    sentinel::{Sentinel, SentinelNodeConnectionInfo},
 };
 use snafu::prelude::*;
 
@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::{
-    sink::{RedisConnection, RedisSink},
     RedisCreateFailedSnafu,
+    sink::{RedisConnection, RedisSink},
 };
 
 #[derive(Clone, Copy, Debug)]

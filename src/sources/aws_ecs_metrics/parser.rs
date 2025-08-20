@@ -573,7 +573,7 @@ pub(super) fn parse(
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use vector_lib::assert_event_data_eq;
     use vector_lib::metric_tags;
 

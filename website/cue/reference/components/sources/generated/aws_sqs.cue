@@ -548,6 +548,12 @@ generated: components: sources: aws_sqs: configuration: {
 					}
 				}
 			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
 			method: {
 				description: "The framing method."
 				required:    false
@@ -567,6 +573,10 @@ generated: components: sources: aws_sqs: configuration: {
 															Byte frames according to the [octet counting][octet_counting] format.
 
 															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
+						varint_length_delimited: """
+															Byte frames which are prefixed by a varint indicating the length.
+															This is compatible with protobuf's length-delimited encoding.
 															"""
 					}
 				}

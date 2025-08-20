@@ -9,9 +9,9 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
-    aggregation::Aggregator, build_request, DDTracesMetadata, DatadogTracesEndpoint,
-    DatadogTracesEndpointConfiguration, RequestBuilderError, StatsPayload,
-    BUCKET_DURATION_NANOSECONDS,
+    BUCKET_DURATION_NANOSECONDS, DDTracesMetadata, DatadogTracesEndpoint,
+    DatadogTracesEndpointConfiguration, RequestBuilderError, StatsPayload, aggregation::Aggregator,
+    build_request,
 };
 use crate::{
     http::{BuildRequestSnafu, HttpClient},

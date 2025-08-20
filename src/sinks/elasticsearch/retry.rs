@@ -12,8 +12,8 @@ use crate::{
 };
 use http::StatusCode;
 use serde::Deserialize;
-use vector_lib::json_size::JsonSize;
 use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::json_size::JsonSize;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -154,7 +154,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                                 .clone()
                                                 .into_iter()
                                                 .zip(status_codes.iter())
-                                                .filter(|(_, &flag)| flag)
+                                                .filter(|&(_, &flag)| flag)
                                                 .map(|(item, _)| item)
                                                 .collect();
                                             let finalizers = failed_events.take_finalizers();
@@ -258,7 +258,10 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+        assert_eq!(
+            reason,
+            "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]"
+        );
     }
 
     #[test]
@@ -268,6 +271,9 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
+        assert_eq!(
+            reason,
+            "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value"
+        );
     }
 }

@@ -9,17 +9,17 @@
 
 use std::{env, sync::LazyLock, time::Duration};
 
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt, stream};
 use futures_util::Future;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
     metrics::Controller,
     sinks::VectorSink,
-    SourceSender,
 };
 
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.

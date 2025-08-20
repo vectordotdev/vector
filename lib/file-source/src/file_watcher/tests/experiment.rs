@@ -7,10 +7,9 @@ use std::{fs, io::Write};
 use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::{
-    file_watcher::{tests::*, FileWatcher, RawLineResult},
-    ReadFrom,
-};
+use crate::file_watcher::{tests::*, FileWatcher, RawLineResult};
+
+use file_source_common::ReadFrom;
 
 // Interpret all FWActions, including truncation
 //

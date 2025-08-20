@@ -10,15 +10,14 @@ use vector_config_macros::configurable_component;
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
-    client_async_with_config,
+    WebSocketStream, client_async_with_config,
     tungstenite::{
-        client::{uri_mode, IntoClientRequest},
+        client::{IntoClientRequest, uri_mode},
         error::{Error as TungsteniteError, ProtocolError, UrlError},
         handshake::client::Request,
         protocol::WebSocketConfig,
         stream::Mode as UriMode,
     },
-    WebSocketStream,
 };
 
 use crate::{

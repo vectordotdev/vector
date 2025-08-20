@@ -379,7 +379,7 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
+    use chrono::{DateTime, SecondsFormat, Timelike, Utc, offset::TimeZone};
     use vector_lib::metric_tags;
 
     use super::*;
@@ -637,7 +637,10 @@ mod tests {
         let uri = settings
             .write_uri("http://localhost:8086".to_owned())
             .unwrap();
-        assert_eq!("http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns", uri.to_string())
+        assert_eq!(
+            "http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns",
+            uri.to_string()
+        )
     }
 
     #[test]
@@ -900,9 +903,8 @@ mod integration_tests {
         config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
-            healthcheck,
-            test_util::{address_v1, address_v2, next_database, onboarding_v2, BUCKET, ORG, TOKEN},
-            InfluxDb1Settings, InfluxDb2Settings,
+            InfluxDb1Settings, InfluxDb2Settings, healthcheck,
+            test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
     };
 
