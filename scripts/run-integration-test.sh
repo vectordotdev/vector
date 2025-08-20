@@ -127,7 +127,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     RET=$START_RET
   fi
   
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "${TEST_ENV}" || true
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
 
   # Post-run cleanup
   if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
