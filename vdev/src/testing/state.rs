@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io::ErrorKind, sync::LazyLock};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::config::Environment;
@@ -13,6 +13,7 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         .collect()
 });
 
+#[derive(Debug)]
 pub struct EnvsDir {
     path: PathBuf,
 }
