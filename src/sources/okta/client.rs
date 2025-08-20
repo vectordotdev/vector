@@ -111,7 +111,7 @@ fn find_rel_next_link(header: &str) -> Option<String> {
     for part in header.split(',') {
         let relpart: Vec<_> = part.split(';').collect();
         if let Some(url) = relpart
-            .get(0)
+            .first()
             .map(|s| s.trim().trim_matches(|c| c == '<' || c == '>'))
         {
             if part.contains("rel=\"next\"") {
@@ -184,7 +184,7 @@ impl SourceConfig for OktaConfig {
 
         vec![SourceOutput::new_maybe_logs(
             JsonDeserializerConfig::default().output_type(),
-            JsonDeserializerConfig::default().schema_definition(log_namespace.clone()),
+            JsonDeserializerConfig::default().schema_definition(log_namespace),
         )]
     }
 
@@ -193,7 +193,7 @@ impl SourceConfig for OktaConfig {
     }
 }
 
-fn enrich_events(events: &mut Vec<Event>, log_namespace: &LogNamespace) {
+fn enrich_events(events: &mut Vec<Event>, log_namespace: LogNamespace) {
     let now = Utc::now();
     for event in events {
         log_namespace.insert_standard_vector_source_metadata(
@@ -220,7 +220,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 .get_all("link")
                 .iter()
                 .filter_map(|v| v.to_str().ok())
-                .filter_map(|v| find_rel_next_link(v))
+                .filter_map(find_rel_next_link)
                 .next()
                 .and_then(|next| Uri::try_from(next).ok())
             {
@@ -245,7 +245,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
 fn handle_response(
     response: OktaRunResult,
     decoder: Decoder,
-    log_namespace: &LogNamespace,
+    log_namespace: LogNamespace,
     url: String,
 ) -> Option<impl Stream<Item = Event> + Send + use<>> {
     match response {
@@ -262,7 +262,7 @@ fn handle_response(
             emit!(HttpClientEventsReceived {
                 byte_size,
                 count: events.len(),
-                url: url,
+                url,
             });
 
             if events.is_empty() {
@@ -276,12 +276,12 @@ fn handle_response(
         Ok((header, _, _)) => {
             emit!(HttpClientHttpResponseError {
                 code: header.status,
-                url: url,
+                url,
             });
             None
         }
         Err(error) => {
-            emit!(HttpClientHttpError { error, url: url });
+            emit!(HttpClientHttpError { error, url });
             None
         }
     }
@@ -309,7 +309,7 @@ pub(crate) async fn run(
     let decoder = DecodingConfig::new(
         FramingConfig::Bytes,
         DeserializerConfig::Json(JsonDeserializerConfig::default()),
-        log_namespace.clone(),
+        log_namespace,
     )
     .build()
     .map_err(|ref e| {
@@ -327,15 +327,15 @@ pub(crate) async fn run(
         .take_until(shutdown)
         .then(move |_| {
             let client = client.clone();
-            let timeout = timeout.clone();
-            let url_mutex = url_mutex.clone();
+            let timeout = timeout;
+            let url_mutex = Arc::clone(&url_mutex);
             let token = token.clone();
             let decoder = decoder.clone();
 
             async move {
                 stream::unfold((), move |_| {
-                    let timeout = timeout.clone();
-                    let url_mutex = url_mutex.clone();
+                    let timeout = timeout;
+                    let url_mutex = Arc::clone(&url_mutex);
                     let token = token.clone();
                     let decoder = decoder.clone();
                     let client = client.clone();
@@ -361,7 +361,7 @@ pub(crate) async fn run(
                             let headers = request.headers_mut();
                             headers.insert(
                                 http::header::AUTHORIZATION,
-                                format!("SSWS {}", token).parse().unwrap(),
+                                format!("SSWS {token}").parse().unwrap(),
                             );
                             headers
                                 .insert(http::header::ACCEPT, "application/json".parse().unwrap());
@@ -371,15 +371,12 @@ pub(crate) async fn run(
                             );
 
                             let client = client.clone();
-                            let timeout = timeout.clone();
-
-                            let response =
-                                tokio::time::timeout(timeout.clone(), client.send(request))
-                                    .then({
-                                        let url = url.clone();
-                                        move |result| run_once(url, result, timeout)
-                                    })
-                                    .await;
+                            let response = tokio::time::timeout(timeout, client.send(request))
+                                .then({
+                                    let url = url.clone();
+                                    move |result| run_once(url, result, timeout)
+                                })
+                                .await;
 
                             if let Ok((_, _, Some(ref next))) = response {
                                 *url_lock = next.clone();
@@ -388,7 +385,7 @@ pub(crate) async fn run(
                             (url, response)
                         };
 
-                        handle_response(response, decoder, &log_namespace, run_url)
+                        handle_response(response, decoder, log_namespace, run_url)
                             .map(|events| (events, ()))
                     }
                 })
@@ -407,7 +404,7 @@ pub(crate) async fn run(
         Err(_) => {
             let (count, _) = stream.size_hint();
             emit!(StreamClosedError { count });
-            Err(().into())
+            Err(())
         }
     }
 }

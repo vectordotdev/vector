@@ -70,7 +70,7 @@ async fn okta_compliance() {
     wait_for_tcp(in_addr).await;
 
     let events = run_compliance(OktaConfig {
-        domain: format!("http://{}", in_addr),
+        domain: format!("http://{in_addr}"),
         token: "token".to_string(),
         interval: INTERVAL,
         timeout: TIMEOUT,
@@ -100,18 +100,17 @@ async fn okta_compliance() {
 
 #[tokio::test]
 async fn okta_follows_rel() {
-    let in_addr = next_addr();
+    let addr = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
         .map({
-            let addr = in_addr.clone();
             move |q: std::collections::HashMap<String, String>| match q.get("after") {
                 None => warp::http::Response::builder()
                     .header("Content-Type", "application/json")
                     .header(
                         "link",
-                        format!("<http://{}/api/v1/logs?after=bar>; rel=\"next\"", addr),
+                        format!("<http://{addr}/api/v1/logs?after=bar>; rel=\"next\""),
                     )
                     .body(r#"[{"data":"foo"}]"#)
                     .unwrap(),
@@ -119,7 +118,7 @@ async fn okta_follows_rel() {
                     .header("Content-Type", "application/json")
                     .header(
                         "link",
-                        format!("<http://{}/api/v1/logs?after=baz>; rel=\"next\"", addr),
+                        format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
                     )
                     .body(r#"[{"data":"bar"}]"#)
                     .unwrap(),
@@ -127,7 +126,7 @@ async fn okta_follows_rel() {
                     .header("Content-Type", "application/json")
                     .header(
                         "link",
-                        format!("<http://{}/api/v1/logs?after=quux>; rel=\"next\"", addr),
+                        format!("<http://{addr}/api/v1/logs?after=quux>; rel=\"next\""),
                     )
                     .body(r#"[]"#)
                     .unwrap(),
@@ -135,11 +134,11 @@ async fn okta_follows_rel() {
             }
         });
 
-    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
-    wait_for_tcp(in_addr).await;
+    tokio::spawn(warp::serve(dummy_endpoint).run(addr));
+    wait_for_tcp(addr).await;
 
     let events = run_compliance(OktaConfig {
-        domain: format!("http://{}", in_addr),
+        domain: format!("http://{addr}"),
         token: "token".to_string(),
         interval: INTERVAL,
         timeout: TIMEOUT,
@@ -164,7 +163,7 @@ async fn okta_follows_rel() {
 async fn okta_persists_rel() {
     // the client follows `next` links; on the next interval it should pick up where it left off
     // and not start over from the beginning
-    let in_addr = next_addr();
+    let addr = next_addr();
     let seen = tokio::sync::OnceCell::<bool>::new();
 
     // the first request sets `seen` but returns 0 events, ending the inner stream,
@@ -172,13 +171,12 @@ async fn okta_persists_rel() {
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
         .map({
-            let addr = in_addr.clone();
             move |q: std::collections::HashMap<String, String>| match q.get("after") {
                 None => warp::http::Response::builder()
                     .header("Content-Type", "application/json")
                     .header(
                         "link",
-                        format!("<http://{}/api/v1/logs?after=bar>; rel=\"next\"", addr),
+                        format!("<http://{addr}/api/v1/logs?after=bar>; rel=\"next\""),
                     )
                     .body(r#"[{"data":"foo"}]"#)
                     .unwrap(),
@@ -188,7 +186,7 @@ async fn okta_persists_rel() {
                             .header("Content-Type", "application/json")
                             .header(
                                 "link",
-                                format!("<http://{}/api/v1/logs?after=baz>; rel=\"next\"", addr),
+                                format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
                             )
                             .body(r#"[{"data":"bar"}]"#)
                             .unwrap()
@@ -198,7 +196,7 @@ async fn okta_persists_rel() {
                             .header("Content-Type", "application/json")
                             .header(
                                 "link",
-                                format!("<http://{}/api/v1/logs?after=baz>; rel=\"next\"", addr),
+                                format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
                             )
                             .body(r#"[]"#)
                             .unwrap()
@@ -211,11 +209,11 @@ async fn okta_persists_rel() {
             }
         });
 
-    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
-    wait_for_tcp(in_addr).await;
+    tokio::spawn(warp::serve(dummy_endpoint).run(addr));
+    wait_for_tcp(addr).await;
 
     let events = run_compliance(OktaConfig {
-        domain: format!("http://{}", in_addr),
+        domain: format!("http://{addr}"),
         token: "token".to_string(),
         interval: Duration::from_secs(1),
         timeout: Duration::from_millis(100),
