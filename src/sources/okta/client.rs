@@ -294,7 +294,8 @@ fn handle_response(
 /// This function fetches all pages until there are no more results (an empty JSON array) and finishes until
 /// the next interval
 /// The function will run until the `shutdown` signal is received.
-pub(crate) async fn run(
+#[allow(clippy::too_many_arguments)] // internal function
+async fn run(
     url: Uri,
     tls: TlsSettings,
     proxy: ProxyConfig,
