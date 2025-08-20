@@ -16,9 +16,9 @@ Required positional arguments:
   TEST_NAME   Name of the test/app (used as docker compose project name)
 
 Options:
-  -r <NUM>    Number of retries for the "test" phase (default: 2)
-  -h          Show this help and exit
-  -v <LEVEL> Verbosity level passed to cargo vdev (default: info)
+  -h         Show this help and exit
+  -r <NUM>   Number of retries for the "test" phase (default: 2)
+  -v         Increase verbosity; repeat for more (e.g. -vv or -vvv)
   -e <ENV>   Environment to export as TEST_ENV (default: not set)
 
 Notes:
@@ -30,11 +30,12 @@ USAGE
 
 # Defaults (tunable via options)
 RETRIES=2
-VERBOSITY=""
-TEST_ENV=""
+VERBOSITY=
+TEST_ENV=
 
 # Parse options
-while getopts ":hr:v:e:" opt; do
+# Note: options must come before positional args (standard getopts behavior)
+while getopts ":hr:ve:" opt; do
   case "$opt" in
     h)
       usage
@@ -48,7 +49,7 @@ while getopts ":hr:v:e:" opt; do
       fi
       ;;
     v)
-      VERBOSITY="$OPTARG"
+      VERBOSITY+="v"
       ;;
     e)
       TEST_ENV="$OPTARG"
@@ -76,11 +77,7 @@ fi
 
 TEST_TYPE=$1   # either "int" or "e2e"
 TEST_NAME=$2
-
-# Optionally export TEST_ENV if set
-if [[ -n "$TEST_ENV" ]]; then
-  export TEST_ENV
-fi
+VERBOSITY=${VERBOSITY:+-v}
 
 case "$TEST_TYPE" in
   int|e2e) ;;
@@ -102,18 +99,17 @@ print_compose_logs_on_failure() {
   fi
 }
 
-
 if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
   find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete || true
   chmod -R 777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" || true
 fi
 
-cargo vdev ${VERBOSITY:+-v "$VERBOSITY"} "${TEST_TYPE}" start -a "${TEST_NAME}" || true
+cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" || true
 START_RET=$?
 print_compose_logs_on_failure "$START_RET"
 
 if [[ "$START_RET" -eq 0 ]]; then
-  cargo vdev ${VERBOSITY:+-v "$VERBOSITY"} "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}"
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}"
   RET=$?
   print_compose_logs_on_failure "$RET"
 else
@@ -121,7 +117,7 @@ else
   RET=$START_RET
 fi
 
-cargo vdev ${VERBOSITY:+-v "$VERBOSITY"} "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
+cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
 
 # Only upload test results if CI is defined
 if [[ -n "${CI:-}" ]]; then
