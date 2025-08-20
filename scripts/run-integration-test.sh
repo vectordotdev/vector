@@ -19,7 +19,7 @@ Options:
   -h         Show this help and exit
   -r <NUM>   Number of retries for the "test" phase (default: 2)
   -v         Increase verbosity; repeat for more (e.g. -vv or -vvv)
-  -e <ENV>   Environment to export as TEST_ENV (default: not set)
+  -e <ENV>   Environment to export as ENVIRONMENT (default: not set)
 
 Notes:
   - All existing two-argument invocations remain compatible:
@@ -31,7 +31,7 @@ USAGE
 # Defaults (tunable via options)
 RETRIES=2
 VERBOSITY=
-TEST_ENV=
+ENVIRONMENT=
 
 # Parse options
 # Note: options must come before positional args (standard getopts behavior)
@@ -52,7 +52,7 @@ while getopts ":hr:ve:" opt; do
       VERBOSITY+="v"
       ;;
     e)
-      TEST_ENV="$OPTARG"
+      ENVIRONMENT="$OPTARG"
       ;;
     \?)
       echo "error: unknown option: -$OPTARG" >&2
@@ -104,12 +104,12 @@ if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
   chmod -R 777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" || true
 fi
 
-cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" || true
+cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${ENVIRONMENT}" || true
 START_RET=$?
 print_compose_logs_on_failure "$START_RET"
 
 if [[ "$START_RET" -eq 0 ]]; then
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}"
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "${ENVIRONMENT}"
   RET=$?
   print_compose_logs_on_failure "$RET"
 else
@@ -117,7 +117,7 @@ else
   RET=$START_RET
 fi
 
-cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
+cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" "${ENVIRONMENT}" || true
 
 # Only upload test results if CI is defined
 if [[ -n "${CI:-}" ]]; then
