@@ -1,6 +1,6 @@
 package metadata
 
-base: components: sources: okta: configuration: {
+generated: components: sources: okta: configuration: {
 	domain: {
 		description: "The Okta subdomain to scrape"
 		required:    true
