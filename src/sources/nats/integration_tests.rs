@@ -1,6 +1,7 @@
 #![allow(clippy::print_stdout)]
 use crate::config::{SourceConfig, SourceContext};
 use crate::{
+    SourceSender,
     codecs::DecodingConfig,
     config::LogNamespace,
     nats::{
@@ -9,16 +10,15 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::nats::{
-        config::{default_subject_key_field, BuildError, JetStreamConfig, NatsSourceConfig},
+        config::{BuildError, JetStreamConfig, NatsSourceConfig, default_subject_key_field},
         source::{create_subscription, run_nats_core},
     },
     test_util::{
         collect_n,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         random_string,
     },
     tls::{TlsConfig, TlsEnableableConfig},
-    SourceSender,
 };
 use async_nats::jetstream::stream::StorageType;
 use bytes::Bytes;

@@ -1,17 +1,18 @@
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
     sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
-    SourceSender,
 };
 use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
 use chrono::Utc;
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
 use snafu::ResultExt;
 use tokio_util::codec::FramedRead;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     codecs::decoding::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     internal_event::{
@@ -19,7 +20,6 @@ use vector_lib::{
         InternalEventHandle as _, Protocol,
     },
     lookup::owned_value_path,
-    EstimatedJsonEncodedSizeOf,
 };
 
 /// The outcome of processing a single NATS message.

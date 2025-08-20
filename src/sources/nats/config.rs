@@ -1,11 +1,11 @@
 use crate::{
     codecs::DecodingConfig,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     serde::{default_decoding, default_framing_message_based},
     sources::{
-        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
         Source,
+        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
     },
     tls::TlsEnableableConfig,
 };
@@ -328,9 +328,9 @@ mod tests {
     #![allow(clippy::print_stdout)]
 
     use crate::sources::nats::config::default_subject_key_field;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
+    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
     use vector_lib::schema::Definition;
-    use vrl::value::{kind::Collection, Kind};
+    use vrl::value::{Kind, kind::Collection};
 
     use super::*;
 
