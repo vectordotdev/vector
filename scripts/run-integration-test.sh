@@ -23,7 +23,7 @@ Options:
 
 Notes:
   - All existing two-argument invocations remain compatible:
-      scripts/int-e2e-test.sh int opentelemetry-logs
+      scripts/run-integration-test.sh int opentelemetry-logs
   - Additional options can be added later without breaking callers.
 USAGE
 }
