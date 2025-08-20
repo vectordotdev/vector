@@ -112,15 +112,6 @@ impl K8sMetadataCache {
     }
 
     /// Retrieves cached metadata by Pod UID and container name.
-    ///
-    /// ## Behavior
-    /// 1. Constructs composite key via `generate_key()`
-    /// 2. Locks cache for read (blocking until available)
-    /// 3. Returns `Some(Arc)` if key exists (**clones `Arc` pointer only**)
-    ///
-    /// ## Performance
-    /// - ⚡️ **Zero data copy**: Only increments `Arc` reference count
-    /// - 🔒 Short-lived lock contention
     pub fn get(&self, pod_uuid: &str, container_name: &str) -> Option<Arc<dyn Any + Send + Sync>> {
         let key = Self::generate_key(pod_uuid, container_name);
         let cache = self.cache.lock().unwrap();
