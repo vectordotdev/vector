@@ -7,7 +7,7 @@ use anyhow::Result;
 use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
 use crate::testing::build::prepare_build_command;
-use crate::testing::docker::{docker_command, DOCKER_SOCKET};
+use crate::testing::docker::{DOCKER_SOCKET, docker_command};
 use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";

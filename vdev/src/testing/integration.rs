@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
-    INTEGRATION_TESTS_DIR,
+    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, Environment, INTEGRATION_TESTS_DIR,
+    RustToolchainConfig,
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;

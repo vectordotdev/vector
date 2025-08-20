@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io::ErrorKind, sync::LazyLock};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 use super::config::Environment;
