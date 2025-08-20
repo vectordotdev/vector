@@ -8,7 +8,7 @@ use vector_lib::event::Event;
 use crate::config::log_schema;
 use crate::sources::okta::OktaConfig;
 use crate::test_util::{
-    components::run_and_assert_source_compliance, components::HTTP_PULL_SOURCE_TAGS, next_addr,
+    components::HTTP_PULL_SOURCE_TAGS, components::run_and_assert_source_compliance, next_addr,
     test_generate_config, wait_for_tcp,
 };
 

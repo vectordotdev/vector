@@ -13,7 +13,7 @@ use crate::{
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::StreamExt as _;
-use futures_util::{stream, FutureExt, Stream};
+use futures_util::{FutureExt, Stream, stream};
 use http::Uri;
 
 use percent_encoding::utf8_percent_encode;
@@ -25,8 +25,8 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::Decoder as _;
 use vector_lib::codecs::JsonDeserializerConfig;
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::config::proxy::ProxyConfig;
 use vector_lib::configurable::configurable_component;
@@ -34,15 +34,15 @@ use vector_lib::json_size::JsonSize;
 use vector_lib::shutdown::ShutdownSignal;
 use vector_lib::tls::TlsConfig;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceOutput},
     event::Event,
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
+    SourceSender,
     http::HttpClient,
     internal_events::{EndpointBytesReceived, StreamClosedError},
-    SourceSender,
 };
 
 use hyper::{Body, Request};
