@@ -1,6 +1,6 @@
 use std::{io::Cursor, time::Duration};
 
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use tokio::{select, time::sleep};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
@@ -8,10 +8,9 @@ use vector_common::finalization::Finalizable;
 
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
-    assert_buffer_is_empty, assert_buffer_records,
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    EventCount, assert_buffer_is_empty, assert_buffer_records,
+    test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
-    EventCount,
 };
 
 #[tokio::test]

@@ -30,7 +30,7 @@
 
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 
 pub type Port = u16;
 

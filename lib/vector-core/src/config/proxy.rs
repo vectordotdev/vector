@@ -207,11 +207,11 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use base64::prelude::{BASE64_STANDARD, Engine as _};
     use env_test_util::TempEnvVar;
     use http::{
-        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
         HeaderName, HeaderValue, Uri,
+        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
     };
     use proptest::prelude::*;
 
