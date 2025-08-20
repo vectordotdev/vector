@@ -2,22 +2,22 @@ use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
 use aws_smithy_types::byte_stream::ByteStream;
-use futures::{TryStreamExt, stream, stream::StreamExt};
+use futures::{stream, stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_lib::codecs::NewlineDelimitedDecoderConfig;
 use vector_lib::codecs::decoding::{
     DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
 };
+use vector_lib::codecs::NewlineDelimitedDecoderConfig;
 use vector_lib::config::{LegacyKey, LogNamespace};
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::owned_value_path;
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{kind::Collection, Kind};
 
 use super::util::MultilineConfig;
 use crate::codecs::DecodingConfig;
 use crate::{
-    aws::{RegionOrEndpoint, auth::AwsAuthentication, create_client, create_client_and_region},
+    aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -263,7 +263,7 @@ impl AwsS3Config {
             Some(ref sqs) => {
                 let sqs_auth = match &sqs.auth {
                     Some(AwsAuthentication::Fallback(_)) => AwsAuthentication::default(),
-                    Some(ref auth) => auth.clone(),
+                    Some(auth) => auth.clone(),
                     None => self.auth.clone(),
                 };
 
@@ -460,29 +460,29 @@ mod integration_tests {
     };
 
     use aws_sdk_s3::Client as S3Client;
-    use aws_sdk_sqs::{Client as SqsClient, types::QueueAttributeName};
+    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
     use similar_asserts::assert_eq;
-    use vector_lib::codecs::{JsonDeserializerConfig, decoding::DeserializerConfig};
+    use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
     use vector_lib::lookup::path;
     use vrl::value::Value;
 
     use super::*;
     use crate::{
-        SourceSender,
-        aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+        aws::{create_client, AwsAuthentication, RegionOrEndpoint},
         common::sqs::SqsClientBuilder,
         config::{ProxyConfig, SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
         sources::{
-            aws_s3::{S3ClientBuilder, sqs::S3Event},
+            aws_s3::{sqs::S3Event, S3ClientBuilder},
             util::MultilineConfig,
         },
         test_util::{
             collect_n,
-            components::{SOURCE_TAGS, assert_source_compliance},
+            components::{assert_source_compliance, SOURCE_TAGS},
             lines_from_gzip_file, random_lines, trace_init,
         },
+        SourceSender,
     };
 
     fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
