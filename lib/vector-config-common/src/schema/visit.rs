@@ -1,6 +1,6 @@
 use tracing::debug;
 
-use super::{get_cleaned_schema_reference, Map, RootSchema, Schema, SchemaObject, SingleOrVec};
+use super::{Map, RootSchema, Schema, SchemaObject, SingleOrVec, get_cleaned_schema_reference};
 
 /// Trait used to recursively modify a constructed schema and its subschemas.
 pub trait Visitor: std::fmt::Debug {

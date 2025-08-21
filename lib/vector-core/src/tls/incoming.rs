@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::BoxFuture, stream, FutureExt, Stream};
+use futures::{FutureExt, Stream, future::BoxFuture, stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use openssl::x509::X509;
 use snafu::ResultExt;
@@ -18,7 +18,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 use tokio_openssl::SslStream;
-use tonic::transport::{server::Connected, Certificate};
+use tonic::transport::{Certificate, server::Connected};
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
@@ -234,8 +234,8 @@ impl<S> MaybeTlsIncomingStream<S> {
         use super::MaybeTls;
 
         match &mut self.state {
-            StreamState::Accepted(ref mut stream) => Some(match stream {
-                MaybeTls::Raw(ref mut s) => s,
+            StreamState::Accepted(stream) => Some(match stream {
+                MaybeTls::Raw(s) => s,
                 MaybeTls::Tls(s) => s.get_mut(),
             }),
             StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,

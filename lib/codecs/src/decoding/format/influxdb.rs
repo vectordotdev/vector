@@ -9,8 +9,8 @@ use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::event::{Event, Metric, MetricKind, MetricTags, MetricValue};
 use vector_core::{config::DataType, schema};
-use vrl::value::kind::Collection;
 use vrl::value::Kind;
+use vrl::value::kind::Collection;
 
 use crate::decoding::format::default_lossy;
 

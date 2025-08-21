@@ -1,4 +1,4 @@
-use apache_avro::{types::Value, Decimal, Schema};
+use apache_avro::{Decimal, Schema, types::Value};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;

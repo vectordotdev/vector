@@ -3,8 +3,8 @@ use vrl::prelude::*;
 
 use crate::vrl_util::is_case_sensitive;
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
+    vrl_util::{self, add_index, evaluate_condition},
 };
 
 fn get_enrichment_table_record(
@@ -187,9 +187,9 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
+    use vrl::compiler::TargetValue;
     use vrl::compiler::prelude::TimeZone;
     use vrl::compiler::state::RuntimeState;
-    use vrl::compiler::TargetValue;
     use vrl::value;
     use vrl::value::Secrets;
 
