@@ -4,9 +4,9 @@ use vector_config_common::{attributes::CustomAttribute, constants};
 
 use crate::schema::generate_optional_schema;
 use crate::{
-    num::NumberClass,
-    schema::{generate_number_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata,
+    num::NumberClass,
+    schema::{SchemaGenerator, SchemaObject, generate_number_schema},
 };
 
 // Blanket implementation of `Configurable` for any `serde_with` helper that is also `Configurable`.
@@ -38,13 +38,15 @@ where
         T::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // Forward to the underlying `T`.
         //
         // We have to convert from `Metadata` to `Metadata` which erases the default value,
         // notably, but `serde_with` helpers should never actually have default values, so this is
         // essentially a no-op.
-        T::generate_schema(gen)
+        T::generate_schema(generator)
     }
 }
 
@@ -135,10 +137,10 @@ impl Configurable for serde_with::DurationMilliSeconds<u64, serde_with::formats:
 }
 
 impl Configurable for Option<serde_with::DurationMilliSeconds<u64, serde_with::formats::Strict>> {
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
     where
         Self: Sized,
     {
-        generate_optional_schema(&u64::as_configurable_ref(), gen)
+        generate_optional_schema(&u64::as_configurable_ref(), generator)
     }
 }

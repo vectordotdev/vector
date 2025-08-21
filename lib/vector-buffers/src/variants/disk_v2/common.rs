@@ -424,7 +424,7 @@ mod tests {
     use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
 
     use super::{
-        align16, BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT,
+        BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT, align16,
     };
 
     #[test]

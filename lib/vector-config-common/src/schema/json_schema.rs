@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{iter, ops::Deref};
 
-use super::{Map, Set, DEFINITIONS_PREFIX};
+use super::{DEFINITIONS_PREFIX, Map, Set};
 
 /// A JSON Schema.
 #[allow(clippy::large_enum_variant)]

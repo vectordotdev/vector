@@ -2,8 +2,8 @@ use super::common::{kv_list_into_value, to_hex};
 use super::proto::{
     resource::v1::Resource,
     trace::v1::{
-        span::{Event as SpanEvent, Link},
         ResourceSpans, Span, Status as SpanStatus,
+        span::{Event as SpanEvent, Link},
     },
 };
 use chrono::{DateTime, TimeZone, Utc};

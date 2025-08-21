@@ -1,11 +1,11 @@
 use bytes::Bytes;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_core::config::LogNamespace;
 use vector_core::schema::meaning;
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{DataType, log_schema},
     event::{Event, LogEvent},
     schema,
 };

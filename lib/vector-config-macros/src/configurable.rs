@@ -2,8 +2,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, quote_spanned};
 use syn::{
-    parse_macro_input, parse_quote, spanned::Spanned, token::PathSep, DeriveInput, ExprPath, Ident,
-    PathArguments, Type,
+    DeriveInput, ExprPath, Ident, PathArguments, Type, parse_macro_input, parse_quote,
+    spanned::Spanned, token::PathSep,
 };
 use vector_config_common::validation::Validation;
 
@@ -856,7 +856,9 @@ fn generate_enum_variant_schema(
         // { "field_using_enum": { "<tag>": "VariantName" } }
         Tagging::Internal { tag } => match variant.style() {
             Style::Struct => {
-                let tag_already_contained = format!("enum tag `{tag}` already contained as a field in variant; tag cannot overlap with any fields in any variant");
+                let tag_already_contained = format!(
+                    "enum tag `{tag}` already contained as a field in variant; tag cannot overlap with any fields in any variant"
+                );
 
                 // Just generate the tag field directly and pass it along to be included in the
                 // struct schema.

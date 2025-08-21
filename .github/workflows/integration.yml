@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
   pull_request:
   merge_group:
-    types: [checks_requested]
+    types: [ checks_requested ]
 
 concurrency:
   # `github.event.number` exists for pull requests, otherwise fall back to SHA for merge queue
@@ -117,7 +117,7 @@ jobs:
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/int-e2e-test.sh int ${{ matrix.service }}
+              bash scripts/run-integration-test.sh int ${{ matrix.service }}
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi

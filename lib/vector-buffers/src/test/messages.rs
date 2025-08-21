@@ -7,7 +7,7 @@ use vector_common::finalization::{
     AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable,
 };
 
-use crate::{encoding::FixedEncodable, EventCount};
+use crate::{EventCount, encoding::FixedEncodable};
 
 macro_rules! message_wrapper {
     ($id:ident: $ty:ty, $event_count:expr) => {

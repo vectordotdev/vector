@@ -2,9 +2,9 @@ use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
 use vector_common::internal_event::{
-    self, register, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
+    self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered, register,
 };
-use vector_common::{byte_size_of::ByteSizeOf, json_size::JsonSize, EventDataEq};
+use vector_common::{EventDataEq, byte_size_of::ByteSizeOf, json_size::JsonSize};
 
 use crate::config::{ComponentKey, OutputId};
 use crate::event::EventMutRef;
@@ -12,7 +12,7 @@ use crate::schema::Definition;
 use crate::{
     config,
     event::{
-        into_event_stream, EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef,
+        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef, into_event_stream,
     },
     fanout::{self, Fanout},
     schema,

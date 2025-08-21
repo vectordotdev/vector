@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs::{self, metadata, File},
+    fs::{self, File, metadata},
     io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     time,
@@ -394,7 +394,7 @@ mod test {
 
     use bytes::BytesMut;
     use flate2::write::GzEncoder;
-    use tempfile::{tempdir, TempDir};
+    use tempfile::{TempDir, tempdir};
 
     use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
 
@@ -442,15 +442,21 @@ mod test {
         fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
         let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_err());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&full_line_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&not_full_line_path, &mut buf)
-            .is_err());
+        assert!(
+            fingerprinter
+                .get_fingerprint_of_file(&empty_path, &mut buf)
+                .is_err()
+        );
+        assert!(
+            fingerprinter
+                .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .is_ok()
+        );
+        assert!(
+            fingerprinter
+                .get_fingerprint_of_file(&not_full_line_path, &mut buf)
+                .is_err()
+        );
         assert_eq!(
             fingerprinter
                 .get_fingerprint_of_file(&full_line_path, &mut buf)
@@ -725,12 +731,16 @@ mod test {
         fs::write(&duplicate_path, &medium_data).unwrap();
 
         let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&small_path, &mut buf)
-            .is_ok());
+        assert!(
+            fingerprinter
+                .get_fingerprint_of_file(&empty_path, &mut buf)
+                .is_ok()
+        );
+        assert!(
+            fingerprinter
+                .get_fingerprint_of_file(&small_path, &mut buf)
+                .is_ok()
+        );
         assert_ne!(
             fingerprinter
                 .get_fingerprint_of_file(&medium_path, &mut buf)
@@ -756,9 +766,16 @@ mod test {
 
         let mut buf = Vec::new();
         let mut small_files = HashMap::new();
-        assert!(fingerprinter
-            .get_fingerprint_or_log_error(target_dir.path(), &mut buf, &mut small_files, &NoErrors)
-            .is_none());
+        assert!(
+            fingerprinter
+                .get_fingerprint_or_log_error(
+                    target_dir.path(),
+                    &mut buf,
+                    &mut small_files,
+                    &NoErrors
+                )
+                .is_none()
+        );
     }
 
     #[test]

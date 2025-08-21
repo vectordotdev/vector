@@ -4,7 +4,7 @@
 
 use std::{iter, slice, sync::Arc, vec};
 
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
