@@ -7,8 +7,58 @@ use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
 use tokio_util::codec;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vrl::value::Value;
 
 use crate::{config::SecretBackend, signal};
+
+/// Configuration for the command that will be `exec`ed
+#[configurable_component(secrets("exec"))]
+#[configurable(metadata(docs::enum_tag_description = "The protocol version."))]
+#[derive(Clone, Debug)]
+#[serde(rename_all = "snake_case", tag = "version")]
+pub enum ExecVersion {
+    /// Expect the command to fetch the configuration options itself.
+    V1,
+
+    /// Configuration options to the command are to be curried upon each request.
+    V1_1 {
+        /// The name of the backend. This is `type` field in the backend request.
+        backend_type: String,
+        /// The configuration to pass to the secrets executable. This is the `config` field in the
+        /// backend request. Refer to the documentation of your `backend_type `to see which options
+        /// are required to be set.
+        backend_config: Value,
+    },
+}
+
+impl ExecVersion {
+    fn new_query(&self, secrets: HashSet<String>) -> ExecQuery {
+        match &self {
+            ExecVersion::V1 => ExecQuery {
+                version: "1.0".to_string(),
+                secrets,
+                r#type: None,
+                config: None,
+            },
+            ExecVersion::V1_1 {
+                backend_type,
+                backend_config,
+                ..
+            } => ExecQuery {
+                version: "1.1".to_string(),
+                secrets,
+                r#type: Some(backend_type.clone()),
+                config: Some(backend_config.clone()),
+            },
+        }
+    }
+}
+
+impl GenerateConfig for ExecVersion {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(ExecVersion::V1).unwrap()
+    }
+}
 
 /// Configuration for the `exec` secrets backend.
 #[configurable_component(secrets("exec"))]
@@ -22,6 +72,10 @@ pub struct ExecBackend {
     /// The timeout, in seconds, to wait for the command to complete.
     #[serde(default = "default_timeout_secs")]
     pub timeout: u64,
+
+    /// Settings for the protocol between Vector and the secrets executable.
+    #[serde(default = "default_protocol_version")]
+    pub protocol: ExecVersion,
 }
 
 impl GenerateConfig for ExecBackend {
@@ -29,6 +83,7 @@ impl GenerateConfig for ExecBackend {
         toml::Value::try_from(ExecBackend {
             command: vec![String::from("/path/to/script")],
             timeout: 5,
+            protocol: ExecVersion::V1,
         })
         .unwrap()
     }
@@ -38,17 +93,20 @@ const fn default_timeout_secs() -> u64 {
     5
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct ExecQuery {
-    version: String,
-    secrets: HashSet<String>,
+const fn default_protocol_version() -> ExecVersion {
+    ExecVersion::V1
 }
 
-fn new_query(secrets: HashSet<String>) -> ExecQuery {
-    ExecQuery {
-        version: "1.0".to_string(),
-        secrets,
-    }
+#[derive(Clone, Debug, Serialize)]
+struct ExecQuery {
+    // Fields in all versions starting from v1
+    version: String,
+    secrets: HashSet<String>,
+    // Fields added in v1.1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    r#type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -66,7 +124,7 @@ impl SecretBackend for ExecBackend {
         let mut output = executor::block_on(async {
             query_backend(
                 &self.command,
-                new_query(secret_keys.clone()),
+                self.protocol.new_query(secret_keys.clone()),
                 self.timeout,
                 signal_rx,
             )
