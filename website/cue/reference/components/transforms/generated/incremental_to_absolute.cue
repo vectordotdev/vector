@@ -11,7 +11,7 @@ generated: components: transforms: incremental_to_absolute: configuration: cache
 	required: false
 	type: object: options: {
 		max_bytes: {
-			description: "The maximum size in bytes of the metrics normalizer cache."
+			description: "The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead"
 			required:    false
 			type: uint: unit: "bytes"
 		}

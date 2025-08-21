@@ -28,7 +28,7 @@ pub enum NormalizerError {
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
-    /// The maximum size in bytes of the metrics normalizer cache.
+    /// The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
@@ -319,28 +319,9 @@ impl CapacityPolicy {
         self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
     }
 
-    /// Gets the total memory size of entry/series, including LRU cache overhead.
+    /// Gets the total memory size of entry/series, excluding LRU cache overhead.
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        // Content size: The actual memory used by the entry and series
-        let content_size = entry.allocated_bytes() + series.allocated_bytes();
-
-        // LRU Cache Overhead calculation:
-        // 1. HashMap entry in KeyMap:
-        //    - KeyRef (pointer to key): 8 bytes
-        //    - NodeRef (pointer to node): 8 bytes
-        //    - Hash value: 8 bytes
-        //    - Alignment/padding: ~8 bytes
-        // 2. LruEntry node:
-        //    - Key (pointer to actual key): 8 bytes
-        //    - Val (pointer to actual value): 8 bytes
-        //    - Next pointer: 8 bytes
-        //    - Prev pointer: 8 bytes
-        // 3. HashMap capacity/bookkeeping: ~8 bytes per entry (amortized)
-
-        // Total overhead per entry: ~72 bytes
-        const LRU_OVERHEAD_PER_ENTRY: usize = 72;
-
-        content_size + LRU_OVERHEAD_PER_ENTRY
+        entry.allocated_bytes() + series.allocated_bytes()
     }
 }
 
