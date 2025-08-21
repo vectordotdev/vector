@@ -75,6 +75,32 @@ components: transforms: incremental_to_absolute: {
 						}
 					}
 				},
+				{
+					metric: {
+						kind:      "incremental"
+						name:      "counter.1"
+						timestamp: "2021-07-12T07:58:46.223543Z"
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 1.1
+						}
+					}
+				},
+				{
+					metric: {
+						kind:      "incremental"
+						name:      "counter.1"
+						timestamp: "2021-07-12T08:59:45.223543Z"
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 1.1
+						}
+					}
+				},
 			]
 			configuration: {
 				cache: time_to_live: 10
@@ -103,6 +129,32 @@ components: transforms: incremental_to_absolute: {
 						}
 						counter: {
 							value: 2.2
+						}
+					}
+				},
+				{
+					metric: {
+						kind:      "absolute"
+						name:      "counter.1"
+						timestamp: "2021-07-12T07:58:46.223543Z"
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 3.3
+						}
+					}
+				},
+				{
+					metric: {
+						kind:      "absolute"
+						name:      "counter.1"
+						timestamp: "2021-07-12T08:59:45.223543Z"
+						tags: {
+							host: "my.host.com"
+						}
+						counter: {
+							value: 1.1
 						}
 					}
 				},
