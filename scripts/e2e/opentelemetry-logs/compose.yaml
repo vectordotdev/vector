@@ -57,7 +57,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG}
+        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG:-vector_default.yaml}
         target: /etc/vector/vector.yaml
         read_only: true
       - type: bind
