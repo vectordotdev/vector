@@ -102,7 +102,7 @@ jobs:
     name: Master Merge Queue Suite
     # Always run this so that pull_request triggers are marked as success.
     if: always()
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     needs:
       - changes

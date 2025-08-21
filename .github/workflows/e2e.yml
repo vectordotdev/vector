@@ -51,7 +51,7 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 45
     needs: changes
     if: always() && (
@@ -113,7 +113,7 @@ jobs:
 
   e2e-test-suite:
     name: E2E Test Suite
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     if: always()
     needs: e2e-tests

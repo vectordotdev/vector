@@ -9,7 +9,7 @@ permissions:
 jobs:
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 45
     env:
       CARGO_INCREMENTAL: 0
@@ -80,7 +80,7 @@ jobs:
 
   update-pr-status:
     name: (PR review) Signal result to PR
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     needs: cross-linux
     if: needs.cross-linux.result == 'success' && github.event_name == 'pull_request_review'

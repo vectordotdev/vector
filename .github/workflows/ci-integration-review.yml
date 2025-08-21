@@ -51,7 +51,7 @@ env:
 jobs:
   prep-pr:
     name: (PR review) Signal pending to PR
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   integration-tests:
     needs: prep-pr
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 90
     strategy:
       matrix:
@@ -115,7 +115,7 @@ jobs:
 
   e2e-tests:
     needs: prep-pr
-    runs-on: ubuntu-24.04-8core
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -154,7 +154,7 @@ jobs:
 
   update-pr-status:
     name: Signal result to PR
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     needs:
       - integration-tests

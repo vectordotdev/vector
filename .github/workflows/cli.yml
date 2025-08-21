@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   test-cli:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: 0
