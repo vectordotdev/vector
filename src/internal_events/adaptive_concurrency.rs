@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use metrics::{histogram, Histogram};
+use metrics::{Histogram, histogram};
 
 #[derive(Clone, Copy)]
 pub struct AdaptiveConcurrencyLimitData {

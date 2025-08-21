@@ -2,14 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use tracing::debug;
 use vector_config_common::schema::{
-    visit::{with_resolved_schema_reference, Visitor},
+    visit::{Visitor, with_resolved_schema_reference},
     *,
 };
 
 use crate::schema::visitors::merge::Mergeable;
 
 use super::scoped_visit::{
-    visit_schema_object_scoped, SchemaReference, SchemaScopeStack, ScopedVisitor,
+    SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
 };
 
 /// A visitor that marks schemas as closed by disallowing unknown properties via

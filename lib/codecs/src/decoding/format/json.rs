@@ -1,16 +1,16 @@
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
 use vrl::value::Kind;
 
-use super::{default_lossy, Deserializer};
+use super::{Deserializer, default_lossy};
 
 /// Config used to build a `JsonDeserializer`.
 #[configurable_component]

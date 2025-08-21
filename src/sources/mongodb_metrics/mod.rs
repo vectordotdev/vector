@@ -2,21 +2,21 @@ use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::{
-    future::{join_all, try_join_all},
     StreamExt,
+    future::{join_all, try_join_all},
 };
 use mongodb::{
-    bson::{self, doc, from_document, Bson, Document},
+    Client,
+    bson::{self, Bson, Document, doc, from_document},
     error::Error as MongoError,
     options::ClientOptions,
-    Client,
 };
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, metric_tags};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -1078,22 +1078,25 @@ mod tests {
         let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
         let client_options = ClientOptions::parse(endpoint).await.unwrap();
         let endpoint = sanitize_endpoint(endpoint, &client_options);
-        assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");
+        assert_eq!(
+            &endpoint,
+            "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true"
+        );
     }
 }
 
 #[cfg(all(test, feature = "mongodb_metrics-integration-tests"))]
 mod integration_tests {
     use futures::StreamExt;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     use super::*;
     use crate::{
+        SourceSender,
         test_util::{
-            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            components::{PULL_SOURCE_TAGS, assert_source_compliance},
             trace_init,
         },
-        SourceSender,
     };
 
     fn primary_mongo_address() -> String {

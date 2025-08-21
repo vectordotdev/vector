@@ -27,7 +27,7 @@ impl IntoLua for LuaEvent {
                     from: String::from("Event"),
                     to: "table",
                     message: Some("Trace are not supported".to_string()),
-                })
+                });
             }
         }
         Ok(LuaValue::Table(table))
@@ -67,8 +67,8 @@ impl FromLua for Event {
 mod test {
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricValue},
         Metric, Value,
+        metric::{MetricKind, MetricValue},
     };
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {

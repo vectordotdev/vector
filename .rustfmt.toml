@@ -1,4 +1,4 @@
-edition = "2021"
+edition = "2024"
 newline_style = "unix"
 reorder_imports = true
 

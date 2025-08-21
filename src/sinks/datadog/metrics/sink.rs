@@ -3,9 +3,9 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use chrono::Utc;
 use futures_util::{
+    StreamExt,
     future::ready,
     stream::{self, BoxStream},
-    StreamExt,
 };
 use tower::Service;
 use vector_lib::stream::{BatcherSettings, DriverResponse};
@@ -22,9 +22,9 @@ use super::{
 use crate::{
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
+        SinkBuilderExt,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
         request_builder::default_request_builder_concurrency_limit,
-        SinkBuilderExt,
     },
 };
 

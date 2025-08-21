@@ -16,8 +16,8 @@ use std::{
 use indexmap::IndexMap;
 use serde_with::serde_as;
 use vector_config::{
-    component::GenerateConfig, configurable_component, schema::generate_root_schema,
-    ConfigurableString,
+    ConfigurableString, component::GenerateConfig, configurable_component,
+    schema::generate_root_schema,
 };
 
 /// A templated string.

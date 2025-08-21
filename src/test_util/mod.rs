@@ -3,25 +3,25 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
-    future::{ready, Future},
+    future::{Future, ready},
     io::Read,
     iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use chrono::{DateTime, SubsecRound, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -29,7 +29,7 @@ use tokio::{
     runtime,
     sync::oneshot,
     task::JoinHandle,
-    time::{sleep, Duration, Instant},
+    time::{Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]

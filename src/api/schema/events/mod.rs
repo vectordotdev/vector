@@ -6,9 +6,9 @@ pub mod trace;
 
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use futures::{stream, Stream, StreamExt};
-use output::{from_tap_payload_to_output_events, OutputEventsPayload};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use futures::{Stream, StreamExt, stream};
+use output::{OutputEventsPayload, from_tap_payload_to_output_events};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;

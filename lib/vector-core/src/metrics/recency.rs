@@ -48,14 +48,14 @@
 //! not, and thus whether it should actually be deleted.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use metrics::{atomics::AtomicU64, Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
+use metrics::{Counter, CounterFn, Gauge, GaugeFn, HistogramFn, atomics::AtomicU64};
 use metrics_util::{
-    registry::{Registry, Storage},
     Hashable, MetricKind, MetricKindMask,
+    registry::{Registry, Storage},
 };
 use parking_lot::Mutex;
 use quanta::{Clock, Instant};
@@ -82,7 +82,7 @@ pub(super) struct Generation(usize);
 #[derive(Clone)]
 pub(super) struct Generational<T> {
     inner: T,
-    gen: Arc<AtomicUsize>,
+    generation: Arc<AtomicUsize>,
 }
 
 impl<T> Generational<T> {
@@ -90,7 +90,7 @@ impl<T> Generational<T> {
     fn new(inner: T) -> Generational<T> {
         Generational {
             inner,
-            gen: Arc::new(AtomicUsize::new(0)),
+            generation: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -101,7 +101,7 @@ impl<T> Generational<T> {
 
     /// Gets the current generation.
     pub(super) fn get_generation(&self) -> Generation {
-        Generation(self.gen.load(Ordering::Acquire))
+        Generation(self.generation.load(Ordering::Acquire))
     }
 
     /// Acquires a reference to the inner value, and increments the generation.
@@ -110,7 +110,7 @@ impl<T> Generational<T> {
         F: Fn(&T) -> V,
     {
         let result = f(&self.inner);
-        _ = self.gen.fetch_add(1, Ordering::AcqRel);
+        _ = self.generation.fetch_add(1, Ordering::AcqRel);
         result
     }
 }
@@ -389,7 +389,7 @@ where
             .lock()
             .get_timeout_for_key(key, self.global_idle_timeout);
 
-        let gen = value.get_generation();
+        let generation = value.get_generation();
         if let Some(timeout) = key_timeout {
             if self.mask.matches(kind) {
                 let mut guard = self.inner.lock();
@@ -399,7 +399,7 @@ where
                 let deleted = if let Some((last_gen, last_update)) = entries.get_mut(key) {
                     // If the value is the same as the latest value we have internally, and
                     // we're over the idle timeout period, then remove it and continue.
-                    if *last_gen == gen {
+                    if *last_gen == generation {
                         // We don't want to delete the metric if there is an outstanding handle that
                         // could later update the shared value. So, here we look up the count of
                         // references to the inner value to see if there are more than expected.
@@ -416,11 +416,11 @@ where
                     } else {
                         // Value has changed, so mark it such.
                         *last_update = now;
-                        *last_gen = gen;
+                        *last_gen = generation;
                         false
                     }
                 } else {
-                    entries.insert(key.clone(), (gen, now));
+                    entries.insert(key.clone(), (generation, now));
                     false
                 };
 

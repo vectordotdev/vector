@@ -1,8 +1,8 @@
+use vector_lib::codecs::MetricTagValues;
 use vector_lib::codecs::encoding::FramingConfig;
 use vector_lib::codecs::encoding::JsonSerializerConfig;
 use vector_lib::codecs::encoding::JsonSerializerOptions;
 use vector_lib::codecs::encoding::SerializerConfig;
-use vector_lib::codecs::MetricTagValues;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
@@ -11,11 +11,11 @@ use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::Auth as HttpAuthConfig,
     sinks::{
+        Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     tls::TlsConfig,
 };
@@ -196,7 +196,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::axiom::AxiomConfig,
-        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
     };
 
     #[tokio::test]

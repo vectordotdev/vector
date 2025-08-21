@@ -3,22 +3,22 @@ use std::fmt::Write as _;
 use std::str::Utf8Error;
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use hickory_proto::dnssec::rdata::{DNSSECRData, CDNSKEY, CDS, DNSKEY, DS};
 use hickory_proto::dnssec::SupportedAlgorithms;
+use hickory_proto::dnssec::rdata::{CDNSKEY, CDS, DNSKEY, DNSSECRData, DS};
 use hickory_proto::rr::rdata::caa::Property;
 use hickory_proto::{
-    op::{message::Message as TrustDnsMessage, Query},
+    ProtoError,
+    op::{Query, message::Message as TrustDnsMessage},
     rr::{
+        Name, RecordType,
         rdata::{
-            opt::{EdnsCode, EdnsOption},
             A, AAAA, NULL, OPT, SVCB,
+            opt::{EdnsCode, EdnsOption},
         },
         record_data::RData,
         resource::Record,
-        Name, RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
-    ProtoError,
 };
 use snafu::Snafu;
 
@@ -1302,25 +1302,25 @@ mod tests {
         rr::{
             domain::Name,
             rdata::{
+                CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
                 caa::KeyValue,
                 sshfp::{Algorithm, FingerprintType},
                 svcb,
                 tlsa::{CertUsage, Matching, Selector},
-                CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
             },
         },
     };
     use hickory_proto::{
         dnssec::{
-            rdata::{
-                key::{KeyTrust, KeyUsage, Protocol},
-                KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
-            },
             Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
+            rdata::{
+                KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
+                key::{KeyTrust, KeyUsage, Protocol},
+            },
         },
         rr::rdata::{
-            cert::{Algorithm as CertAlgorithm, CertType},
             CERT,
+            cert::{Algorithm as CertAlgorithm, CertType},
         },
         serialize::binary::Restrict,
     };
@@ -1390,8 +1390,7 @@ mod tests {
 
     #[test]
     fn test_parse_as_query_message_with_ede_with_extra_text() {
-        let raw_dns_message =
-            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
+        let raw_dns_message = "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
         let raw_query_message = BASE64
             .decode(raw_dns_message.as_bytes())
             .expect("Invalid base64 encoded data.");
@@ -1532,9 +1531,11 @@ mod tests {
         let raw_update_message = BASE64
             .decode(raw_dns_message.as_bytes())
             .expect("Invalid base64 encoded data.");
-        assert!(DnsMessageParser::new(raw_update_message)
-            .parse_as_update_message()
-            .is_err());
+        assert!(
+            DnsMessageParser::new(raw_update_message)
+                .parse_as_update_message()
+                .is_err()
+        );
     }
 
     #[test]
@@ -1544,9 +1545,11 @@ mod tests {
         let raw_query_message = BASE64
             .decode(raw_dns_message.as_bytes())
             .expect("Invalid base64 encoded data.");
-        assert!(DnsMessageParser::new(raw_query_message)
-            .parse_as_query_message()
-            .is_err());
+        assert!(
+            DnsMessageParser::new(raw_query_message)
+                .parse_as_query_message()
+                .is_err()
+        );
     }
 
     #[test]
@@ -2087,7 +2090,7 @@ mod tests {
             "5ZWBgAABAAEAAAABBm1pbmZvbwhleGFtcGxlMQNjb20AAA4AAcAMAA4AAQAADGsADQRmcmVkwBMDam9lwBMAACkQAAAAAAAAHAAKABgZ5zwJEK3VJQEAAABfSBqpS2bKf9CNBXg=",
             "BGZyZWTAEwNqb2XAEw==",
             14,
-            "fred.example1.com. joe.example1.com."
+            "fred.example1.com. joe.example1.com.",
         );
     }
 

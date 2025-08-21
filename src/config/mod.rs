@@ -50,29 +50,29 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
-pub use cmd::{cmd, Opts};
+pub use cmd::{Opts, cmd};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
-    load_from_str, load_source_from_paths, merge_path_lists, process_paths, COLLECTOR,
-    CONFIG_PATHS,
+    COLLECTOR, CONFIG_PATHS, load, load_builder_from_paths, load_from_paths,
+    load_from_paths_with_provider_and_secrets, load_from_str, load_source_from_paths,
+    merge_path_lists, process_paths,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
 pub use sink::{BoxedSink, SinkConfig, SinkContext, SinkHealthcheckOptions, SinkOuter};
 pub use source::{BoxedSource, SourceConfig, SourceContext, SourceOuter};
 pub use transform::{
-    get_transform_output_ids, BoxedTransform, TransformConfig, TransformContext, TransformOuter,
+    BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
-pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
+pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
 pub use validation::warnings;
-pub use vars::{interpolate, ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX};
+pub use vars::{ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX, interpolate};
 pub use vector_lib::{
     config::{
-        init_log_schema, init_telemetry, log_schema, proxy::ProxyConfig, telemetry, ComponentKey,
-        LogSchema, OutputId,
+        ComponentKey, LogSchema, OutputId, init_log_schema, init_telemetry, log_schema,
+        proxy::ProxyConfig, telemetry,
     },
     id::Inputs,
 };
@@ -584,7 +584,7 @@ mod tests {
     use crate::{config, topology};
     use indoc::indoc;
 
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, ConfigDiff, Format};
+    use super::{ComponentKey, ConfigDiff, Format, builder::ConfigBuilder, format, load_from_str};
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
@@ -1334,12 +1334,13 @@ mod resource_config_tests {
     use indoc::indoc;
     use vector_lib::configurable::schema::generate_root_schema;
 
-    use super::{load_from_str, Format};
+    use super::{Format, load_from_str};
 
     #[test]
     fn config_conflict_detected() {
-        assert!(load_from_str(
-            indoc! {r#"
+        assert!(
+            load_from_str(
+                indoc! {r#"
                 [sources.in0]
                   type = "stdin"
 
@@ -1351,9 +1352,10 @@ mod resource_config_tests {
                   inputs = ["in0","in1"]
                   encoding.codec = "json"
             "#},
-            Format::Toml,
-        )
-        .is_err());
+                Format::Toml,
+            )
+            .is_err()
+        );
     }
 
     #[test]

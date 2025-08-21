@@ -15,19 +15,19 @@ use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use vector_lib::{
-    codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig},
-    lookup::{owned_value_path, OwnedTargetPath},
-};
-use vector_lib::{
     codecs::{
-        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
         BytesDecoder, BytesDeserializer,
+        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
     },
     config::DataType,
 };
 use vector_lib::{
+    codecs::{CharacterDelimitedDecoderConfig, decoding::CharacterDelimitedDecoderOptions},
+    lookup::{OwnedTargetPath, owned_value_path},
+};
+use vector_lib::{
     config::LogNamespace,
-    event::{metric::TagValue, MetricTags},
+    event::{MetricTags, metric::TagValue},
     metric_tags,
 };
 use vrl::compiler::value::Collection;
@@ -36,25 +36,24 @@ use vrl::value::{Kind, ObjectMap};
 
 use crate::schema::Definition;
 use crate::{
+    SourceSender,
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream,
+        Event, EventStatus, Metric, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
-        Event, EventStatus, Metric, Value,
     },
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
+        DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
+        ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
-        components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+        components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
         next_addr, spawn_collect_n, trace_init, wait_for_tcp,
     },
-    SourceSender,
 };
 
 fn test_logs_schema_definition() -> schema::Definition {
