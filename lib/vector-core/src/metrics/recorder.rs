@@ -1,9 +1,9 @@
-use std::sync::{atomic::Ordering, Arc, RwLock};
+use std::sync::{Arc, RwLock, atomic::Ordering};
 use std::{cell::OnceCell, time::Duration};
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
-use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
+use metrics_util::{MetricKindMask, registry::Registry as MetricsRegistry};
 use quanta::Clock;
 
 use super::metric_matcher::MetricKeyMatcher;

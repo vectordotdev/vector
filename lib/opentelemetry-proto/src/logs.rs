@@ -1,13 +1,13 @@
 use super::common::{kv_list_into_value, to_hex};
 use crate::proto::{
-    common::v1::{any_value::Value as PBValue, InstrumentationScope},
+    common::v1::{InstrumentationScope, any_value::Value as PBValue},
     logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
     resource::v1::Resource,
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
-    config::{log_schema, LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, log_schema},
     event::{Event, LogEvent},
 };
 use vrl::core::Value;

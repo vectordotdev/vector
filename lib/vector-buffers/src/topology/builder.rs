@@ -6,10 +6,10 @@ use tracing::Span;
 
 use super::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{
+    Bufferable, WhenFull,
     buffer_usage_data::{BufferUsage, BufferUsageHandle},
     topology::channel::{BufferReceiver, BufferSender},
     variants::MemoryBuffer,
-    Bufferable, WhenFull,
 };
 
 /// Value that can be used as a stage in a buffer topology.
@@ -263,12 +263,12 @@ mod tests {
 
     use super::TopologyBuilder;
     use crate::{
+        WhenFull,
         topology::{
             builder::TopologyError,
-            test_util::{assert_current_send_capacity, Sample},
+            test_util::{Sample, assert_current_send_capacity},
         },
         variants::MemoryBuffer,
-        WhenFull,
     };
 
     #[tokio::test]

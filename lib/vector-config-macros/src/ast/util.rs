@@ -1,9 +1,9 @@
 use darling::{ast::NestedMeta, error::Accumulator};
-use quote::{quote, ToTokens};
-use serde_derive_internals::{attr as serde_attr, Ctxt};
+use quote::{ToTokens, quote};
+use serde_derive_internals::{Ctxt, attr as serde_attr};
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Expr, ExprLit, ExprPath,
-    Lit, Meta, MetaNameValue,
+    Attribute, Expr, ExprLit, ExprPath, Lit, Meta, MetaNameValue, punctuated::Punctuated,
+    spanned::Spanned, token::Comma,
 };
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
@@ -138,11 +138,7 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
 }
 
 fn none_if_empty(s: String) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
-    }
+    if s.is_empty() { None } else { Some(s) }
 }
 
 pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
