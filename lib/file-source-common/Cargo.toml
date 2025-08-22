@@ -24,6 +24,7 @@ dashmap = { version = "6.1", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["rust_backend"] }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
+tokio.workspace = true
 
 [dev-dependencies]
 criterion = "0.7"

@@ -151,7 +151,8 @@ where
                 &mut fingerprint_buffer,
             );
 
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
+                .await;
         }
         self.emitter.emit_files_open(fp_map.len());
 
@@ -218,7 +219,7 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -236,13 +237,14 @@ where
                                             new_modified_time = ?new_modified_time,
                                             old_modified_time = ?old_modified_time,
                                         );
-                                        watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                                        watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                                     }
                                 }
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
+                                .await;
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -304,7 +306,7 @@ where
                 while let Ok(RawLineResult {
                     raw_line: Some(line),
                     discarded_for_size_and_truncated,
-                }) = watcher.read_line()
+                }) = watcher.read_line().await
                 {
                     discarded_for_size_and_truncated.iter().for_each(|buf| {
                         self.emitter.emit_file_line_too_long(
@@ -442,7 +444,7 @@ where
         }
     }
 
-    fn watch_new_file(
+    async fn watch_new_file(
         &self,
         path: PathBuf,
         file_id: FileFingerprint,
@@ -482,7 +484,9 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
-        ) {
+        )
+        .await
+        {
             Ok(mut watcher) => {
                 if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);

@@ -19,7 +19,7 @@ pub async fn run_file_server<PP, E, C, S>(
     checkpointer: Checkpointer,
 ) -> Result<FileServerShutdown, tokio::task::JoinError>
 where
-    PP: PathsProvider + Send + 'static,
+    PP: PathsProvider + Send + Sync + 'static,
     E: FileSourceInternalEvents,
     C: Sink<Vec<Line>> + Unpin + Send + 'static,
     <C as Sink<Vec<Line>>>::Error: Error + Send,

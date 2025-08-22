@@ -1,12 +1,9 @@
-use std::{
-    cmp::min,
-    io::{self, BufRead},
-};
+use crate::FilePosition;
+use std::{cmp::min, io, pin::Pin};
 
 use bstr::Finder;
 use bytes::BytesMut;
-
-use crate::FilePosition;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 
 pub struct ReadResult {
     pub successfully_read: Option<usize>,
@@ -36,8 +33,8 @@ pub struct ReadResult {
 /// Benchmarks indicate that this function processes in the high single-digit
 /// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
 /// the overhead of setup dominates our benchmarks.
-pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
-    reader: &'a mut R,
+pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
+    reader: Pin<Box<&'a mut R>>,
     position: &'a mut FilePosition,
     delim: &'a [u8],
     buf: &'a mut BytesMut,
@@ -48,8 +45,9 @@ pub fn read_until_with_max_size<'a, R: BufRead + ?Sized>(
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     let mut discarded_for_size_and_truncated = Vec::new();
+    let mut reader = Box::new(reader);
     loop {
-        let available: &[u8] = match reader.fill_buf() {
+        let available: &[u8] = match reader.fill_buf().await {
             Ok(n) => n,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
@@ -113,6 +111,7 @@ mod test {
 
     use bytes::{BufMut, BytesMut};
     use quickcheck::{QuickCheck, TestResult};
+    use tokio::io::BufReader;
 
     use crate::buffer::ReadResult;
 
@@ -187,16 +186,18 @@ mod test {
         // this model a single byte does well enough.
         let delimiter: [u8; 1] = [delim];
         for (idx, chunk) in chunks.iter().enumerate() {
-            let mut reader = Cursor::new(&chunk);
+            let mut reader = BufReader::new(Cursor::new(&chunk));
 
-            match read_until_with_max_size(
-                &mut reader,
-                &mut position,
-                &delimiter,
-                &mut buffer,
-                max_size.get() as usize,
-            )
-            .unwrap()
+            let handle = tokio::runtime::Handle::current();
+            match handle
+                .block_on(read_until_with_max_size(
+                    Box::pin(&mut reader),
+                    &mut position,
+                    &delimiter,
+                    &mut buffer,
+                    max_size.get() as usize,
+                ))
+                .unwrap()
             {
                 ReadResult {
                     successfully_read: None,
@@ -235,8 +236,8 @@ mod test {
         TestResult::passed()
     }
 
-    #[test]
-    fn qc_read_until_with_max_size() {
+    #[tokio::test]
+    async fn qc_read_until_with_max_size() {
         // The `read_until_with_max` function is intended to be called
         // multiple times until it returns Ok(Some(usize)). The function
         // should never return error in this test. If the return is None we

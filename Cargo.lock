@@ -3768,6 +3768,7 @@ checksum = "a481586acf778f1b1455424c343f71124b048ffa5f4fc3f8f6ae9dc432dcb3c7"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "async-compression",
  "bytes 1.10.1",
  "chrono",
  "criterion",
@@ -3806,6 +3807,7 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "tempfile",
+ "tokio",
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
