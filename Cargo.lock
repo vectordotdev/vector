@@ -3774,6 +3774,7 @@ dependencies = [
  "file-source-common",
  "flate2",
  "futures 0.3.31",
+ "futures-util",
  "glob",
  "indexmap 2.10.0",
  "libc",

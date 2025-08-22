@@ -1,7 +1,6 @@
 use std::{
     cmp,
     collections::{BTreeMap, HashMap},
-    fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
     time::{self, Duration},
@@ -13,8 +12,14 @@ use futures::{
     future::{select, Either},
     Future, Sink, SinkExt,
 };
+use futures_util::future::join_all;
 use indexmap::IndexMap;
-use tokio::time::sleep;
+use tokio::{
+    fs::{self, remove_file},
+    task::JoinSet,
+};
+use tokio::{task::Id, time::sleep};
+
 use tracing::{debug, error, info, trace};
 
 use file_source_common::{
@@ -115,16 +120,30 @@ where
             }
         }
 
-        existing_files.sort_by_key(|(path, _file_id)| {
-            fs::metadata(path)
-                .and_then(|m| m.created())
+        let metadata = join_all(
+            existing_files
+                .iter()
+                .map(|(path, _file_id)| fs::metadata(path)),
+        )
+        .await;
+
+        let created = metadata.into_iter().map(|m| {
+            m.and_then(|m| m.created())
                 .map(DateTime::<Utc>::from)
                 .unwrap_or_else(|_| Utc::now())
         });
 
+        let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
+            .into_iter()
+            .zip(created)
+            .map(|((path, file_id), key)| (key, path, file_id))
+            .collect();
+
+        existing_files.sort_by_key(|(key, _, _)| *key);
+
         let checkpoints = checkpointer.view();
 
-        for (path, file_id) in existing_files {
+        for (_key, path, file_id) in existing_files {
             checkpointer.maybe_upgrade(
                 &path,
                 file_id,
@@ -208,8 +227,8 @@ where
                                 );
                                 let (old_path, new_path) = (&watcher.path, &path);
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(old_path).and_then(|m| m.modified()),
-                                    fs::metadata(new_path).and_then(|m| m.modified()),
+                                    fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
                                 ) {
                                     if old_modified_time < new_modified_time {
                                         info!(
@@ -233,25 +252,43 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                known_small_files.retain(|path, last_time_open| {
-                    // Should the file be removed
-                    if last_time_open.elapsed() >= grace_period {
-                        // Try to remove
-                        match remove_file(path) {
-                            Ok(()) => {
-                                self.emitter.emit_file_deleted(path);
-                                false
-                            }
-                            Err(error) => {
-                                // We will try again after some time.
-                                self.emitter.emit_file_delete_error(path, error);
-                                true
+                let mut set = JoinSet::new();
+
+                let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
+                    .iter()
+                    .filter_map(|(path, last_time_open)| {
+                        (last_time_open.elapsed() >= grace_period).then(|| path.clone())
+                    })
+                    .map(|path| {
+                        let path_ = path.clone();
+                        let abort_handle =
+                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
+                        (abort_handle.id(), path)
+                    })
+                    .collect();
+
+                while let Some(res) = set.join_next().await {
+                    match res {
+                        Ok((path, Ok(()))) => {
+                            let removed = known_small_files.remove(&path);
+
+                            if let Some(_) = removed {
+                                self.emitter.emit_file_deleted(&path);
                             }
                         }
-                    } else {
-                        true
+                        Ok((path, Err(err))) => {
+                            self.emitter.emit_file_delete_error(&path, err);
+                        }
+                        Err(err) => {
+                            self.emitter.emit_file_delete_error(
+                                remove_file_tasks
+                                    .get(&err.id())
+                                    .expect("panicked task id not in task id pool"),
+                                std::io::Error::from_raw_os_error(1), // FIXME actually use `err`
+                            );
+                        }
                     }
-                });
+                }
             }
 
             // Collect lines by polling files.
@@ -309,7 +346,7 @@ where
                     if let Some(grace_period) = self.remove_after {
                         if watcher.last_read_success().elapsed() >= grace_period {
                             // Try to remove
-                            match remove_file(&watcher.path) {
+                            match remove_file(&watcher.path).await {
                                 Ok(()) => {
                                     self.emitter.emit_file_deleted(&watcher.path);
                                     watcher.set_dead();

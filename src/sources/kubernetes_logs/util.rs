@@ -25,6 +25,7 @@ where
     <C as Sink<Vec<Line>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
+    <<PP as PathsProvider>::IntoIter as IntoIterator>::IntoIter: Send,
 {
     let span = info_span!("file_server");
     let join_handle = tokio::spawn(async move {
