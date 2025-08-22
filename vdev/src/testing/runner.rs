@@ -4,11 +4,11 @@ use std::{env, path::PathBuf};
 
 use anyhow::Result;
 
-use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
+use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
+use crate::env_vars::{append_environment_variables, Environment};
 use crate::testing::build::prepare_build_command;
 use crate::testing::docker::{docker_command, DOCKER_SOCKET};
-use crate::testing::integration::append_config_environment_variables;
 use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -249,7 +249,7 @@ where
             }
             command.args(["--env", key]);
         }
-        append_config_environment_variables(&mut command, "--env", config_environment_variables);
+        append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
         command.args(TEST_COMMAND);

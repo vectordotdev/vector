@@ -1,8 +1,8 @@
 use crate::app;
 use crate::app::CommandExt;
-use crate::testing::config::{Environment, RustToolchainConfig};
+use crate::env_vars::{extract_present, rename_environment_keys, Environment};
+use crate::testing::config::RustToolchainConfig;
 use crate::testing::docker::docker_command;
-use crate::testing::integration::append_config_environment_variables;
 use crate::util::IS_A_TTY;
 use anyhow::Result;
 use std::path::PathBuf;
@@ -46,7 +46,8 @@ pub fn prepare_build_command(
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
     ]);
 
-    append_config_environment_variables(&mut command, "--build-arg", config_environment_variables);
+    let env_vars = extract_present(&rename_environment_keys(config_environment_variables));
+    command.envs(env_vars);
 
     command.args(["."]);
     command

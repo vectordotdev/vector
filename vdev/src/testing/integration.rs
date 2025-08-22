@@ -4,12 +4,12 @@ use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
-    INTEGRATION_TESTS_DIR,
+    ComposeConfig, ComposeTestConfig, RustToolchainConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
+use crate::env_vars::{extract_present, rename_environment_keys, Environment};
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
 use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
@@ -121,8 +121,8 @@ impl ComposeTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in adapt_environment_variables(&self.env_config) {
-            env_vars.insert(key, Some(value));
+        for (key, value) in rename_environment_keys(&self.env_config) {
+            env_vars.insert(key, value);
         }
 
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
@@ -196,7 +196,7 @@ impl ComposeTest {
                 bail!("environment is already up");
             }
 
-            compose.start(&self.env_config)?;
+            compose.start(&rename_environment_keys(&self.env_config))?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
         } else {
@@ -278,9 +278,11 @@ impl Compose {
         }
     }
 
-    fn start(&self, config: &Environment) -> Result<()> {
-        self.prepare()?;
-        self.run("Starting", &["up", "--detach"], Some(config))
+    fn start(&self, environment: &Environment) -> Result<()> {
+        #[cfg(unix)]
+        unix::prepare_compose_volumes(&self.config, &self.test_dir, &environment)?;
+
+        self.run("Starting", &["up", "--detach"], Some(environment))
     }
 
     fn stop(&self) -> Result<()> {
@@ -292,7 +294,12 @@ impl Compose {
         )
     }
 
-    fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
+    fn run(
+        &self,
+        action: &str,
+        args: &[&'static str],
+        environment: Option<&Environment>,
+    ) -> Result<()> {
         let mut command = Command::new(CONTAINER_TOOL.clone());
         command.arg("compose");
         // When the integration test environment is already active, the tempfile path does not
@@ -323,45 +330,12 @@ impl Compose {
                 command.env(key, value);
             }
         }
-        if let Some(config) = config {
-            command.envs(adapt_environment_variables(config));
+        if let Some(config) = environment {
+            command.envs(extract_present(&config));
         }
 
         waiting!("{action} service environment");
         command.check_run()
-    }
-
-    fn prepare(&self) -> Result<()> {
-        #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.config, &self.test_dir)?;
-        Ok(())
-    }
-}
-
-pub(crate) fn adapt_environment_variables(
-    config: &Environment,
-) -> impl Iterator<Item = (String, String)> + '_ {
-    config.iter().filter_map(|(var, value)| {
-        value.as_ref().map(|value| {
-            (
-                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
-                value.to_string(),
-            )
-        })
-    })
-}
-
-pub(crate) fn append_config_environment_variables(
-    command: &mut Command,
-    arg_type: &str,
-    config_environment_variables: &Environment,
-) {
-    for (key, value) in config_environment_variables {
-        command.arg(arg_type);
-        match value {
-            Some(value) => command.arg(format!("{key}={value}")),
-            None => command.arg(key),
-        };
     }
 }
 
@@ -372,6 +346,7 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     use super::super::config::ComposeConfig;
+    use crate::env_vars::{resolve_placeholders, Environment};
     use crate::testing::config::VolumeMount;
     use anyhow::{Context, Result};
 
@@ -381,7 +356,11 @@ mod unix {
     const ALL_READ_DIR: u32 = 0o555;
 
     /// Fix up potential issues before starting a compose container
-    pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
+    pub fn prepare_compose_volumes(
+        config: &ComposeConfig,
+        test_dir: &Path,
+        environment: &Environment,
+    ) -> Result<()> {
         for service in config.services.values() {
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
@@ -393,12 +372,12 @@ mod unix {
                         }
                         VolumeMount::Long { source, .. } => source,
                     };
-
-                    if !config.volumes.contains_key(source)
+                    let source = resolve_placeholders(&source, environment);
+                    if !config.volumes.contains_key(&source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')
                     {
-                        let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
+                        let path: PathBuf = [test_dir, Path::new(&source)].iter().collect();
                         add_read_permission(&path)?;
                     }
                 }
