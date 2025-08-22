@@ -59,6 +59,6 @@ pub fn resolve_placeholders(input: &str, environment: &Environment) -> String {
 
 fn lookup(name: &str, env: &Environment) -> Option<String> {
     env.get(name)
-        .and_then(|opt| opt.clone())
+        .and_then(std::clone::Clone::clone)
         .or_else(|| std::env::var(name).ok())
 }

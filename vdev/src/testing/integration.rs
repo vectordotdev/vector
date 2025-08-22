@@ -280,7 +280,7 @@ impl Compose {
 
     fn start(&self, environment: &Environment) -> Result<()> {
         #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.config, &self.test_dir, &environment)?;
+        unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
 
         self.run("Starting", &["up", "--detach"], Some(environment))
     }
@@ -330,8 +330,8 @@ impl Compose {
                 command.env(key, value);
             }
         }
-        if let Some(config) = environment {
-            command.envs(extract_present(&config));
+        if let Some(environment) = environment {
+            command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");
@@ -372,7 +372,7 @@ mod unix {
                         }
                         VolumeMount::Long { source, .. } => source,
                     };
-                    let source = resolve_placeholders(&source, environment);
+                    let source = resolve_placeholders(source, environment);
                     if !config.volumes.contains_key(&source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')

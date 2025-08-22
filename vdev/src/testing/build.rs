@@ -46,7 +46,7 @@ pub fn prepare_build_command(
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
     ]);
 
-    command.envs(extract_present(&config_environment_variables));
+    command.envs(extract_present(config_environment_variables));
 
     command.args(["."]);
     command
