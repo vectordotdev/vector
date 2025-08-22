@@ -8,12 +8,13 @@ use vector_lib::codecs::NativeDeserializerConfig;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
+    SourceSender,
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
@@ -21,9 +22,8 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server, Source},
+    sources::{Source, util::grpc::run_grpc_server},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 /// Marker type for version two of the configuration for the `vector` source.
@@ -219,7 +219,7 @@ impl SourceConfig for VectorConfig {
 mod test {
     use vector_lib::lookup::owned_value_path;
     use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{kind::Collection, Kind};
+    use vrl::value::{Kind, kind::Collection};
 
     use crate::config::SourceConfig;
 
@@ -280,9 +280,10 @@ mod test {
 mod tests {
     use super::*;
     use crate::{
+        SourceSender,
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util, SourceSender,
+        test_util,
     };
     use vector_lib::assert_event_data_eq;
     use vector_lib::config::log_schema;

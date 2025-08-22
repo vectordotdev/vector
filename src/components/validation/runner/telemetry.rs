@@ -17,7 +17,7 @@ use crate::{
     test_util::next_addr,
 };
 
-use super::io::{spawn_grpc_server, EventForwardService};
+use super::io::{EventForwardService, spawn_grpc_server};
 
 const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";

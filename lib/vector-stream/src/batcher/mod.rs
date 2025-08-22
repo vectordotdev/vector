@@ -4,13 +4,13 @@ pub mod limiter;
 
 use std::{
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 pub use config::BatchConfig;
 use futures::{
-    stream::{Fuse, Stream},
     Future, StreamExt,
+    stream::{Fuse, Stream},
 };
 use pin_project::pin_project;
 use tokio::time::Sleep;
@@ -66,7 +66,7 @@ where
                         } else {
                             Poll::Ready(Some(this.state.take_batch()))
                         }
-                    }
+                    };
                 }
                 Poll::Ready(Some(item)) => {
                     let (item_fits, item_metadata) = this.state.item_fits_in_batch(&item);
@@ -100,7 +100,7 @@ where
                         } else {
                             Poll::Pending
                         }
-                    }
+                    };
                 }
             }
         }

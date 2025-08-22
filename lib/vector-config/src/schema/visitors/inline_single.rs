@@ -7,7 +7,7 @@ use vector_config_common::schema::{visit::Visitor, *};
 use crate::schema::visitors::merge::Mergeable;
 
 use super::scoped_visit::{
-    visit_schema_object_scoped, SchemaReference, SchemaScopeStack, ScopedVisitor,
+    SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
 };
 
 /// A visitor that inlines schema references where the referenced schema is only referenced once.

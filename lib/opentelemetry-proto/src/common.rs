@@ -1,4 +1,4 @@
-use super::proto::common::v1::{any_value::Value as PBValue, KeyValue};
+use super::proto::common::v1::{KeyValue, any_value::Value as PBValue};
 use bytes::Bytes;
 use ordered_float::NotNan;
 use vector_core::event::metric::TagValue;

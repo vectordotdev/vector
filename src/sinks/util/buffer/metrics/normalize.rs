@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 use vector_lib::event::{
-    metric::{MetricData, MetricSeries},
     EventMetadata, Metric, MetricKind,
+    metric::{MetricData, MetricSeries},
 };
 
 use serde_with::serde_as;

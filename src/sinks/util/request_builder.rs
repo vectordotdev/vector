@@ -3,7 +3,7 @@ use std::{io, num::NonZeroUsize};
 use bytes::Bytes;
 use vector_lib::request_metadata::{GroupedCountByteSize, RequestMetadata};
 
-use super::{encoding::Encoder, metadata::RequestMetadataBuilder, Compression, Compressor};
+use super::{Compression, Compressor, encoding::Encoder, metadata::RequestMetadataBuilder};
 
 pub fn default_request_builder_concurrency_limit() -> NonZeroUsize {
     if let Some(limit) = std::env::var("VECTOR_EXPERIMENTAL_REQUEST_BUILDER_CONCURRENCY")

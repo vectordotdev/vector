@@ -2,7 +2,7 @@ use darling::util::path_to_string;
 use proc_macro::TokenStream;
 
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Attribute, DeriveInput, Error, LitStr};
+use syn::{Attribute, DeriveInput, Error, LitStr, parse_macro_input, spanned::Spanned};
 
 use crate::attrs::{self, path_matches};
 
@@ -183,6 +183,8 @@ fn check_component_name_validity(component_name: &str) -> Result<(), String> {
     if component_name == component_name_converted {
         Ok(())
     } else {
-        Err(format!("component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{component_name_converted}\")"))
+        Err(format!(
+            "component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{component_name_converted}\")"
+        ))
     }
 }

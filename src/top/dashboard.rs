@@ -1,21 +1,21 @@
 use crate::internal_telemetry::is_allocation_tracking_enabled;
 use crossterm::{
+    ExecutableCommand,
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     tty::IsTty,
-    ExecutableCommand,
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
-    Frame, Terminal,
 };
 use std::{io::stdout, time::Duration};
 use tokio::sync::oneshot;

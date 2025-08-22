@@ -7,9 +7,9 @@ use vector_common::finalization::{
 };
 
 use crate::{
+    EventCount,
     encoding::FixedEncodable,
     variants::disk_v2::{record::RECORD_HEADER_LEN, tests::align16},
-    EventCount,
 };
 
 #[derive(Debug)]

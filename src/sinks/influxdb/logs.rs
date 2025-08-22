@@ -10,13 +10,13 @@ use vrl::value::Kind;
 
 use vector_lib::config::log_schema;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::PathPrefix;
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::schema;
 
 use super::{
-    encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-    InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
+    Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp, healthcheck,
+    influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -25,11 +25,11 @@ use crate::{
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
-        util::{
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
-            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
-        },
         Healthcheck, VectorSink,
+        util::{
+            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+        },
     },
     tls::{TlsConfig, TlsSettings},
 };
@@ -391,9 +391,9 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, stream, StreamExt};
-    use http::{request::Parts, StatusCode};
+    use chrono::{Utc, offset::TimeZone};
+    use futures::{StreamExt, channel::mpsc, stream};
+    use http::{StatusCode, request::Parts};
     use indoc::indoc;
 
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -406,8 +406,8 @@ mod tests {
         },
         test_util::{
             components::{
-                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-                HTTP_SINK_TAGS,
+                COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, run_and_assert_sink_compliance,
+                run_and_assert_sink_error,
             },
             next_addr,
         },
@@ -882,11 +882,11 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            logs::InfluxDbLogsConfig,
-            test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
+            logs::InfluxDbLogsConfig,
+            test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
-        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
     };
 
     use super::*;

@@ -1,9 +1,9 @@
 use crate::common::mqtt::MqttCommonConfig;
 use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::mqtt::config::MqttQoS;
 use crate::sinks::mqtt::MqttSinkConfig;
+use crate::sinks::mqtt::config::MqttQoS;
 use crate::template::Template;
-use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
+use crate::test_util::components::{SINK_TAGS, run_and_assert_sink_compliance};
 use crate::test_util::{random_lines_with_stream, trace_init};
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;

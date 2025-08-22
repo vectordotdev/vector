@@ -7,18 +7,18 @@ use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
 use vrl::event_path;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
+use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 
 use crate::common::http::ErrorMessage;
 use crate::{
+    SourceSender,
     event::{Event, ObjectMap, TraceEvent, Value},
     sources::datadog_agent::{
-        ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource,
+        ApiKeyQueryParams, DatadogAgentSource, ddtrace_proto, handle_request,
     },
-    SourceSender,
 };
 
 pub(crate) fn build_warp_filter(

@@ -115,7 +115,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use futures::{channel::mpsc, poll, task::Poll, SinkExt, StreamExt};
+    use futures::{SinkExt, StreamExt, channel::mpsc, poll, task::Poll};
 
     use super::ReadyFrames;
 

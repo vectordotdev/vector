@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use data_encoding::BASE64;
 use dnsmsg_parser::dns_message_parser::DnsMessageParser;
 use hickory_proto::rr::rdata::NULL;

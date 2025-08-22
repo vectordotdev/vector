@@ -7,24 +7,23 @@ use azure_core::{error::HttpError, prelude::Range};
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use http::StatusCode;
-use vector_lib::codecs::{
-    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
 use vector_lib::ByteSizeOf;
+use vector_lib::codecs::{
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    encoding::FramingConfig,
+};
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        azure_common,
+        VectorSink, azure_common,
         util::{Compression, TowerRequestConfig},
-        VectorSink,
     },
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -281,13 +280,11 @@ impl AzureBlobSinkConfig {
             .expect("Failed to fetch blobs")
             .unwrap();
 
-        let blobs = response
+        response
             .blobs
             .blobs()
             .map(|blob| blob.name.clone())
-            .collect::<Vec<_>>();
-
-        blobs
+            .collect::<Vec<_>>()
     }
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {

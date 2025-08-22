@@ -1,7 +1,7 @@
 use super::{
+    ConfigSnafu, NatsError,
     config::{NatsHeaderConfig, NatsSinkConfig},
     sink::NatsSink,
-    ConfigSnafu, NatsError,
 };
 use crate::{
     nats::{
@@ -10,7 +10,7 @@ use crate::{
     sinks::nats::config::JetStreamConfig,
     sinks::prelude::*,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
     },
     tls::TlsEnableableConfig,
