@@ -1,15 +1,15 @@
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+    ComposeConfig, ComposeTestConfig, RustToolchainConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::env_vars::{Environment, extract_present, rename_environment_keys};
+use crate::env_vars::{extract_present, rename_environment_keys, Environment};
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
 use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
@@ -103,7 +103,7 @@ impl ComposeTest {
             envs_dir,
             runner,
             compose,
-            env_config,
+            env_config: rename_environment_keys(&env_config),
             build_all,
             retries,
         };
@@ -121,7 +121,7 @@ impl ComposeTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in rename_environment_keys(&self.env_config) {
+        for (key, value) in self.env_config.clone() {
             env_vars.insert(key, value);
         }
 
@@ -196,7 +196,7 @@ impl ComposeTest {
                 bail!("environment is already up");
             }
 
-            compose.start(&rename_environment_keys(&self.env_config))?;
+            compose.start(&self.env_config)?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
         } else {
@@ -346,7 +346,7 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     use super::super::config::ComposeConfig;
-    use crate::env_vars::{Environment, resolve_placeholders};
+    use crate::env_vars::{resolve_placeholders, Environment};
     use crate::testing::config::VolumeMount;
     use anyhow::{Context, Result};
 
