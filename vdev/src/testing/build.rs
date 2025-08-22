@@ -1,6 +1,6 @@
 use crate::app;
 use crate::app::CommandExt;
-use crate::environment::{extract_present, Environment};
+use crate::environment::{Environment, extract_present};
 use crate::testing::config::RustToolchainConfig;
 use crate::testing::docker::docker_command;
 use crate::util::IS_A_TTY;
