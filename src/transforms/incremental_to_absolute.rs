@@ -106,8 +106,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricValue},
         Metric,
+        metric::{MetricKind, MetricValue},
     };
 
     fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
