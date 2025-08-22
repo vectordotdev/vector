@@ -2,13 +2,13 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use indexmap::IndexMap;
 use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::env_vars::Environment;
+use crate::environment::Environment;
 use crate::{app, util};
 
 const FILE_NAME: &str = "test.yaml";

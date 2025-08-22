@@ -1,15 +1,15 @@
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+    ComposeConfig, ComposeTestConfig, RustToolchainConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::env_vars::{Environment, extract_present, rename_environment_keys};
+use crate::environment::{extract_present, rename_environment_keys, Environment};
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
 use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
@@ -346,7 +346,7 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     use super::super::config::ComposeConfig;
-    use crate::env_vars::{Environment, resolve_placeholders};
+    use crate::environment::{resolve_placeholders, Environment};
     use crate::testing::config::VolumeMount;
     use anyhow::{Context, Result};
 

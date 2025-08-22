@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io::ErrorKind, sync::LazyLock};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::env_vars::Environment;
+use crate::environment::Environment;
 use crate::{platform, util};
 
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {

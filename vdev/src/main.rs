@@ -11,7 +11,7 @@ mod macros;
 mod app;
 mod commands;
 mod config;
-mod env_vars;
+mod environment;
 mod features;
 mod git;
 mod platform;
