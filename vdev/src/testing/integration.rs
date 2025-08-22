@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use tempfile::{Builder, NamedTempFile};
 
 use super::config::{
-    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, Environment, INTEGRATION_TESTS_DIR,
-    RustToolchainConfig,
+    ComposeConfig, ComposeTestConfig, Environment, RustToolchainConfig, E2E_TESTS_DIR,
+    INTEGRATION_TESTS_DIR,
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
@@ -121,7 +121,7 @@ impl ComposeTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in config_env(&self.env_config) {
+        for (key, value) in adapt_environment_variables(&self.env_config) {
             env_vars.insert(key, Some(value));
         }
 
@@ -181,8 +181,11 @@ impl ComposeTest {
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
         if self.local_config.kind == ComposeTestKind::E2E {
-            self.runner
-                .build(Some(&self.config.features), self.local_config.directory)?;
+            self.runner.build(
+                Some(&self.config.features),
+                self.local_config.directory,
+                &self.env_config,
+            )?;
         }
 
         self.config.check_required()?;
@@ -321,7 +324,7 @@ impl Compose {
             }
         }
         if let Some(config) = config {
-            command.envs(config_env(config));
+            command.envs(adapt_environment_variables(config));
         }
 
         waiting!("{action} service environment");
@@ -335,7 +338,9 @@ impl Compose {
     }
 }
 
-fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
+pub(crate) fn adapt_environment_variables(
+    config: &Environment,
+) -> impl Iterator<Item = (String, String)> + '_ {
     config.iter().filter_map(|(var, value)| {
         value.as_ref().map(|value| {
             (
@@ -344,6 +349,20 @@ fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + 
             )
         })
     })
+}
+
+pub(crate) fn append_config_environment_variables(
+    command: &mut Command,
+    arg_type: &str,
+    config_environment_variables: &Environment,
+) {
+    for (key, value) in config_environment_variables {
+        command.arg(arg_type);
+        match value {
+            Some(value) => command.arg(format!("{key}={value}")),
+            None => command.arg(key),
+        };
+    }
 }
 
 #[cfg(unix)]

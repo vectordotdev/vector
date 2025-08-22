@@ -2,7 +2,7 @@ name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
     container_name: otel-collector-source
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
     init: true
     volumes:
       - type: bind
@@ -33,7 +33,7 @@ services:
 
   otel-collector-sink:
     container_name: otel-collector-sink
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
     init: true
     volumes:
       - type: bind
@@ -57,7 +57,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG:-vector_default.yaml}
+        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG}
         target: /etc/vector/vector.yaml
         read_only: true
       - type: bind
