@@ -1,4 +1,4 @@
-use regex::Regex;
+use regex::{Captures, Regex};
 use std::collections::BTreeMap;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -34,31 +34,32 @@ pub(crate) fn append_environment_variables(command: &mut Command, environment: &
     }
 }
 
-/// If the variable is not found or is `None`, it is left unchanged.
+#[cfg(unix)]
+/// Resolve all environment variable placeholders. If the variable is not found or is `None`, it is left unchanged.
 pub fn resolve_placeholders(input: &str, environment: &Environment) -> String {
-    // static regexes
     static BRACED: OnceLock<Regex> = OnceLock::new();
     static BARE: OnceLock<Regex> = OnceLock::new();
 
-    let braced = BRACED.get_or_init(|| Regex::new(r"\$\{([A-Za-z0-9_]+)\}").unwrap());
-    let bare = BARE.get_or_init(|| Regex::new(r"\$([A-Za-z0-9_]+)").unwrap());
+    let braced =
+        BRACED.get_or_init(|| Regex::new(r"\$\{([A-Za-z0-9_]+)\}").expect("cannot build regex"));
+    let bare = BARE.get_or_init(|| Regex::new(r"\$([A-Za-z0-9_]+)").expect("cannot build regex"));
 
     // First replace ${VAR}
-    let step1 = braced.replace_all(input, |caps: &regex::Captures| {
-        let name = &caps[1];
-        lookup(name, environment).unwrap_or_else(|| caps[0].to_string())
+    let step1 = braced.replace_all(input, |captures: &Captures| {
+        resolve_or_keep(&captures[0], &captures[1], environment)
     });
 
     // Then replace $VAR
-    bare.replace_all(&step1, |caps: &regex::Captures| {
-        let name = &caps[1];
-        lookup(name, environment).unwrap_or_else(|| caps[0].to_string())
+    bare.replace_all(&step1, |captures: &Captures| {
+        resolve_or_keep(&captures[0], &captures[1], environment)
     })
     .into_owned()
 }
 
-fn lookup(name: &str, env: &Environment) -> Option<String> {
+#[cfg(unix)]
+fn resolve_or_keep(full: &str, name: &str, env: &Environment) -> String {
     env.get(name)
-        .and_then(std::clone::Clone::clone)
+        .and_then(Clone::clone)
         .or_else(|| std::env::var(name).ok())
+        .unwrap_or_else(|| full.to_string())
 }
