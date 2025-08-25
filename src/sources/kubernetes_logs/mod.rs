@@ -855,7 +855,6 @@ impl Source {
                 include_file_metric_tag,
             },
             // A handle to the current tokio runtime
-            handle: tokio::runtime::Handle::current(),
             rotate_wait,
         };
 

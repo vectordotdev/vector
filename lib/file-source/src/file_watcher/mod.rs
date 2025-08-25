@@ -47,7 +47,7 @@ pub struct RawLineResult {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: Box<dyn BufRead>,
+    reader: Box<dyn BufRead + Send>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -91,7 +91,7 @@ impl FileWatcher {
         let gzipped = is_gzipped(&mut reader)?;
 
         // Determine the actual position at which we should start reading
-        let (reader, file_position): (Box<dyn BufRead>, FilePosition) =
+        let (reader, file_position): (Box<dyn BufRead + Send>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -170,7 +170,7 @@ impl FileWatcher {
         if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
             let mut reader = io::BufReader::new(fs::File::open(&path)?);
             let gzipped = is_gzipped(&mut reader)?;
-            let new_reader: Box<dyn BufRead> = if gzipped {
+            let new_reader: Box<dyn BufRead + Send> = if gzipped {
                 if self.file_position != 0 {
                     Box::new(null_reader())
                 } else {
