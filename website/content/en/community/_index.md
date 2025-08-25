@@ -18,14 +18,17 @@ description: >
 * For VRL bugs: [Create a VRL GitHub issue][vrl_bug_report]
 * For VRL discussions: [Create a VRL GitHub discussion][vrl_discussion]
 
-
 ## Discord
 
-You can join our [Discord server here][chat].
+You can join our [Discord server here][discord].
 
 The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is via GitHub.
 
 The Discord server is meant for connecting with other Vector users and fostering community conversations.
+
+## X
+
+You can find us on [X here][vector_x].
 
 ## FAQ
 
@@ -37,7 +40,7 @@ Vector is [open source][oss] and welcomes contributions. A few guidelines to hel
 
 2. Start with [good first issues][first_issues].
 
-3. Join our [chat] if you have any questions. We are happy to help!
+3. Join our [discord] if you have any questions. We are happy to help!
 
 ### What is Vector's governance model?
 
@@ -63,7 +66,9 @@ Vector has adopted the Rust community model and practices for engaging with peop
 
 2. [Rust community standards][rust_community]
 
-[chat]: https://chat.vector.dev
+[vector_x]: https://x.com/vectordotdev
+
+[discord]: https://chat.vector.dev
 
 [cncf]: https://bestpractices.coreinfrastructure.org/en
 
