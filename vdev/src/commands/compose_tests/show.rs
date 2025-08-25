@@ -1,6 +1,6 @@
+use crate::environment::Environment;
+use crate::testing::{config::ComposeTestConfig, state};
 use anyhow::Result;
-
-use crate::testing::{config::ComposeTestConfig, config::Environment, state};
 
 pub fn exec(integration: Option<&String>, path: &str) -> Result<()> {
     match integration {

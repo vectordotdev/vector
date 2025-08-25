@@ -4,7 +4,7 @@ use std::{fs, io::ErrorKind, sync::LazyLock};
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-use super::config::Environment;
+use crate::environment::Environment;
 use crate::{platform, util};
 
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
