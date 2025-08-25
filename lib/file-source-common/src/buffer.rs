@@ -117,7 +117,7 @@ mod test {
 
     use super::read_until_with_max_size;
 
-    fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
+    async fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
         // The `global_data` is the view of `chunks` as a single contiguous
         // block of memory. Where `chunks` simulates what happens when bytes are
         // fitfully available `global_data` is the view of all chunks assembled
@@ -188,16 +188,15 @@ mod test {
         for (idx, chunk) in chunks.iter().enumerate() {
             let mut reader = BufReader::new(Cursor::new(&chunk));
 
-            let handle = tokio::runtime::Handle::current();
-            match handle
-                .block_on(read_until_with_max_size(
-                    Box::pin(&mut reader),
-                    &mut position,
-                    &delimiter,
-                    &mut buffer,
-                    max_size.get() as usize,
-                ))
-                .unwrap()
+            match read_until_with_max_size(
+                Box::pin(&mut reader),
+                &mut position,
+                &delimiter,
+                &mut buffer,
+                max_size.get() as usize,
+            )
+            .await
+            .unwrap()
             {
                 ReadResult {
                     successfully_read: None,
@@ -249,9 +248,19 @@ mod test {
         //
         // I think I will adjust the function to have a richer return
         // type. This will help in the transition to async.
-        QuickCheck::new()
-            .tests(1_000)
-            .max_tests(2_000)
-            .quickcheck(qc_inner as fn(Vec<Vec<u8>>, u8, NonZeroU8) -> TestResult);
+        fn inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
+            let handle = tokio::runtime::Handle::current();
+            handle.block_on(qc_inner(chunks, delim, max_size));
+            TestResult::passed()
+        }
+
+        tokio::task::spawn_blocking(|| {
+            QuickCheck::new()
+                .tests(1_000)
+                .max_tests(2_000)
+                .quickcheck(inner as fn(Vec<Vec<u8>>, u8, NonZeroU8) -> TestResult);
+        })
+        .await
+        .unwrap()
     }
 }

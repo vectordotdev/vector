@@ -3,11 +3,12 @@
 //!
 //! In stdlib imported code, warnings are allowed.
 
-use std::fs::File;
+use std::fs::Metadata;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::{mem::zeroed, ptr};
+use tokio::fs::File;
 
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
@@ -18,14 +19,15 @@ use winapi::um::{
     winnt::FILE_ATTRIBUTE_REPARSE_POINT, winnt::MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
 };
 
+#[allow(async_fn_in_trait)]
 #[cfg(not(windows))]
-pub trait PortableFileExt {
-    fn portable_dev(&self) -> std::io::Result<u64>;
-    fn portable_ino(&self) -> std::io::Result<u64>;
+pub trait AsyncPortableFileExt {
+    async fn portable_dev(&self) -> std::io::Result<u64>;
+    async fn portable_ino(&self) -> std::io::Result<u64>;
 }
 
 #[cfg(windows)]
-pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
+pub trait AsyncPortableFileExt: std::os::windows::io::AsRawHandle {
     fn portable_dev(&self) -> std::io::Result<u64>;
     fn portable_ino(&self) -> std::io::Result<u64>;
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
@@ -70,23 +72,33 @@ pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
 }
 
 #[cfg(unix)]
-impl PortableFileExt for File {
-    fn portable_dev(&self) -> std::io::Result<u64> {
-        Ok(self.metadata()?.dev())
+impl AsyncPortableFileExt for File {
+    async fn portable_dev(&self) -> std::io::Result<u64> {
+        Ok(self.metadata().await?.dev())
     }
-    fn portable_ino(&self) -> std::io::Result<u64> {
-        Ok(self.metadata()?.ino())
+    async fn portable_ino(&self) -> std::io::Result<u64> {
+        Ok(self.metadata().await?.ino())
+    }
+}
+
+#[cfg(unix)]
+impl AsyncPortableFileExt for Metadata {
+    async fn portable_dev(&self) -> std::io::Result<u64> {
+        Ok(self.dev())
+    }
+    async fn portable_ino(&self) -> std::io::Result<u64> {
+        Ok(self.ino())
     }
 }
 
 #[cfg(windows)]
-impl PortableFileExt for File {
-    fn portable_dev(&self) -> std::io::Result<u64> {
+impl AsyncPortableFileExt for File {
+    async fn portable_dev(&self) -> std::io::Result<u64> {
         let info = self.get_file_info()?;
         Ok(info.dwVolumeSerialNumber.into())
     }
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
-    fn portable_ino(&self) -> std::io::Result<u64> {
+    async fn portable_ino(&self) -> std::io::Result<u64> {
         let info = self.get_file_info()?;
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
         Ok((info.nFileIndexLow as u64) | ((info.nFileIndexHigh as u64) << 32))

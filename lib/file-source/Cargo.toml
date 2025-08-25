@@ -25,7 +25,8 @@ file-source-common = { path = "../file-source-common" }
 async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
 
 [dev-dependencies]
-criterion = "0.7"
+tokio = { workspace = true, features = ["full"] }
+criterion = { version = "0.7", features = ["async", "async_tokio"] }
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

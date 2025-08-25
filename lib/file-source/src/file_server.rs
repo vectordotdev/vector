@@ -104,18 +104,22 @@ where
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
 
-        checkpointer.read_checkpoints(self.ignore_before);
+        checkpointer.read_checkpoints(self.ignore_before).await;
 
         let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
-            if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
-                &path,
-                &mut fingerprint_buffer,
-                &mut known_small_files,
-                &self.emitter,
-            ) {
+            if let Some(file_id) = self
+                .fingerprinter
+                .get_fingerprint_or_log_error(
+                    &path,
+                    &mut fingerprint_buffer,
+                    &mut known_small_files,
+                    &self.emitter,
+                )
+                .await
+            {
                 existing_files.push((path, file_id));
             }
         }
@@ -144,12 +148,9 @@ where
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
-            checkpointer.maybe_upgrade(
-                &path,
-                file_id,
-                &self.fingerprinter,
-                &mut fingerprint_buffer,
-            );
+            checkpointer
+                .maybe_upgrade(&path, file_id, &self.fingerprinter, &mut fingerprint_buffer)
+                .await;
 
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
                 .await;
@@ -197,12 +198,16 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths().into_iter() {
-                    if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
-                        &path,
-                        &mut fingerprint_buffer,
-                        &mut known_small_files,
-                        &self.emitter,
-                    ) {
+                    if let Some(file_id) = self
+                        .fingerprinter
+                        .get_fingerprint_or_log_error(
+                            &path,
+                            &mut fingerprint_buffer,
+                            &mut known_small_files,
+                            &self.emitter,
+                        )
+                        .await
+                    {
                         if let Some(watcher) = fp_map.get_mut(&file_id) {
                             // file fingerprint matches a watched file
                             let was_found_this_cycle = watcher.file_findable();
@@ -433,7 +438,7 @@ where
                     let checkpointer = checkpoint_task_handle
                         .await
                         .expect("checkpoint task has panicked");
-                    if let Err(error) = checkpointer.write_checkpoints() {
+                    if let Err(error) = checkpointer.write_checkpoints().await {
                         error!(?error, "Error writing checkpoints before shutdown");
                     }
                     return Ok(Shutdown);
@@ -517,15 +522,11 @@ async fn checkpoint_writer(
 
         let emitter = emitter.clone();
         let checkpointer = Arc::clone(&checkpointer);
-        tokio::task::spawn_blocking(move || {
-            let start = time::Instant::now();
-            match checkpointer.write_checkpoints() {
-                Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                Err(error) => emitter.emit_file_checkpoint_write_error(error),
-            }
-        })
-        .await
-        .ok();
+        let start = time::Instant::now();
+        match checkpointer.write_checkpoints().await {
+            Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+            Err(error) => emitter.emit_file_checkpoint_write_error(error),
+        };
     }
     checkpointer
 }

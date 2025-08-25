@@ -1,8 +1,10 @@
-use std::{fmt, io::Cursor};
+use std::{fmt, sync::Arc};
 
 use bytes::BytesMut;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use file_source_common::buffer::read_until_with_max_size;
+use futures::io::BufReader;
+use tokio::sync::Mutex;
 
 struct Parameters {
     bytes: Vec<u8>,
@@ -48,23 +50,35 @@ fn read_until_bench(c: &mut Criterion) {
         }
     }
 
+    let rt = tokio::runtime::Runtime::new().unwrap();
     for param in &parameters {
         group.throughput(Throughput::Bytes(param.bytes_before_first_delim as u64));
 
-        let mut position = 0;
-        let mut buffer = BytesMut::with_capacity(param.max_size as usize);
-        let mut reader = Cursor::new(&param.bytes);
         let delimiter: [u8; 1] = [param.delim];
+        let position: Arc<Mutex<file_source_common::FilePosition>> = Arc::new(Mutex::new(0));
+        let buffer = Arc::new(Mutex::new(BytesMut::with_capacity(param.max_size as usize)));
         group.bench_with_input(BenchmarkId::new("read_until", param), &param, |b, _| {
-            b.iter(|| {
-                _ = read_until_with_max_size(
-                    &mut reader,
-                    &mut position,
-                    &delimiter,
-                    &mut buffer,
-                    param.max_size as usize,
-                );
-                reader.set_position(0);
+            b.to_async(&rt).iter({
+                let position = position.clone();
+                let buffer = buffer.clone();
+                move || {
+                    let position = position.clone();
+                    let buffer = buffer.clone();
+                    async move {
+                        let mut position = position.lock().await;
+                        let reader = BufReader::new(&param.bytes[..]);
+                        let mut buffer = buffer.lock().await;
+                        read_until_with_max_size(
+                            Box::pin(&mut reader.buffer()),
+                            &mut position,
+                            &delimiter,
+                            &mut buffer,
+                            param.max_size as usize,
+                        )
+                        .await
+                        .unwrap();
+                    }
+                }
             })
         });
     }
