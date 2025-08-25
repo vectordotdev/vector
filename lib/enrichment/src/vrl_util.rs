@@ -38,7 +38,7 @@ impl DiagnosticMessage for Error {
 }
 
 /// Evaluates the condition object to search the enrichment tables with.
-pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Condition> {
+pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Condition<'_>> {
     Ok(match value {
         Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {

@@ -2,14 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use tracing::debug;
 use vector_config_common::schema::{
-    visit::{Visitor, with_resolved_schema_reference},
+    visit::{with_resolved_schema_reference, Visitor},
     *,
 };
 
 use crate::schema::visitors::merge::Mergeable;
 
 use super::scoped_visit::{
-    SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
+    visit_schema_object_scoped, SchemaReference, SchemaScopeStack, ScopedVisitor,
 };
 
 /// A visitor that marks schemas as closed by disallowing unknown properties via
@@ -72,29 +72,29 @@ impl Visitor for DisallowUnevaluatedPropertiesVisitor {
         if let Some(reference) = schema.reference.as_ref() {
             let current_parent_schema_ref = self.get_current_schema_scope();
 
-            if let Some(referrers) = self.eligible_to_flatten.get(reference) {
-                if referrers.contains(current_parent_schema_ref) {
-                    let current_schema_ref = get_cleaned_schema_reference(reference);
-                    let referenced_schema = definitions
-                        .get(current_schema_ref)
-                        .expect("schema definition must exist");
+            if let Some(referrers) = self.eligible_to_flatten.get(reference)
+                && referrers.contains(current_parent_schema_ref)
+            {
+                let current_schema_ref = get_cleaned_schema_reference(reference);
+                let referenced_schema = definitions
+                    .get(current_schema_ref)
+                    .expect("schema definition must exist");
 
+                debug!(
+                    referent = current_schema_ref,
+                    referrer = current_parent_schema_ref.as_ref(),
+                    "Found eligible referent/referrer mapping."
+                );
+
+                if let Schema::Object(referenced_schema) = referenced_schema {
                     debug!(
                         referent = current_schema_ref,
                         referrer = current_parent_schema_ref.as_ref(),
-                        "Found eligible referent/referrer mapping."
+                        "Flattening referent into referrer."
                     );
 
-                    if let Schema::Object(referenced_schema) = referenced_schema {
-                        debug!(
-                            referent = current_schema_ref,
-                            referrer = current_parent_schema_ref.as_ref(),
-                            "Flattening referent into referrer."
-                        );
-
-                        schema.reference = None;
-                        schema.merge(referenced_schema);
-                    }
+                    schema.reference = None;
+                    schema.merge(referenced_schema);
                 }
             }
         }
@@ -157,15 +157,15 @@ fn unmark_or_flatten_schema(definitions: &mut Map<String, Schema>, schema: &mut 
         object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
     } else {
         with_resolved_schema_reference(definitions, schema, |_, schema_ref, resolved| {
-            if let Schema::Object(resolved) = resolved {
-                if let Some(object) = resolved.object.as_mut() {
-                    debug!(
-                        referent = schema_ref,
-                        "Unmarked subschema by traversing schema reference."
-                    );
+            if let Schema::Object(resolved) = resolved
+                && let Some(object) = resolved.object.as_mut()
+            {
+                debug!(
+                    referent = schema_ref,
+                    "Unmarked subschema by traversing schema reference."
+                );
 
-                    object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
-                }
+                object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
             }
         });
     }
@@ -425,13 +425,13 @@ fn get_referents(parent_schema: &SchemaObject, referents: &mut HashSet<MarkableR
 
         // For `additionalProperties`, if present and defined as a schema object, collect the schema
         // reference if one is set.
-        if let Some(additional_properties) = parent_object.additional_properties.as_ref() {
-            if let Some(child_schema) = additional_properties.as_ref().as_object() {
-                if let Some(child_schema_ref) = child_schema.reference.as_ref() {
-                    referents.insert(MarkableReferent::would_not_unmark(child_schema_ref));
-                } else {
-                    get_referents(child_schema, referents);
-                }
+        if let Some(additional_properties) = parent_object.additional_properties.as_ref()
+            && let Some(child_schema) = additional_properties.as_ref().as_object()
+        {
+            if let Some(child_schema_ref) = child_schema.reference.as_ref() {
+                referents.insert(MarkableReferent::would_not_unmark(child_schema_ref));
+            } else {
+                get_referents(child_schema, referents);
             }
         }
     }

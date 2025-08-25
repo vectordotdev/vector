@@ -4,19 +4,19 @@
 
 use std::collections::HashSet;
 
-use darling::{FromAttributes, error::Accumulator, util::Flag};
-use serde_derive_internals::{Ctxt, Derive, ast as serde_ast};
+use darling::{error::Accumulator, util::Flag, FromAttributes};
+use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
 use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
 
 use super::{
-    Data, Field, LazyCustomAttribute, Metadata, Style, Tagging, Variant,
     util::{
-        DarlingResultIterator, err_serde_failed, get_serde_default_value,
-        try_extract_doc_title_description,
-    },
+        err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
+        DarlingResultIterator,
+    }, Data, Field, LazyCustomAttribute, Metadata, Style, Tagging,
+    Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -280,7 +280,7 @@ impl<'a> Container<'a> {
     /// Data for the container.
     ///
     /// This would be the fields of a struct, or the variants for an enum.
-    pub fn data(&self) -> &Data {
+    pub fn data(&self) -> &Data<'_> {
         &self.data
     }
 
@@ -548,7 +548,7 @@ fn get_generic_type_path_ident(ty: &Type) -> Option<Ident> {
 mod tests {
     use proc_macro2::Ident;
     use quote::format_ident;
-    use syn::{Type, parse_quote};
+    use syn::{parse_quote, Type};
 
     use super::get_generic_type_param_idents;
 
