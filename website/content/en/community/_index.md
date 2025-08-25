@@ -20,15 +20,15 @@ description: >
 
 ## Discord
 
-You can join our [Discord server here][discord].
+Join our [Discord server][discord].
 
-The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is via GitHub.
+The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is through GitHub.
 
 The Discord server is meant for connecting with other Vector users and fostering community conversations.
 
 ## X
 
-You can find us on [X here][vector_x].
+Find us on [X][vector_x].
 
 ## FAQ
 
