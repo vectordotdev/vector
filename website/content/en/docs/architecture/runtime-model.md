@@ -1,5 +1,5 @@
 ---
-title: Runtime Model
+title: Runtime model
 description: Vector's runtime model and how it manages concurrency
 weight: 3
 tags: ["runtime", "concurrency", "state", "scheduler"]
