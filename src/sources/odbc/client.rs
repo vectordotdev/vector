@@ -170,12 +170,12 @@ pub struct OdbcConfig {
     /// Decoder to use on the HTTP responses.
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
+    pub decoding: DeserializerConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
-    log_namespace: Option<bool>,
+    pub log_namespace: Option<bool>,
 }
 
 const fn default_query_timeout_sec() -> Duration {

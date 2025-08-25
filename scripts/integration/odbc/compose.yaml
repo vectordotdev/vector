@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  mysql:
+    image: docker.io/mysql:${CONFIG_VERSION}
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_USER=vector
+      - MYSQL_PASSWORD=vector
+      - MYSQL_ROOT_PASSWORD=vector
+      - MYSQL_DATABASE=vector_db
+    volumes:
+      - socket:/var/run/mysqld
+#      - ../../../tests/data/odbc/odbc-init.sh:/odbc-init.sh:ro
+#    command: /odbc-init.sh
+
+volumes:
+  socket: {}

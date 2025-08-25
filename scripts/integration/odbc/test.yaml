@@ -1,0 +1,23 @@
+features:
+  - odbc-integration-tests
+
+test_filter: '::odbc::'
+
+env:
+  MYSQL_HOST: mysql
+  MYSQL_SOCKET: /mysql_socket
+  ODBC_MYSQL_CONN_STRING: "driver={MariaDB ODBC 3.0 Driver};server=mysql;port=3306;database=vector_db;user=vector;password=vector;"
+
+runner:
+  volumes:
+    mysql_socket: /mysql_socket
+    ../../../tests/data/odbc/odbc-init.sh: /odbc-init.sh:ro
+
+matrix:
+  version: [ '8.0' ]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sources/odbc/**"
+  - "scripts/integration/odbc/**"

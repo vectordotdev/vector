@@ -7,7 +7,7 @@
 ```shell
 brew install unixodbc
 
-brew install mariadb-connector-odbc  # Install MariaDB ODBC, and you need to configure odbcinst.ini.
+brew install mariadb-connector-odbc@3.2.6  # Install MariaDB ODBC, and you need to configure odbcinst.ini.
 ```
 
 Refs
@@ -21,7 +21,7 @@ Refs
 
     [MariaDB ODBC 3.0 Driver]
     Description = MariaDB Connector/ODBC v.3.0
-    Driver = /opt/homebrew/Cellar/mariadb-connector-odbc/3.2.5/lib/mariadb/libmaodbc.dylib
+    Driver = /opt/homebrew/Cellar/mariadb-connector-odbc/3.2.6/lib/mariadb/libmaodbc.dylib
     EOF
     ```
 - MSSQL

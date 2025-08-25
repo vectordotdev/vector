@@ -84,6 +84,9 @@ use vrl::prelude::*;
 #[cfg(feature = "sources-odbc")]
 mod client;
 
+#[cfg(all(test, feature = "odbc-integration-tests"))]
+mod integration_tests;
+
 const TIMESTAMP_FORMATS: &[&str] = &[
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%dT%H:%M:%S",
@@ -148,6 +151,13 @@ impl Configurable for OdbcSchedule {
 
     fn generate_schema(_: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
         Ok(generate_string_schema())
+    }
+}
+
+impl From<&str> for OdbcSchedule {
+    fn from(s: &str) -> Self {
+        let schedule = Schedule::from_str(s).expect("Invalid cron expression");
+        Self { inner: schedule }
     }
 }
 
