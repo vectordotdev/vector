@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+  localstack:
+    image: docker.io/localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+    ports:
+      - 4571:4571
+    environment:
+    - SERVICES=opensearch:4571
+  opensearch:
+    image: docker.io/opensearchproject/opensearch:${CONFIG_VERSION}
+    ports:
+      - 9200:9200
+    environment:
+    - discovery.type=single-node
+    - OPENSEARCH_JAVA_OPTS=-Xms400m -Xmx400m
+    - DISABLE_SECURITY_PLUGIN=true
+    - DISABLE_INSTALL_DEMO_CONFIG=true
+  opensearch-secure:
+    image: docker.io/opensearchproject/opensearch:${CONFIG_VERSION}
+    environment:
+    - discovery.type=single-node
+    - OPENSEARCH_JAVA_OPTS=-Xms400m -Xmx400m
+    - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Vector123!
+    - plugins.security.ssl.http.enabled=true
+    - plugins.security.ssl.http.keystore_filepath=/usr/share/opensearch/config/certs/intermediate_server/private/elasticsearch-secure.key.pem
+    - plugins.security.ssl.http.keystore_password=""
+    - plugins.security.ssl.http.truststore_filepath=/usr/share/opensearch/config/certs/intermediate_server/certs/elasticsearch-secure-chain.cert.pem
+    - plugins.security.ssl.http.truststore_password=""
+    volumes:
+    - ../../../tests/data/ca:/usr/share/opensearch/config/certs:ro

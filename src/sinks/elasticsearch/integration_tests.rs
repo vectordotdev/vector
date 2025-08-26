@@ -33,15 +33,15 @@ use crate::{
 };
 
 fn aws_server() -> String {
-    std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+    std::env::var("AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
 }
 
 fn http_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
+    std::env::var("HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
 }
 
 fn https_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
+    std::env::var("HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
 }
 
 impl ElasticsearchCommon {

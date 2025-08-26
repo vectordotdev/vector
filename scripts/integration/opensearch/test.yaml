@@ -7,11 +7,11 @@ env:
   AWS_ACCESS_KEY_ID: dummy
   AWS_SECRET_ACCESS_KEY: dummy
   AWS_ADDRESS: http://localstack:4571
-  HTTPS_ADDRESS: https://elasticsearch-secure:9200
-  HTTP_ADDRESS: http://elasticsearch:9200
+  HTTP_ADDRESS: http://opensearch:9200
+  HTTPS_ADDRESS: https://opensearch:9200
 
 matrix:
-  version: [7.13.1]
+  version: [2.19.3]
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
