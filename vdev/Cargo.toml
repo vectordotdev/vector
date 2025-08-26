@@ -37,3 +37,4 @@ toml.workspace = true
 semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
+cfg-if.workspace = true
