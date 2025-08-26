@@ -1,8 +1,10 @@
+#![allow(dead_code)] // TODO add complex feature gateno-
+
 use std::{io::Error, path::Path};
 
 use metrics::counter;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;

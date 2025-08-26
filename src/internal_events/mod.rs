@@ -2,6 +2,7 @@
 pub mod prelude;
 
 mod adaptive_concurrency;
+#[cfg(feature = "transforms-aggregate")]
 mod aggregate;
 #[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
 mod amqp;
@@ -78,6 +79,7 @@ mod kafka;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
+#[cfg(feature = "sources-heroku_logs")]
 mod logplex;
 #[cfg(feature = "sinks-loki")]
 mod loki;
@@ -92,6 +94,7 @@ mod mqtt;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "sources-kubernetes_logs")]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
@@ -108,7 +111,9 @@ mod pulsar;
 mod redis;
 #[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
+#[cfg(feature = "transforms-remap")]
 mod remap;
+#[cfg(feature = "transforms-impl-sample")]
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -124,6 +129,7 @@ mod template;
 #[cfg(feature = "transforms-throttle")]
 mod throttle;
 mod udp;
+#[cfg(unix)]
 mod unix;
 #[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 mod websocket;
@@ -238,7 +244,7 @@ pub(crate) use self::metric_to_log::*;
 pub(crate) use self::mqtt::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
-#[allow(unused_imports)]
+#[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
@@ -278,6 +284,7 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
+
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
