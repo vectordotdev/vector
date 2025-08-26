@@ -2,21 +2,21 @@ use crate::{
     schema,
     sinks::{
         prelude::*,
-        pulsar::sink::{healthcheck, PulsarSink},
+        pulsar::sink::{PulsarSink, healthcheck},
     },
 };
 use futures_util::{FutureExt, TryFutureExt};
 use pulsar::{
+    Authentication, ConnectionRetryOptions, Error as PulsarError, ProducerOptions, Pulsar,
+    TokioExecutor,
     authentication::oauth2::{OAuth2Authentication, OAuth2Params},
     compression,
     message::proto,
-    Authentication, ConnectionRetryOptions, Error as PulsarError, ProducerOptions, Pulsar,
-    TokioExecutor,
 };
-use pulsar::{error::AuthenticationError, OperationRetryOptions};
+use pulsar::{OperationRetryOptions, error::AuthenticationError};
 use std::path::Path;
 use std::time::Duration;
-use vector_lib::codecs::{encoding::SerializerConfig, TextSerializerConfig};
+use vector_lib::codecs::{TextSerializerConfig, encoding::SerializerConfig};
 use vector_lib::config::DataType;
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 use vector_lib::sensitive_string::SensitiveString;

@@ -579,6 +579,12 @@ generated: components: sinks: azure_blob: configuration: {
 					}
 				}
 			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
 			method: {
 				description: "The framing method."
 				required:    true
@@ -591,6 +597,11 @@ generated: components: sinks: azure_blob: configuration: {
 						The prefix is a 32-bit unsigned integer, little endian.
 						"""
 					newline_delimited: "Event data is delimited by a newline (LF) character."
+					varint_length_delimited: """
+						Event data is prefixed with its length in bytes as a varint.
+
+						This is compatible with protobuf's length-delimited encoding.
+						"""
 				}
 			}
 		}

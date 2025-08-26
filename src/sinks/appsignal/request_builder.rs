@@ -8,7 +8,7 @@ use vector_lib::{
 };
 
 use crate::sinks::util::{
-    metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, RequestBuilder,
+    Compression, RequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
 };
 
 use super::encoder::AppsignalEncoder;

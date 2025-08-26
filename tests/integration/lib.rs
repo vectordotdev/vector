@@ -1,5 +1,5 @@
 use std::{
-    fs::{create_dir, OpenOptions},
+    fs::{OpenOptions, create_dir},
     io::Write,
     path::PathBuf,
 };

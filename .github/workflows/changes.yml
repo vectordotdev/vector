@@ -126,8 +126,8 @@ on:
       e2e-opentelemetry-logs:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
 env:
-  BASE_REF: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_ref) || github.event.pull_request.base.ref }}
-  HEAD_REF: ${{ inputs.head_ref  || (github.event_name == 'merge_group' && github.event.merge_group.head_ref)  || github.event.pull_request.head.ref }}
+  BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
 
 jobs:
   # Detects changes that are not specific to integration tests
@@ -151,8 +151,8 @@ jobs:
     - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
       id: filter
       with:
-        base: ${{ env.BASE_REF }}
-        ref:  ${{ env.HEAD_REF }}
+        base: ${{ env.BASE_SHA }}
+        ref:  ${{ env.HEAD_SHA }}
         filters: |
           source:
             - ".github/workflows/test.yml"
@@ -198,10 +198,11 @@ jobs:
             - "distribution/install.sh"
           k8s:
             - "src/sources/kubernetes_logs/**"
+            - "lib/k8s-e2e-tests/**"
+            - "lib/k8s-test-framework/**"
           website:
             - "website/**"
           not_website:
-            - "**"
             - "!website/**"
 
   # Detects changes that are specific to integration tests
@@ -258,8 +259,8 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
-          base: ${{ env.BASE_REF }}
-          ref:  ${{ env.HEAD_REF }}
+          base: ${{ env.BASE_SHA }}
+          ref:  ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -336,6 +337,6 @@ jobs:
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
         with:
-          base: ${{ env.BASE_REF }}
-          ref:  ${{ env.HEAD_REF }}
+          base: ${{ env.BASE_SHA }}
+          ref:  ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml

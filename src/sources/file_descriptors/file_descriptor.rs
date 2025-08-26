@@ -1,7 +1,7 @@
 use std::os::fd::{FromRawFd as _, IntoRawFd as _, RawFd};
 use std::{fs::File, io};
 
-use super::{outputs, FileDescriptorConfig};
+use super::{FileDescriptorConfig, outputs};
 use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
@@ -119,11 +119,11 @@ mod tests {
 
     use super::*;
     use crate::{
+        SourceSender,
         config::log_schema,
         test_util::components::{
-            assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS, SOURCE_TAGS,
+            COMPONENT_ERROR_TAGS, SOURCE_TAGS, assert_source_compliance, assert_source_error,
         },
-        SourceSender,
     };
     use futures::StreamExt;
     use vrl::value;
@@ -206,10 +206,11 @@ mod tests {
                 meta.get(path!("vector", "source_type")).unwrap(),
                 &value!("file_descriptor")
             );
-            assert!(meta
-                .get(path!("vector", "ingest_timestamp"))
-                .unwrap()
-                .is_timestamp());
+            assert!(
+                meta.get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp()
+            );
 
             let event = stream.next().await;
             let event = event.unwrap();

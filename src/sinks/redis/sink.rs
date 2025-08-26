@@ -2,9 +2,9 @@ use snafu::prelude::*;
 use std::{future, sync::Arc, time::Duration};
 
 use redis::{
+    RedisResult,
     aio::ConnectionManager,
     sentinel::{Sentinel, SentinelNodeConnectionInfo},
-    RedisResult,
 };
 use tokio::{
     sync::watch::{self, Receiver, Sender},
@@ -15,10 +15,10 @@ use tokio::{
 use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 use super::{
+    RedisEvent, RedisRequest, RepairChannelSnafu,
     config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
-    RedisEvent, RepairChannelSnafu,
 };
 
 pub(super) type GenerationCount = u64;
@@ -166,7 +166,10 @@ impl RedisConnection {
             if !repairing {
                 // Wait until a repair is needed
                 if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
-                    warn!("Connection state channel was dropped {error:?}.");
+                    warn!(
+                        internal_log_rate_limit = true,
+                        "Connection state channel was dropped {error:?}."
+                    );
                     continue;
                 }
 
@@ -189,7 +192,10 @@ impl RedisConnection {
                     }
                 }
                 Err(error) => {
-                    warn!("Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
+                    warn!(
+                        internal_log_rate_limit = true,
+                        "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}."
+                    );
                     sleep(Duration::from_millis(250)).await;
                     continue;
                 }
@@ -257,15 +263,25 @@ pub(super) struct RedisSink {
     conn: RedisConnection,
     data_type: super::DataType,
     key: Template,
+    score: Option<UnsignedIntTemplate>,
     batcher_settings: BatcherSettings,
 }
 
 impl RedisSink {
     pub(super) fn new(config: &RedisSinkConfig, conn: RedisConnection) -> crate::Result<Self> {
-        let method = config.list_option.map(|option| option.method);
+        let list_method = config.list_option.map(|option| option.method);
+        let (sorted_set_method, score) = if let Some(option) = &config.sorted_set_option {
+            (option.method, option.score.clone())
+        } else {
+            (None, None)
+        };
+
         let data_type = match config.data_type {
             DataTypeConfig::Channel => super::DataType::Channel,
-            DataTypeConfig::List => super::DataType::List(method.unwrap_or_default()),
+            DataTypeConfig::List => super::DataType::List(list_method.unwrap_or_default()),
+            DataTypeConfig::SortedSet => {
+                super::DataType::SortedSet(sorted_set_method.unwrap_or_default())
+            }
         };
 
         let batcher_settings = config.batch.validate()?.into_batcher_settings()?;
@@ -283,6 +299,7 @@ impl RedisSink {
             conn,
             data_type,
             key,
+            score,
         })
     }
 
@@ -302,7 +319,22 @@ impl RedisSink {
             })
             .ok()?;
 
-        Some(RedisEvent { event, key })
+        let score = self
+            .score
+            .as_ref()
+            .map(|template| {
+                template.render(&event).map_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("score"),
+                        drop_event: true,
+                    });
+                })
+            })
+            .transpose()
+            .ok()?;
+
+        Some(RedisEvent { event, key, score })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -351,6 +383,7 @@ pub(super) struct RedisRetryLogic {
 
 impl RetryLogic for RedisRetryLogic {
     type Error = RedisSinkError;
+    type Request = RedisRequest;
     type Response = RedisResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -370,7 +403,7 @@ impl RetryLogic for RedisRetryLogic {
         }
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         if response.is_successful() {
             RetryAction::Successful
         } else {

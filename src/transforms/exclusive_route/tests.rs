@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use indoc::indoc;
 use vector_lib::transform::TransformOutputsBuf;
 
+use crate::transforms::SyncTransform;
 use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
 use crate::transforms::exclusive_route::transform::ExclusiveRoute;
-use crate::transforms::SyncTransform;
 use crate::{
-    config::{build_unit_tests, ConfigBuilder},
-    test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+    config::{ConfigBuilder, build_unit_tests},
+    test_util::components::{COMPONENT_MULTIPLE_OUTPUTS_TESTS, init_test},
 };
 
 fn get_outputs_buf() -> (Vec<&'static str>, TransformOutputsBuf) {

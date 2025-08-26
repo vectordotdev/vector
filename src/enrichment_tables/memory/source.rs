@@ -7,6 +7,7 @@ use std::{
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     configurable::configurable_component,
     event::{Event, EventMetadata, LogEvent},
@@ -14,10 +15,9 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle, Protocol,
     },
     shutdown::ShutdownSignal,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
-use crate::{internal_events::StreamClosedError, SourceSender};
+use crate::{SourceSender, internal_events::StreamClosedError};
 
 use super::{Memory, MemoryConfig};
 

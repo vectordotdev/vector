@@ -10,7 +10,7 @@ use crate::{
     serde::default_decoding,
 };
 
-use super::{outputs, FileDescriptorConfig};
+use super::{FileDescriptorConfig, outputs};
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source("stdin", "Collect logs sent via stdin."))]
@@ -111,9 +111,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::log_schema, shutdown::ShutdownSignal,
-        test_util::components::assert_source_compliance, test_util::components::SOURCE_TAGS,
-        SourceSender,
+        SourceSender, config::log_schema, shutdown::ShutdownSignal,
+        test_util::components::SOURCE_TAGS, test_util::components::assert_source_compliance,
     };
     use futures::StreamExt;
     use vector_lib::lookup::path;
@@ -190,10 +189,11 @@ mod tests {
                 meta.get(path!("vector", "source_type")).unwrap(),
                 &value!("stdin")
             );
-            assert!(meta
-                .get(path!("vector", "ingest_timestamp"))
-                .unwrap()
-                .is_timestamp());
+            assert!(
+                meta.get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp()
+            );
 
             let event = stream.next().await;
             let event = event.unwrap();

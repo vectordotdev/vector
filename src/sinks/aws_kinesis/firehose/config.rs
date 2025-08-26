@@ -8,18 +8,18 @@ use vector_lib::configurable::configurable_component;
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{
-    aws::{create_client, is_retriable_error, ClientBuilder},
+    aws::{ClientBuilder, create_client, is_retriable_error},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        util::{retries::RetryLogic, BatchConfig, SinkBatchSettings},
         Healthcheck, VectorSink,
+        util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
     },
 };
 
+use super::sink::BatchKinesisRequest;
 use super::{
-    build_sink,
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
     record::{KinesisFirehoseClient, KinesisFirehoseRecord},
-    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -173,6 +173,7 @@ struct KinesisRetryLogic {
 
 impl RetryLogic for KinesisRetryLogic {
     type Error = SdkError<KinesisError, HttpResponse>;
+    type Request = BatchKinesisRequest<KinesisFirehoseRecord>;
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -187,7 +188,7 @@ impl RetryLogic for KinesisRetryLogic {
         is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         if response.failure_count > 0 && self.retry_partial {
             let msg = format!("partial error count {}", response.failure_count);
             RetryAction::Retry(msg.into())

@@ -9,7 +9,7 @@ use super::{
     encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
-use crate::sinks::util::{metadata::RequestMetadataBuilder, IncrementalRequestBuilder};
+use crate::sinks::util::{IncrementalRequestBuilder, metadata::RequestMetadataBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {

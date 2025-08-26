@@ -4,8 +4,8 @@ use chrono::Utc;
 use vrl::event_path;
 
 use super::{
-    bucket::Bucket, ClientStatsBucket, ClientStatsPayload, PartitionKey,
-    BUCKET_DURATION_NANOSECONDS,
+    BUCKET_DURATION_NANOSECONDS, ClientStatsBucket, ClientStatsPayload, PartitionKey,
+    bucket::Bucket,
 };
 use crate::event::{ObjectMap, TraceEvent, Value};
 

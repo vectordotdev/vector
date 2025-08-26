@@ -5,7 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
@@ -13,19 +13,17 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesSent, Protocol, Registered};
 
 use super::{
-    datagram::{send_datagrams, DatagramSocket},
     SinkBuildError,
+    datagram::{DatagramSocket, send_datagrams},
 };
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::Event,
     internal_events::{UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError},
     net,
-    sinks::{
-        util::{retries::ExponentialBackoff, StreamSink},
-        Healthcheck, VectorSink,
-    },
+    sinks::{Healthcheck, VectorSink, util::StreamSink},
 };
 
 #[derive(Debug, Snafu)]
@@ -80,10 +78,10 @@ impl UdpSinkConfig {
         &self,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
         let sink = UdpSink::new(connector.clone(), transformer, encoder);

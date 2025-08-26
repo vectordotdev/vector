@@ -5,9 +5,9 @@ use vector_common::TimeZone;
 use vector_config::{configurable_component, impl_generate_config_from_default};
 
 use super::super::default_data_dir;
-use super::metrics_expiration::PerMetricSetExpiration;
 use super::Telemetry;
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use super::metrics_expiration::PerMetricSetExpiration;
+use super::{AcknowledgementsConfig, LogSchema, proxy::ProxyConfig};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]

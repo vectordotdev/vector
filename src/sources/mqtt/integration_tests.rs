@@ -12,10 +12,10 @@ use tokio::time::timeout;
 
 use super::MqttSourceConfig;
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext},
+    SourceSender,
+    config::{SourceConfig, SourceContext, log_schema},
     event::Event,
     test_util::components::assert_source_compliance,
-    SourceSender,
 };
 
 fn mqtt_broker_address() -> String {

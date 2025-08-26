@@ -4,7 +4,7 @@ use chrono::Utc;
 use futures::{future::ready, stream};
 use serde::Deserialize;
 use serde_json::{json, to_value};
-use vector_lib::config::{init_telemetry, Tags, Telemetry};
+use vector_lib::config::{Tags, Telemetry, init_telemetry};
 use vrl::value;
 
 use super::*;
@@ -13,8 +13,8 @@ use crate::{
     event::{Event, LogEvent, Metric, MetricKind, MetricValue},
     test_util::{
         components::{
-            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
+            run_and_assert_sink_compliance,
         },
         http::{always_200_response, spawn_blackhole_http_server},
     },

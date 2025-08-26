@@ -7,9 +7,8 @@ use dyn_clone::DynClone;
 use serde::Serialize;
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
-    configurable_component,
+    Configurable, GenerateError, Metadata, NamedComponent, configurable_component,
     schema::{SchemaGenerator, SchemaObject},
-    Configurable, GenerateError, Metadata, NamedComponent,
 };
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
@@ -18,10 +17,10 @@ use vector_lib::{
     transform::Transform,
 };
 
-use super::dot_graph::GraphConfig;
-use super::schema::Options as SchemaOptions;
 use super::ComponentKey;
 use super::OutputId;
+use super::dot_graph::GraphConfig;
+use super::schema::Options as SchemaOptions;
 use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;

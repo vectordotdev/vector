@@ -3,14 +3,14 @@ use std::{
     future::Future,
     mem,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures::future::BoxFuture;
 use tokio::sync::OwnedSemaphorePermit;
-use tower::{load::Load, Service};
+use tower::{Service, load::Load};
 
-use super::{controller::Controller, future::ResponseFuture, AdaptiveConcurrencySettings};
+use super::{AdaptiveConcurrencySettings, controller::Controller, future::ResponseFuture};
 use crate::sinks::util::retries::RetryLogic;
 
 /// Enforces a limit on the concurrent number of requests the underlying
@@ -134,14 +134,14 @@ mod tests {
     use tower_test::{
         assert_request_eq,
         mock::{
-            self, future::ResponseFuture as MockResponseFuture, Handle, Mock, SendResponse, Spawn,
+            self, Handle, Mock, SendResponse, Spawn, future::ResponseFuture as MockResponseFuture,
         },
     };
 
     use super::{
         super::{
-            controller::{ControllerStatistics, Inner},
             AdaptiveConcurrencyLimitLayer,
+            controller::{ControllerStatistics, Inner},
         },
         *,
     };
@@ -156,6 +156,7 @@ mod tests {
     struct TestRetryLogic;
     impl RetryLogic for TestRetryLogic {
         type Error = TestError;
+        type Request = ();
         type Response = String;
         fn is_retriable_error(&self, _error: &Self::Error) -> bool {
             true

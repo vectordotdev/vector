@@ -4,23 +4,23 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
 };
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -312,13 +312,13 @@ mod integration_test {
 
     use super::*;
     use crate::{
+        SourceSender,
         config::log_schema,
         test_util::{
             collect_n,
-            components::{run_and_assert_source_compliance_n, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
             random_string,
         },
-        SourceSender,
     };
     use vrl::value;
 
