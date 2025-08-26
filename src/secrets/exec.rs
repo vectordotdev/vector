@@ -287,6 +287,9 @@ mod tests {
         let query_secrets: HashSet<String> =
             ["fake_secret_900"].into_iter().map(String::from).collect();
         let fetched_keys = backend.retrieve(query_secrets.clone(), &mut rx).await;
-        assert_eq!(format!("{}", fetched_keys.unwrap_err()), "secret for key 'fake_secret_900' was not retrieved: backend does not provide secret key");
+        assert_eq!(
+            format!("{}", fetched_keys.unwrap_err()),
+            "secret for key 'fake_secret_900' was not retrieved: backend does not provide secret key"
+        );
     }
 }
