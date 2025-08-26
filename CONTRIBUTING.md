@@ -279,7 +279,7 @@ first to ensure they pass.
 
 ```sh
 # Run the Clippy linter to catch common mistakes.
-cargo vdev check rust --clippy
+cargo vdev check rust --fix
 # Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.
