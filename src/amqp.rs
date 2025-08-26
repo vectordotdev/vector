@@ -72,7 +72,7 @@ impl AmqpConfig {
                 };
                 let identity = if let Some(identity) = &tls.key_file {
                     let der = tokio::fs::read(identity.to_owned()).await?;
-                    Some(OwnedIdentity {
+                    Some(OwnedIdentity::PKCS12 {
                         der,
                         password: tls
                             .key_pass
