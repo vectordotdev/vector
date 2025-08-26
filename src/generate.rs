@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -9,13 +9,13 @@ use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use toml::{map::Map, Value};
+use toml::{Value, map::Map};
 use vector_lib::configurable::component::{
     SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
-use crate::config::{format, Format, SinkHealthcheckOptions};
+use crate::config::{Format, SinkHealthcheckOptions, format};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]

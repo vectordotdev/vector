@@ -1,11 +1,11 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
+use crate::SourceSender;
+use crate::enrichment_tables::memory::MemoryConfig;
 use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
-use crate::enrichment_tables::memory::MemoryConfig;
-use crate::SourceSender;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -373,7 +373,7 @@ impl StreamSink<Event> for Memory {
 
 #[cfg(test)]
 mod tests {
-    use futures::{future::ready, StreamExt};
+    use futures::{StreamExt, future::ready};
     use futures_util::stream;
     use std::slice::from_ref;
     use std::{num::NonZeroU64, time::Duration};
@@ -392,8 +392,8 @@ mod tests {
         },
         event::{Event, LogEvent},
         test_util::components::{
-            run_and_assert_sink_compliance, run_and_assert_source_compliance, SINK_TAGS,
-            SOURCE_TAGS,
+            SINK_TAGS, SOURCE_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_source_compliance,
         },
     };
 
