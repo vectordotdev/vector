@@ -468,11 +468,11 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
     use vector_buffers::{
-        WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
+        WhenFull,
     };
     use vrl::value::Value;
 
@@ -622,7 +622,10 @@ mod tests {
         fanout.send(clones, None).await.expect("should not fail");
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
+            assert_eq!(
+                collect_ready(receiver.into_stream()),
+                std::slice::from_ref(&events)
+            );
         }
     }
 
