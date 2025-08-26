@@ -215,7 +215,7 @@ mod tests {
             }
         }
 
-        fn get_metric(&self) -> FileSourceMetricFile {
+        fn get_metric(&self) -> FileSourceMetricFile<'_> {
             FileSourceMetricFile::from_tuple((
                 self.name.to_string(),
                 vec![&self.bytes_metric, &self.events_metric],

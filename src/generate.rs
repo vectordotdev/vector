@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    fs::{File, create_dir_all},
+    fs::{create_dir_all, File},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -9,13 +9,13 @@ use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use toml::{Value, map::Map};
+use toml::{map::Map, Value};
 use vector_lib::configurable::component::{
     SinkDescription, SourceDescription, TransformDescription,
 };
 use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
-use crate::config::{Format, SinkHealthcheckOptions, format};
+use crate::config::{format, Format, SinkHealthcheckOptions};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -324,9 +324,9 @@ pub(crate) fn generate_example(
     };
 
     let file = opts.file.as_ref();
-    if file.is_some() {
-        #[allow(clippy::print_stdout)]
-        match write_config(file.as_ref().unwrap(), &builder) {
+    if let Some(path) = file {
+        match write_config(path, &builder) {
+            #[allow(clippy::print_stdout)]
             Ok(_) => {
                 println!(
                     "Config file written to {:?}",
