@@ -464,7 +464,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
@@ -705,3 +705,7 @@ cargo-install-%:
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
 	cargo vdev build publish-metadata
+
+.PHONY: clippy-fix
+clippy-fix:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --fix
