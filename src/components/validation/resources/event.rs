@@ -8,8 +8,8 @@ use vector_lib::codecs::encoding::format::JsonSerializerOptions;
 
 use crate::codecs::Encoder;
 use vector_lib::codecs::{
-    encoding, JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
-    NewlineDelimitedEncoder,
+    JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
+    NewlineDelimitedEncoder, encoding,
 };
 use vector_lib::event::{Event, LogEvent};
 
