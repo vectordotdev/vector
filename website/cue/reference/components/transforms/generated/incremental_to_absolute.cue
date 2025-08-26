@@ -11,7 +11,7 @@ generated: components: transforms: incremental_to_absolute: configuration: cache
 	required: false
 	type: object: options: {
 		max_bytes: {
-			description: "The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead"
+			description: "The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead."
 			required:    false
 			type: uint: unit: "bytes"
 		}
@@ -21,7 +21,7 @@ generated: components: transforms: incremental_to_absolute: configuration: cache
 			type: uint: unit: "events"
 		}
 		time_to_live: {
-			description: "The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache"
+			description: "The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache."
 			required:    false
 			type: uint: {
 				default: 300

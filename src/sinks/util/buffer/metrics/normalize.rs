@@ -28,7 +28,7 @@ pub enum NormalizerError {
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
-    /// The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead
+    /// The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead.
     #[serde(default = "default_max_bytes::<D>")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_bytes: Option<usize>,
@@ -38,7 +38,7 @@ pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
     #[configurable(metadata(docs::type_unit = "events"))]
     pub max_events: Option<usize>,
 
-    /// The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache
+    /// The maximum age of a metric not being updated before it is evicted from the metrics normalizer cache.
     #[serde(default = "default_time_to_live::<D>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Time To Live"))]
