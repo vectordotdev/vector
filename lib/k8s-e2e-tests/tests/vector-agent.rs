@@ -665,8 +665,12 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let numeric_regex = regex::Regex::new(r#"[^\d]"#).unwrap();
     let minor = k8s_version.minor();
     let numeric_minor = numeric_regex.replace(&minor, "");
-    let minor = u8::from_str(&numeric_minor).unwrap_or_else(|_| panic!("Couldn't get u8 from String, received {} instead!",
-        k8s_version.minor()));
+    let minor = u8::from_str(&numeric_minor).unwrap_or_else(|_| {
+        panic!(
+            "Couldn't get u8 from String, received {} instead!",
+            k8s_version.minor()
+        )
+    });
 
     // Read the rest of the log lines.
     let mut got_marker = false;
