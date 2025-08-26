@@ -85,14 +85,14 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -139,7 +139,7 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -210,14 +210,14 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -246,7 +246,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             &pod_namespace,
             "test-pod",
-            &format!("echo {}", test_message),
+            &format!("echo {test_message}"),
             vec![],
             vec![],
         ))?)
@@ -265,7 +265,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -362,14 +362,14 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -392,7 +392,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -464,14 +464,14 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -519,7 +519,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -591,14 +591,14 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -657,7 +657,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
     let k8s_version = framework.kubernetes_version().await?;
 
@@ -665,10 +665,8 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let numeric_regex = regex::Regex::new(r#"[^\d]"#).unwrap();
     let minor = k8s_version.minor();
     let numeric_minor = numeric_regex.replace(&minor, "");
-    let minor = u8::from_str(&numeric_minor).expect(&format!(
-        "Couldn't get u8 from String, received {} instead!",
-        k8s_version.minor()
-    ));
+    let minor = u8::from_str(&numeric_minor).unwrap_or_else(|_| panic!("Couldn't get u8 from String, received {} instead!",
+        k8s_version.minor()));
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -756,7 +754,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let affinity_label = format!("{}-affinity", pod_namespace);
+    let affinity_label = format!("{pod_namespace}-affinity");
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector-agent");
 
@@ -778,14 +776,14 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -809,7 +807,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )?)
         .await?;
 
-    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns_name = format!("{pod_namespace}-affinity");
     let affinity_ns = framework
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(affinity_ns_name.clone(), None),
@@ -870,7 +868,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1018,7 +1016,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -1054,7 +1052,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         excluded_test_pod_names.push(name);
     }
     for name in excluded_test_pod_names {
-        let name = format!("pods/{}", name);
+        let name = format!("pods/{name}");
         framework
             .wait(
                 &pod_namespace,
@@ -1093,7 +1091,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1216,14 +1214,14 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -1274,7 +1272,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1422,7 +1420,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -1460,7 +1458,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1563,7 +1561,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
-    let affinity_label = format!("{}-affinity", pod_namespace);
+    let affinity_label = format!("{pod_namespace}-affinity");
     let framework = make_framework();
     let override_name = get_override_name(&namespace, "vector-agent");
 
@@ -1585,14 +1583,14 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -1613,7 +1611,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let mut test_namespaces = vec![];
     let mut expected_namespaces = HashSet::new();
     for i in 0..10 {
-        let name = format!("{}-{}", pod_namespace, i);
+        let name = format!("{pod_namespace}-{i}");
         test_namespaces.push(
             framework
                 .namespace(namespace::Config::from_namespace(
@@ -1626,7 +1624,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a pod for our other pods to have an affinity to ensure they are all deployed on
     // the same node.
-    let affinity_ns_name = format!("{}-affinity", pod_namespace);
+    let affinity_ns_name = format!("{pod_namespace}-affinity");
     let affinity_ns = framework
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(affinity_ns_name.clone(), None),
@@ -1669,7 +1667,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1747,7 +1745,7 @@ async fn existing_config_file() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -1781,7 +1779,7 @@ async fn existing_config_file() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1848,14 +1846,14 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;
@@ -1917,7 +1915,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{vector_pod}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1961,9 +1959,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure we did get at least one event since before deployed the test pod.
     assert!(
         processed_events_after > processed_events_before,
-        "before: {}, after: {}",
-        processed_events_before,
-        processed_events_after
+        "before: {processed_events_before}, after: {processed_events_after}"
     );
 
     metrics::assert_metrics_present(&vector_metrics_url, metrics::SOURCE_COMPLIANCE_METRICS)
@@ -2005,14 +2001,14 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", override_name),
+            &format!("daemonset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
 
     let mut vector_metrics_port_forward = framework.port_forward(
         &namespace,
-        &format!("daemonset/{}", override_name),
+        &format!("daemonset/{override_name}"),
         9090,
         9090,
     )?;

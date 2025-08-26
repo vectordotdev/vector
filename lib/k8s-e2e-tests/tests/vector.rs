@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use indoc::{formatdoc, indoc};
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
@@ -85,7 +87,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/aggregator-vector"),
+            &"statefulset/aggregator-vector".to_string(),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -106,7 +108,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", agent_override_name),
+            &format!("daemonset/{agent_override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -136,7 +138,8 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("statefulset/aggregator-vector"))?;
+    let mut log_reader =
+        framework.logs(&namespace, &"statefulset/aggregator-vector".to_string())?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -207,7 +210,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/aggregator-vector"),
+            &"statefulset/aggregator-vector".to_string(),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -215,7 +218,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("deployment/aggregator-vector-haproxy"),
+            &"deployment/aggregator-vector-haproxy".to_string(),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -236,7 +239,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", agent_override_name),
+            &format!("daemonset/{agent_override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -266,7 +269,8 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("statefulset/aggregator-vector"))?;
+    let mut log_reader =
+        framework.logs(&namespace, &"statefulset/aggregator-vector".to_string())?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
