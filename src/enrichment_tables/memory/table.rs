@@ -1,11 +1,11 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
-use crate::SourceSender;
-use crate::enrichment_tables::memory::MemoryConfig;
 use crate::enrichment_tables::memory::internal_events::{
     MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
     MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
 };
+use crate::enrichment_tables::memory::MemoryConfig;
+use crate::SourceSender;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -373,8 +373,9 @@ impl StreamSink<Event> for Memory {
 
 #[cfg(test)]
 mod tests {
-    use futures::{StreamExt, future::ready};
+    use futures::{future::ready, StreamExt};
     use futures_util::stream;
+    use std::slice::from_ref;
     use std::{num::NonZeroU64, time::Duration};
     use tokio::time;
 
@@ -391,8 +392,8 @@ mod tests {
         },
         event::{Event, LogEvent},
         test_util::components::{
-            SINK_TAGS, SOURCE_TAGS, run_and_assert_sink_compliance,
-            run_and_assert_source_compliance,
+            run_and_assert_sink_compliance, run_and_assert_source_compliance, SINK_TAGS,
+            SOURCE_TAGS,
         },
     };
 
@@ -483,7 +484,7 @@ mod tests {
                 ("ttl".into(), Value::from(0)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         // Force scan
@@ -549,7 +550,7 @@ mod tests {
                 ("ttl".into(), Value::from(ttl / 2)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
