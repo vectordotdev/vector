@@ -212,11 +212,10 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some(bytes_sent) = bytes_sent {
-                        if let Some(byte_size) = response.bytes_sent() {
+                    if let Some(bytes_sent) = bytes_sent
+                        && let Some(byte_size) = response.bytes_sent() {
                             bytes_sent.emit(ByteSize(byte_size));
                         }
-                    }
 
                     response.events_sent().emit_event(events_sent);
 

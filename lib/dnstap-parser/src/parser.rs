@@ -147,9 +147,9 @@ impl DnstapParser {
                 dnstap_data_type.clone(),
             );
 
-            if dnstap_data_type == "Message" {
-                if let Some(message) = proto_msg.message {
-                    if let Err(err) =
+            if dnstap_data_type == "Message"
+                && let Some(message) = proto_msg.message
+                    && let Err(err) =
                         DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
                     {
                         emit!(DnstapParseWarning { error: &err });
@@ -161,8 +161,6 @@ impl DnstapParser {
                             err.to_string(),
                         );
                     }
-                }
-            }
         } else {
             emit!(DnstapParseWarning {
                 error: format!("Unknown dnstap data type: {dnstap_data_type_id}")

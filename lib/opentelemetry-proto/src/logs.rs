@@ -116,8 +116,8 @@ impl ResourceLog {
         }
 
         // Optional fields
-        if let Some(resource) = self.resource {
-            if !resource.attributes.is_empty() {
+        if let Some(resource) = self.resource
+            && !resource.attributes.is_empty() {
                 log_namespace.insert_source_metadata(
                     SOURCE_NAME,
                     &mut log,
@@ -126,7 +126,6 @@ impl ResourceLog {
                     kv_list_into_value(resource.attributes),
                 );
             }
-        }
         if !self.log_record.attributes.is_empty() {
             log_namespace.insert_source_metadata(
                 SOURCE_NAME,

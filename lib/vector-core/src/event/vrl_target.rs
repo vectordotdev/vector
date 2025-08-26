@@ -198,8 +198,8 @@ fn move_field_definitions_into_message(mut definition: Definition) -> Definition
     message.remove_object();
     message.remove_array();
 
-    if !message.is_never() {
-        if let Some(message_key) = log_schema().message_key() {
+    if !message.is_never()
+        && let Some(message_key) = log_schema().message_key() {
             // We need to add the given message type to a field called `message`
             // in the event.
             let message = Kind::object(Collection::from(BTreeMap::from([(
@@ -217,7 +217,6 @@ fn move_field_definitions_into_message(mut definition: Definition) -> Definition
 
             *definition.event_kind_mut() = definition.event_kind().union(message);
         }
-    }
 
     definition
 }
@@ -639,9 +638,7 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
                 &mut timestamp,
                 &mut tags,
             ];
-            properties
-                .iter_mut()
-                .for_each(|property| property.insert(metric, &mut map));
+            for property in &mut properties { property.insert(metric, &mut map); }
             break;
         }
 

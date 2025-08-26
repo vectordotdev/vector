@@ -390,8 +390,8 @@ where
             .get_timeout_for_key(key, self.global_idle_timeout);
 
         let generation = value.get_generation();
-        if let Some(timeout) = key_timeout {
-            if self.mask.matches(kind) {
+        if let Some(timeout) = key_timeout
+            && self.mask.matches(kind) {
                 let mut guard = self.inner.lock();
                 let (clock, entries) = &mut *guard;
 
@@ -429,7 +429,6 @@ where
                     return false;
                 }
             }
-        }
 
         true
     }

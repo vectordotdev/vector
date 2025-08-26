@@ -100,14 +100,13 @@ impl ResourceSpan {
             Value::from(span.dropped_links_count),
         );
         trace.insert(event_path!("status"), Value::from(span.status));
-        if let Some(resource) = self.resource {
-            if !resource.attributes.is_empty() {
+        if let Some(resource) = self.resource
+            && !resource.attributes.is_empty() {
                 trace.insert(
                     event_path!(RESOURCE_KEY),
                     kv_list_into_value(resource.attributes),
                 );
             }
-        }
         trace.insert(event_path!("ingest_timestamp"), Value::from(now));
         trace.into()
     }

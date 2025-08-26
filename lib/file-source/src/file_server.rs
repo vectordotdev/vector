@@ -211,8 +211,8 @@ where
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
                                     fs::metadata(old_path).and_then(|m| m.modified()),
                                     fs::metadata(new_path).and_then(|m| m.modified()),
-                                ) {
-                                    if old_modified_time < new_modified_time {
+                                )
+                                    && old_modified_time < new_modified_time {
                                         info!(
                                             message = "Switching to watch most recently modified file.",
                                             new_modified_time = ?new_modified_time,
@@ -220,7 +220,6 @@ where
                                         );
                                         watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                     }
-                                }
                             }
                         } else {
                             // untracked file fingerprint
@@ -307,8 +306,8 @@ where
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
                 } else {
                     // Should the file be removed
-                    if let Some(grace_period) = self.remove_after {
-                        if watcher.last_read_success().elapsed() >= grace_period {
+                    if let Some(grace_period) = self.remove_after
+                        && watcher.last_read_success().elapsed() >= grace_period {
                             // Try to remove
                             match remove_file(&watcher.path) {
                                 Ok(()) => {
@@ -321,7 +320,6 @@ where
                                 }
                             }
                         }
-                    }
                 }
 
                 // Do not move on to newer files if we are behind on an older file

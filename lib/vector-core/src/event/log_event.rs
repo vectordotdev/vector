@@ -13,29 +13,29 @@ use bytes::Bytes;
 use chrono::Utc;
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::{PathPrefix, lookup_v2::TargetPath, metadata_path, path};
+use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
-    EventDataEq,
     byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::{JsonSize, NonZeroJsonSize},
     request_metadata::GetEventCountTags,
+    EventDataEq,
 };
-use vrl::path::{OwnedTargetPath, PathParseError, parse_target_path};
+use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
 use vrl::{event_path, owned_value_path};
 
 use super::{
-    EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
-    finalization::{BatchNotifier, EventFinalizer},
-    metadata::EventMetadata,
-    util,
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, finalization::{BatchNotifier, EventFinalizer}, metadata::EventMetadata, util, EventFinalizers,
+    Finalizable,
+    KeyString,
+    ObjectMap,
+    Value,
 };
 use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
-use crate::event::MaybeAsLogMut;
 use crate::event::util::log::{all_fields, all_metadata_fields};
+use crate::event::MaybeAsLogMut;
 
 static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
@@ -626,7 +626,7 @@ impl EventDataEq for LogEvent {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::{Bytes, LogEvent, Utc, log_schema};
+    use super::{log_schema, Bytes, LogEvent, Utc};
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.
@@ -1033,9 +1033,8 @@ mod test {
     fn json_value_to_vector_log_event_to_json_value() {
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
-        std::fs::read_dir(FIXTURE_ROOT)
-            .unwrap()
-            .for_each(|fixture_file| match fixture_file {
+        for fixture_file in std::fs::read_dir(FIXTURE_ROOT).unwrap() {
+            match fixture_file {
                 Ok(fixture_file) => {
                     let path = fixture_file.path();
                     tracing::trace!(?path, "Opening.");
@@ -1047,7 +1046,8 @@ mod test {
                     assert_eq!(serde_value, serde_value_again);
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
-            });
+            }
+        }
     }
 
     fn assert_merge_value(

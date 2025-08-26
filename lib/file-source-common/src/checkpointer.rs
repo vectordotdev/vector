@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::{
-    FilePosition,
     fingerprinter::{FileFingerprint, Fingerprinter},
+    FilePosition,
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
@@ -403,15 +403,15 @@ impl Checkpointer {
     fn read_legacy_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
         for path in glob(&self.glob_string).unwrap().flatten() {
             let mut mtime = None;
-            if let Some(ignore_before) = ignore_before {
-                if let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified()) {
-                    let modified = DateTime::<Utc>::from(modified);
-                    if modified < ignore_before {
-                        fs::remove_file(path).ok();
-                        continue;
-                    }
-                    mtime = Some(modified);
+            if let Some(ignore_before) = ignore_before
+                && let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified())
+            {
+                let modified = DateTime::<Utc>::from(modified);
+                if modified < ignore_before {
+                    fs::remove_file(path).ok();
+                    continue;
                 }
+                mtime = Some(modified);
             }
             let (fng, pos) = self.decode(&path);
             self.checkpoints.checkpoints.insert(fng, pos);
@@ -430,7 +430,7 @@ mod test {
 
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
-        CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, FileFingerprint, FilePosition,
+        Checkpoint, Checkpointer, FileFingerprint, FilePosition, CHECKPOINT_FILE_NAME,
         TMP_FILE_NAME,
     };
 

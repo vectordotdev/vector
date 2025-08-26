@@ -74,8 +74,8 @@ pub trait ContainerTestRunner: TestRunner {
         let container_name = self.container_name();
 
         for line in command.check_output()?.lines() {
-            if let Some((name, state)) = line.split_once(' ') {
-                if name == container_name {
+            if let Some((name, state)) = line.split_once(' ')
+                && name == container_name {
                     return Ok(if state == "created" {
                         RunnerState::Created
                     } else if state == "dead" {
@@ -92,7 +92,6 @@ pub trait ContainerTestRunner: TestRunner {
                         RunnerState::Unknown
                     });
                 }
-            }
         }
 
         Ok(RunnerState::Missing)
