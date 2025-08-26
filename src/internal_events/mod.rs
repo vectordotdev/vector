@@ -138,6 +138,8 @@ mod window;
     feature = "sinks-file",
 ))]
 mod file;
+
+#[cfg(windows)]
 mod windows;
 
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
