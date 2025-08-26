@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};

@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
