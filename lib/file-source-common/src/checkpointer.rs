@@ -128,10 +128,10 @@ impl CheckpointsView {
         match state {
             State::V1 { checkpoints } => {
                 for checkpoint in checkpoints {
-                    if let Some(ignore_before) = ignore_before {
-                        if checkpoint.modified < ignore_before {
-                            continue;
-                        }
+                    if let Some(ignore_before) = ignore_before
+                        && checkpoint.modified < ignore_before
+                    {
+                        continue;
                     }
                     self.load(checkpoint);
                 }
@@ -179,20 +179,18 @@ impl CheckpointsView {
             self.update(fng, pos);
         }
 
-        if self.checkpoints.get(&fng).is_none() {
-            if let Ok(Some(fingerprint)) =
+        if self.checkpoints.get(&fng).is_none()
+            && let Ok(Some(fingerprint)) =
                 fingerprinter.get_legacy_checksum(path, fingerprint_buffer)
-            {
-                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
-                    self.update(fng, pos);
-                }
+        {
+            if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+                self.update(fng, pos);
             }
             if let Ok(Some(fingerprint)) =
                 fingerprinter.get_legacy_first_lines_checksum(path, fingerprint_buffer)
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
-                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
-                    self.update(fng, pos);
-                }
+                self.update(fng, pos);
             }
         }
     }
