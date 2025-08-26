@@ -223,7 +223,7 @@ pub struct FileConfig {
     /// if not set, then last line without delimiter will not be return
     #[configurable(derived)]
     #[serde(default)]
-    pub eof_linger_timeout_sec: Option<u64>,
+    pub read_eof_linger_line: bool,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -436,7 +436,7 @@ impl Default for FileConfig {
             oldest_first: false,
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
-            eof_linger_timeout_sec: None,
+            read_eof_linger_line: false,
             encoding: None,
             acknowledgements: Default::default(),
             log_namespace: None,
@@ -597,7 +597,7 @@ pub fn file_source(
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
-        eof_linger_timeout_sec: config.eof_linger_timeout_sec,
+        read_eof_linger_line: config.read_eof_linger_line,
         data_dir,
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter {

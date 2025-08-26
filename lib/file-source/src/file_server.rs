@@ -45,7 +45,7 @@ where
     pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub line_delimiter: Bytes,
-    pub eof_linger_timeout_sec: Option<u64>,
+    pub read_eof_linger_line: bool,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
@@ -433,7 +433,7 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
-            self.eof_linger_timeout_sec,
+            self.read_eof_linger_line,
             self.trigger_wait_sec,
         ) {
             Ok(mut watcher) => {
