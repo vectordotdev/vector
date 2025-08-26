@@ -20,9 +20,8 @@ mod util;
 
 use anyhow::Result;
 use clap::Parser;
-use std::env;
-
 use commands::Cli;
+use std::env;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

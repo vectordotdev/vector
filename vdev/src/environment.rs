@@ -1,7 +1,13 @@
-use regex::{Captures, Regex};
+use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 use std::process::Command;
-use std::sync::OnceLock;
+
+cfg_if! {
+    if #[cfg(unix)] {
+        use std::sync::OnceLock;
+        use regex::{Captures, Regex};
+    }
+}
 
 pub type Environment = BTreeMap<String, Option<String>>;
 
@@ -34,32 +40,35 @@ pub(crate) fn append_environment_variables(command: &mut Command, environment: &
     }
 }
 
-#[cfg(unix)]
-/// Resolve all environment variable placeholders. If the variable is not found or is `None`, it is left unchanged.
-pub fn resolve_placeholders(input: &str, environment: &Environment) -> String {
-    static BRACED: OnceLock<Regex> = OnceLock::new();
-    static BARE: OnceLock<Regex> = OnceLock::new();
+cfg_if! {
+if #[cfg(unix)] {
+    /// Resolve all environment variable placeholders. If the variable is not found or is `None`, it is left unchanged.
+    pub fn resolve_placeholders(input: &str, environment: &Environment) -> String {
+        static BRACED: OnceLock<Regex> = OnceLock::new();
+        static BARE: OnceLock<Regex> = OnceLock::new();
 
-    let braced =
-        BRACED.get_or_init(|| Regex::new(r"\$\{([A-Za-z0-9_]+)\}").expect("cannot build regex"));
-    let bare = BARE.get_or_init(|| Regex::new(r"\$([A-Za-z0-9_]+)").expect("cannot build regex"));
+        let braced =
+            BRACED.get_or_init(|| Regex::new(r"\$\{([A-Za-z0-9_]+)\}").expect("cannot build regex"));
+        let bare = BARE.get_or_init(|| Regex::new(r"\$([A-Za-z0-9_]+)").expect("cannot build regex"));
 
-    // First replace ${VAR}
-    let step1 = braced.replace_all(input, |captures: &Captures| {
-        resolve_or_keep(&captures[0], &captures[1], environment)
-    });
+        // First replace ${VAR}
+        let step1 = braced.replace_all(input, |captures: &Captures| {
+            resolve_or_keep(&captures[0], &captures[1], environment)
+        });
 
-    // Then replace $VAR
-    bare.replace_all(&step1, |captures: &Captures| {
-        resolve_or_keep(&captures[0], &captures[1], environment)
-    })
-    .into_owned()
+        // Then replace $VAR
+        bare.replace_all(&step1, |captures: &Captures| {
+            resolve_or_keep(&captures[0], &captures[1], environment)
+        })
+        .into_owned()
+    }
+
+    #[cfg(unix)]
+    fn resolve_or_keep(full: &str, name: &str, env: &Environment) -> String {
+        env.get(name)
+            .and_then(Clone::clone)
+            .or_else(|| std::env::var(name).ok())
+            .unwrap_or_else(|| full.to_string())
+    }
 }
-
-#[cfg(unix)]
-fn resolve_or_keep(full: &str, name: &str, env: &Environment) -> String {
-    env.get(name)
-        .and_then(Clone::clone)
-        .or_else(|| std::env::var(name).ok())
-        .unwrap_or_else(|| full.to_string())
 }

@@ -11848,6 +11848,7 @@ name = "vdev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cfg-if",
  "chrono",
  "clap",
  "clap-verbosity-flag",
