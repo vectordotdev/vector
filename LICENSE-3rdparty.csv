@@ -33,14 +33,12 @@ async-channel,https://github.com/smol-rs/async-channel,Apache-2.0 OR MIT,Stjepan
 async-compression,https://github.com/Nullus157/async-compression,MIT OR Apache-2.0,"Wim Looman <wim@nemo157.com>, Allen Bui <fairingrey@gmail.com>"
 async-executor,https://github.com/smol-rs/async-executor,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-fs,https://github.com/smol-rs/async-fs,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
-async-global-executor,https://github.com/Keruspe/async-global-executor,Apache-2.0 OR MIT,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
 async-graphql,https://github.com/async-graphql/async-graphql,MIT OR Apache-2.0,"sunli <scott_s829@163.com>, Koxiaet"
 async-io,https://github.com/smol-rs/async-io,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-lock,https://github.com/smol-rs/async-lock,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-nats,https://github.com/nats-io/nats.rs,Apache-2.0,"Tomasz Pietrek <tomasz@nats.io>, Casper Beyer <caspervonb@pm.me>"
 async-net,https://github.com/smol-rs/async-net,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
 async-process,https://github.com/smol-rs/async-process,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
-async-reactor-trait,https://github.com/amqp-rs/reactor-trait,Apache-2.0 OR MIT,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
 async-recursion,https://github.com/dcchut/async-recursion,MIT OR Apache-2.0,Robert Usher <266585+dcchut@users.noreply.github.com>
 async-signal,https://github.com/smol-rs/async-signal,Apache-2.0 OR MIT,John Nunley <dev@notgull.net>
 async-stream,https://github.com/tokio-rs/async-stream,MIT,Carl Lerche <me@carllerche.com>
@@ -478,7 +476,6 @@ pin-project,https://github.com/taiki-e/pin-project,Apache-2.0 OR MIT,The pin-pro
 pin-project-internal,https://github.com/taiki-e/pin-project,Apache-2.0 OR MIT,The pin-project-internal Authors
 pin-project-lite,https://github.com/taiki-e/pin-project-lite,Apache-2.0 OR MIT,The pin-project-lite Authors
 pin-utils,https://github.com/rust-lang-nursery/pin-utils,MIT OR Apache-2.0,Josef Brandl <mail@josefbrandl.de>
-pinky-swear,https://github.com/amqp-rs/pinky-swear,BSD-2-Clause,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
 piper,https://github.com/notgull/piper,MIT OR Apache-2.0,"Stjepan Glavina <stjepang@gmail.com>, John Nunley <dev@notgull.net>"
 pkcs1,https://github.com/RustCrypto/formats/tree/master/pkcs1,Apache-2.0 OR MIT,RustCrypto Developers
 pkcs8,https://github.com/RustCrypto/formats/tree/master/pkcs8,Apache-2.0 OR MIT,RustCrypto Developers
@@ -530,6 +527,7 @@ ratatui,https://github.com/ratatui/ratatui,MIT,"Florian Dehau <work@fdehau.com>,
 raw-cpuid,https://github.com/gz/rust-cpuid,MIT,Gerd Zellweger <mail@gerdzellweger.com>
 raw-window-handle,https://github.com/rust-windowing/raw-window-handle,MIT OR Apache-2.0 OR Zlib,Osspial <osspial@gmail.com>
 rdkafka,https://github.com/fede1024/rust-rdkafka,MIT,Federico Giraud <giraud.federico@gmail.com>
+reactor-trait,https://github.com/amqp-rs/reactor-trait,Apache-2.0 OR MIT,Marc-Antoine Perennou <Marc-Antoine@Perennou.com>
 redis,https://github.com/redis-rs/redis-rs,BSD-3-Clause,The redis Authors
 redox_syscall,https://gitlab.redox-os.org/redox-os/syscall,MIT,Jeremy Soller <jackpot51@gmail.com>
 redox_users,https://gitlab.redox-os.org/redox-os/users,MIT,"Jose Narvaez <goyox86@gmail.com>, Wesley Hershberger <mggmugginsmc@gmail.com>"
