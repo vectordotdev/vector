@@ -87,7 +87,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &"statefulset/aggregator-vector".to_string(),
+            "statefulset/aggregator-vector",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -138,8 +138,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader =
-        framework.logs(&namespace, &"statefulset/aggregator-vector".to_string())?;
+    let mut log_reader = framework.logs(&namespace, "statefulset/aggregator-vector")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -210,7 +209,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &"statefulset/aggregator-vector".to_string(),
+            "statefulset/aggregator-vector",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -218,7 +217,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &"deployment/aggregator-vector-haproxy".to_string(),
+            "deployment/aggregator-vector-haproxy",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -269,8 +268,7 @@ async fn haproxy() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader =
-        framework.logs(&namespace, &"statefulset/aggregator-vector".to_string())?;
+    let mut log_reader = framework.logs(&namespace, "statefulset/aggregator-vector")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
