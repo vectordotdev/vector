@@ -702,11 +702,11 @@ pub fn file_source(
         });
 
         let span = info_span!("file_server");
-        tokio::task::spawn_blocking(move || {
+        tokio::spawn(async move {
             let _enter = span.enter();
-            let rt = tokio::runtime::Handle::current();
-            let result = rt.block_on(file_server
-                .run(tx, shutdown, shutdown_checkpointer, checkpointer));
+            let result = file_server
+                .run(tx, shutdown, shutdown_checkpointer, checkpointer)
+                .await;
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
