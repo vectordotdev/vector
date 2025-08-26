@@ -3,12 +3,12 @@ use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
 use bytes::Bytes;
 use derivative::Derivative;
-use tokio_tungstenite::tungstenite::{handshake::server::Request, Message};
+use tokio_tungstenite::tungstenite::{Message, handshake::server::Request};
 use url::Url;
 use uuid::Uuid;
 use vector_config::configurable_component;
 use vector_lib::{
-    codecs::decoding::{format::Deserializer as _, DeserializerConfig},
+    codecs::decoding::{DeserializerConfig, format::Deserializer as _},
     event::{Event, MaybeAsLogMut},
     lookup::lookup_v2::ConfigValuePath,
 };
@@ -212,7 +212,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
                 {
                     match Uuid::parse_str(&last_received_param_value) {
                         Ok(last_received_val) => {
-                            return BufferReplayRequest::with_replay_from(last_received_val)
+                            return BufferReplayRequest::with_replay_from(last_received_val);
                         }
                         Err(err) => {
                             warn!(message = "Parsing last received message UUID failed.", %err)

@@ -1,16 +1,16 @@
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
     metrics::v1::{
-        metric::Data, number_data_point::Value as NumberDataPointValue, AggregationTemporality,
-        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint,
-        NumberDataPoint, ResourceMetrics, Sum, Summary, SummaryDataPoint,
+        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+        Histogram, HistogramDataPoint, NumberDataPoint, ResourceMetrics, Sum, Summary,
+        SummaryDataPoint, metric::Data, number_data_point::Value as NumberDataPointValue,
     },
     resource::v1::Resource,
 };
 use chrono::{TimeZone, Utc};
 use vector_core::event::{
-    metric::{Bucket, Quantile, TagValue},
     Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+    metric::{Bucket, Quantile, TagValue},
 };
 
 impl ResourceMetrics {

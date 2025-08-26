@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures_util::{stream::BoxStream, FutureExt, StreamExt};
+use futures_util::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::Snafu;
 use tokio::sync::oneshot;
 use vector_lib::configurable::configurable_component;
@@ -11,9 +11,9 @@ use vector_lib::{
 };
 
 use crate::{
+    SourceSender,
     config::{SinkConfig, SinkContext},
     sinks::Healthcheck,
-    SourceSender,
 };
 
 /// Configuration for the `test_basic` sink.

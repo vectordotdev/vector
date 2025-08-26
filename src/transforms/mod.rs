@@ -47,8 +47,8 @@ mod test {
 
     use crate::{
         config::{
-            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
             ConfigBuilder, TransformConfig,
+            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
         },
         event::Event,
         test_util::start_topology,

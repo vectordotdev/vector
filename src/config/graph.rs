@@ -1,8 +1,8 @@
 use super::{
-    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput, WildcardMatching,
+    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
+    TransformOutput, WildcardMatching, schema,
 };
-use indexmap::{set::IndexSet, IndexMap};
+use indexmap::{IndexMap, set::IndexSet};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
@@ -177,7 +177,9 @@ impl Graph {
                     // using value != glob::Pattern::escape(value) to check if value is a glob
                     // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
                     if from != glob::Pattern::escape(from) {
-                        info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
+                        info!(
+                            "Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled."
+                        );
                         return Ok(());
                     }
                 }

@@ -1,7 +1,7 @@
 use core::fmt;
 use std::collections::BTreeSet;
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
@@ -212,18 +212,18 @@ impl MetricValue {
     #[must_use]
     pub fn add(&mut self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
-            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { value }, Self::Counter { value: value2 })
+            | (Self::Gauge { value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
                 true
             }
-            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+            (Self::Set { values }, Self::Set { values: values2 }) => {
                 values.extend(values2.iter().map(Into::into));
                 true
             }
             (
                 Self::Distribution {
-                    ref mut samples,
+                    samples,
                     statistic: statistic_a,
                 },
                 Self::Distribution {
@@ -236,9 +236,9 @@ impl MetricValue {
             }
             (
                 Self::AggregatedHistogram {
-                    ref mut buckets,
-                    ref mut count,
-                    ref mut sum,
+                    buckets,
+                    count,
+                    sum,
                 },
                 Self::AggregatedHistogram {
                     buckets: buckets2,
@@ -282,17 +282,15 @@ impl MetricValue {
             // process restart, etc.  Thus, being able to generate negative deltas would violate
             // that.  Whether a counter is reset to 0, or if it incorrectly warps to a previous
             // value, it doesn't matter: we're going to reinitialize it.
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
-                if *value >= *value2 =>
-            {
+            (Self::Counter { value }, Self::Counter { value: value2 }) if *value >= *value2 => {
                 *value -= value2;
                 true
             }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Gauge { value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
                 true
             }
-            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+            (Self::Set { values }, Self::Set { values: values2 }) => {
                 for item in values2 {
                     values.remove(item);
                 }
@@ -300,7 +298,7 @@ impl MetricValue {
             }
             (
                 Self::Distribution {
-                    ref mut samples,
+                    samples,
                     statistic: statistic_a,
                 },
                 Self::Distribution {
@@ -333,9 +331,9 @@ impl MetricValue {
             // make that decision, and simply force the metric to be reinitialized.
             (
                 Self::AggregatedHistogram {
-                    ref mut buckets,
-                    ref mut count,
-                    ref mut sum,
+                    buckets,
+                    count,
+                    sum,
                 },
                 Self::AggregatedHistogram {
                     buckets: buckets2,

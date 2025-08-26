@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
+use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
@@ -12,23 +12,24 @@ use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use super::Region;
 use crate::{
+    Result,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{
-        metric::{Metric, MetricValue},
         Event, KeyString,
+        metric::{Metric, MetricValue},
     },
     http::HttpClient,
     internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
-        influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
+        Healthcheck, HealthcheckError, VectorSink,
+        influxdb::{Field, ProtocolVersion, encode_timestamp, encode_uri, influx_line_protocol},
         util::{
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, VectorSink,
     },
-    vector_version, Result,
+    vector_version,
 };
 
 #[derive(Clone)]
@@ -176,7 +177,7 @@ impl SematextMetricsService {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic,
+                HttpRetryLogic::default(),
                 sematext_service,
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
@@ -304,17 +305,17 @@ fn to_fields(label: String, value: f64) -> HashMap<KeyString, Field> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Timelike, Utc};
+    use chrono::{Timelike, Utc, offset::TimeZone};
     use futures::StreamExt;
     use indoc::indoc;
     use vector_lib::metric_tags;
 
     use super::*;
     use crate::{
-        event::{metric::MetricKind, Event},
+        event::{Event, metric::MetricKind},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
-            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, assert_sink_compliance},
             next_addr, test_generate_config,
         },
     };
@@ -326,17 +327,19 @@ mod tests {
 
     #[test]
     fn test_encode_counter_event() {
-        let events = vec![Metric::new(
-            "pool.used",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 42.0 },
-        )
-        .with_namespace(Some("jvm"))
-        .with_timestamp(Some(
-            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
-                .single()
-                .expect("invalid timestamp"),
-        ))];
+        let events = vec![
+            Metric::new(
+                "pool.used",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_namespace(Some("jvm"))
+            .with_timestamp(Some(
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            )),
+        ];
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
@@ -346,16 +349,18 @@ mod tests {
 
     #[test]
     fn test_encode_counter_event_no_namespace() {
-        let events = vec![Metric::new(
-            "used",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 42.0 },
-        )
-        .with_timestamp(Some(
-            Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
-                .single()
-                .expect("invalid timestamp"),
-        ))];
+        let events = vec![
+            Metric::new(
+                "used",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 42.0 },
+            )
+            .with_timestamp(Some(
+                Utc.with_ymd_and_hms(2020, 8, 18, 21, 0, 0)
+                    .single()
+                    .expect("invalid timestamp"),
+            )),
+        ];
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",

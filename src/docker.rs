@@ -2,6 +2,7 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use bollard::{
+    API_DEFAULT_VERSION, Docker,
     errors::Error as DockerError,
     models::HostConfig,
     query_parameters::{
@@ -9,7 +10,6 @@ use bollard::{
         RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
     },
     secret::ContainerCreateBody,
-    Docker, API_DEFAULT_VERSION,
 };
 use futures::StreamExt;
 use http::uri::Uri;

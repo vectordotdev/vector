@@ -3,15 +3,15 @@ mod http;
 
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use vector_lib::{
     codecs::{
+        BytesEncoder,
         decoding::{self, DeserializerConfig},
         encoding::{
             self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
             TextSerializerConfig,
         },
-        BytesEncoder,
     },
     config::LogNamespace,
 };
@@ -19,13 +19,13 @@ use vector_lib::{config::DataType, event::Event};
 
 use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
-pub use self::event::{encode_test_event, TestEvent};
+pub use self::event::{TestEvent, encode_test_event};
 pub use self::http::HttpResourceConfig;
 use self::http::HttpResourceOutputContext;
 
 use super::{
-    sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
+    sync::{Configuring, TaskCoordinator},
 };
 
 /// The codec used by the external resource.
@@ -200,6 +200,13 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
         decoding::FramingConfig::OctetCounting(_) => todo!(),
         // TODO: chunked gelf is not supported yet in encoding
         decoding::FramingConfig::ChunkedGelf(_) => todo!(),
+        decoding::FramingConfig::VarintLengthDelimited(config) => {
+            encoding::FramingConfig::VarintLengthDelimited(
+                encoding::VarintLengthDelimitedEncoderConfig {
+                    max_frame_length: config.max_frame_length,
+                },
+            )
+        }
     };
 
     framing_config.build()
@@ -249,6 +256,13 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
         }
         encoding::FramingConfig::NewlineDelimited => {
             decoding::FramingConfig::NewlineDelimited(Default::default())
+        }
+        vector_lib::codecs::encoding::FramingConfig::VarintLengthDelimited(config) => {
+            decoding::FramingConfig::VarintLengthDelimited(
+                decoding::VarintLengthDelimitedDecoderConfig {
+                    max_frame_length: config.max_frame_length,
+                },
+            )
         }
     };
 

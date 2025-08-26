@@ -7,18 +7,19 @@ use futures::StreamExt;
 use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     internal_events::{
@@ -29,11 +30,10 @@ use crate::{
     serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
-        socket::SocketConfig,
-        util::net::{try_bind_udp_socket, SocketListenAddr},
         Source,
+        socket::SocketConfig,
+        util::net::{SocketListenAddr, try_bind_udp_socket},
     },
-    SourceSender,
 };
 
 /// UDP configuration for the `socket` source.
@@ -231,6 +231,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
+                                        internal_log_rate_limit = true
                                     );
                                     continue;
                                 }
@@ -258,6 +259,7 @@ pub(super) fn udp(
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
                                         max_length = max_length,
+                                        internal_log_rate_limit = true
                                     );
                                 }
 

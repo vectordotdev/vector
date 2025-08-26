@@ -69,12 +69,12 @@ async fn sink_events() {
             Some(TapPayload::Notification(Notification::Matched(matched)))
                 if matched.pattern == pattern_matched =>
             {
-                continue
+                continue;
             }
             Some(TapPayload::Notification(Notification::NotMatched(not_matched)))
                 if not_matched.pattern == pattern_not_matched =>
             {
-                continue
+                continue;
             }
             _ => panic!("unexpected payload"),
         }
@@ -198,13 +198,13 @@ async fn integration_test_source_metric() {
         "to_metric",
         &["in"],
         LogToMetricConfig {
-            metrics: vec![MetricConfig {
+            metrics: Some(vec![MetricConfig {
                 field: "message".try_into().expect("Fixed template string"),
                 name: None,
                 namespace: None,
                 tags: None,
                 metric: MetricTypeConfig::Gauge,
-            }],
+            }]),
             all_metrics: None,
         },
     );
@@ -340,13 +340,17 @@ async fn integration_test_transform_input() {
         assert_notification(tap_events[1][0].clone()),
         assert_notification(tap_events[2][0].clone()),
     ];
-    assert!(notifications
-        .iter()
-        .any(|n| *n == Notification::Matched(Matched::new("transform".to_string()))));
+    assert!(
+        notifications
+            .iter()
+            .any(|n| *n == Notification::Matched(Matched::new("transform".to_string())))
+    );
     // "in" is not matched since it corresponds to a source
-    assert!(notifications
-        .iter()
-        .any(|n| *n == Notification::NotMatched(NotMatched::new("in".to_string()))));
+    assert!(
+        notifications
+            .iter()
+            .any(|n| *n == Notification::NotMatched(NotMatched::new("in".to_string())))
+    );
     // "in" generates an invalid match notification to warn against an
     // attempt to tap the input of a source
     assert!(notifications.iter().any(|n| *n

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures_util::{future::err, FutureExt};
+use futures_util::{FutureExt, future::err};
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::schema::Definition;

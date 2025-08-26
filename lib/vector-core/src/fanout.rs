@@ -468,11 +468,11 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
     use vector_buffers::{
+        WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
-        WhenFull,
     };
     use vrl::value::Value;
 

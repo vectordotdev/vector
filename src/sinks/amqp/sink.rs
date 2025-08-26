@@ -6,11 +6,11 @@ use serde::Serialize;
 
 use super::channel::AmqpSinkChannels;
 use super::{
+    BuildError,
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
     encoder::AmqpEncoder,
     request_builder::AmqpRequestBuilder,
     service::AmqpService,
-    BuildError,
 };
 
 /// Stores the event together with the rendered exchange and routing_key values.

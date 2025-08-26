@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
 
-use super::{component_name, open_file, read_dir, Format};
+use super::{Format, component_name, open_file, read_dir};
 use crate::config::format;
 
 /// Provides a hint to the loading system of the type of components that should be found

@@ -2,8 +2,8 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{
-    de::{self, Error, MapAccess, Unexpected, Visitor},
     Deserialize, Deserializer,
+    de::{self, Error, MapAccess, Unexpected, Visitor},
 };
 
 use crate::event::{Metric, MetricKind, MetricTags, MetricValue};

@@ -13,7 +13,7 @@ on:
   pull_request:
   # Needs to pass by default in MQ
   merge_group:
-    types: [checks_requested]
+    types: [ checks_requested ]
   schedule:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
@@ -90,7 +90,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e datadog-logs
 
       - if: (github.event_name == 'schedule' ||
           github.event_name == 'workflow_dispatch' ||
@@ -101,14 +101,14 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
+          command: bash scripts/run-integration-test.sh e2e datadog-metrics
 
       - if: (github.event_name == 'schedule' ||
           github.event_name == 'workflow_dispatch' ||
           needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-opentelemetry-logs
-        run: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
 
 
   e2e-test-suite:
@@ -117,13 +117,12 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs: e2e-tests
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

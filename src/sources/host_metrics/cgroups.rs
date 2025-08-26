@@ -8,7 +8,7 @@ use tokio::{
 };
 use vector_lib::metric_tags;
 
-use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
+use super::{CGroupsConfig, HostMetrics, MetricsBuffer, filter_result_sync};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
@@ -455,17 +455,17 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    use rand::{rngs::ThreadRng, Rng};
+    use rand::{Rng, rngs::ThreadRng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_lib::event::Metric;
 
     use super::{
         super::{
-            tests::{count_name, count_tag},
             HostMetrics, HostMetricsConfig,
+            tests::{count_name, count_tag},
         },
-        join_name, join_path, MetricsBuffer,
+        MetricsBuffer, join_name, join_path,
     };
 
     #[test]

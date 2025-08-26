@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
 
 #[derive(Debug)]
 pub(crate) struct ThrottleEventDiscarded {

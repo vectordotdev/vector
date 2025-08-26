@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
-    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
     Merged, SinkBatchSettings,
+    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
 };
 
 mod normalize;

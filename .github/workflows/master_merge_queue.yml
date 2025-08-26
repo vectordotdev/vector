@@ -114,14 +114,12 @@ jobs:
       - unit-mac
       - unit-windows
       - install-sh
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: exit
+      - name: Check all jobs status
         run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

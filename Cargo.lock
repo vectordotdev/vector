@@ -633,25 +633,25 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.33.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbc1f1a75fd07f0f517322d103211f12d757658e91676def9a2e688774656c60"
+checksum = "08f6da6d49a956424ca4e28fe93656f790d748b469eaccbc7488fec545315180"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.1",
  "bytes 1.10.1",
  "futures 0.3.31",
- "http 0.2.9",
  "memchr",
- "nkeys 0.3.2",
+ "nkeys",
  "nuid",
  "once_cell",
+ "pin-project",
+ "portable-atomic",
  "rand 0.8.5",
  "regex",
  "ring",
- "rustls 0.21.12",
- "rustls-native-certs 0.6.3",
- "rustls-pemfile 1.0.4",
- "rustls-webpki 0.101.7",
+ "rustls-native-certs 0.7.0",
+ "rustls-pemfile 2.1.0",
+ "rustls-webpki 0.102.8",
  "serde",
  "serde_json",
  "serde_nanos",
@@ -659,9 +659,11 @@ dependencies = [
  "thiserror 1.0.68",
  "time",
  "tokio",
- "tokio-retry",
- "tokio-rustls 0.24.1",
+ "tokio-rustls 0.26.2",
+ "tokio-util",
+ "tokio-websockets",
  "tracing 0.1.41",
+ "tryhard",
  "url",
 ]
 
@@ -3776,9 +3778,21 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "fancy-regex"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e24cb5a94bcae1e5408b0effca5cd7172ea3c5755049c5f3af4cd283a165298"
+checksum = "d6215aee357f8c7c989ebb4b8466ca4d7dc93b3957039f2fc3ea2ade8ea5f279"
+dependencies = [
+ "bit-set",
+ "derivative",
+ "regex-automata 0.4.8",
+ "regex-syntax 0.8.5",
+]
+
+[[package]]
+name = "fancy-regex"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf04c5ec15464ace8355a7b440a33aece288993475556d461154d7a62ad9947c"
 dependencies = [
  "bit-set",
  "regex-automata 0.4.8",
@@ -3820,6 +3834,28 @@ checksum = "a481586acf778f1b1455424c343f71124b048ffa5f4fc3f8f6ae9dc432dcb3c7"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.10.1",
+ "chrono",
+ "criterion",
+ "file-source-common",
+ "flate2",
+ "futures 0.3.31",
+ "glob",
+ "indexmap 2.10.0",
+ "libc",
+ "quickcheck",
+ "similar-asserts",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.41",
+ "vector-common",
+ "winapi",
+]
+
+[[package]]
+name = "file-source-common"
+version = "0.1.0"
+dependencies = [
  "bstr 1.12.0",
  "bytes 1.10.1",
  "chrono",
@@ -3827,9 +3863,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "flate2",
- "futures 0.3.31",
  "glob",
- "indexmap 2.10.0",
  "libc",
  "quickcheck",
  "scan_fmt",
@@ -3837,7 +3871,6 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "tempfile",
- "tokio",
  "tracing 0.1.41",
  "vector-common",
  "vector-config",
@@ -4889,7 +4922,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -5613,15 +5646,15 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.30.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1b46a0365a611fbf1d2143104dcf910aada96fafd295bab16c60b802bf6fa1d"
+checksum = "24690c68dfcdde5980d676b0f1820981841016b1f29eecb4c42ad48ab4118681"
 dependencies = [
  "ahash 0.8.11",
  "base64 0.22.1",
  "bytecount",
  "email_address",
- "fancy-regex",
+ "fancy-regex 0.16.1",
  "fraction",
  "idna 1.0.3",
  "itoa",
@@ -6701,22 +6734,6 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aad178aad32087b19042ee36dfd450b73f5f934fbfb058b59b198684dfec4c47"
-dependencies = [
- "byteorder",
- "data-encoding",
- "ed25519",
- "ed25519-dalek",
- "getrandom 0.2.15",
- "log",
- "rand 0.8.5",
- "signatory",
-]
-
-[[package]]
-name = "nkeys"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879011babc47a1c7fdf5a935ae3cfe94f34645ca0cac1c7f6424b36fc743d1bf"
@@ -7280,6 +7297,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.10.1",
  "chrono",
+ "glob",
  "hex",
  "ordered-float 4.6.0",
  "prost 0.12.6",
@@ -8082,7 +8100,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8128,7 +8146,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.95",
  "quote 1.0.40",
  "syn 2.0.104",
@@ -8759,9 +8777,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.30.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8eff4fa778b5c2a57e85c5f2fe3a709c52f0e60d23146e2151cbef5893f420e"
+checksum = "7a3d769362109497b240e66462606bc28af68116436c8669bac17069533b908e"
 dependencies = [
  "ahash 0.8.11",
  "fluent-uri 0.3.2",
@@ -11042,6 +11060,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-websockets"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f591660438b3038dd04d16c938271c79e7e06260ad2ea2885a4861bfb238605d"
+dependencies = [
+ "base64 0.22.1",
+ "bytes 1.10.1",
+ "futures-core",
+ "futures-sink",
+ "http 1.1.0",
+ "httparse",
+ "rand 0.8.5",
+ "ring",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls 0.26.2",
+ "tokio-util",
+ "webpki-roots 0.26.1",
+]
+
+[[package]]
 name = "toml"
 version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11554,6 +11593,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
+name = "tryhard"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fe58ebd5edd976e0fe0f8a14d2a04b7c81ef153ea9a54eebc42e67c2c23b4e5"
+dependencies = [
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tungstenite"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11897,6 +11946,7 @@ name = "vdev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cfg-if",
  "chrono",
  "clap",
  "clap-verbosity-flag",
@@ -11927,7 +11977,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.49.0"
+version = "0.50.0"
 dependencies = [
  "apache-avro",
  "approx",
@@ -12040,7 +12090,7 @@ dependencies = [
  "netlink-packet-utils",
  "netlink-sys",
  "nix 0.26.2",
- "nkeys 0.4.5",
+ "nkeys",
  "nom 8.0.0",
  "notify",
  "num-format",
@@ -12360,6 +12410,7 @@ dependencies = [
  "codecs",
  "enrichment",
  "file-source",
+ "file-source-common",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
@@ -12410,13 +12461,9 @@ name = "vector-tap"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
  "colored",
  "futures 0.3.31",
- "futures-util",
  "glob",
- "portpicker",
- "serde_json",
  "serde_yaml",
  "tokio",
  "tokio-stream",
@@ -12492,8 +12539,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.25.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#834e80187f508a48b06b4ea7cf0acf7dae81ebc9"
+version = "0.26.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#b0a4de2555453f794d9f841a7700bb4bed081fb3"
 dependencies = [
  "aes",
  "aes-siv",
@@ -12526,7 +12573,7 @@ dependencies = [
  "dyn-clone",
  "encoding_rs",
  "exitcode",
- "fancy-regex",
+ "fancy-regex 0.15.0",
  "flate2",
  "grok",
  "hex",
@@ -12593,6 +12640,7 @@ dependencies = [
  "uuid",
  "webbrowser",
  "woothee",
+ "xxhash-rust",
  "zstd 0.13.2",
 ]
 
@@ -13459,6 +13507,12 @@ name = "xmlparser"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "yoke"

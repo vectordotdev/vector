@@ -1,7 +1,7 @@
 [package]
 name = "vdev"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
 readme = "README.md"
@@ -26,14 +26,15 @@ log = "0.4.27"
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.2.2", features = ["supports-colors"] }
 paste.workspace = true
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
+regex.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
 serde_json.workspace = true
-serde_yaml = "0.9.34"
+serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
 toml.workspace = true
 semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
+cfg-if.workspace = true

@@ -4,19 +4,19 @@
 
 use std::collections::HashSet;
 
-use darling::{error::Accumulator, util::Flag, FromAttributes};
-use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
+use darling::{FromAttributes, error::Accumulator, util::Flag};
+use serde_derive_internals::{Ctxt, Derive, ast as serde_ast};
 use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
     TypeParam,
 };
 
 use super::{
-    util::{
-        err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
-        DarlingResultIterator,
-    },
     Data, Field, LazyCustomAttribute, Metadata, Style, Tagging, Variant,
+    util::{
+        DarlingResultIterator, err_serde_failed, get_serde_default_value,
+        try_extract_doc_title_description,
+    },
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -175,12 +175,20 @@ impl<'a> Container<'a> {
                             // This allows untagged enums used for "(de)serialize as A, B, or C"
                             // purposes to avoid needless titles/descriptions when their fields will
                             // implicitly provide that.
-                            if variant.description().is_none() && tagging != Tagging::None {
+                            if variant.description().is_none()
+                                && tagging != Tagging::None
+                                && variant.tagging() != &Tagging::None
+                            {
                                 accumulator.push(
                                     darling::Error::custom(ERR_NO_ENUM_VARIANT_DESCRIPTION)
                                         .with_span(variant),
                                 );
                             }
+
+                            // Serde allows multiple untagged variants in a tagged enum. We do not
+                            // restrict their count or order here; ambiguity handling is done via
+                            // schema generation strategy (e.g., falling back to `anyOf`) and
+                            // discriminant hints when needed.
                         }
 
                         // If we're in untagged mode, there can be no duplicate variants.
@@ -517,11 +525,7 @@ fn get_generic_args_from_path_segment(
                 })
                 .collect::<Vec<_>>();
 
-            if args.is_empty() {
-                None
-            } else {
-                Some(args)
-            }
+            if args.is_empty() { None } else { Some(args) }
         }
         // We don't support parenthesized generic arguments as they only come up in the case of
         // function pointers, and we don't support those with `Configurable`.
@@ -544,7 +548,7 @@ fn get_generic_type_path_ident(ty: &Type) -> Option<Ident> {
 mod tests {
     use proc_macro2::Ident;
     use quote::format_ident;
-    use syn::{parse_quote, Type};
+    use syn::{Type, parse_quote};
 
     use super::get_generic_type_param_idents;
 

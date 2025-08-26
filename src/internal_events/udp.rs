@@ -1,6 +1,6 @@
 use metrics::counter;
 use vector_lib::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;
@@ -47,6 +47,7 @@ impl InternalEvent for UdpSendIncompleteError {
             dropped = self.data_size - self.sent,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

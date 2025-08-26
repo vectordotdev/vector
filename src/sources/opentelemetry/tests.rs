@@ -2,17 +2,17 @@ use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
+        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
     },
-    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
         self,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         next_addr,
     },
-    SourceSender,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -24,26 +24,76 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tonic::Request;
 use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::metrics_service_client::MetricsServiceClient;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value::StringValue;
-use vector_lib::opentelemetry::proto::metrics::v1::exponential_histogram_data_point::Buckets;
-use vector_lib::opentelemetry::proto::metrics::v1::metric::Data;
-use vector_lib::opentelemetry::proto::metrics::v1::summary_data_point::ValueAtQuantile;
-use vector_lib::opentelemetry::proto::metrics::v1::{
-    AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram,
-    HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum, Summary,
-    SummaryDataPoint,
-};
-use vector_lib::opentelemetry::proto::resource::v1::Resource;
 use vector_lib::opentelemetry::proto::{
-    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
+    collector::{
+        logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+        metrics::v1::{ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient},
+    },
+    common::v1::{
+        AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
+    },
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
-    resource::v1::Resource as OtelResource,
+    metrics::v1::{
+        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
+        Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets, metric::Data,
+        summary_data_point::ValueAtQuantile,
+    },
+    resource::v1::{Resource, Resource as OtelResource},
 };
 use vrl::value;
 use warp::http::HeaderMap;
+
+fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
+    Request::new(ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            resource: Some(OtelResource {
+                attributes: vec![KeyValue {
+                    key: "res_key".into(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("res_val".into())),
+                    }),
+                }],
+                dropped_attributes_count: 0,
+            }),
+            scope_logs: vec![ScopeLogs {
+                scope: Some(InstrumentationScope {
+                    name: "some.scope.name".into(),
+                    version: "1.2.3".into(),
+                    attributes: vec![KeyValue {
+                        key: "scope_attr".into(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("scope_val".into())),
+                        }),
+                    }],
+                    dropped_attributes_count: 7,
+                }),
+                log_records: vec![LogRecord {
+                    time_unix_nano: 1,
+                    observed_time_unix_nano: 2,
+                    severity_number: 9,
+                    severity_text: "info".into(),
+                    body: Some(AnyValue {
+                        value: Some(StringValue("log body".into())),
+                    }),
+                    attributes: vec![KeyValue {
+                        key: "attr_key".into(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("attr_val".into())),
+                        }),
+                    }],
+                    dropped_attributes_count: 3,
+                    flags: 4,
+                    // opentelemetry sdk will hex::decode the given trace_id and span_id
+                    trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                    span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                }],
+                schema_url: "v1".into(),
+            }],
+            schema_url: "v1".into(),
+        }],
+    })
+}
 
 #[test]
 fn generate_config() {
@@ -64,54 +114,7 @@ async fn receive_grpc_logs_vector_namespace() {
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let req = Request::new(ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                resource: Some(OtelResource {
-                    attributes: vec![KeyValue {
-                        key: "res_key".into(),
-                        value: Some(AnyValue {
-                            value: Some(StringValue("res_val".into())),
-                        }),
-                    }],
-                    dropped_attributes_count: 0,
-                }),
-                scope_logs: vec![ScopeLogs {
-                    scope: Some(InstrumentationScope {
-                        name: "some.scope.name".into(),
-                        version: "1.2.3".into(),
-                        attributes: vec![KeyValue {
-                            key: "scope_attr".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("scope_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 7,
-                    }),
-                    log_records: vec![LogRecord {
-                        time_unix_nano: 1,
-                        observed_time_unix_nano: 2,
-                        severity_number: 9,
-                        severity_text: "info".into(),
-                        body: Some(AnyValue {
-                            value: Some(StringValue("log body".into())),
-                        }),
-                        attributes: vec![KeyValue {
-                            key: "attr_key".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("attr_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 3,
-                        flags: 4,
-                        // opentelemetry sdk will hex::decode the given trace_id and span_id
-                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
-                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
-                    }],
-                    schema_url: "v1".into(),
-                }],
-                schema_url: "v1".into(),
-            }],
-        });
+        let req = create_test_logs_request();
         _ = client.export(req).await;
         let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output
@@ -126,10 +129,11 @@ async fn receive_grpc_logs_vector_namespace() {
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
+        assert!(
+            meta.get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp()
+        );
         assert_eq!(
             meta.get(path!("opentelemetry", "resources")).unwrap(),
             &value!({res_key: "res_val"})
@@ -209,54 +213,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let req = Request::new(ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                resource: Some(OtelResource {
-                    attributes: vec![KeyValue {
-                        key: "res_key".into(),
-                        value: Some(AnyValue {
-                            value: Some(StringValue("res_val".into())),
-                        }),
-                    }],
-                    dropped_attributes_count: 0,
-                }),
-                scope_logs: vec![ScopeLogs {
-                    scope: Some(InstrumentationScope {
-                        name: "some.scope.name".into(),
-                        version: "1.2.3".into(),
-                        attributes: vec![KeyValue {
-                            key: "scope_attr".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("scope_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 7,
-                    }),
-                    log_records: vec![LogRecord {
-                        time_unix_nano: 1,
-                        observed_time_unix_nano: 2,
-                        severity_number: 9,
-                        severity_text: "info".into(),
-                        body: Some(AnyValue {
-                            value: Some(StringValue("log body".into())),
-                        }),
-                        attributes: vec![KeyValue {
-                            key: "attr_key".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("attr_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 3,
-                        flags: 4,
-                        // opentelemetry sdk will hex::decode the given trace_id and span_id
-                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
-                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
-                    }],
-                    schema_url: "v1".into(),
-                }],
-                schema_url: "v1".into(),
-            }],
-        });
+        let req = create_test_logs_request();
         _ = client.export(req).await;
         let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output

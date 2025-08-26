@@ -10,19 +10,21 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
-    future::{select, Either},
     Future, Sink, SinkExt,
+    future::{Either, select},
 };
 use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
-use crate::{
+use file_source_common::{
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
+};
+
+use crate::{
     file_watcher::{FileWatcher, RawLineResult},
-    fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
-    FileSourceInternalEvents, ReadFrom,
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,

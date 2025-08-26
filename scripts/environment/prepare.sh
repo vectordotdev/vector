@@ -117,8 +117,8 @@ if contains_module rustup; then
 fi
 set -e -o verbose
 if contains_module cargo-deb; then
-  if [[ "$(cargo-deb --version 2>/dev/null)" != "2.0.2" ]]; then
-    rustup run stable cargo "${install[@]}" cargo-deb --version 2.0.2 --force --locked
+  if [[ "$(cargo-deb --version 2>/dev/null)" != "2.9.3" ]]; then
+    rustup run stable cargo "${install[@]}" cargo-deb --version 2.9.3 --force --locked
   fi
 fi
 

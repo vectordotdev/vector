@@ -1,6 +1,6 @@
 use std::{future::ready, pin::Pin};
 
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use mlua::ExternalError;
 use mlua::FromLua;
 use ordered_float::NotNan;
@@ -255,6 +255,7 @@ impl mlua::UserData for LuaEvent {
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
+                            internal_log_rate_limit = true
                         );
                         this.inner.as_mut_log().remove(&key_path);
                     }
