@@ -1,4 +1,8 @@
 use crate::components::validation::prelude::*;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tokio::time::Duration;
 use vector_lib::config::LogNamespace;
 use warp::Filter;
@@ -59,11 +63,25 @@ async fn okta_compliance() {
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
-        .map(move |_| {
-            warp::http::Response::builder()
-                .header("Content-Type", "application/json")
-                .body(r#"[{"data":"foo"},{"data":"bar"}]"#)
-                .unwrap()
+        .map({
+            move |q: std::collections::HashMap<String, String>| match q.get("after") {
+                None => warp::http::Response::builder()
+                    .header("Content-Type", "application/json")
+                    .header(
+                        "link",
+                        format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
+                    )
+                    .body(r#"[{"data":"foo"},{"data":"bar"}]"#)
+                    .unwrap(),
+                Some(_) => warp::http::Response::builder()
+                    .header("Content-Type", "application/json")
+                    .header(
+                        "link",
+                        format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
+                    )
+                    .body(r#"[]"#)
+                    .unwrap(),
+            }
         });
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
@@ -164,7 +182,8 @@ async fn okta_persists_rel() {
     // the client follows `next` links; on the next interval it should pick up where it left off
     // and not start over from the beginning
     let addr = next_addr();
-    let seen = tokio::sync::OnceCell::<bool>::new();
+
+    let init_guard: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     // the first request sets `seen` but returns 0 events, ending the inner stream,
     // the next interval should pick up where it left off
@@ -176,29 +195,29 @@ async fn okta_persists_rel() {
                     .header("Content-Type", "application/json")
                     .header(
                         "link",
-                        format!("<http://{addr}/api/v1/logs?after=bar>; rel=\"next\""),
+                        format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
                     )
                     .body(r#"[{"data":"foo"}]"#)
                     .unwrap(),
-                Some(after) if after == "bar" => {
-                    if seen.initialized() {
+                Some(after) if after == "test" => {
+                    let initialized = init_guard.swap(true, Ordering::Relaxed);
+                    if !initialized {
                         warp::http::Response::builder()
                             .header("Content-Type", "application/json")
                             .header(
                                 "link",
-                                format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
-                            )
-                            .body(r#"[{"data":"bar"}]"#)
-                            .unwrap()
-                    } else {
-                        seen.set(true).unwrap();
-                        warp::http::Response::builder()
-                            .header("Content-Type", "application/json")
-                            .header(
-                                "link",
-                                format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
+                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
                             )
                             .body(r#"[]"#)
+                            .unwrap()
+                    } else {
+                        warp::http::Response::builder()
+                            .header("Content-Type", "application/json")
+                            .header(
+                                "link",
+                                format!("<http://{addr}/api/v1/logs?after=end>; rel=\"next\""),
+                            )
+                            .body(r#"[{"initialized":"true"}]"#)
                             .unwrap()
                     }
                 }

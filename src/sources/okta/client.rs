@@ -238,7 +238,6 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
         }
         Ok(Err(error)) => Err(error.into()),
         Err(_) => Err(format!("Timeout error: request exceeded {}s", timeout.as_secs_f64()).into()),
-        //}
     }
 }
 
@@ -380,8 +379,9 @@ async fn run(
                             if let Ok((_, _, Some(ref next))) = response {
                                 *url_lock = next.clone();
                             }
+                            let new_url = url_lock.to_string();
 
-                            (url, response)
+                            (new_url, response)
                         };
 
                         handle_response(response, decoder, log_namespace, run_url)
