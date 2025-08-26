@@ -9,7 +9,7 @@ use super::config::{
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
 use crate::app::CommandExt as _;
-use crate::env_vars::{Environment, extract_present, rename_environment_keys};
+use crate::environment::{Environment, extract_present, rename_environment_keys};
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
 use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
 
@@ -103,7 +103,7 @@ impl ComposeTest {
             envs_dir,
             runner,
             compose,
-            env_config,
+            env_config: rename_environment_keys(&env_config),
             build_all,
             retries,
         };
@@ -121,7 +121,7 @@ impl ComposeTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in rename_environment_keys(&self.env_config) {
+        for (key, value) in self.env_config.clone() {
             env_vars.insert(key, value);
         }
 
@@ -196,7 +196,7 @@ impl ComposeTest {
                 bail!("environment is already up");
             }
 
-            compose.start(&rename_environment_keys(&self.env_config))?;
+            compose.start(&self.env_config)?;
 
             self.envs_dir.save(&self.environment, &self.env_config)
         } else {
@@ -280,7 +280,7 @@ impl Compose {
 
     fn start(&self, environment: &Environment) -> Result<()> {
         #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.config, &self.test_dir, &environment)?;
+        unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
 
         self.run("Starting", &["up", "--detach"], Some(environment))
     }
@@ -330,8 +330,8 @@ impl Compose {
                 command.env(key, value);
             }
         }
-        if let Some(config) = environment {
-            command.envs(extract_present(&config));
+        if let Some(environment) = environment {
+            command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");
@@ -346,7 +346,7 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     use super::super::config::ComposeConfig;
-    use crate::env_vars::{Environment, resolve_placeholders};
+    use crate::environment::{Environment, resolve_placeholders};
     use crate::testing::config::VolumeMount;
     use anyhow::{Context, Result};
 
@@ -372,7 +372,7 @@ mod unix {
                         }
                         VolumeMount::Long { source, .. } => source,
                     };
-                    let source = resolve_placeholders(&source, environment);
+                    let source = resolve_placeholders(source, environment);
                     if !config.volumes.contains_key(&source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')

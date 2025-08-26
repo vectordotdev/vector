@@ -1,6 +1,6 @@
 use crate::app;
 use crate::app::CommandExt;
-use crate::env_vars::{Environment, extract_present, rename_environment_keys};
+use crate::environment::{Environment, extract_present};
 use crate::testing::config::RustToolchainConfig;
 use crate::testing::docker::docker_command;
 use crate::util::IS_A_TTY;
@@ -46,8 +46,7 @@ pub fn prepare_build_command(
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
     ]);
 
-    let env_vars = extract_present(&rename_environment_keys(config_environment_variables));
-    command.envs(env_vars);
+    command.envs(extract_present(config_environment_variables));
 
     command.args(["."]);
     command

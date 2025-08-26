@@ -1,4 +1,4 @@
-use crate::env_vars::Environment;
+use crate::environment::Environment;
 use crate::testing::{config::ComposeTestConfig, state};
 use anyhow::Result;
 
