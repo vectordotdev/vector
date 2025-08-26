@@ -69,9 +69,10 @@ fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
     }
 
     if let Some(pat) = pat
-        && !name.contains(pat) {
-            return false;
-        }
+        && !name.contains(pat)
+    {
+        return false;
+    }
 
     true
 }

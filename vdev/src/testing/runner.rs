@@ -75,23 +75,24 @@ pub trait ContainerTestRunner: TestRunner {
 
         for line in command.check_output()?.lines() {
             if let Some((name, state)) = line.split_once(' ')
-                && name == container_name {
-                    return Ok(if state == "created" {
-                        RunnerState::Created
-                    } else if state == "dead" {
-                        RunnerState::Dead
-                    } else if state == "exited" || state.starts_with("Exited ") {
-                        RunnerState::Exited
-                    } else if state == "paused" {
-                        RunnerState::Paused
-                    } else if state == "restarting" {
-                        RunnerState::Restarting
-                    } else if state == "running" || state.starts_with("Up ") {
-                        RunnerState::Running
-                    } else {
-                        RunnerState::Unknown
-                    });
-                }
+                && name == container_name
+            {
+                return Ok(if state == "created" {
+                    RunnerState::Created
+                } else if state == "dead" {
+                    RunnerState::Dead
+                } else if state == "exited" || state.starts_with("Exited ") {
+                    RunnerState::Exited
+                } else if state == "paused" {
+                    RunnerState::Paused
+                } else if state == "restarting" {
+                    RunnerState::Restarting
+                } else if state == "running" || state.starts_with("Up ") {
+                    RunnerState::Running
+                } else {
+                    RunnerState::Unknown
+                });
+            }
         }
 
         Ok(RunnerState::Missing)

@@ -117,15 +117,16 @@ impl ResourceLog {
 
         // Optional fields
         if let Some(resource) = self.resource
-            && !resource.attributes.is_empty() {
-                log_namespace.insert_source_metadata(
-                    SOURCE_NAME,
-                    &mut log,
-                    Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
-                    path!(RESOURCE_KEY),
-                    kv_list_into_value(resource.attributes),
-                );
-            }
+            && !resource.attributes.is_empty()
+        {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
+                path!(RESOURCE_KEY),
+                kv_list_into_value(resource.attributes),
+            );
+        }
         if !self.log_record.attributes.is_empty() {
             log_namespace.insert_source_metadata(
                 SOURCE_NAME,

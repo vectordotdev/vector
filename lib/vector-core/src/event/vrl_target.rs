@@ -199,24 +199,25 @@ fn move_field_definitions_into_message(mut definition: Definition) -> Definition
     message.remove_array();
 
     if !message.is_never()
-        && let Some(message_key) = log_schema().message_key() {
-            // We need to add the given message type to a field called `message`
-            // in the event.
-            let message = Kind::object(Collection::from(BTreeMap::from([(
-                message_key.to_string().into(),
-                message,
-            )])));
+        && let Some(message_key) = log_schema().message_key()
+    {
+        // We need to add the given message type to a field called `message`
+        // in the event.
+        let message = Kind::object(Collection::from(BTreeMap::from([(
+            message_key.to_string().into(),
+            message,
+        )])));
 
-            definition.event_kind_mut().remove_bytes();
-            definition.event_kind_mut().remove_integer();
-            definition.event_kind_mut().remove_float();
-            definition.event_kind_mut().remove_boolean();
-            definition.event_kind_mut().remove_timestamp();
-            definition.event_kind_mut().remove_regex();
-            definition.event_kind_mut().remove_null();
+        definition.event_kind_mut().remove_bytes();
+        definition.event_kind_mut().remove_integer();
+        definition.event_kind_mut().remove_float();
+        definition.event_kind_mut().remove_boolean();
+        definition.event_kind_mut().remove_timestamp();
+        definition.event_kind_mut().remove_regex();
+        definition.event_kind_mut().remove_null();
 
-            *definition.event_kind_mut() = definition.event_kind().union(message);
-        }
+        *definition.event_kind_mut() = definition.event_kind().union(message);
+    }
 
     definition
 }
@@ -638,7 +639,9 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
                 &mut timestamp,
                 &mut tags,
             ];
-            for property in &mut properties { property.insert(metric, &mut map); }
+            for property in &mut properties {
+                property.insert(metric, &mut map);
+            }
             break;
         }
 

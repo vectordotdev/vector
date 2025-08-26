@@ -101,12 +101,13 @@ impl ResourceSpan {
         );
         trace.insert(event_path!("status"), Value::from(span.status));
         if let Some(resource) = self.resource
-            && !resource.attributes.is_empty() {
-                trace.insert(
-                    event_path!(RESOURCE_KEY),
-                    kv_list_into_value(resource.attributes),
-                );
-            }
+            && !resource.attributes.is_empty()
+        {
+            trace.insert(
+                event_path!(RESOURCE_KEY),
+                kv_list_into_value(resource.attributes),
+            );
+        }
         trace.insert(event_path!("ingest_timestamp"), Value::from(now));
         trace.into()
     }

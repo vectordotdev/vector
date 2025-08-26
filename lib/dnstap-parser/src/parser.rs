@@ -149,18 +149,13 @@ impl DnstapParser {
 
             if dnstap_data_type == "Message"
                 && let Some(message) = proto_msg.message
-                    && let Err(err) =
-                        DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
-                    {
-                        emit!(DnstapParseWarning { error: &err });
-                        need_raw_data = true;
-                        DnstapParser::insert(
-                            event,
-                            &root,
-                            &DNSTAP_VALUE_PATHS.error,
-                            err.to_string(),
-                        );
-                    }
+                && let Err(err) =
+                    DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
+            {
+                emit!(DnstapParseWarning { error: &err });
+                need_raw_data = true;
+                DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.error, err.to_string());
+            }
         } else {
             emit!(DnstapParseWarning {
                 error: format!("Unknown dnstap data type: {dnstap_data_type_id}")

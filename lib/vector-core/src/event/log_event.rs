@@ -13,29 +13,29 @@ use bytes::Bytes;
 use chrono::Utc;
 
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::{lookup_v2::TargetPath, metadata_path, path, PathPrefix};
+use lookup::{PathPrefix, lookup_v2::TargetPath, metadata_path, path};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::{
+    EventDataEq,
     byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::{JsonSize, NonZeroJsonSize},
     request_metadata::GetEventCountTags,
-    EventDataEq,
 };
-use vrl::path::{parse_target_path, OwnedTargetPath, PathParseError};
+use vrl::path::{OwnedTargetPath, PathParseError, parse_target_path};
 use vrl::{event_path, owned_value_path};
 
 use super::{
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, finalization::{BatchNotifier, EventFinalizer}, metadata::EventMetadata, util, EventFinalizers,
-    Finalizable,
-    KeyString,
-    ObjectMap,
-    Value,
+    EventFinalizers, Finalizable, KeyString, ObjectMap, Value,
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
+    finalization::{BatchNotifier, EventFinalizer},
+    metadata::EventMetadata,
+    util,
 };
 use crate::config::LogNamespace;
 use crate::config::{log_schema, telemetry};
-use crate::event::util::log::{all_fields, all_metadata_fields};
 use crate::event::MaybeAsLogMut;
+use crate::event::util::log::{all_fields, all_metadata_fields};
 
 static VECTOR_SOURCE_TYPE_PATH: LazyLock<Option<OwnedTargetPath>> = LazyLock::new(|| {
     Some(OwnedTargetPath::metadata(owned_value_path!(
@@ -626,7 +626,7 @@ impl EventDataEq for LogEvent {
 
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
-    use super::{log_schema, Bytes, LogEvent, Utc};
+    use super::{Bytes, LogEvent, Utc, log_schema};
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.

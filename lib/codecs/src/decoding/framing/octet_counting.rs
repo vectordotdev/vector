@@ -233,12 +233,13 @@ impl OctetCountingDecoder {
         src: &mut BytesMut,
     ) -> Option<Result<Option<Bytes>, LinesCodecError>> {
         if let Some(&first_byte) = src.first()
-            && (49..=57).contains(&first_byte) {
-                // First character is non zero number so we can assume that
-                // octet count framing is used.
-                trace!("Octet counting encoded event detected.");
-                self.octet_decoding = Some(State::NotDiscarding);
-            }
+            && (49..=57).contains(&first_byte)
+        {
+            // First character is non zero number so we can assume that
+            // octet count framing is used.
+            trace!("Octet counting encoded event detected.");
+            self.octet_decoding = Some(State::NotDiscarding);
+        }
 
         self.octet_decoding
             .map(|state| self.octet_decode(state, src))

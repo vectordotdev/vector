@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::{
-    fingerprinter::{FileFingerprint, Fingerprinter},
     FilePosition,
+    fingerprinter::{FileFingerprint, Fingerprinter},
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
@@ -430,7 +430,7 @@ mod test {
 
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
-        Checkpoint, Checkpointer, FileFingerprint, FilePosition, CHECKPOINT_FILE_NAME,
+        CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, FileFingerprint, FilePosition,
         TMP_FILE_NAME,
     };
 
