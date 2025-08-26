@@ -1,4 +1,4 @@
-use metrics::gauge;
+use metrics::{counter, gauge};
 use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -17,11 +17,24 @@ impl InternalEvent for ConfigReloadRejected {
                     internal_log_rate_limit = true,
                 );
 
-                gauge!(
+                counter!(
                     "vector_config_reload_rejected",
                     "reason" => self.reason.as_str(),
                 )
-                .set(1.0);
+                .increment(1);
+            }
+            ReloadRejectReason::FailedToComputeGlobalDiff => {
+                error!(
+                    message = "Config reload rejected due to failed to compute global diff.",
+                    reason = %self.reason.as_str(),
+                    internal_log_rate_limit = true,
+                );
+
+                counter!(
+                    "vector_config_reload_rejected",
+                    "reason" => self.reason.as_str(),
+                )
+                .increment(1);
             }
         }
     }
@@ -37,17 +50,43 @@ impl ConfigReloadRejected {
             reason: ReloadRejectReason::GlobalOptionsChanged { fields },
         }
     }
+
+    pub fn failed_to_compute_global_diff() -> Self {
+        Self {
+            reason: ReloadRejectReason::FailedToComputeGlobalDiff,
+        }
+    }
 }
 
 #[derive(Debug)]
 enum ReloadRejectReason {
     GlobalOptionsChanged { fields: Vec<String> },
+    FailedToComputeGlobalDiff,
 }
 
 impl ReloadRejectReason {
     fn as_str(&self) -> &'static str {
         match self {
             Self::GlobalOptionsChanged { fields: _ } => "global_options changed",
+            Self::FailedToComputeGlobalDiff => "failed to compute global diff",
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ConfigReloaded {}
+
+impl InternalEvent for ConfigReloaded {
+    fn emit(self) {
+        info!(
+            message = "New configuration loaded successfully.",
+            internal_log_rate_limit = true,
+        );
+
+        counter!("vector_config_reloaded",).increment(1);
+    }
+
+    fn name(&self) -> Option<&'static str> {
+        Some("ConfigReloaded")
     }
 }
