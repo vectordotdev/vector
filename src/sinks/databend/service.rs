@@ -8,7 +8,7 @@ use chrono::Utc;
 use databend_client::APIClient as DatabendAPIClient;
 use databend_client::Error as DatabendError;
 use futures::future::BoxFuture;
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
@@ -23,6 +23,7 @@ pub struct DatabendRetryLogic;
 
 impl RetryLogic for DatabendRetryLogic {
     type Error = DatabendError;
+    type Request = DatabendRequest;
     type Response = DatabendResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

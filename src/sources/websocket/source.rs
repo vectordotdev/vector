@@ -1,34 +1,34 @@
 use crate::vector_lib::codecs::StreamDecodingError;
 use crate::{
+    SourceSender,
     codecs::Decoder,
-    common::websocket::{is_closed, PingInterval, WebSocketConnector},
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketBytesReceived, WebSocketConnectionError,
+        ConnectionOpen, OpenGauge, PROTOCOL, WebSocketBytesReceived, WebSocketConnectionError,
         WebSocketConnectionEstablished, WebSocketConnectionFailedError,
         WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
-        WebSocketReceiveError, WebSocketSendError, PROTOCOL,
+        WebSocketReceiveError, WebSocketSendError,
     },
     sources::websocket::config::WebSocketConfig,
-    SourceSender,
 };
 use chrono::Utc;
-use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
 use std::pin::Pin;
 use tokio::time;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, Message};
+use tokio_tungstenite::tungstenite::{Message, error::Error as TungsteniteError};
 use tokio_util::codec::FramedRead;
 use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{Event, LogEvent},
-    EstimatedJsonEncodedSizeOf,
 };
 
 macro_rules! fail_with_event {
-    ($context:expr) => {{
+    ($context:expr_2021) => {{
         emit!(WebSocketConnectionFailedError {
             error: Box::new($context.build())
         });
@@ -94,7 +94,7 @@ impl WebSocketSource {
         loop {
             let result = tokio::select! {
                 _ = cx.shutdown.clone() => {
-                    info!("Received shutdown signal.");
+                    info!(internal_log_rate_limit = true, "Received shutdown signal.");
                     break;
                 },
 
@@ -117,16 +117,23 @@ impl WebSocketSource {
                         warn!(
                             message = "Connection closed by server.",
                             code = %frame.code,
-                            reason = %frame.reason
+                            reason = %frame.reason,
+                            internal_log_rate_limit = true
                         );
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::RemoteClosedEmpty => {
-                        warn!("Connection closed by server without a close frame.");
+                        warn!(
+                            internal_log_rate_limit = true,
+                            "Connection closed by server without a close frame."
+                        );
                         emit!(WebSocketConnectionShutdown);
                     }
                     WebSocketSourceError::PongTimeout => {
-                        error!("Disconnecting due to pong timeout.");
+                        error!(
+                            internal_log_rate_limit = true,
+                            "Disconnecting due to pong timeout."
+                        );
                         emit!(WebSocketReceiveError {
                             error: &TungsteniteError::Io(std::io::Error::new(
                                 std::io::ErrorKind::TimedOut,
@@ -140,7 +147,7 @@ impl WebSocketSource {
                         if is_closed(&ws_err) {
                             emit!(WebSocketConnectionShutdown);
                         }
-                        error!(message = "WebSocket connection error.", error = %ws_err);
+                        error!(message = "WebSocket connection error.", error = %ws_err, internal_log_rate_limit = true);
                     }
                     // These errors should only happen during `connect` or `reconnect`,
                     // not in the main loop's result.
@@ -194,7 +201,10 @@ impl WebSocketSource {
             Message::Ping(_) => Ok(()),
             Message::Close(frame) => self.handle_close_frame(frame),
             Message::Frame(_) => {
-                warn!("Unsupported message type received: frame.");
+                warn!(
+                    internal_log_rate_limit = true,
+                    "Unsupported message type received: frame."
+                );
                 Ok(())
             }
         }
@@ -241,7 +251,7 @@ impl WebSocketSource {
                     });
 
                     if let Err(error) = out.send_batch(events_with_meta).await {
-                        error!(message = "Error sending events.", %error);
+                        error!(message = "Error sending events.", %error, internal_log_rate_limit = true);
                     }
                 }
                 Err(error) => {
@@ -265,14 +275,17 @@ impl WebSocketSource {
         ws_sink: &mut WebSocketSink,
         ws_source: &mut WebSocketStream,
     ) -> Result<(), WebSocketSourceError> {
-        info!("Reconnecting to WebSocket...");
+        info!(
+            internal_log_rate_limit = true,
+            "Reconnecting to WebSocket..."
+        );
 
         let (new_sink, new_source) = self.connect(out).await?;
 
         *ws_sink = new_sink;
         *ws_source = new_source;
 
-        info!("Reconnected.");
+        info!(internal_log_rate_limit = true, "Reconnected to Websocket.");
 
         Ok(())
     }
@@ -447,16 +460,16 @@ mod tests {
         sources::websocket::config::PongMessage,
         sources::websocket::config::WebSocketConfig,
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr,
         },
     };
-    use futures::{sink::SinkExt, StreamExt};
+    use futures::{StreamExt, sink::SinkExt};
     use std::borrow::Cow;
     use std::num::NonZeroU64;
     use tokio::{net::TcpListener, time::Duration};
     use tokio_tungstenite::tungstenite::{
-        protocol::frame::coding::CloseCode, protocol::frame::CloseFrame,
+        protocol::frame::CloseFrame, protocol::frame::coding::CloseCode,
     };
     use tokio_tungstenite::{accept_async, tungstenite::Message};
     use url::Url;

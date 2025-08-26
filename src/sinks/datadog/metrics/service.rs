@@ -4,8 +4,8 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
     Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
 use hyper::Body;
 use snafu::ResultExt;
@@ -26,6 +26,7 @@ pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
     type Error = DatadogApiError;
+    type Request = DatadogMetricsRequest;
     type Response = DatadogMetricsResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

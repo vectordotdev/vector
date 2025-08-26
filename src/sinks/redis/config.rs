@@ -1,6 +1,6 @@
 use redis::{
-    sentinel::{Sentinel, SentinelNodeConnectionInfo},
     ProtocolVersion, RedisConnectionInfo, TlsMode,
+    sentinel::{Sentinel, SentinelNodeConnectionInfo},
 };
 use snafu::prelude::*;
 
@@ -10,8 +10,8 @@ use crate::{
 };
 
 use super::{
-    sink::{RedisConnection, RedisSink},
     RedisCreateFailedSnafu,
+    sink::{RedisConnection, RedisSink},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -35,6 +35,12 @@ pub enum DataTypeConfig {
     #[derivative(Default)]
     List,
 
+    /// The Redis `sorted set` type.
+    ///
+    /// This resembles a priority queue, where messages can be pushed and popped with an
+    /// associated score.
+    SortedSet,
+
     /// The Redis `channel` type.
     ///
     /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
@@ -47,7 +53,7 @@ pub enum DataTypeConfig {
 #[serde(rename_all = "lowercase")]
 pub struct ListOption {
     /// The method to use for pushing messages into a `list`.
-    pub(super) method: Method,
+    pub method: ListMethod,
 }
 
 /// Method for pushing messages into a `list`.
@@ -55,7 +61,7 @@ pub struct ListOption {
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum Method {
+pub enum ListMethod {
     /// Use the `rpush` method.
     ///
     /// This pushes messages onto the tail of the list.
@@ -68,6 +74,40 @@ pub enum Method {
     ///
     /// This pushes messages onto the head of the list.
     LPush,
+}
+
+/// Sorted Set-specific options
+#[configurable_component]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub struct SortedSetOption {
+    /// The method to use for pushing messages into a `sorted set`.
+    pub method: Option<SortedSetMethod>,
+
+    /// The score to publish a message with to a `sorted set`.
+    ///
+    /// Examples:
+    /// - `%s`
+    /// - `%Y%m%d%H%M%S`
+    // Examples added in Rustdoc as `vector-config`'s metadata doesn't handle
+    // UnsignedIntTemplate's properly yet. TODO: Improve this.
+    #[configurable(validation(length(min = 1)))]
+    pub score: Option<UnsignedIntTemplate>,
+}
+
+/// Method for pushing messages into a `sorted set`.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SortedSetMethod {
+    /// Use the `zadd` method.
+    ///
+    /// This adds messages onto a queue with a score.
+    ///
+    /// This is the default.
+    #[derivative(Default)]
+    ZAdd,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -94,6 +134,10 @@ pub struct RedisSinkConfig {
     #[configurable(derived)]
     #[serde(alias = "list")]
     pub(super) list_option: Option<ListOption>,
+
+    #[configurable(derived)]
+    #[serde(alias = "sorted_set")]
+    pub(super) sorted_set_option: Option<SortedSetOption>,
 
     /// The URL of the Redis endpoint to connect to.
     ///

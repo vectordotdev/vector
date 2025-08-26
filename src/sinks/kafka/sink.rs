@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use rdkafka::{
+    ClientConfig,
     error::KafkaError,
     producer::{BaseProducer, FutureProducer, Producer},
-    ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
 use tower::limit::RateLimit;

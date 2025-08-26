@@ -10,14 +10,13 @@ use std::{
 use exitcode::ExitCode;
 use futures::StreamExt;
 use tokio::runtime::{self, Runtime};
-use tokio::sync::{broadcast::error::RecvError, MutexGuard};
+use tokio::sync::{MutexGuard, broadcast::error::RecvError};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
+    cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, Config, ConfigPath},
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
@@ -28,6 +27,7 @@ use crate::{
     },
     trace,
 };
+use crate::{config::ComponentType, extra_context::ExtraContext};
 
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
@@ -158,7 +158,9 @@ impl ApplicationConfig {
                 }
             }
         } else {
-            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            info!(
+                message = "API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`."
+            );
             None
         }
     }
@@ -206,7 +208,9 @@ impl Application {
 
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
-            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+            debug!(
+                message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL."
+            );
         }
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
@@ -379,6 +383,15 @@ async fn handle_signal(
 
             reload_config_from_result(topology_controller, new_config).await
         }
+        Ok(SignalTo::ReloadEnrichmentTables) => {
+            let topology_controller = topology_controller.lock().await;
+
+            topology_controller
+                .topology
+                .reload_enrichment_tables()
+                .await;
+            None
+        }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
             None
@@ -535,15 +548,31 @@ pub async fn load_configs(
     if let Some(watcher_conf) = watcher_conf {
         for (name, transform) in config.transforms() {
             let files = transform.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::Transform,
+            );
             watched_component_paths.push(component_config);
         }
 
         for (name, sink) in config.sinks() {
             let files = sink.inner.files_to_watch();
-            let component_config =
-                ComponentConfig::new(files.into_iter().cloned().collect(), name.clone());
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::Sink,
+            );
+            watched_component_paths.push(component_config);
+        }
+
+        for (name, table) in config.enrichment_tables() {
+            let files = table.inner.files_to_watch();
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::EnrichmentTable,
+            );
             watched_component_paths.push(component_config);
         }
 
@@ -590,7 +619,10 @@ pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) 
     };
 
     trace::init(color, json, &level, rate);
-    debug!(message = "Internal log rate limit configured.",);
+    debug!(
+        message = "Internal log rate limit configured.",
+        internal_log_rate_secs = rate,
+    );
     info!(message = "Log level is enabled.", level = ?level);
 }
 

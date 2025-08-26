@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 use indexmap::IndexMap;
-use vector_config::{configurable_component, schema::generate_root_schema, ConfigurableString};
+use vector_config::{ConfigurableString, configurable_component, schema::generate_root_schema};
 
 /// A type that pretends to be `ConfigurableString` but has a non-string-like schema.
 #[configurable_component]

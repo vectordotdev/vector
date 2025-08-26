@@ -3,8 +3,8 @@ use indexmap::IndexMap;
 use std::time::{Duration, Instant};
 
 use vector_lib::event::{
-    metric::{MetricData, MetricSeries},
     EventMetadata, Metric, MetricKind,
+    metric::{MetricData, MetricSeries},
 };
 
 /// Normalizes metrics according to a set of rules.

@@ -282,7 +282,9 @@ impl QueryableSchema for &SchemaObject {
             } else if let Some(any_of) = subschemas.any_of.as_ref() {
                 return SchemaType::AnyOf(any_of.iter().map(schema_to_simple_schema).collect());
             } else {
-                panic!("Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf.");
+                panic!(
+                    "Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf."
+                );
             }
         }
 

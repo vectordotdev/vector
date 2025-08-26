@@ -8,14 +8,14 @@ use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
 use super::{
-    config::{default_host, AzureMonitorLogsConfig},
+    config::{AzureMonitorLogsConfig, default_host},
     sink::JsonEncoding,
 };
 use crate::{
     event::LogEvent,
     sinks::{prelude::*, util::encoding::Encoder},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };

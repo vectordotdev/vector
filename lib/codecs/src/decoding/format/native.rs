@@ -1,11 +1,11 @@
 use bytes::Bytes;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::DataType,
-    event::{proto, Event, EventArray, EventContainer},
+    event::{Event, EventArray, EventContainer, proto},
     schema,
 };
 use vrl::value::Kind;
