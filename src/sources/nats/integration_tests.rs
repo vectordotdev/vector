@@ -520,6 +520,7 @@ async fn nats_jetstream_consumer_not_found() {
 
 #[tokio::test]
 async fn nats_shutdown_drain_messages() {
+    use futures::StreamExt;
     use tokio::time::{Duration, timeout};
 
     let subject = format!("test-drain-{}", random_string(10));
@@ -531,7 +532,7 @@ async fn nats_shutdown_drain_messages() {
 
     let (nc, sub) = create_subscription(&conf).await.unwrap();
     let nc_pub = nc.clone();
-    let (tx, rx) = SourceSender::new_test();
+    let (tx, mut rx) = SourceSender::new_test();
     let decoder = DecodingConfig::new(
         conf.framing.clone(),
         conf.decoding.clone(),
@@ -576,10 +577,14 @@ async fn nats_shutdown_drain_messages() {
         .unwrap();
     nc_pub.flush().await.unwrap();
 
-    let events = timeout(Duration::from_secs(5), collect_n(rx, 3))
-        .await
-        .expect("Test timed out waiting for drained messages.");
-
+    let mut events = Vec::new();
+    for _ in 0..3 {
+        let event = timeout(Duration::from_secs(5), rx.next())
+            .await
+            .expect("Test timed out waiting for drained messages.")
+            .expect("Stream ended before all messages were drained.");
+        events.push(event);
+    }
     assert_eq!(events.len(), 3);
     let msg = &events[0].as_log()[log_schema().message_key().unwrap().to_string()];
     assert_eq!(*msg, "msg1".into());
