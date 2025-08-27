@@ -114,11 +114,7 @@ impl EstimatedJsonEncodedSizeOf for Bytes {
 
 impl EstimatedJsonEncodedSizeOf for bool {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        if *self {
-            TRUE_SIZE
-        } else {
-            FALSE_SIZE
-        }
+        if *self { TRUE_SIZE } else { FALSE_SIZE }
     }
 }
 

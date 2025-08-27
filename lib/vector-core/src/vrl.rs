@@ -1,5 +1,5 @@
-use lookup::{owned_value_path, OwnedTargetPath};
-use vrl::compiler::{compile_with_state, CompilationResult, CompileConfig, Function, TypeState};
+use lookup::{OwnedTargetPath, owned_value_path};
+use vrl::compiler::{CompilationResult, CompileConfig, Function, TypeState, compile_with_state};
 use vrl::diagnostic::DiagnosticList;
 
 /// Compiles a VRL program

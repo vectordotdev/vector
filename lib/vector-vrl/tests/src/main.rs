@@ -6,7 +6,7 @@ mod test_enrichment;
 
 use std::env;
 use std::path::PathBuf;
-use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
+use vrl::test::{Test, TestConfig, get_tests_from_functions, run_tests};
 
 use chrono_tz::Tz;
 use clap::Parser;

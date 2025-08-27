@@ -8,23 +8,23 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use rkyv::{archived_root, AlignedVec};
+use rkyv::{AlignedVec, archived_root};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::{
+    Filesystem,
     common::create_crc32c_hasher,
     ledger::Ledger,
-    record::{validate_record_archive, ArchivedRecord, Record, RecordStatus},
-    Filesystem,
+    record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
+    Bufferable,
     encoding::{AsMetadata, Encodable},
     internal_events::BufferReadError,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
-    Bufferable,
 };
 
 pub(super) struct ReadToken {

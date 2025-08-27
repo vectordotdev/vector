@@ -17,7 +17,7 @@ pub use metric::Value as MetricValue;
 pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
-use super::{array, metric::MetricSketch, EventMetadata};
+use super::{EventMetadata, array, metric::MetricSketch};
 
 impl event_array::Events {
     // We can't use the standard `From` traits here because the actual

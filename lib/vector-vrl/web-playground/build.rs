@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, io};
 
-use cargo_lock::{package::SourceKind, Lockfile};
+use cargo_lock::{Lockfile, package::SourceKind};
 
 fn get_vector_lock_path() -> PathBuf {
     let path = fs::canonicalize(env::var("CARGO_MANIFEST_DIR").unwrap()).unwrap();

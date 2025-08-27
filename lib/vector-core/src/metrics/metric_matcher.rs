@@ -297,14 +297,16 @@ mod tests {
             "test_metric",
             [Label::new("key_two", "test_value")].iter()
         )));
-        assert!(matcher.matches(&Key::from_parts(
-            "different_name",
-            [
-                Label::new("key_one", "metric_value_1234"),
-                Label::new("key_two", "test_value")
-            ]
-            .iter()
-        )));
+        assert!(
+            matcher.matches(&Key::from_parts(
+                "different_name",
+                [
+                    Label::new("key_one", "metric_value_1234"),
+                    Label::new("key_two", "test_value")
+                ]
+                .iter()
+            ))
+        );
     }
 
     #[test]
@@ -355,63 +357,75 @@ mod tests {
             "custom_metric_with_missing_component_type",
             [Label::new("component_kind", "sink")].iter()
         )));
-        assert!(!matcher.matches(&Key::from_parts(
-            "custom_metric_with_missing_extra_labels",
-            [
-                Label::new("component_kind", "sink"),
-                Label::new("component_type", "aws_cloudwatch_metrics")
-            ]
-            .iter()
-        )));
-        assert!(!matcher.matches(&Key::from_parts(
-            "custom_metric_with_wrong_region",
-            [
-                Label::new("component_kind", "sink"),
-                Label::new("component_type", "aws_cloudwatch_metrics"),
-                Label::new("region", "some_other_region")
-            ]
-            .iter()
-        )));
-        assert!(!matcher.matches(&Key::from_parts(
-            "custom_metric_with_wrong_region_and_endpoint",
-            [
-                Label::new("component_kind", "sink"),
-                Label::new("component_type", "aws_cloudwatch_metrics"),
-                Label::new("region", "some_other_region"),
-                Label::new("endpoint", "wrong_endpoint.com/metrics")
-            ]
-            .iter()
-        )));
-        assert!(matcher.matches(&Key::from_parts(
-            "custom_metric_with_wrong_endpoint_but_correct_region",
-            [
-                Label::new("component_kind", "sink"),
-                Label::new("component_type", "aws_cloudwatch_metrics"),
-                Label::new("region", "some_aws_region_name"),
-                Label::new("endpoint", "wrong_endpoint.com/metrics")
-            ]
-            .iter()
-        )));
-        assert!(matcher.matches(&Key::from_parts(
-            "custom_metric_with_wrong_region_but_correct_endpoint",
-            [
-                Label::new("component_kind", "sink"),
-                Label::new("component_type", "aws_cloudwatch_metrics"),
-                Label::new("region", "some_other_region"),
-                Label::new("endpoint", "test.com/metrics")
-            ]
-            .iter()
-        )));
-        assert!(!matcher.matches(&Key::from_parts(
-            "custom_metric_with_wrong_component_kind",
-            [
-                Label::new("component_kind", "source"),
-                Label::new("component_type", "aws_cloudwatch_metrics"),
-                Label::new("region", "some_other_region"),
-                Label::new("endpoint", "test.com/metrics")
-            ]
-            .iter()
-        )));
+        assert!(
+            !matcher.matches(&Key::from_parts(
+                "custom_metric_with_missing_extra_labels",
+                [
+                    Label::new("component_kind", "sink"),
+                    Label::new("component_type", "aws_cloudwatch_metrics")
+                ]
+                .iter()
+            ))
+        );
+        assert!(
+            !matcher.matches(&Key::from_parts(
+                "custom_metric_with_wrong_region",
+                [
+                    Label::new("component_kind", "sink"),
+                    Label::new("component_type", "aws_cloudwatch_metrics"),
+                    Label::new("region", "some_other_region")
+                ]
+                .iter()
+            ))
+        );
+        assert!(
+            !matcher.matches(&Key::from_parts(
+                "custom_metric_with_wrong_region_and_endpoint",
+                [
+                    Label::new("component_kind", "sink"),
+                    Label::new("component_type", "aws_cloudwatch_metrics"),
+                    Label::new("region", "some_other_region"),
+                    Label::new("endpoint", "wrong_endpoint.com/metrics")
+                ]
+                .iter()
+            ))
+        );
+        assert!(
+            matcher.matches(&Key::from_parts(
+                "custom_metric_with_wrong_endpoint_but_correct_region",
+                [
+                    Label::new("component_kind", "sink"),
+                    Label::new("component_type", "aws_cloudwatch_metrics"),
+                    Label::new("region", "some_aws_region_name"),
+                    Label::new("endpoint", "wrong_endpoint.com/metrics")
+                ]
+                .iter()
+            ))
+        );
+        assert!(
+            matcher.matches(&Key::from_parts(
+                "custom_metric_with_wrong_region_but_correct_endpoint",
+                [
+                    Label::new("component_kind", "sink"),
+                    Label::new("component_type", "aws_cloudwatch_metrics"),
+                    Label::new("region", "some_other_region"),
+                    Label::new("endpoint", "test.com/metrics")
+                ]
+                .iter()
+            ))
+        );
+        assert!(
+            !matcher.matches(&Key::from_parts(
+                "custom_metric_with_wrong_component_kind",
+                [
+                    Label::new("component_kind", "source"),
+                    Label::new("component_type", "aws_cloudwatch_metrics"),
+                    Label::new("region", "some_other_region"),
+                    Label::new("endpoint", "test.com/metrics")
+                ]
+                .iter()
+            ))
+        );
     }
 
     #[test]

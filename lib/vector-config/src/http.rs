@@ -3,8 +3,8 @@ use serde_json::Value;
 use std::cell::RefCell;
 
 use crate::{
-    schema::{generate_number_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject, generate_number_schema},
 };
 
 impl ToValue for StatusCode {
