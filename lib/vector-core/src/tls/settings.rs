@@ -9,9 +9,9 @@ use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
+    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
-    x509::{X509, store::X509StoreBuilder},
+    x509::{store::X509StoreBuilder, X509},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -317,7 +317,9 @@ impl TlsSettings {
             load_windows_certs(context).unwrap();
 
             #[cfg(target_os = "macos")]
-            load_mac_certs(context).unwrap();
+            if let Err(e) = load_mac_certs(context) {
+                warn!("{e:?}"); // TODO remove me before merging
+            }
         } else {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
             for authority in &self.authorities {

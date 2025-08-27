@@ -4,14 +4,15 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
-use smallvec::{SmallVec, smallvec};
+use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, TraceEvent};
 use vector_core::{
-    config::{DataType, LogNamespace, log_schema},
+    config::{log_schema, DataType, LogNamespace},
     event::Event,
     schema,
 };
+use vrl::protobuf::Options;
 use vrl::value::{Kind, Value};
 
 use super::Deserializer;
@@ -82,25 +83,27 @@ pub struct ProtobufDeserializerOptions {
 #[derive(Debug, Clone)]
 pub struct ProtobufDeserializer {
     message_descriptor: MessageDescriptor,
+    options: Options,
 }
 
 impl ProtobufDeserializer {
     /// Creates a new `ProtobufDeserializer`.
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
-        Self { message_descriptor }
+        Self { message_descriptor, options: Default::default() }
     }
 
     /// Creates a new deserializer instance using the descriptor bytes directly.
-    pub fn new_from_bytes(desc_bytes: &[u8], message_type: &str) -> vector_common::Result<Self> {
+    pub fn new_from_bytes(desc_bytes: &[u8], message_type: &str, options: Options) -> vector_common::Result<Self> {
         let message_descriptor =
             vrl::protobuf::get_message_descriptor_from_bytes(desc_bytes, message_type)?;
-        Ok(Self { message_descriptor })
+        Ok(Self { message_descriptor, options })
     }
 }
 
 fn extract_vrl_value(
     bytes: Bytes,
     message_descriptor: &MessageDescriptor,
+    options: &Options
 ) -> vector_common::Result<Value> {
     let dynamic_message = DynamicMessage::decode(message_descriptor.clone(), bytes)
         .map_err(|error| format!("Error parsing protobuf: {error:?}"))?;
@@ -108,6 +111,7 @@ fn extract_vrl_value(
     Ok(vrl::protobuf::proto_to_value(
         &prost_reflect::Value::Message(dynamic_message),
         None,
+        options,
     )?)
 }
 
@@ -117,7 +121,7 @@ impl Deserializer for ProtobufDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor)?;
+        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor, &self.options)?;
         let mut event = Event::Log(LogEvent::from(vrl_value));
 
         let event = match log_namespace {
@@ -138,7 +142,7 @@ impl Deserializer for ProtobufDeserializer {
     }
 
     fn parse_traces(&self, bytes: Bytes) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor)?;
+        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor, &self.options)?;
         let trace_event = Event::Trace(TraceEvent::from(vrl_value));
         Ok(smallvec![trace_event])
     }
