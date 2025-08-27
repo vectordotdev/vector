@@ -1,4 +1,4 @@
-#![allow(dead_code)] // TODO add complex feature gateno-
+#![allow(dead_code)] // TODO add complex feature gate in ./mod.rs
 
 use std::{io::Error, path::Path};
 
