@@ -119,7 +119,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Deprecated: use expire_metrics_secs instead
+    /// Deprecated: use `expire_metrics_secs` instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::hidden))]

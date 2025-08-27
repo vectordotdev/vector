@@ -122,9 +122,9 @@ impl UncompressedReader for UncompressedReaderImpl {
             fp.seek(SeekFrom::Start(0))?;
             let result = fp.read_exact(&mut magic);
 
-            if result.is_err() {
+            if let Err(e) = result {
                 fp.seek(SeekFrom::Start(0))?;
-                return Err(result.unwrap_err());
+                return Err(e);
             }
 
             if magic == magic_header_bytes {
