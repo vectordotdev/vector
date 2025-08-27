@@ -975,7 +975,7 @@ mod test {
         from
     }
 
-    async fn init_udp_with_shutdown<'a>(
+    async fn init_udp_with_shutdown(
         sender: SourceSender,
         source_id: &ComponentKey,
         shutdown: &mut SourceShutdownCoordinator,
@@ -984,7 +984,7 @@ mod test {
         init_udp_inner(sender, source_id, shutdown_signal, None, false).await
     }
 
-    async fn init_udp<'a>(sender: SourceSender, use_log_namespace: bool) -> SocketAddr {
+    async fn init_udp(sender: SourceSender, use_log_namespace: bool) -> SocketAddr {
         init_udp_inner(
             sender,
             &ComponentKey::from("default"),
@@ -996,7 +996,7 @@ mod test {
         .0
     }
 
-    async fn init_udp_with_config<'a>(sender: SourceSender, config: UdpConfig) -> SocketAddr {
+    async fn init_udp_with_config(sender: SourceSender, config: UdpConfig) -> SocketAddr {
         init_udp_inner(
             sender,
             &ComponentKey::from("default"),
@@ -1008,7 +1008,7 @@ mod test {
         .0
     }
 
-    async fn init_udp_inner<'a>(
+    async fn init_udp_inner(
         sender: SourceSender,
         source_key: &ComponentKey,
         shutdown_signal: ShutdownSignal,
