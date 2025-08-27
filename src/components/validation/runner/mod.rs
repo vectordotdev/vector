@@ -587,11 +587,10 @@ fn spawn_input_driver(
             // the controlled edge (vector source) adds metadata to the event when it is received.
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
-            if component_type != ComponentType::Source {
-                if let Event::Log(log) = input_event.get_event() {
+            if component_type != ComponentType::Source
+                && let Event::Log(log) = input_event.get_event() {
                     log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
                 }
-            }
 
             let (failure_case, mut event) = input_event.clone().get();
 
@@ -620,9 +619,9 @@ fn spawn_input_driver(
                 // For example, the `datadog_agent` source. This only takes effect when
                 // the test case YAML file defining the event, constructs it with the log
                 // builder variant, and specifies an integer in milliseconds for the timestamp.
-                if component_type == ComponentType::Source {
-                    if let Event::Log(ref mut log) = event {
-                        if let Some(ts) = log.remove_timestamp() {
+                if component_type == ComponentType::Source
+                    && let Event::Log(ref mut log) = event
+                        && let Some(ts) = log.remove_timestamp() {
                             let ts = match ts.as_integer() {
                                 Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
                                     .unwrap_or_else(|| {
@@ -634,8 +633,6 @@ fn spawn_input_driver(
                             log.parse_path_and_insert("timestamp", ts)
                                 .expect("failed to insert timestamp");
                         }
-                    }
-                }
 
                 // This particular metric is tricky because a component can run the
                 // EstimatedJsonSizeOf calculation on a single event or an array of

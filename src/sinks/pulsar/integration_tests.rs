@@ -31,8 +31,8 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     let prop_key_opt = cnf.properties_key.clone();
     let input_events = events.map(move |mut events| {
         // if a property_key is defined, add some properties!
-        if let Some(properties_key) = &prop_key_opt {
-            if let Some(properties_key) = &properties_key.path {
+        if let Some(properties_key) = &prop_key_opt
+            && let Some(properties_key) = &properties_key.path {
                 let mut property_values = ObjectMap::new();
                 property_values.insert(prop_1_key.into(), Value::Bytes(Bytes::from(prop_1_value)));
                 events.iter_logs_mut().for_each(move |log| {
@@ -40,7 +40,6 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
                 });
                 return events;
             }
-        }
         events
     });
 

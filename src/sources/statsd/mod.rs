@@ -294,14 +294,13 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
         // The other modes already emit BytesReceived
-        if let Some(mode) = self.socket_mode {
-            if mode == SocketMode::Udp {
+        if let Some(mode) = self.socket_mode
+            && mode == SocketMode::Udp {
                 emit!(SocketBytesReceived {
                     mode,
                     byte_size: bytes.len(),
                 });
             }
-        }
 
         match std::str::from_utf8(&bytes).map_err(ParseError::InvalidUtf8) {
             Err(error) => Err(Box::new(error)),
@@ -335,11 +334,10 @@ async fn statsd_udp(
         })
         .await?;
 
-    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
+        && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
             warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
-    }
 
     info!(
         message = "Listening.",

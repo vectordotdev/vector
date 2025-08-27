@@ -25,7 +25,7 @@ impl<'a> FileSourceMetricFile<'a> {
         Self { name, metrics }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub const fn get_name(&self) -> &str {
         self.name.as_str()
     }
 }

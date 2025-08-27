@@ -375,11 +375,10 @@ where
         // the meantime.  We store these locally and return them all at the end.
         loop {
             // If an event count was given, and we've hit it, break out of the loop.
-            if let Some(count) = event_count {
-                if events.len() == count {
+            if let Some(count) = event_count
+                && events.len() == count {
                     break;
                 }
-            }
 
             select! {
                 _ = &mut source_timeout => break,
@@ -396,11 +395,10 @@ where
         // until no more are left, which avoids timing issues with missing events that came in right when the timeout
         // fired.
         while let Some(event) = rx.next().await {
-            if let Some(count) = event_count {
-                if events.len() == count {
+            if let Some(count) = event_count
+                && events.len() == count {
                     break;
                 }
-            }
 
             events.push(event);
         }

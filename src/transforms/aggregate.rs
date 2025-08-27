@@ -223,8 +223,7 @@ impl Aggregate {
                         if let MetricValue::Gauge {
                             value: existing_value,
                         } = existing.0.value()
-                        {
-                            if let MetricValue::Gauge { value: new_value } = data.value() {
+                            && let MetricValue::Gauge { value: new_value } = data.value() {
                                 let should_update = match self.mode {
                                     AggregationMode::Max => new_value > existing_value,
                                     AggregationMode::Min => new_value < existing_value,
@@ -234,7 +233,6 @@ impl Aggregate {
                                     *existing = (data, metadata);
                                 }
                             }
-                        }
                     } else {
                         emit!(AggregateUpdateFailed);
                         *existing = (data, metadata);
@@ -251,13 +249,11 @@ impl Aggregate {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
-            if matches!(self.mode, AggregationMode::Diff) {
-                if let Some(prev_entry) = self.prev_map.get(metric.series()) {
-                    if metric.data().kind == prev_entry.0.kind && !metric.subtract(&prev_entry.0) {
+            if matches!(self.mode, AggregationMode::Diff)
+                && let Some(prev_entry) = self.prev_map.get(metric.series())
+                    && metric.data().kind == prev_entry.0.kind && !metric.subtract(&prev_entry.0) {
                         emit!(AggregateUpdateFailed);
                     }
-                }
-            }
             output.push(Event::Metric(metric));
         }
 

@@ -507,8 +507,8 @@ mod test {
 
                     std::future::poll_fn(move |cx| {
                         loop {
-                            if let Some(fut) = close_rx.as_mut() {
-                                if let Poll::Ready(()) = fut.poll_unpin(cx) {
+                            if let Some(fut) = close_rx.as_mut()
+                                && let Poll::Ready(()) = fut.poll_unpin(cx) {
                                     stream
                                         .get_mut()
                                         .unwrap()
@@ -518,7 +518,6 @@ mod test {
                                         .unwrap();
                                     close_rx = None;
                                 }
-                            }
 
                             let mut buf = [0u8; 11];
                             let mut buf = ReadBuf::new(&mut buf);

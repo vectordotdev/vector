@@ -283,11 +283,10 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<Strin
         })
         .collect();
 
-    if !vars.contains_key("HOSTNAME") {
-        if let Ok(hostname) = crate::get_hostname() {
+    if !vars.contains_key("HOSTNAME")
+        && let Ok(hostname) = crate::get_hostname() {
             vars.insert("HOSTNAME".into(), hostname);
         }
-    }
     vars::interpolate(&source_string, &vars)
 }
 

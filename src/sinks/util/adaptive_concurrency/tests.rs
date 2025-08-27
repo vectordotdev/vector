@@ -368,11 +368,10 @@ impl TestController {
 
     fn end_request(&mut self, now: Instant, completed: bool) {
         self.stats.end_request(now, completed);
-        if self.stats.completed >= self.todo {
-            if let Some(done) = self.send_done.take() {
+        if self.stats.completed >= self.todo
+            && let Some(done) = self.send_done.take() {
                 done.send(()).expect("Could not send done signal");
             }
-        }
     }
 }
 

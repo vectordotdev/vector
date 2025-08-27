@@ -326,8 +326,7 @@ impl RunningTopology {
         if let Some(mut new_pieces) =
             TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
                 .await
-        {
-            if self
+            && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
             {
@@ -338,7 +337,6 @@ impl RunningTopology {
 
                 return Ok(false);
             }
-        }
 
         error!("Failed to restore old configuration.");
 

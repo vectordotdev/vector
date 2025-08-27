@@ -126,8 +126,8 @@ pub fn normalize_event(event: &mut Event) {
     // NOTE: we don't access by semantic meaning here because in the prior step
     // we ensured reserved attributes are in expected locations.
     let ddtags_path = event_path!(DDTAGS);
-    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path) {
-        if !tags_arr.is_empty() {
+    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path)
+        && !tags_arr.is_empty() {
             let all_tags: String = tags_arr
                 .iter()
                 .filter_map(|tag_kv| {
@@ -139,7 +139,6 @@ pub fn normalize_event(event: &mut Event) {
 
             log.insert(ddtags_path, all_tags);
         }
-    }
 
     // ensure the timestamp is in expected format
     // NOTE: we don't access by semantic meaning here because in the prior step

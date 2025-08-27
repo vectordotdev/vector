@@ -261,11 +261,10 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOp => {}
         }
 
-        if let Some(tx) = self.result_tx {
-            if tx.send(result).is_err() {
+        if let Some(tx) = self.result_tx
+            && tx.send(result).is_err() {
                 error!(message = "Sending unit test results failed in unit test sink.");
             }
-        }
         Ok(())
     }
 }

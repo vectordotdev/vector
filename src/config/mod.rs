@@ -328,11 +328,10 @@ impl Resource {
         // Find equality based conflicts
         for (key, resources) in components {
             for resource in resources {
-                if let Resource::Port(address, protocol) = &resource {
-                    if address.ip().is_unspecified() {
+                if let Resource::Port(address, protocol) = &resource
+                    && address.ip().is_unspecified() {
                         unspecified.push((key.clone(), *address, *protocol));
                     }
-                }
 
                 resource_map
                     .entry(resource)

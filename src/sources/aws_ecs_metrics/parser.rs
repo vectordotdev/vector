@@ -340,8 +340,8 @@ fn cpu_metrics(
         );
     }
 
-    if let Some(cpu_usage) = &cpu.cpu_usage {
-        if let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
+    if let Some(cpu_usage) = &cpu.cpu_usage
+        && let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
         {
             metrics.extend((0..online_cpus).filter_map(|index| {
                 percpu_usage.get(index).map(|value| {
@@ -359,7 +359,6 @@ fn cpu_metrics(
                 })
             }));
         }
-    }
 
     metrics
 }

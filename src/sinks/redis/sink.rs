@@ -391,8 +391,8 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn on_retriable_error(&self, error: &Self::Error) {
-        if let RedisSinkError::SendError { source, generation } = error {
-            if matches!(
+        if let RedisSinkError::SendError { source, generation } = error
+            && matches!(
                 source.kind(),
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
@@ -400,7 +400,6 @@ impl RetryLogic for RedisRetryLogic {
             ) {
                 self.connection.signal_broken(*generation);
             }
-        }
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {

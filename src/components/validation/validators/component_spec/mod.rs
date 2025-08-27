@@ -220,11 +220,10 @@ fn filter_events_by_metric_and_component<'a>(
         .filter(|&m| {
             if m.name() == metric.to_string() {
                 debug!("{}", m);
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_id").unwrap_or("") == component_id {
+                if let Some(tags) = m.tags()
+                    && tags.get("component_id").unwrap_or("") == component_id {
                         return true;
                     }
-                }
             }
 
             false

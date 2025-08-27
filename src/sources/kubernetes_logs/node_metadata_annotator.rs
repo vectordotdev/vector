@@ -76,8 +76,8 @@ fn annotate_from_metadata(
     metadata: &ObjectMeta,
     log_namespace: LogNamespace,
 ) {
-    if let Some(labels) = &metadata.labels {
-        if let Some(prefix_path) = &fields_spec.node_labels.path {
+    if let Some(labels) = &metadata.labels
+        && let Some(prefix_path) = &fields_spec.node_labels.path {
             for (key, value) in labels.iter() {
                 let key_path = path!(key);
 
@@ -90,7 +90,6 @@ fn annotate_from_metadata(
                 )
             }
         }
-    }
 }
 
 #[cfg(test)]

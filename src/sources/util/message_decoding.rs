@@ -50,14 +50,13 @@ pub fn decode_message<'a>(
                                 log.insert(metadata_path!("vector", "ingest_timestamp"), now);
                             }
                             LogNamespace::Legacy => {
-                                if let Some(timestamp) = timestamp {
-                                    if let Some(timestamp_key) = schema.timestamp_key() {
+                                if let Some(timestamp) = timestamp
+                                    && let Some(timestamp_key) = schema.timestamp_key() {
                                         log.try_insert(
                                             (PathPrefix::Event, timestamp_key),
                                             timestamp,
                                         );
                                     }
-                                }
                             }
                         }
                     }

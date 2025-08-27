@@ -48,8 +48,8 @@ impl PartialEventMergeState {
                 bytes_mut.extend_from_slice(new_value);
 
                 // drop event if it's bigger than max allowed
-                if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes {
-                    if bytes_mut.len() > max_merged_line_bytes {
+                if let Some(max_merged_line_bytes) = self.maybe_max_merged_line_bytes
+                    && bytes_mut.len() > max_merged_line_bytes {
                         bucket.exceeds_max_merged_line_limit = true;
                         // perf impact of clone should be minimal since being here means no further processing of this event will occur
                         emit!(KubernetesMergedLineTooBigError {
@@ -58,7 +58,6 @@ impl PartialEventMergeState {
                             encountered_size_so_far: bytes_mut.len()
                         });
                     }
-                }
 
                 *prev_value = bytes_mut.freeze();
             }
@@ -188,11 +187,10 @@ fn merge_partial_events_with_custom_expiration(
                 .unwrap_or_default();
 
             state.add_event(event, &file, &message_path, expiration_time);
-            if !is_partial {
-                if let Some(log_event) = state.remove_event(&file) {
+            if !is_partial
+                && let Some(log_event) = state.remove_event(&file) {
                     emitter.emit(log_event);
                 }
-            }
         },
         |state: &mut PartialEventMergeState, emitter: &mut Emitter<LogEvent>| {
             // check for expired events

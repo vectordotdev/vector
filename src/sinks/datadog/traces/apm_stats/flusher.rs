@@ -108,11 +108,10 @@ impl ApmStatsSender {
 
                 Some((payload, aggregator.get_api_key()))
             }
-        } {
-            if let Err(error) = self.compress_and_send(payload, api_key).await {
+        }
+            && let Err(error) = self.compress_and_send(payload, api_key).await {
                 emit!(DatadogTracesAPMStatsError { error });
             }
-        }
     }
 
     async fn compress_and_send(

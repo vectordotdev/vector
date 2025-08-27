@@ -93,11 +93,10 @@ impl UnixConnector {
                 .map(UnixEither::Stream)?,
         };
 
-        if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = net::set_send_buffer_size(&either_socket, send_buffer_size) {
+        if let Some(send_buffer_size) = self.send_buffer_size
+            && let Err(error) = net::set_send_buffer_size(&either_socket, send_buffer_size) {
                 warn!(%error, "Failed configuring send buffer size on Unix socket.");
             }
-        }
 
         Ok((self.path.clone(), either_socket))
     }

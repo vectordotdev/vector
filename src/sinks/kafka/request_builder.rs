@@ -86,8 +86,8 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
 
 fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<OwnedHeaders> {
     headers_key.and_then(|headers_key| {
-        if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_key) {
+        if let Event::Log(log) = event
+            && let Some(headers) = log.get(headers_key) {
                 match headers {
                     Value::Object(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
@@ -112,7 +112,6 @@ fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<O
                     }
                 }
             }
-        }
         None
     })
 }

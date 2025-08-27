@@ -339,8 +339,8 @@ where
             }
 
             // Cleanup of in flight futures
-            if let Some(in_flight) = this.in_flight.as_mut() {
-                if in_flight.len() > this.partitions.len() {
+            if let Some(in_flight) = this.in_flight.as_mut()
+                && in_flight.len() > this.partitions.len() {
                     // There is at least one in flight future without a partition to check it
                     // so we will do it here.
                     let partitions = this.partitions;
@@ -348,7 +348,6 @@ where
                         partitions.contains_key(partition) || req.poll_unpin(cx).is_pending()
                     });
                 }
-            }
 
             // Try move item from buffer to batch.
             if let Some((partition, item)) = self.buffer.take() {

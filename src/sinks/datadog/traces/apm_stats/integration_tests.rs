@@ -95,11 +95,10 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
 
-    if let Some(content_type) = content_type {
-        if content_type.starts_with("application/x-protobuf") {
+    if let Some(content_type) = content_type
+        && content_type.starts_with("application/x-protobuf") {
             debug!("Got trace payload.");
         }
-    }
 }
 
 /// Process a POST request from the stats endpoint.
@@ -113,8 +112,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
 
-    if let Some(content_type) = content_type {
-        if content_type.starts_with("application/msgpack") {
+    if let Some(content_type) = content_type
+        && content_type.starts_with("application/msgpack") {
             debug!("`{}` server got stats payload.", state.name);
 
             let body = request.body_mut();
@@ -137,7 +136,6 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
 
             state.tx.send(payload).await.unwrap();
         }
-    }
 }
 
 #[derive(Serialize)]

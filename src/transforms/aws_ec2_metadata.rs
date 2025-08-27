@@ -474,38 +474,33 @@ impl MetadataClient {
                 new_state.push((self.keys.region_key.clone(), document.region.into()));
             }
 
-            if self.fields.contains(AVAILABILITY_ZONE_KEY) {
-                if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
+            if self.fields.contains(AVAILABILITY_ZONE_KEY)
+                && let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
                     new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
                 }
-            }
 
-            if self.fields.contains(LOCAL_HOSTNAME_KEY) {
-                if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
+            if self.fields.contains(LOCAL_HOSTNAME_KEY)
+                && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
                     new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
                 }
-            }
 
-            if self.fields.contains(LOCAL_IPV4_KEY) {
-                if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
+            if self.fields.contains(LOCAL_IPV4_KEY)
+                && let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
                     new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
                 }
-            }
 
-            if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
-                if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
+            if self.fields.contains(PUBLIC_HOSTNAME_KEY)
+                && let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
                     new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
                 }
-            }
 
-            if self.fields.contains(PUBLIC_IPV4_KEY) {
-                if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
+            if self.fields.contains(PUBLIC_IPV4_KEY)
+                && let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
                     new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
                 }
-            }
 
-            if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
-                if let Some(mac) = self.get_metadata(&MAC).await? {
+            if (self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY))
+                && let Some(mac) = self.get_metadata(&MAC).await? {
                     let mac = String::from_utf8_lossy(&mac[..]);
 
                     if self.fields.contains(SUBNET_ID_KEY) {
@@ -534,10 +529,9 @@ impl MetadataClient {
                         }
                     }
                 }
-            }
 
-            if self.fields.contains(ROLE_NAME_KEY) {
-                if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
+            if self.fields.contains(ROLE_NAME_KEY)
+                && let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
                     let role_names = String::from_utf8_lossy(&role_names[..]);
 
                     for (i, role_name) in role_names.lines().enumerate() {
@@ -557,7 +551,6 @@ impl MetadataClient {
                         ));
                     }
                 }
-            }
 
             for tag in self.tags.clone() {
                 let tag_path = format!("/latest/meta-data/tags/instance/{tag}");
