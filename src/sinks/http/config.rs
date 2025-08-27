@@ -241,7 +241,6 @@ impl SinkConfig for HttpSinkConfig {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let encoder = self.build_encoder()?;
-        println!("🚧 encoder: {encoder:?}");
         let transformer = self.encoding.transformer();
 
         let mut request = self.request.clone();
