@@ -20,13 +20,6 @@ pub struct Cli {
 impl Cli {
     /// Build the argument vector for cargo invocation.
     fn build_args(&self) -> Vec<OsString> {
-        let features = self.features.join(",");
-        let features = if self.features.is_empty() {
-            "default,all-integration-tests"
-        } else {
-            &features
-        };
-
         let tool = if self.clippy { "clippy" } else { "check" };
 
         let pre_args = if self.fix {
@@ -41,16 +34,20 @@ impl Cli {
             Vec::default()
         };
 
-        [
-            tool,
-            "--workspace",
-            "--all-targets",
-            "--no-default-features",
-            "--features",
-            features,
-        ]
-        .chain_args(pre_args)
-        .chain_args(clippy_args)
+        let feature_args = if self.features.is_empty() {
+            vec!["--all-features".to_string()]
+        } else {
+            vec![
+                "--no-default-features".to_string(),
+                "--features".to_string(),
+                self.features.join(",").to_string(),
+            ]
+        };
+
+        [tool, "--workspace", "--all-targets"]
+            .chain_args(feature_args)
+            .chain_args(pre_args)
+            .chain_args(clippy_args)
     }
 
     pub fn exec(self) -> Result<()> {
