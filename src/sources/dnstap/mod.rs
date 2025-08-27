@@ -117,13 +117,10 @@ impl DnstapConfig {
                 let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
                 if self.raw_data_only()
-                    && let Some(message_key) = log_schema().message_key() {
-                        return schema.with_event_field(
-                            message_key,
-                            Kind::bytes(),
-                            Some("message"),
-                        );
-                    }
+                    && let Some(message_key) = log_schema().message_key()
+                {
+                    return schema.with_event_field(message_key, Kind::bytes(), Some("message"));
+                }
                 event_schema.schema_definition(schema)
             }
             LogNamespace::Vector => {

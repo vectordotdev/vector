@@ -109,11 +109,9 @@ impl Transformer {
             && except_fields
                 .iter()
                 .any(|f| only_fields.iter().any(|v| v == f))
-            {
-                return Err(
-                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
-                );
-            }
+        {
+            return Err("`except_fields` and `only_fields` should be mutually exclusive.".into());
+        }
         Ok(())
     }
 
@@ -168,10 +166,11 @@ impl Transformer {
                 // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
                 // refer to this later when emitting metrics.
                 if let (Some(v), Some(service_path)) = (value, service_path)
-                    && service_path.path == *value_path {
-                        log.metadata_mut()
-                            .add_dropped_field(meaning::SERVICE.into(), v);
-                    }
+                    && service_path.path == *value_path
+                {
+                    log.metadata_mut()
+                        .add_dropped_field(meaning::SERVICE.into(), v);
+                }
             }
         }
     }

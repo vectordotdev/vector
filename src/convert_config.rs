@@ -59,11 +59,12 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     if opts.input_path.is_file() && opts.output_path.extension().is_some() {
         if let Some(base_dir) = opts.output_path.parent()
-            && !base_dir.exists() {
-                fs::create_dir_all(base_dir).unwrap_or_else(|_| {
-                    panic!("Failed to create output dir(s): {:?}", &opts.output_path)
-                });
-            }
+            && !base_dir.exists()
+        {
+            fs::create_dir_all(base_dir).unwrap_or_else(|_| {
+                panic!("Failed to create output dir(s): {:?}", &opts.output_path)
+            });
+        }
 
         match convert_config(&opts.input_path, &opts.output_path, opts.output_format) {
             Ok(_) => exitcode::OK,

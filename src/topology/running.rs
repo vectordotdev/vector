@@ -329,14 +329,14 @@ impl RunningTopology {
             && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
-            {
-                self.connect_diff(&diff, &mut new_pieces).await;
-                self.spawn_diff(&diff, new_pieces);
+        {
+            self.connect_diff(&diff, &mut new_pieces).await;
+            self.spawn_diff(&diff, new_pieces);
 
-                info!("Old configuration restored successfully.");
+            info!("Old configuration restored successfully.");
 
-                return Ok(false);
-            }
+            return Ok(false);
+        }
 
         error!("Failed to restore old configuration.");
 

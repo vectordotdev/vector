@@ -223,9 +223,10 @@ impl DockerLogsConfig {
 
     fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
         if let Some(val) = &self.partial_event_marker_field
-            && val.is_empty() {
-                self.partial_event_marker_field = None;
-            }
+            && val.is_empty()
+        {
+            self.partial_event_marker_field = None;
+        }
         self
     }
 }
@@ -1159,9 +1160,10 @@ impl ContainerLogInfo {
             }
             LogNamespace::Legacy => {
                 if let Some(timestamp) = timestamp
-                    && let Some(timestamp_key) = log_schema().timestamp_key() {
-                        log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
-                    }
+                    && let Some(timestamp_key) = log_schema().timestamp_key()
+                {
+                    log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                }
             }
         };
 

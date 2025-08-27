@@ -801,11 +801,12 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
     let mut tags = MetricTags::default();
 
     if let Some(els) = log.get(event_path!("tags"))
-        && let Some(el) = els.as_object() {
-            for (key, value) in el {
-                tags.insert(key.to_string(), bytes_to_str(value));
-            }
+        && let Some(el) = els.as_object()
+    {
+        for (key, value) in el {
+            tags.insert(key.to_string(), bytes_to_str(value));
         }
+    }
     let tags_result = Some(tags);
 
     let kind_str = match try_get_string_from_log(log, "kind")? {

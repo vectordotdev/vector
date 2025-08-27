@@ -64,9 +64,10 @@ impl UdpConnector {
         let socket = UdpSocket::bind(bind_address).await.context(FailedToBind)?;
 
         if let Some(send_buffer_size) = self.send_buffer_size
-            && let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size) {
-                warn!(%error, "Failed configuring send buffer size on UDP socket.");
-            }
+            && let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size)
+        {
+            warn!(%error, "Failed configuring send buffer size on UDP socket.");
+        }
 
         socket.connect(addr).await.context(FailedToConnect)?;
 

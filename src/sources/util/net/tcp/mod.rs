@@ -267,14 +267,16 @@ async fn handle_stream<T>(
     };
 
     if let Some(keepalive) = keepalive
-        && let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
+    }
 
     if let Some(receive_buffer_bytes) = receive_buffer_bytes
-        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
+    }
 
     let socket = socket.after_read(move |byte_size| {
         emit!(TcpBytesReceived {

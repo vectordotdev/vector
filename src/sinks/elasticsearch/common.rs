@@ -94,12 +94,13 @@ impl ElasticsearchCommon {
         );
 
         if let Some(pipeline) = &config.pipeline
-            && !pipeline.is_empty() {
-                query_params.insert(
-                    "pipeline".into(),
-                    QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
-                );
-            }
+            && !pipeline.is_empty()
+        {
+            query_params.insert(
+                "pipeline".into(),
+                QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
+            );
+        }
 
         let bulk_url = {
             let mut query = url::form_urlencoded::Serializer::new(String::new());
@@ -405,13 +406,15 @@ async fn get_version(
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
     if let Some(version) = version
-        && let Some(number) = version.number {
-            let v: Vec<&str> = number.split('.').collect();
-            if !v.is_empty()
-                && let Ok(major_version) = v[0].parse::<usize>() {
-                    return Ok(major_version);
-                }
+        && let Some(number) = version.number
+    {
+        let v: Vec<&str> = number.split('.').collect();
+        if !v.is_empty()
+            && let Ok(major_version) = v[0].parse::<usize>()
+        {
+            return Ok(major_version);
         }
+    }
     Err("Unexpected response from Elasticsearch endpoint `/`. Consider setting `api_version` option.".into())
 }
 

@@ -191,16 +191,17 @@ pub fn acquire_allocation_group_id(
     component_kind: String,
 ) -> AllocationGroupId {
     if let Some(group_id) = AllocationGroupId::register()
-        && let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
-            let mut writer = group_lock.lock().unwrap();
-            *writer = GroupInfo {
-                component_id,
-                component_kind,
-                component_type,
-            };
+        && let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize)
+    {
+        let mut writer = group_lock.lock().unwrap();
+        *writer = GroupInfo {
+            component_id,
+            component_kind,
+            component_type,
+        };
 
-            return group_id;
-        }
+        return group_id;
+    }
 
     warn!(
         "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",

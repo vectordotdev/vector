@@ -39,9 +39,10 @@ impl NatsHeaderConfig {
         let mut headers = HeaderMap::new();
 
         if let Some(template) = &self.message_id
-            && let Ok(value) = template.render_string(event) {
-                headers.insert(header::NATS_MESSAGE_ID, value.as_str());
-            }
+            && let Ok(value) = template.render_string(event)
+        {
+            headers.insert(header::NATS_MESSAGE_ID, value.as_str());
+        }
 
         headers
     }

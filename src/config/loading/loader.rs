@@ -136,16 +136,17 @@ pub(super) mod process {
             if recurse {
                 for entry in folders {
                     if let Ok(name) = component_name(&entry)
-                        && !result.contains_key(&name) {
-                            match self.load_dir(&entry, true) {
-                                Ok(table) => {
-                                    result.insert(name, Value::Table(table));
-                                }
-                                Err(errs) => {
-                                    errors.extend(errs);
-                                }
+                        && !result.contains_key(&name)
+                    {
+                        match self.load_dir(&entry, true) {
+                            Ok(table) => {
+                                result.insert(name, Value::Table(table));
+                            }
+                            Err(errs) => {
+                                errors.extend(errs);
                             }
                         }
+                    }
                 }
             }
 
@@ -177,9 +178,11 @@ pub(super) mod process {
         ) -> Result<Option<(String, Table)>, Vec<String>> {
             if let Some((name, mut table)) = self.load_file(path, format)? {
                 if let Some(subdir) = path.parent().map(|p| p.join(&name))
-                    && subdir.is_dir() && subdir.exists() {
-                        self.load_dir_into(&subdir, &mut table, true)?;
-                    }
+                    && subdir.is_dir()
+                    && subdir.exists()
+                {
+                    self.load_dir_into(&subdir, &mut table, true)?;
+                }
                 Ok(Some((name, table)))
             } else {
                 Ok(None)

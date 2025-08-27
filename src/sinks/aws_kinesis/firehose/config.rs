@@ -181,9 +181,10 @@ impl RetryLogic for KinesisRetryLogic {
             && matches!(
                 inner.err(),
                 PutRecordBatchError::ServiceUnavailableException(_)
-            ) {
-                return true;
-            }
+            )
+        {
+            return true;
+        }
         is_retriable_error(error)
     }
 

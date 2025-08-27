@@ -545,14 +545,16 @@ async fn handle_stream(
     };
 
     if let Some(keepalive) = frame_handler.keepalive()
-        && let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
+    }
 
     if let Some(receive_buffer_bytes) = frame_handler.receive_buffer_bytes()
-        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
+    }
 
     let socket = socket.after_read(move |byte_size| {
         emit!(TcpBytesReceived {
@@ -675,12 +677,13 @@ async fn handle_tcp_frame<T>(
         )
         .await;
     } else if let Some(event) = frame_handler.handle_event(received_from, frame)
-        && let Err(e) = event_sink.send_event(event).await {
-            error!(
-                internal_log_rate_limit = true,
-                "Error sending event: {e:?}."
-            );
-        }
+        && let Err(e) = event_sink.send_event(event).await
+    {
+        error!(
+            internal_log_rate_limit = true,
+            "Error sending event: {e:?}."
+        );
+    }
 }
 
 /**
@@ -915,9 +918,10 @@ async fn spawn_event_handling_tasks(
     tokio::spawn(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data)
-                && event_sink.send_event(evt).await.is_err() {
-                    error!("Encountered error while sending event.");
-                }
+                && event_sink.send_event(evt).await.is_err()
+            {
+                error!("Encountered error while sending event.");
+            }
             active_task_nums.fetch_sub(1, Ordering::AcqRel);
         })
         .await;

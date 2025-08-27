@@ -359,9 +359,10 @@ impl Ingestor {
         // that panic here to properly shutdown Vector.
         for handle in handles.drain(..) {
             if let Err(e) = handle.await
-                && e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
+            }
         }
 
         Ok(())

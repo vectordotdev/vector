@@ -342,23 +342,23 @@ fn cpu_metrics(
 
     if let Some(cpu_usage) = &cpu.cpu_usage
         && let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
-        {
-            metrics.extend((0..online_cpus).filter_map(|index| {
-                percpu_usage.get(index).map(|value| {
-                    let mut tags = tags.clone();
-                    tags.replace("cpu".into(), index.to_string());
+    {
+        metrics.extend((0..online_cpus).filter_map(|index| {
+            percpu_usage.get(index).map(|value| {
+                let mut tags = tags.clone();
+                tags.replace("cpu".into(), index.to_string());
 
-                    counter(
-                        usage,
-                        "usage_percpu_jiffies_total",
-                        namespace.clone(),
-                        timestamp,
-                        *value,
-                        tags,
-                    )
-                })
-            }));
-        }
+                counter(
+                    usage,
+                    "usage_percpu_jiffies_total",
+                    namespace.clone(),
+                    timestamp,
+                    *value,
+                    tags,
+                )
+            })
+        }));
+    }
 
     metrics
 }

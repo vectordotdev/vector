@@ -178,14 +178,16 @@ impl TcpConnector {
             .context(ConnectSnafu)
             .map(|mut maybe_tls| {
                 if let Some(keepalive) = self.keepalive
-                    && let Err(error) = maybe_tls.set_keepalive(keepalive) {
-                        warn!(message = "Failed configuring TCP keepalive.", %error);
-                    }
+                    && let Err(error) = maybe_tls.set_keepalive(keepalive)
+                {
+                    warn!(message = "Failed configuring TCP keepalive.", %error);
+                }
 
                 if let Some(send_buffer_bytes) = self.send_buffer_bytes
-                    && let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
-                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
-                    }
+                    && let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes)
+                {
+                    warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
+                }
 
                 maybe_tls
             })

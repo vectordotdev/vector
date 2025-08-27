@@ -539,13 +539,14 @@ mod tests {
 
             // Wait for the initial message from the client
             if let Some(Ok(Message::Text(msg))) = websocket.next().await
-                && msg == initial_message {
-                    // Received correct initial message, send response
-                    websocket
-                        .send(Message::Text(response_message))
-                        .await
-                        .unwrap();
-                }
+                && msg == initial_message
+            {
+                // Received correct initial message, send response
+                websocket
+                    .send(Message::Text(response_message))
+                    .await
+                    .unwrap();
+            }
         });
 
         server_addr

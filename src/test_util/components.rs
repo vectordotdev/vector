@@ -376,9 +376,10 @@ where
         loop {
             // If an event count was given, and we've hit it, break out of the loop.
             if let Some(count) = event_count
-                && events.len() == count {
-                    break;
-                }
+                && events.len() == count
+            {
+                break;
+            }
 
             select! {
                 _ = &mut source_timeout => break,
@@ -396,9 +397,10 @@ where
         // fired.
         while let Some(event) = rx.next().await {
             if let Some(count) = event_count
-                && events.len() == count {
-                    break;
-                }
+                && events.len() == count
+            {
+                break;
+            }
 
             events.push(event);
         }

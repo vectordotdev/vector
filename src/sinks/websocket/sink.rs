@@ -65,12 +65,13 @@ impl WebSocketSink {
 
     fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
         if let Some(ping_timeout) = self.ping_timeout
-            && last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-                return Err(TungsteniteError::Io(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Pong not received in time",
-                )));
-            }
+            && last_pong.elapsed() > Duration::from_secs(ping_timeout.into())
+        {
+            return Err(TungsteniteError::Io(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "Pong not received in time",
+            )));
+        }
 
         Ok(())
     }

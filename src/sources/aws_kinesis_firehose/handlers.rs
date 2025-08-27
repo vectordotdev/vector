@@ -135,12 +135,12 @@ pub(super) async fn firehose(
                             );
 
                             if context.store_access_key
-                                && let Some(access_key) = &request.access_key {
-                                    log.metadata_mut().secrets_mut().insert_secret(
-                                        "aws_kinesis_firehose_access_key",
-                                        access_key,
-                                    );
-                                }
+                                && let Some(access_key) = &request.access_key
+                            {
+                                log.metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("aws_kinesis_firehose_access_key", access_key);
+                            }
                         }
                     }
 

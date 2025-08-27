@@ -87,9 +87,10 @@ impl SqsSource {
         // that panic here to properly shutdown Vector.
         for task_handle in task_handles.drain(..) {
             if let Err(e) = task_handle.await
-                && e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
+            }
         }
         Ok(())
     }

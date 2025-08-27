@@ -65,9 +65,10 @@ impl AllocationGroupId {
     pub fn attach_to_span(self, span: &Span) {
         tracing::dispatcher::get_default(move |dispatch| {
             if let Some(id) = span.id()
-                && let Some(ctx) = dispatch.downcast_ref::<WithAllocationGroup>() {
-                    (ctx.with_allocation_group)(dispatch, &id, AllocationGroupToken::from(self));
-                }
+                && let Some(ctx) = dispatch.downcast_ref::<WithAllocationGroup>()
+            {
+                (ctx.with_allocation_group)(dispatch, &id, AllocationGroupToken::from(self));
+            }
         });
     }
 }

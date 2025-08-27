@@ -51,12 +51,10 @@ pub fn decode_message<'a>(
                             }
                             LogNamespace::Legacy => {
                                 if let Some(timestamp) = timestamp
-                                    && let Some(timestamp_key) = schema.timestamp_key() {
-                                        log.try_insert(
-                                            (PathPrefix::Event, timestamp_key),
-                                            timestamp,
-                                        );
-                                    }
+                                    && let Some(timestamp_key) = schema.timestamp_key()
+                                {
+                                    log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
+                                }
                             }
                         }
                     }

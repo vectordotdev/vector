@@ -201,9 +201,10 @@ pub(super) fn udp(
         }
 
         if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
-            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
+            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+        {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+        }
 
         let mut max_length = config.max_length;
 

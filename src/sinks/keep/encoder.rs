@@ -30,13 +30,14 @@ impl SinkEncoder<Vec<Event>> for KeepEncoder {
 
             let mut data = json!(event.as_log());
             if let Some(message) = data.get("message")
-                && let Some(message_str) = message.as_str() {
-                    // Parse the JSON string in `message`
-                    let parsed_message: serde_json::Value = serde_json::from_str(message_str)?;
+                && let Some(message_str) = message.as_str()
+            {
+                // Parse the JSON string in `message`
+                let parsed_message: serde_json::Value = serde_json::from_str(message_str)?;
 
-                    // Reassign the parsed JSON back to `message`
-                    data["message"] = parsed_message;
-                }
+                // Reassign the parsed JSON back to `message`
+                data["message"] = parsed_message;
+            }
             data["keep_source_type"] = json!(event.source_id());
 
             json_events.push(data);

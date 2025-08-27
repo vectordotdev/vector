@@ -588,9 +588,10 @@ fn spawn_input_driver(
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
             if component_type != ComponentType::Source
-                && let Event::Log(log) = input_event.get_event() {
-                    log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
-                }
+                && let Event::Log(log) = input_event.get_event()
+            {
+                log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
+            }
 
             let (failure_case, mut event) = input_event.clone().get();
 
@@ -621,18 +622,17 @@ fn spawn_input_driver(
                 // builder variant, and specifies an integer in milliseconds for the timestamp.
                 if component_type == ComponentType::Source
                     && let Event::Log(ref mut log) = event
-                        && let Some(ts) = log.remove_timestamp() {
-                            let ts = match ts.as_integer() {
-                                Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
-                                    .unwrap_or_else(|| {
-                                        panic!("invalid timestamp in input test event {ts}")
-                                    })
-                                    .into(),
-                                None => ts,
-                            };
-                            log.parse_path_and_insert("timestamp", ts)
-                                .expect("failed to insert timestamp");
-                        }
+                    && let Some(ts) = log.remove_timestamp()
+                {
+                    let ts = match ts.as_integer() {
+                        Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
+                            .unwrap_or_else(|| panic!("invalid timestamp in input test event {ts}"))
+                            .into(),
+                        None => ts,
+                    };
+                    log.parse_path_and_insert("timestamp", ts)
+                        .expect("failed to insert timestamp");
+                }
 
                 // This particular metric is tricky because a component can run the
                 // EstimatedJsonSizeOf calculation on a single event or an array of

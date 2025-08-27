@@ -139,14 +139,14 @@ impl Memory {
                     .byte_size
                     .saturating_add(new_entry_size as u64)
                     > max_byte_size
-                {
-                    // Reject new entries
-                    emit!(MemoryEnrichmentTableInsertFailed {
-                        key: &new_entry_key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                    });
-                    continue;
-                }
+            {
+                // Reject new entries
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: &new_entry_key,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                });
+                continue;
+            }
             writer.metadata.byte_size = writer
                 .metadata
                 .byte_size
@@ -173,16 +173,17 @@ impl Memory {
         if let Some(reader) = self.get_read_handle().read() {
             for (k, v) in reader.iter() {
                 if let Some(entry) = v.get_one()
-                    && entry.expired(now, self.config.ttl) {
-                        // Byte size is not reduced at this point, because the actual deletion
-                        // will only happen at refresh time
-                        writer.write_handle.empty(k.clone());
-                        emit!(MemoryEnrichmentTableTtlExpired {
-                            key: k,
-                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                        });
-                        needs_flush = true;
-                    }
+                    && entry.expired(now, self.config.ttl)
+                {
+                    // Byte size is not reduced at this point, because the actual deletion
+                    // will only happen at refresh time
+                    writer.write_handle.empty(k.clone());
+                    emit!(MemoryEnrichmentTableTtlExpired {
+                        key: k,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    needs_flush = true;
+                }
             }
         };
 

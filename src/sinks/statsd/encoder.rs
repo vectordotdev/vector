@@ -139,9 +139,10 @@ fn encode_and_write_single_event<V: Display>(
     write!(&mut writer, "{metric_name}:{val}|{metric_type}").unwrap();
 
     if let Some(sample_rate) = sample_rate
-        && sample_rate != 1 {
-            write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
-        };
+        && sample_rate != 1
+    {
+        write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
+    };
 
     if let Some(t) = metric_tags {
         write!(&mut writer, "|#{t}").unwrap();

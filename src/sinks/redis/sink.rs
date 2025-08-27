@@ -397,9 +397,10 @@ impl RetryLogic for RedisRetryLogic {
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
-            ) {
-                self.connection.signal_broken(*generation);
-            }
+            )
+        {
+            self.connection.signal_broken(*generation);
+        }
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {

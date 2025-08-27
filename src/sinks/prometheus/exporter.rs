@@ -328,9 +328,10 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
             };
 
             if let Some(Ok(encoded_credentials)) = encoded_credentials
-                && auth_header == encoded_credentials {
-                    return true;
-                }
+                && auth_header == encoded_credentials
+            {
+                return true;
+            }
         }
     } else {
         return true;

@@ -1861,9 +1861,10 @@ mod integration_test {
 
         for result in topic_results {
             if let Err((topic, err)) = result
-                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
-                    panic!("Creating a topic failed: {:?}", (topic, err))
-                }
+                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                panic!("Creating a topic failed: {:?}", (topic, err))
+            }
         }
     }
 

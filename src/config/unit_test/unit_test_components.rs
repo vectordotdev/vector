@@ -262,9 +262,10 @@ impl StreamSink<Event> for UnitTestSink {
         }
 
         if let Some(tx) = self.result_tx
-            && tx.send(result).is_err() {
-                error!(message = "Sending unit test results failed in unit test sink.");
-            }
+            && tx.send(result).is_err()
+        {
+            error!(message = "Sending unit test results failed in unit test sink.");
+        }
         Ok(())
     }
 }

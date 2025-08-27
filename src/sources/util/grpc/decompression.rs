@@ -230,9 +230,10 @@ async fn drive_body_decompression(
     let maybe_trailers =
         result.map_err(|_| Status::internal("error reading trailers from underlying body"))?;
     if let Some(trailers) = maybe_trailers
-        && destination.send_trailers(trailers).await.is_err() {
-            return Err(Status::internal("destination body abnormally closed"));
-        }
+        && destination.send_trailers(trailers).await.is_err()
+    {
+        return Err(Status::internal("destination body abnormally closed"));
+    }
 
     Ok(bytes_received)
 }

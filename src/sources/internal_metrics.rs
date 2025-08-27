@@ -171,9 +171,10 @@ impl InternalMetrics<'_> {
                 }
 
                 if let Some(host_key) = &self.host_key.path
-                    && let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                    }
+                    && let Ok(hostname) = &hostname
+                {
+                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
+                }
                 if let Some(pid_key) = &self.pid_key {
                     metric.replace_tag(pid_key.to_owned(), pid.clone());
                 }

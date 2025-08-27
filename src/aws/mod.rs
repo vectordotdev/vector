@@ -367,12 +367,13 @@ where
         HttpConnectorFuture::new(fut.inspect(move |result| {
             let byte_size = bytes_sent.load(Ordering::Relaxed);
             if let Ok(result) = result
-                && result.status().is_success() {
-                    emit!(AwsBytesSent {
-                        byte_size,
-                        region: Some(region),
-                    });
-                }
+                && result.status().is_success()
+            {
+                emit!(AwsBytesSent {
+                    byte_size,
+                    region: Some(region),
+                });
+            }
         }))
     }
 }

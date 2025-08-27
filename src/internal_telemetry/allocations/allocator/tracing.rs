@@ -55,16 +55,18 @@ where
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id)
-            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.enter();
-            }
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.enter();
+        }
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span_ref) = ctx.span(id)
-            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.exit();
-            }
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.exit();
+        }
     }
 
     unsafe fn downcast_raw(&self, id: TypeId) -> Option<*const ()> {

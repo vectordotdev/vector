@@ -329,9 +329,10 @@ impl Resource {
         for (key, resources) in components {
             for resource in resources {
                 if let Resource::Port(address, protocol) = &resource
-                    && address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), *address, *protocol));
-                    }
+                    && address.ip().is_unspecified()
+                {
+                    unspecified.push((key.clone(), *address, *protocol));
+                }
 
                 resource_map
                     .entry(resource)
