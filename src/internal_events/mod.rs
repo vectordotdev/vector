@@ -94,7 +94,11 @@ mod mqtt;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
-#[cfg(feature = "sources-kubernetes_logs")]
+#[cfg(any(
+    feature = "sources-kubernetes_logs",
+    feature = "transforms-log_to_metric",
+    feature = "sinks-datadog_events",
+))]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
