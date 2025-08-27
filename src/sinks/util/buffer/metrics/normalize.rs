@@ -505,11 +505,10 @@ impl MetricSet {
 
         // Remove expired entries and update memory tracking (if max_bytes is set)
         for series in expired_keys {
-            if let Some(entry) = self.inner.pop(&series) {
-                if let Some(ref mut capacity_policy) = self.capacity_policy {
+            if let Some(entry) = self.inner.pop(&series)
+                && let Some(ref mut capacity_policy) = self.capacity_policy {
                     capacity_policy.free_item(&series, &entry);
                 }
-            }
         }
     }
 
