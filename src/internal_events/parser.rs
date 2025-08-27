@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
 
 use metrics::counter;
