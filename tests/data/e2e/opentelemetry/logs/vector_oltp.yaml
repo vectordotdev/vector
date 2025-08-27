@@ -8,7 +8,7 @@ sources:
       keepalive:
         max_connection_age_jitter_factor: 0.1
         max_connection_age_secs: 300
-    use_otlp_decoding: true
+    use_oltp_decoding: true
 
   internal_metrics:
     type: internal_metrics
@@ -16,7 +16,8 @@ sources:
 
 sinks:
   otel_sink:
-    inputs: [ "source0.logs" ]
+    inputs:
+      - source0.logs
     type: opentelemetry
     protocol:
       type: http
@@ -36,7 +37,7 @@ sinks:
     type: file
     path: "/output/vector-file-sink.log"
     inputs:
-      - remap_otel
+      - source0.logs
     encoding:
       codec: json
 
