@@ -1,14 +1,14 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use vector_lib::configurable::configurable_component;
 use vector_lib::config::LegacyKey;
+use vector_lib::configurable::configurable_component;
 
 use super::BuildError;
 
 /// Configuration for the `windows_eventlog` source.
 #[configurable_component(source(
-    "windows_eventlog", 
+    "windows_eventlog",
     "Collect logs from Windows Event Log channels using the Windows Event Log API."
 ))]
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -27,7 +27,9 @@ pub struct WindowsEventLogConfig {
     /// Allows filtering events using XML Path Language queries.
     /// If not specified, all events from the specified channels will be collected.
     #[configurable(metadata(docs::examples = "*[System[Level=1 or Level=2 or Level=3]]"))]
-    #[configurable(metadata(docs::examples = "*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]"))]
+    #[configurable(metadata(
+        docs::examples = "*[System[(Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= 86400000]]]"
+    ))]
     pub event_query: Option<String>,
 
     /// Polling interval in seconds for reading events.
@@ -311,7 +313,7 @@ mod tests {
     #[test]
     fn test_config_validation() {
         let mut config = WindowsEventLogConfig::default();
-        
+
         // Valid configuration should pass
         assert!(config.validate().is_ok());
 
@@ -387,13 +389,16 @@ mod tests {
 
         // Should serialize and deserialize without errors
         let serialized = serde_json::to_string(&config).expect("serialization should succeed");
-        let deserialized: WindowsEventLogConfig = 
+        let deserialized: WindowsEventLogConfig =
             serde_json::from_str(&serialized).expect("deserialization should succeed");
-        
+
         assert_eq!(config.channels, deserialized.channels);
         assert_eq!(config.event_query, deserialized.event_query);
         assert_eq!(config.poll_interval_secs, deserialized.poll_interval_secs);
-        assert_eq!(config.read_existing_events, deserialized.read_existing_events);
+        assert_eq!(
+            config.read_existing_events,
+            deserialized.read_existing_events
+        );
         assert_eq!(config.batch_size, deserialized.batch_size);
     }
 }

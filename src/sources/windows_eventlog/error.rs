@@ -1,5 +1,5 @@
-use std::fmt;
 use snafu::Snafu;
+use std::fmt;
 
 /// Errors that can occur when working with Windows Event Logs.
 #[derive(Debug, Snafu)]
@@ -46,60 +46,40 @@ pub enum WindowsEventLogError {
     },
 
     #[snafu(display("Failed to parse event XML: {}", source))]
-    ParseXmlError {
-        source: quick_xml::Error,
-    },
+    ParseXmlError { source: quick_xml::Error },
 
     #[snafu(display("Invalid XPath query '{}': {}", query, message))]
-    InvalidXPathQuery {
-        query: String,
-        message: String,
-    },
+    InvalidXPathQuery { query: String, message: String },
 
-    #[snafu(display("Access denied to channel '{}'. Administrator privileges may be required", channel))]
-    AccessDeniedError {
-        channel: String,
-    },
+    #[snafu(display(
+        "Access denied to channel '{}'. Administrator privileges may be required",
+        channel
+    ))]
+    AccessDeniedError { channel: String },
 
     #[snafu(display("Channel '{}' not found", channel))]
-    ChannelNotFoundError {
-        channel: String,
-    },
+    ChannelNotFoundError { channel: String },
 
     #[snafu(display("Invalid event bookmark: {}", message))]
-    InvalidBookmarkError {
-        message: String,
-    },
+    InvalidBookmarkError { message: String },
 
     #[snafu(display("Bookmark persistence error: {}", message))]
-    BookmarkPersistenceError {
-        message: String,
-    },
+    BookmarkPersistenceError { message: String },
 
     #[snafu(display("I/O error: {}", source))]
-    IoError {
-        source: std::io::Error,
-    },
+    IoError { source: std::io::Error },
 
     #[snafu(display("Event filtering error: {}", message))]
-    FilterError {
-        message: String,
-    },
+    FilterError { message: String },
 
     #[snafu(display("Configuration error: {}", message))]
-    ConfigError {
-        message: String,
-    },
+    ConfigError { message: String },
 
     #[snafu(display("System resource exhausted: {}", message))]
-    ResourceExhaustedError {
-        message: String,
-    },
+    ResourceExhaustedError { message: String },
 
     #[snafu(display("Operation timeout after {} seconds", timeout_secs))]
-    TimeoutError {
-        timeout_secs: u64,
-    },
+    TimeoutError { timeout_secs: u64 },
 
     #[cfg(not(windows))]
     #[snafu(display("Windows Event Log functionality is only available on Windows"))]
@@ -111,27 +91,25 @@ impl WindowsEventLogError {
     pub fn is_recoverable(&self) -> bool {
         match self {
             // Network/connection issues are typically recoverable
-            Self::QueryEventsError { .. } |
-            Self::ReadEventError { .. } |
-            Self::ResourceExhaustedError { .. } |
-            Self::TimeoutError { .. } => true,
+            Self::QueryEventsError { .. }
+            | Self::ReadEventError { .. }
+            | Self::ResourceExhaustedError { .. }
+            | Self::TimeoutError { .. } => true,
 
             // Configuration and permission issues are not recoverable
-            Self::OpenChannelError { .. } |
-            Self::CreateSubscriptionError { .. } |
-            Self::AccessDeniedError { .. } |
-            Self::ChannelNotFoundError { .. } |
-            Self::InvalidXPathQuery { .. } |
-            Self::ConfigError { .. } |
-            Self::InvalidBookmarkError { .. } => false,
+            Self::OpenChannelError { .. }
+            | Self::CreateSubscriptionError { .. }
+            | Self::AccessDeniedError { .. }
+            | Self::ChannelNotFoundError { .. }
+            | Self::InvalidXPathQuery { .. }
+            | Self::ConfigError { .. }
+            | Self::InvalidBookmarkError { .. } => false,
 
             // Parsing errors might be recoverable depending on the specific error
-            Self::ParseXmlError { .. } |
-            Self::RenderMessageError { .. } => false,
+            Self::ParseXmlError { .. } | Self::RenderMessageError { .. } => false,
 
             // I/O and bookmark errors could be temporary
-            Self::BookmarkPersistenceError { .. } |
-            Self::IoError { .. } => true,
+            Self::BookmarkPersistenceError { .. } | Self::IoError { .. } => true,
 
             Self::FilterError { .. } => false,
 
@@ -156,13 +134,11 @@ impl WindowsEventLogError {
                 )
             }
             Self::InvalidXPathQuery { query, .. } => {
-                format!(
-                    "Invalid XPath query '{}'. Check the query syntax.",
-                    query
-                )
+                format!("Invalid XPath query '{}'. Check the query syntax.", query)
             }
             Self::ResourceExhaustedError { .. } => {
-                "System resources exhausted. Consider reducing batch_size or poll_interval_secs.".to_string()
+                "System resources exhausted. Consider reducing batch_size or poll_interval_secs."
+                    .to_string()
             }
             Self::TimeoutError { timeout_secs } => {
                 format!(
@@ -172,7 +148,8 @@ impl WindowsEventLogError {
             }
             #[cfg(not(windows))]
             Self::NotSupportedError => {
-                "Windows Event Log source is only supported on Windows operating systems.".to_string()
+                "Windows Event Log source is only supported on Windows operating systems."
+                    .to_string()
             }
             _ => self.to_string(),
         }
@@ -226,7 +203,11 @@ mod tests {
         ];
 
         for error in recoverable_errors {
-            assert!(error.is_recoverable(), "Error should be recoverable: {}", error);
+            assert!(
+                error.is_recoverable(),
+                "Error should be recoverable: {}",
+                error
+            );
         }
 
         let non_recoverable_errors = vec![
@@ -246,7 +227,11 @@ mod tests {
         ];
 
         for error in non_recoverable_errors {
-            assert!(!error.is_recoverable(), "Error should not be recoverable: {}", error);
+            assert!(
+                !error.is_recoverable(),
+                "Error should not be recoverable: {}",
+                error
+            );
         }
     }
 
@@ -276,7 +261,10 @@ mod tests {
     fn test_error_conversions() {
         let xml_error = quick_xml::Error::UnexpectedEof("test".to_string());
         let converted: WindowsEventLogError = xml_error.into();
-        assert!(matches!(converted, WindowsEventLogError::ParseXmlError { .. }));
+        assert!(matches!(
+            converted,
+            WindowsEventLogError::ParseXmlError { .. }
+        ));
 
         let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "test");
         let converted: WindowsEventLogError = io_error.into();

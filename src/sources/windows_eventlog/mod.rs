@@ -7,19 +7,21 @@ use snafu::{ResultExt, Snafu};
 use tokio::{select, sync::mpsc, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered};
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 use vrl::value::{Kind, Value};
 
 use crate::{
-    config::{SourceConfig, SourceContext, SourceOutput, DataType, log_schema},
+    SourceSender,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::LogEvent,
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 mod config;
@@ -32,9 +34,7 @@ mod tests;
 
 pub use self::config::*;
 use self::{
-    error::WindowsEventLogError,
-    parser::EventLogParser,
-    subscription::EventLogSubscription,
+    error::WindowsEventLogError, parser::EventLogParser, subscription::EventLogSubscription,
 };
 
 #[derive(Debug, Snafu)]
@@ -54,7 +54,7 @@ impl WindowsEventLogSource {
     pub fn new(config: WindowsEventLogConfig) -> crate::Result<Self> {
         // Validate configuration
         config.validate()?;
-        
+
         Ok(Self { config })
     }
 
@@ -65,7 +65,7 @@ impl WindowsEventLogSource {
     ) -> Result<(), WindowsEventLogError> {
         let mut subscription = EventLogSubscription::new(&self.config)?;
         let mut parser = EventLogParser::new(&self.config);
-        
+
         let mut events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
@@ -78,7 +78,7 @@ impl WindowsEventLogSource {
                     info!("Windows Event Log source received shutdown signal");
                     break;
                 }
-                
+
                 _ = interval_stream.next() => {
                     match subscription.poll_events().await {
                         Ok(events) => {

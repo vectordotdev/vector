@@ -5,13 +5,13 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use snafu::{ResultExt, OptionExt};
-use tokio::{fs, io::{AsyncReadExt, AsyncWriteExt}};
-
-use super::{
-    config::WindowsEventLogConfig,
-    error::*,
+use snafu::{OptionExt, ResultExt};
+use tokio::{
+    fs,
+    io::{AsyncReadExt, AsyncWriteExt},
 };
+
+use super::{config::WindowsEventLogConfig, error::*};
 
 /// Represents a Windows Event Log event
 #[derive(Debug, Clone)]
@@ -42,7 +42,7 @@ impl WindowsEvent {
     pub fn level_name(&self) -> &'static str {
         match self.level {
             1 => "Critical",
-            2 => "Error", 
+            2 => "Error",
             3 => "Warning",
             4 => "Information",
             5 => "Verbose",
@@ -98,23 +98,23 @@ impl EventLogSubscription {
 
             let mut all_events = Vec::new();
             let max_events = self.config.batch_size as usize;
-            
+
             for channel in &self.config.channels {
                 let events = self.poll_channel_events(channel, max_events).await?;
                 all_events.extend(events);
-                
+
                 if all_events.len() >= max_events {
                     all_events.truncate(max_events);
                     break;
                 }
             }
-            
+
             // Filter events based on configuration
             let filtered_events = self.filter_events(all_events)?;
-            
+
             // Update bookmarks for processed events
             self.update_bookmarks(&filtered_events).await?;
-            
+
             Ok(filtered_events)
         }
     }
@@ -126,11 +126,11 @@ impl EventLogSubscription {
         max_events: usize,
     ) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
         use windows::{
-            core::HSTRING,
             Win32::System::EventLog::{
-                EvtNext, EvtQuery, EvtQueryChannelPath, EvtQueryForwardDirection,
-                EvtRender, EvtRenderEventXml, EvtClose, EVT_HANDLE,
+                EVT_HANDLE, EvtClose, EvtNext, EvtQuery, EvtQueryChannelPath,
+                EvtQueryForwardDirection, EvtRender, EvtRenderEventXml,
             },
+            core::HSTRING,
         };
 
         let channel_hstring = HSTRING::from(channel);
@@ -150,10 +150,10 @@ impl EventLogSubscription {
 
         let mut events = Vec::new();
         let mut event_handles = vec![EVT_HANDLE::default(); max_events.min(100)];
-        
+
         loop {
             let mut returned = 0u32;
-            
+
             let result = unsafe {
                 EvtNext(
                     query_handle,
@@ -171,7 +171,7 @@ impl EventLogSubscription {
 
             for i in 0..returned as usize {
                 let event_handle = event_handles[i];
-                
+
                 match self.process_event_handle(event_handle, channel).await {
                     Ok(Some(event)) => {
                         events.push(event);
@@ -196,7 +196,7 @@ impl EventLogSubscription {
                         );
                     }
                 }
-                
+
                 unsafe { EvtClose(event_handle) };
             }
 
@@ -215,14 +215,12 @@ impl EventLogSubscription {
         event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
         channel: &str,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
-        use windows::Win32::System::EventLog::{
-            EvtRender, EvtRenderEventXml,
-        };
+        use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
 
         // Get the event XML
         let mut buffer_size = 0u32;
         let mut buffer_used = 0u32;
-        
+
         // First call to get required buffer size
         unsafe {
             EvtRender(
@@ -243,7 +241,7 @@ impl EventLogSubscription {
         }
 
         let mut buffer = vec![0u16; (buffer_size / 2) as usize];
-        
+
         let result = unsafe {
             EvtRender(
                 None,
@@ -263,7 +261,7 @@ impl EventLogSubscription {
         }
 
         let xml = String::from_utf16_lossy(&buffer[..((buffer_used / 2) as usize)]);
-        
+
         // Parse the XML to extract event data
         self.parse_event_xml(xml, channel)
     }
@@ -275,17 +273,17 @@ impl EventLogSubscription {
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         // This is a simplified parser - in a real implementation, we'd use a proper XML parser
         // For now, we'll extract basic information using string parsing
-        
+
         let record_id = Self::extract_xml_value(&xml, "RecordID")
             .unwrap_or_else(|| "0".to_string())
             .parse::<u64>()
             .unwrap_or(0);
-            
+
         let event_id = Self::extract_xml_value(&xml, "EventID")
             .unwrap_or_else(|| "0".to_string())
             .parse::<u32>()
             .unwrap_or(0);
-            
+
         let level = Self::extract_xml_value(&xml, "Level")
             .unwrap_or_else(|| "4".to_string())
             .parse::<u8>()
@@ -302,8 +300,8 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-        let time_created_str = Self::extract_xml_value(&xml, "TimeCreated")
-            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let time_created_str =
+            Self::extract_xml_value(&xml, "TimeCreated").unwrap_or_else(|| Utc::now().to_rfc3339());
         let time_created = DateTime::parse_from_rfc3339(&time_created_str)
             .unwrap_or_else(|_| Utc::now().into())
             .with_timezone(&Utc);
@@ -316,11 +314,11 @@ impl EventLogSubscription {
             }
         }
 
-        let provider_name = Self::extract_xml_value(&xml, "Provider")
-            .unwrap_or_else(|| "Unknown".to_string());
-            
-        let computer = Self::extract_xml_value(&xml, "Computer")
-            .unwrap_or_else(|| "localhost".to_string());
+        let provider_name =
+            Self::extract_xml_value(&xml, "Provider").unwrap_or_else(|| "Unknown".to_string());
+
+        let computer =
+            Self::extract_xml_value(&xml, "Computer").unwrap_or_else(|| "localhost".to_string());
 
         let process_id = Self::extract_xml_value(&xml, "ProcessID")
             .unwrap_or_else(|| "0".to_string())
@@ -349,10 +347,14 @@ impl EventLogSubscription {
             thread_id,
             activity_id: Self::extract_xml_value(&xml, "ActivityID"),
             related_activity_id: Self::extract_xml_value(&xml, "RelatedActivityID"),
-            raw_xml: if self.config.include_xml { xml } else { String::new() },
+            raw_xml: if self.config.include_xml {
+                xml
+            } else {
+                String::new()
+            },
             rendered_message: None, // Would be rendered in full implementation
             event_data: HashMap::new(), // Would be extracted from EventData section
-            user_data: HashMap::new(),  // Would be extracted from UserData section
+            user_data: HashMap::new(), // Would be extracted from UserData section
         };
 
         Ok(Some(event))
@@ -362,7 +364,7 @@ impl EventLogSubscription {
         // Simple XML value extraction - would use proper XML parser in production
         let start_tag = format!("<{}", tag);
         let end_tag = format!("</{}>", tag);
-        
+
         if let Some(start_pos) = xml.find(&start_tag) {
             if let Some(content_start) = xml[start_pos..].find('>') {
                 let content_start = start_pos + content_start + 1;
@@ -377,7 +379,7 @@ impl EventLogSubscription {
 
     fn build_xpath_query(&self, channel: &str) -> Result<String, WindowsEventLogError> {
         let mut query = "*".to_string();
-        
+
         if let Some(ref custom_query) = self.config.event_query {
             query = custom_query.clone();
         } else {
@@ -398,8 +400,8 @@ impl EventLogSubscription {
         #[cfg(windows)]
         {
             use windows::{
+                Win32::System::EventLog::{EvtClose, EvtOpenChannelEnum},
                 core::HSTRING,
-                Win32::System::EventLog::{EvtOpenChannelEnum, EvtClose},
             };
 
             // Try to enumerate channels to validate they exist
@@ -412,16 +414,19 @@ impl EventLogSubscription {
         Ok(())
     }
 
-    fn filter_events(&self, events: Vec<WindowsEvent>) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
+    fn filter_events(
+        &self,
+        events: Vec<WindowsEvent>,
+    ) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
         let mut filtered = Vec::new();
-        
+
         for event in events {
             // Apply field filtering logic here
             if self.should_include_event(&event) {
                 filtered.push(event);
             }
         }
-        
+
         Ok(filtered)
     }
 
@@ -436,7 +441,8 @@ impl EventLogSubscription {
             if let Ok(content) = fs::read_to_string(path).await {
                 for line in content.lines() {
                     if let Some((channel, bookmark)) = line.split_once('=') {
-                        self.last_bookmarks.insert(channel.trim().to_string(), bookmark.trim().to_string());
+                        self.last_bookmarks
+                            .insert(channel.trim().to_string(), bookmark.trim().to_string());
                     }
                 }
             }
@@ -444,7 +450,10 @@ impl EventLogSubscription {
         Ok(())
     }
 
-    async fn update_bookmarks(&mut self, events: &[WindowsEvent]) -> Result<(), WindowsEventLogError> {
+    async fn update_bookmarks(
+        &mut self,
+        events: &[WindowsEvent],
+    ) -> Result<(), WindowsEventLogError> {
         if let Some(ref path) = self.bookmark_file {
             if events.is_empty() {
                 return Ok(());
@@ -460,7 +469,8 @@ impl EventLogSubscription {
 
             // Update in-memory bookmarks
             for (channel, bookmark) in &channel_bookmarks {
-                self.last_bookmarks.insert(channel.to_string(), bookmark.clone());
+                self.last_bookmarks
+                    .insert(channel.to_string(), bookmark.clone());
             }
 
             // Write all bookmarks to file
@@ -475,7 +485,7 @@ impl EventLogSubscription {
                 });
             }
         }
-        
+
         Ok(())
     }
 }
@@ -516,17 +526,17 @@ mod tests {
     #[test]
     fn test_xml_value_extraction() {
         let xml = r#"<Event><System><EventID>1000</EventID><Level>2</Level></System></Event>"#;
-        
+
         assert_eq!(
-            EventLogSubscription::extract_xml_value(xml, "EventID"), 
+            EventLogSubscription::extract_xml_value(xml, "EventID"),
             Some("1000".to_string())
         );
         assert_eq!(
-            EventLogSubscription::extract_xml_value(xml, "Level"), 
+            EventLogSubscription::extract_xml_value(xml, "Level"),
             Some("2".to_string())
         );
         assert_eq!(
-            EventLogSubscription::extract_xml_value(xml, "NonExistent"), 
+            EventLogSubscription::extract_xml_value(xml, "NonExistent"),
             None
         );
     }
@@ -536,39 +546,52 @@ mod tests {
     fn test_not_supported_error() {
         let config = WindowsEventLogConfig::default();
         let result = EventLogSubscription::new(&config);
-        
-        assert!(matches!(result, Err(WindowsEventLogError::NotSupportedError)));
+
+        assert!(matches!(
+            result,
+            Err(WindowsEventLogError::NotSupportedError)
+        ));
     }
 
     #[tokio::test]
     async fn test_file_bookmark_persistence() {
         use tempfile::NamedTempFile;
-        
+
         let temp_file = NamedTempFile::new().unwrap();
         let config = WindowsEventLogConfig {
             channels: vec!["System".to_string()],
             bookmark_db_path: Some(temp_file.path().to_path_buf()),
             ..Default::default()
         };
-        
+
         let mut subscription = EventLogSubscription {
             config,
             bookmark_file: Some(temp_file.path().to_path_buf()),
             last_bookmarks: HashMap::new(),
         };
-        
+
         // Test saving bookmarks
-        subscription.last_bookmarks.insert("System".to_string(), "record:12345".to_string());
-        subscription.last_bookmarks.insert("Application".to_string(), "record:67890".to_string());
-        
+        subscription
+            .last_bookmarks
+            .insert("System".to_string(), "record:12345".to_string());
+        subscription
+            .last_bookmarks
+            .insert("Application".to_string(), "record:67890".to_string());
+
         let events = Vec::new(); // Empty events, will use existing bookmarks
         subscription.update_bookmarks(&events).await.unwrap();
-        
+
         // Test loading bookmarks
         subscription.last_bookmarks.clear();
         subscription.load_bookmarks().await.unwrap();
-        
-        assert_eq!(subscription.last_bookmarks.get("System"), Some(&"record:12345".to_string()));
-        assert_eq!(subscription.last_bookmarks.get("Application"), Some(&"record:67890".to_string()));
+
+        assert_eq!(
+            subscription.last_bookmarks.get("System"),
+            Some(&"record:12345".to_string())
+        );
+        assert_eq!(
+            subscription.last_bookmarks.get("Application"),
+            Some(&"record:67890".to_string())
+        );
     }
 }

@@ -3,16 +3,14 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use quick_xml::{Reader, events::Event as XmlEvent};
 use snafu::ResultExt;
-use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::config::{LogNamespace, log_schema};
 use vector_lib::lookup::{owned_value_path, path};
-use vrl::value::{Value, ObjectMap};
+use vrl::value::{ObjectMap, Value};
 
-use crate::{
-    event::LogEvent,
-};
+use crate::event::LogEvent;
 
 use super::{
-    config::{WindowsEventLogConfig, EventDataFormat, FieldFilter},
+    config::{EventDataFormat, FieldFilter, WindowsEventLogConfig},
     error::*,
     subscription::WindowsEvent,
 };
@@ -26,7 +24,8 @@ pub struct EventLogParser {
 impl EventLogParser {
     /// Create a new parser with the given configuration
     pub fn new(config: &WindowsEventLogConfig) -> Self {
-        let log_namespace = config.log_namespace
+        let log_namespace = config
+            .log_namespace
             .map(LogNamespace::from)
             .unwrap_or_else(|| LogNamespace::Legacy);
 
@@ -39,7 +38,7 @@ impl EventLogParser {
     /// Parse a Windows event into a Vector LogEvent
     pub fn parse_event(&self, event: WindowsEvent) -> Result<LogEvent, WindowsEventLogError> {
         let mut log_event = LogEvent::default();
-        
+
         // Set core fields based on log namespace
         match self.log_namespace {
             LogNamespace::Vector => {
@@ -68,31 +67,23 @@ impl EventLogParser {
 
         // Set timestamp
         if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.insert(
-                timestamp_key,
-                Value::Timestamp(event.time_created.into()),
-            );
+            log_event.insert(timestamp_key, Value::Timestamp(event.time_created.into()));
         }
 
         // Set message (rendered message or event data)
         if let Some(message_key) = log_schema.message_key() {
-            let message = event.rendered_message
+            let message = event
+                .rendered_message
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
-            
-            log_event.insert(
-                message_key,
-                Value::Bytes(message.into()),
-            );
+
+            log_event.insert(message_key, Value::Bytes(message.into()));
         }
 
         // Set source/host
         if let Some(host_key) = log_schema.host_key() {
-            log_event.insert(
-                host_key,
-                Value::Bytes(event.computer.clone().into()),
-            );
+            log_event.insert(host_key, Value::Bytes(event.computer.clone().into()));
         }
 
         // Set Windows-specific fields
@@ -115,11 +106,12 @@ impl EventLogParser {
         }
 
         if let Some(message_key) = log_schema.message_key() {
-            let message = event.rendered_message
+            let message = event
+                .rendered_message
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
-            
+
             log_event.insert(message_key, Value::Bytes(message.into()));
         }
 
@@ -139,30 +131,15 @@ impl EventLogParser {
         event: &WindowsEvent,
     ) -> Result<(), WindowsEventLogError> {
         // Core Windows Event Log fields
-        log_event.insert(
-            "event_id",
-            Value::Integer(event.event_id as i64),
-        );
-        
-        log_event.insert(
-            "record_id",
-            Value::Integer(event.record_id as i64),
-        );
+        log_event.insert("event_id", Value::Integer(event.event_id as i64));
 
-        log_event.insert(
-            "level",
-            Value::Bytes(event.level_name().into()),
-        );
+        log_event.insert("record_id", Value::Integer(event.record_id as i64));
 
-        log_event.insert(
-            "level_value",
-            Value::Integer(event.level as i64),
-        );
+        log_event.insert("level", Value::Bytes(event.level_name().into()));
 
-        log_event.insert(
-            "channel",
-            Value::Bytes(event.channel.clone().into()),
-        );
+        log_event.insert("level_value", Value::Integer(event.level as i64));
+
+        log_event.insert("channel", Value::Bytes(event.channel.clone().into()));
 
         log_event.insert(
             "provider_name",
@@ -170,60 +147,33 @@ impl EventLogParser {
         );
 
         if let Some(ref provider_guid) = event.provider_guid {
-            log_event.insert(
-                "provider_guid",
-                Value::Bytes(provider_guid.clone().into()),
-            );
+            log_event.insert("provider_guid", Value::Bytes(provider_guid.clone().into()));
         }
 
-        log_event.insert(
-            "computer",
-            Value::Bytes(event.computer.clone().into()),
-        );
+        log_event.insert("computer", Value::Bytes(event.computer.clone().into()));
 
         if let Some(ref user_id) = event.user_id {
-            log_event.insert(
-                "user_id",
-                Value::Bytes(user_id.clone().into()),
-            );
+            log_event.insert("user_id", Value::Bytes(user_id.clone().into()));
         }
 
-        log_event.insert(
-            "process_id",
-            Value::Integer(event.process_id as i64),
-        );
+        log_event.insert("process_id", Value::Integer(event.process_id as i64));
 
-        log_event.insert(
-            "thread_id",
-            Value::Integer(event.thread_id as i64),
-        );
+        log_event.insert("thread_id", Value::Integer(event.thread_id as i64));
 
         if event.task != 0 {
-            log_event.insert(
-                "task",
-                Value::Integer(event.task as i64),
-            );
+            log_event.insert("task", Value::Integer(event.task as i64));
         }
 
         if event.opcode != 0 {
-            log_event.insert(
-                "opcode",
-                Value::Integer(event.opcode as i64),
-            );
+            log_event.insert("opcode", Value::Integer(event.opcode as i64));
         }
 
         if event.keywords != 0 {
-            log_event.insert(
-                "keywords",
-                Value::Integer(event.keywords as i64),
-            );
+            log_event.insert("keywords", Value::Integer(event.keywords as i64));
         }
 
         if let Some(ref activity_id) = event.activity_id {
-            log_event.insert(
-                "activity_id",
-                Value::Bytes(activity_id.clone().into()),
-            );
+            log_event.insert("activity_id", Value::Bytes(activity_id.clone().into()));
         }
 
         if let Some(ref related_activity_id) = event.related_activity_id {
@@ -235,10 +185,7 @@ impl EventLogParser {
 
         // Include raw XML if requested
         if self.config.include_xml && !event.raw_xml.is_empty() {
-            log_event.insert(
-                "xml",
-                Value::Bytes(event.raw_xml.clone().into()),
-            );
+            log_event.insert("xml", Value::Bytes(event.raw_xml.clone().into()));
         }
 
         // Include event data if configured
@@ -247,10 +194,7 @@ impl EventLogParser {
             for (key, value) in &event.event_data {
                 event_data_map.insert(key.clone().into(), Value::Bytes(value.clone().into()));
             }
-            log_event.insert(
-                "event_data",
-                Value::Object(event_data_map),
-            );
+            log_event.insert("event_data", Value::Object(event_data_map));
         }
 
         // Include user data if configured
@@ -259,10 +203,7 @@ impl EventLogParser {
             for (key, value) in &event.user_data {
                 user_data_map.insert(key.clone().into(), Value::Bytes(value.clone().into()));
             }
-            log_event.insert(
-                "user_data",
-                Value::Object(user_data_map),
-            );
+            log_event.insert("user_data", Value::Object(user_data_map));
         }
 
         Ok(())
@@ -283,21 +224,15 @@ impl EventLogParser {
         )
     }
 
-    fn apply_field_filtering(
-        &self,
-        log_event: &mut LogEvent,
-    ) -> Result<(), WindowsEventLogError> {
+    fn apply_field_filtering(&self, log_event: &mut LogEvent) -> Result<(), WindowsEventLogError> {
         let filter = &self.config.field_filter;
 
         // If include_fields is specified, remove fields not in the list
         if let Some(ref include_fields) = filter.include_fields {
             let include_set: std::collections::HashSet<_> = include_fields.iter().collect();
-            
+
             // Get all current field names
-            let current_fields: Vec<String> = log_event
-                .keys()
-                .map(|k| k.to_string())
-                .collect();
+            let current_fields: Vec<String> = log_event.keys().map(|k| k.to_string()).collect();
 
             // Remove fields not in include list
             for field in current_fields {
@@ -337,23 +272,24 @@ impl EventLogParser {
         format: &EventDataFormat,
     ) -> Result<Value, WindowsEventLogError> {
         match format {
-            EventDataFormat::String => {
-                Ok(Value::Bytes(value.to_string().into()))
-            }
+            EventDataFormat::String => Ok(Value::Bytes(value.to_string().into())),
             EventDataFormat::Integer => {
                 let int_value = match value {
                     Value::Integer(i) => *i,
                     Value::Float(f) => *f as i64,
-                    Value::Bytes(b) => {
-                        String::from_utf8_lossy(b)
-                            .parse::<i64>()
-                            .map_err(|_| WindowsEventLogError::FilterError {
-                                message: format!("Cannot convert '{}' to integer", String::from_utf8_lossy(b)),
-                            })?
+                    Value::Bytes(b) => String::from_utf8_lossy(b).parse::<i64>().map_err(|_| {
+                        WindowsEventLogError::FilterError {
+                            message: format!(
+                                "Cannot convert '{}' to integer",
+                                String::from_utf8_lossy(b)
+                            ),
+                        }
+                    })?,
+                    _ => {
+                        return Err(WindowsEventLogError::FilterError {
+                            message: format!("Cannot convert {:?} to integer", value),
+                        });
                     }
-                    _ => return Err(WindowsEventLogError::FilterError {
-                        message: format!("Cannot convert {:?} to integer", value),
-                    }),
                 };
                 Ok(Value::Integer(int_value))
             }
@@ -361,16 +297,19 @@ impl EventLogParser {
                 let float_value = match value {
                     Value::Float(f) => *f,
                     Value::Integer(i) => *i as f64,
-                    Value::Bytes(b) => {
-                        String::from_utf8_lossy(b)
-                            .parse::<f64>()
-                            .map_err(|_| WindowsEventLogError::FilterError {
-                                message: format!("Cannot convert '{}' to float", String::from_utf8_lossy(b)),
-                            })?
+                    Value::Bytes(b) => String::from_utf8_lossy(b).parse::<f64>().map_err(|_| {
+                        WindowsEventLogError::FilterError {
+                            message: format!(
+                                "Cannot convert '{}' to float",
+                                String::from_utf8_lossy(b)
+                            ),
+                        }
+                    })?,
+                    _ => {
+                        return Err(WindowsEventLogError::FilterError {
+                            message: format!("Cannot convert {:?} to float", value),
+                        });
                     }
-                    _ => return Err(WindowsEventLogError::FilterError {
-                        message: format!("Cannot convert {:?} to float", value),
-                    }),
                 };
                 Ok(Value::Float(float_value.into()))
             }
@@ -382,9 +321,11 @@ impl EventLogParser {
                         let s = String::from_utf8_lossy(b).to_lowercase();
                         matches!(s.as_str(), "true" | "1" | "yes" | "on")
                     }
-                    _ => return Err(WindowsEventLogError::FilterError {
-                        message: format!("Cannot convert {:?} to boolean", value),
-                    }),
+                    _ => {
+                        return Err(WindowsEventLogError::FilterError {
+                            message: format!("Cannot convert {:?} to boolean", value),
+                        });
+                    }
                 };
                 Ok(Value::Boolean(bool_value))
             }
@@ -396,10 +337,12 @@ impl EventLogParser {
     }
 
     /// Parse XML event data section
-    pub fn parse_event_data_xml(xml: &str) -> Result<std::collections::HashMap<String, String>, WindowsEventLogError> {
+    pub fn parse_event_data_xml(
+        xml: &str,
+    ) -> Result<std::collections::HashMap<String, String>, WindowsEventLogError> {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
-        
+
         let mut event_data = std::collections::HashMap::new();
         let mut current_element = String::new();
         let mut current_name = String::new();
@@ -409,7 +352,7 @@ impl EventLogParser {
             match reader.read_event() {
                 Ok(XmlEvent::Start(ref e)) => {
                     let name = String::from_utf8_lossy(e.name().as_ref());
-                    
+
                     if name == "EventData" {
                         in_event_data = true;
                     } else if in_event_data && name == "Data" {
@@ -451,8 +394,8 @@ impl EventLogParser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use chrono::Utc;
+    use std::collections::HashMap;
 
     fn create_test_event() -> WindowsEvent {
         WindowsEvent {
@@ -493,14 +436,8 @@ mod tests {
         let log_event = parser.parse_event(event.clone()).unwrap();
 
         // Check core fields
-        assert_eq!(
-            log_event.get("event_id").unwrap(),
-            &Value::Integer(1000)
-        );
-        assert_eq!(
-            log_event.get("record_id").unwrap(),
-            &Value::Integer(12345)
-        );
+        assert_eq!(log_event.get("event_id").unwrap(), &Value::Integer(1000));
+        assert_eq!(log_event.get("record_id").unwrap(), &Value::Integer(12345));
         assert_eq!(
             log_event.get("level").unwrap(),
             &Value::Bytes("Information".into())
@@ -523,7 +460,7 @@ mod tests {
     fn test_parse_event_with_xml() {
         let mut config = WindowsEventLogConfig::default();
         config.include_xml = true;
-        
+
         let parser = EventLogParser::new(&config);
         let event = create_test_event();
 
@@ -540,7 +477,7 @@ mod tests {
     fn test_parse_event_data_filtering() {
         let mut config = WindowsEventLogConfig::default();
         config.field_filter.include_event_data = true;
-        
+
         let parser = EventLogParser::new(&config);
         let event = create_test_event();
 
@@ -557,11 +494,10 @@ mod tests {
     #[test]
     fn test_custom_formatting() {
         let mut config = WindowsEventLogConfig::default();
-        config.event_data_format.insert(
-            "event_id".to_string(), 
-            EventDataFormat::String
-        );
-        
+        config
+            .event_data_format
+            .insert("event_id".to_string(), EventDataFormat::String);
+
         let parser = EventLogParser::new(&config);
         let event = create_test_event();
 
@@ -577,11 +513,9 @@ mod tests {
     #[test]
     fn test_field_include_filtering() {
         let mut config = WindowsEventLogConfig::default();
-        config.field_filter.include_fields = Some(vec![
-            "event_id".to_string(),
-            "level".to_string(),
-        ]);
-        
+        config.field_filter.include_fields =
+            Some(vec!["event_id".to_string(), "level".to_string()]);
+
         let parser = EventLogParser::new(&config);
         let event = create_test_event();
 
@@ -597,11 +531,9 @@ mod tests {
     #[test]
     fn test_field_exclude_filtering() {
         let mut config = WindowsEventLogConfig::default();
-        config.field_filter.exclude_fields = Some(vec![
-            "raw_xml".to_string(),
-            "provider_guid".to_string(),
-        ]);
-        
+        config.field_filter.exclude_fields =
+            Some(vec!["raw_xml".to_string(), "provider_guid".to_string()]);
+
         let parser = EventLogParser::new(&config);
         let event = create_test_event();
 
@@ -629,7 +561,10 @@ mod tests {
         let event_data = EventLogParser::parse_event_data_xml(xml).unwrap();
 
         assert_eq!(event_data.get("TargetUserName"), Some(&"admin".to_string()));
-        assert_eq!(event_data.get("TargetLogonId"), Some(&"0x12345".to_string()));
+        assert_eq!(
+            event_data.get("TargetLogonId"),
+            Some(&"0x12345".to_string())
+        );
         assert_eq!(event_data.get("LogonType"), Some(&"2".to_string()));
     }
 
@@ -637,10 +572,12 @@ mod tests {
     fn test_extract_message_from_event_data() {
         let config = WindowsEventLogConfig::default();
         let parser = EventLogParser::new(&config);
-        
+
         let mut event = create_test_event();
         event.rendered_message = None;
-        event.event_data.insert("message".to_string(), "Custom message".to_string());
+        event
+            .event_data
+            .insert("message".to_string(), "Custom message".to_string());
 
         let message = parser.extract_message_from_event_data(&event);
         assert_eq!(message, "Custom message");
@@ -653,17 +590,23 @@ mod tests {
 
         // Test string conversion
         let value = Value::Integer(123);
-        let result = parser.format_value(&value, &EventDataFormat::String).unwrap();
+        let result = parser
+            .format_value(&value, &EventDataFormat::String)
+            .unwrap();
         assert_eq!(result, Value::Bytes("123".into()));
 
         // Test integer conversion
         let value = Value::Bytes("456".into());
-        let result = parser.format_value(&value, &EventDataFormat::Integer).unwrap();
+        let result = parser
+            .format_value(&value, &EventDataFormat::Integer)
+            .unwrap();
         assert_eq!(result, Value::Integer(456));
 
         // Test float conversion
         let value = Value::Bytes("123.45".into());
-        let result = parser.format_value(&value, &EventDataFormat::Float).unwrap();
+        let result = parser
+            .format_value(&value, &EventDataFormat::Float)
+            .unwrap();
         if let Value::Float(f) = result {
             assert!((f.into_inner() - 123.45).abs() < f64::EPSILON);
         } else {
@@ -672,7 +615,9 @@ mod tests {
 
         // Test boolean conversion
         let value = Value::Bytes("true".into());
-        let result = parser.format_value(&value, &EventDataFormat::Boolean).unwrap();
+        let result = parser
+            .format_value(&value, &EventDataFormat::Boolean)
+            .unwrap();
         assert_eq!(result, Value::Boolean(true));
 
         // Test auto format (no change)
