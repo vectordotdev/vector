@@ -797,3 +797,795 @@ async fn test_concurrent_channels() {
     assert!(config.validate().is_ok());
     assert_eq!(config.channels.len(), 4);
 }
+
+// ================================================================================================
+// SECURITY TESTS - Critical security attack vector validation
+// ================================================================================================
+
+#[cfg(test)]
+mod security_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// Test XPath injection attack prevention
+    #[test]
+    fn test_xpath_injection_prevention() {
+        let mut config = create_test_config();
+
+        // Test JavaScript injection attempts
+        let javascript_attacks = vec![
+            "javascript:alert('xss')",
+            "*[javascript:eval('malicious')]",
+            "System[javascript:document.write('attack')]",
+            "*[System[javascript:window.open()]]",
+        ];
+
+        for attack in javascript_attacks {
+            config.event_query = Some(attack.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "JavaScript injection '{}' should be blocked",
+                attack
+            );
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("potentially unsafe pattern"),
+                "Error should mention unsafe pattern for: {}",
+                attack
+            );
+        }
+
+        // Test VBScript injection attempts
+        let vbscript_attacks = vec![
+            "vbscript:msgbox('attack')",
+            "*[vbscript:CreateObject('Shell.Application')]",
+            "System[vbscript:eval('malicious')]",
+        ];
+
+        for attack in vbscript_attacks {
+            config.event_query = Some(attack.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "VBScript injection '{}' should be blocked",
+                attack
+            );
+        }
+
+        // Test command execution injection attempts
+        let command_attacks = vec![
+            "*[System[cmd.exe]]",
+            "System[powershell.exe]",
+            "*[exec('rm -rf /')]",
+            "System[system('del *.*')]",
+            "*[eval('malicious code')]",
+        ];
+
+        for attack in command_attacks {
+            config.event_query = Some(attack.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Command injection '{}' should be blocked",
+                attack
+            );
+        }
+
+        // Test file protocol injection attempts
+        let file_attacks = vec![
+            "file:///etc/passwd",
+            "*[file://c:/windows/system32/]",
+            "System[http://malicious.com/payload]",
+            "*[https://attacker.com/steal-data]",
+            "ftp://evil.com/backdoor",
+        ];
+
+        for attack in file_attacks {
+            config.event_query = Some(attack.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "File/URL injection '{}' should be blocked",
+                attack
+            );
+        }
+
+        // Test valid XPath queries should still work
+        let valid_queries = vec![
+            "*[System[Level=1 or Level=2]]",
+            "*[System[(Level=1 or Level=2) and TimeCreated[timediff(@SystemTime) <= 86400000]]]",
+            "*[System[Provider[@Name='Microsoft-Windows-Security-Auditing']]]",
+            "Event/System[EventID=4624]",
+        ];
+
+        for valid_query in valid_queries {
+            config.event_query = Some(valid_query.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_ok(),
+                "Valid XPath query '{}' should be allowed",
+                valid_query
+            );
+        }
+    }
+
+    /// Test path traversal attack prevention
+    #[test]
+    fn test_path_traversal_prevention() {
+        let mut config = create_test_config();
+
+        // Test directory traversal attempts
+        let traversal_attacks = vec![
+            "../../../etc/passwd",
+            "..\\..\\..\\windows\\system32\\config\\sam",
+            "/../../etc/shadow",
+            "C:\\..\\..\\..\\sensitive\\data",
+            "bookmark\\..\\..\\system\\files",
+            "./../../root/.ssh/id_rsa",
+            "..\\System32\\drivers\\etc\\hosts",
+            "/usr/../../etc/passwd",
+        ];
+
+        for attack in traversal_attacks {
+            config.bookmark_db_path = Some(PathBuf::from(attack));
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Path traversal attack '{}' should be blocked",
+                attack
+            );
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("cannot contain '..' components"),
+                "Error should mention path traversal protection for: {}",
+                attack
+            );
+        }
+
+        // Test valid paths should work
+        let valid_paths = vec![
+            "C:\\ProgramData\\vector\\winevtlog.db",
+            "/var/log/vector/bookmarks.db",
+            "./bookmarks/winevtlog.db",
+            "bookmarks.db",
+            "C:\\temp\\vector_bookmarks.sqlite",
+        ];
+
+        for valid_path in valid_paths {
+            config.bookmark_db_path = Some(PathBuf::from(valid_path));
+            let result = config.validate();
+            assert!(
+                result.is_ok(),
+                "Valid path '{}' should be allowed",
+                valid_path
+            );
+        }
+    }
+
+    /// Test malformed XPath syntax validation
+    #[test]
+    fn test_malformed_xpath_validation() {
+        let mut config = create_test_config();
+
+        // Test unbalanced brackets and parentheses
+        let malformed_xpath = vec![
+            "*[System[Level=1]", // Missing closing bracket
+            "*System[Level=1]]", // Extra closing bracket
+            "*[System(Level=1]", // Mismatched bracket/parenthesis
+            "*[System[Level=1)]]", // Mismatched parenthesis
+            "(((*[System[Level=1]))", // Unbalanced parentheses
+            "*[[[System[Level=1]", // Multiple unbalanced brackets
+            "*[System[Level=1 and Provider[@Name='Test']", // Incomplete query
+        ];
+
+        for malformed in malformed_xpath {
+            config.event_query = Some(malformed.to_string());
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Malformed XPath '{}' should be rejected",
+                malformed
+            );
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("unbalanced brackets or parentheses"),
+                "Error should mention syntax error for: {}",
+                malformed
+            );
+        }
+    }
+
+    /// Test resource exhaustion attack prevention
+    #[test]
+    fn test_resource_exhaustion_prevention() {
+        let mut config = create_test_config();
+
+        // Test excessive poll intervals (DoS prevention)
+        config.poll_interval_secs = 0;
+        assert!(
+            config.validate().is_err(),
+            "Zero poll interval should be rejected"
+        );
+
+        config.poll_interval_secs = u64::MAX;
+        assert!(
+            config.validate().is_err(),
+            "Excessive poll interval should be rejected"
+        );
+
+        config.poll_interval_secs = 7200; // 2 hours
+        assert!(
+            config.validate().is_err(),
+            "Poll interval > 3600 seconds should be rejected"
+        );
+
+        // Test excessive batch sizes (memory exhaustion prevention)
+        config.poll_interval_secs = 1; // Reset to valid value
+        config.batch_size = 0;
+        assert!(
+            config.validate().is_err(),
+            "Zero batch size should be rejected"
+        );
+
+        config.batch_size = 100000;
+        assert!(
+            config.validate().is_err(),
+            "Excessive batch size should be rejected"
+        );
+
+        // Test excessive read limits (memory exhaustion prevention)
+        config.batch_size = 10; // Reset to valid value
+        config.read_limit_bytes = 0;
+        assert!(
+            config.validate().is_err(),
+            "Zero read limit should be rejected"
+        );
+
+        config.read_limit_bytes = 1024 * 1024 * 1024; // 1GB
+        assert!(
+            config.validate().is_err(),
+            "Excessive read limit should be rejected"
+        );
+
+        // Test excessive filter list sizes (resource exhaustion prevention)
+        config.read_limit_bytes = 524_288; // Reset to valid value
+        config.ignore_event_ids = (0..2000).collect(); // 2000 IDs
+        assert!(
+            config.validate().is_err(),
+            "Excessive ignore list should be rejected"
+        );
+
+        config.ignore_event_ids = vec![]; // Reset
+        config.only_event_ids = Some((0..2000).collect()); // 2000 IDs
+        assert!(
+            config.validate().is_err(),
+            "Excessive only list should be rejected"
+        );
+
+        // Test excessive field filter lists
+        config.only_event_ids = None; // Reset
+        config.field_filter.include_fields = Some((0..200).map(|i| format!("field_{}", i)).collect());
+        assert!(
+            config.validate().is_err(),
+            "Excessive include fields should be rejected"
+        );
+
+        config.field_filter.include_fields = None; // Reset
+        config.field_filter.exclude_fields = Some((0..200).map(|i| format!("field_{}", i)).collect());
+        assert!(
+            config.validate().is_err(),
+            "Excessive exclude fields should be rejected"
+        );
+    }
+
+    /// Test channel name validation (injection prevention)
+    #[test]
+    fn test_channel_name_security_validation() {
+        let mut config = create_test_config();
+
+        // Test dangerous channel names
+        let dangerous_channels = vec![
+            "", // Empty channel
+            "   ", // Whitespace only
+            "System\0", // Null byte injection
+            "System\r\nmalicious", // CRLF injection
+            "System<script>alert('xss')</script>", // HTML injection
+            "System'; DROP TABLE events; --", // SQL injection attempt
+            "System$(malicious_command)", // Command substitution
+            "System`malicious_command`", // Command substitution
+            &"A".repeat(300), // Excessive length
+        ];
+
+        for dangerous_channel in dangerous_channels {
+            config.channels = vec!["System".to_string(), dangerous_channel.to_string()];
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Dangerous channel name '{}' should be rejected",
+                dangerous_channel.escape_debug()
+            );
+        }
+
+        // Test channel names with invalid characters
+        let invalid_char_channels = vec![
+            "System|malicious",
+            "System>redirect",
+            "System&background",
+            "System;command",
+            "System(subshell)",
+            "System{expansion}",
+            "System*wildcard",
+            "System?wildcard",
+            "System[bracket",
+            "System]bracket",
+            "System@symbol",
+            "System#hash",
+            "System%percent",
+            "System^caret",
+        ];
+
+        for invalid_channel in invalid_char_channels {
+            config.channels = vec!["System".to_string(), invalid_channel.to_string()];
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Invalid character in channel '{}' should be rejected",
+                invalid_channel
+            );
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("contains invalid characters"),
+                "Error should mention invalid characters for: {}",
+                invalid_channel
+            );
+        }
+
+        // Test valid channel names should work
+        let valid_channels = vec![
+            "System",
+            "Application",
+            "Security",
+            "Windows PowerShell",
+            "Microsoft-Windows-Security-Auditing/Operational",
+            "Custom-Application_Log",
+            "Service-Name/Admin",
+            "Application and Services Logs/Custom",
+        ];
+
+        for valid_channel in valid_channels {
+            config.channels = vec!["System".to_string(), valid_channel.to_string()];
+            let result = config.validate();
+            assert!(
+                result.is_ok(),
+                "Valid channel name '{}' should be allowed",
+                valid_channel
+            );
+        }
+    }
+
+    /// Test excessive query length prevention
+    #[test]
+    fn test_excessive_query_length_prevention() {
+        let mut config = create_test_config();
+
+        // Test query length limits
+        let long_query = "*[System[".to_string() + &"Level=1 and ".repeat(1000) + "Level=2]]";
+        config.event_query = Some(long_query);
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "Excessively long query should be rejected"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("exceeds maximum length"),
+            "Error should mention length limit"
+        );
+
+        // Test reasonable query length should work
+        let reasonable_query = "*[System[Level=1 or Level=2 or Level=3]]".to_string();
+        config.event_query = Some(reasonable_query);
+        assert!(
+            config.validate().is_ok(),
+            "Reasonable length query should be allowed"
+        );
+    }
+
+    /// Test field name validation security
+    #[test]
+    fn test_field_name_security_validation() {
+        let mut config = create_test_config();
+
+        // Test dangerous field names in include list
+        let dangerous_fields = vec![
+            "", // Empty field name
+            &"A".repeat(200), // Excessively long field name
+            "field\0null", // Null byte injection
+            "field\r\ninjection", // CRLF injection
+            "field<script>", // HTML injection attempt
+        ];
+
+        for dangerous_field in dangerous_fields {
+            config.field_filter.include_fields = Some(vec![
+                "event_id".to_string(),
+                dangerous_field.to_string(),
+            ]);
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Dangerous field name '{}' should be rejected",
+                dangerous_field.escape_debug()
+            );
+        }
+
+        // Test dangerous field names in exclude list
+        for dangerous_field in &dangerous_fields {
+            config.field_filter.include_fields = None; // Reset
+            config.field_filter.exclude_fields = Some(vec![
+                "raw_xml".to_string(),
+                dangerous_field.to_string(),
+            ]);
+            let result = config.validate();
+            assert!(
+                result.is_err(),
+                "Dangerous field name '{}' in exclude list should be rejected",
+                dangerous_field.escape_debug()
+            );
+        }
+    }
+
+    /// Test bookmark file path length validation
+    #[test]
+    fn test_bookmark_path_length_validation() {
+        let mut config = create_test_config();
+
+        // Test excessively long path
+        let long_path = "/".to_string() + &"very_long_directory_name/".repeat(50) + "bookmark.db";
+        config.bookmark_db_path = Some(PathBuf::from(long_path));
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "Excessively long bookmark path should be rejected"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("path is too long"),
+            "Error should mention path length limit"
+        );
+    }
+}
+
+// ================================================================================================
+// BUFFER OVERFLOW AND MEMORY SAFETY TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod buffer_safety_tests {
+    use super::*;
+
+    /// Test XML parsing with malicious buffer sizes
+    #[test]
+    fn test_malformed_xml_buffer_safety() {
+        // Test extremely large XML documents (should be handled gracefully)
+        let large_xml = format!(
+            "<Event><EventData>{}</EventData></Event>",
+            "<Data Name='field'>value</Data>".repeat(10000)
+        );
+
+        // This should not panic or cause memory issues
+        let result = EventLogParser::parse_event_data_xml(&large_xml);
+        
+        // Either succeeds with limited data or fails gracefully
+        match result {
+            Ok(data) => {
+                // Should have some reasonable limit on parsed data
+                assert!(data.len() <= 1000, "Should limit parsed data size");
+            }
+            Err(e) => {
+                // Should fail gracefully with appropriate error
+                assert!(
+                    e.to_string().contains("limit") || e.to_string().contains("exceeded"),
+                    "Should mention limits in error: {}",
+                    e
+                );
+            }
+        }
+    }
+
+    /// Test XML parsing with deeply nested structures
+    #[test]
+    fn test_deeply_nested_xml_protection() {
+        // Create deeply nested XML structure
+        let mut nested_xml = "<Event>".to_string();
+        for i in 0..1000 {
+            nested_xml.push_str(&format!("<Level{}>", i));
+        }
+        nested_xml.push_str("<EventData><Data Name='test'>value</Data></EventData>");
+        for i in (0..1000).rev() {
+            nested_xml.push_str(&format!("</Level{}>", i));
+        }
+        nested_xml.push_str("</Event>");
+
+        // This should not cause stack overflow or excessive memory usage
+        let result = EventLogParser::parse_event_data_xml(&nested_xml);
+        
+        // Should handle gracefully
+        match result {
+            Ok(_) => {} // OK if it parses successfully
+            Err(e) => {
+                // Should fail with appropriate error message
+                assert!(
+                    e.to_string().contains("limit") || e.to_string().contains("exceeded"),
+                    "Should mention limits for deeply nested XML: {}",
+                    e
+                );
+            }
+        }
+    }
+
+    /// Test XML with malicious entity expansion attempts
+    #[test]
+    fn test_xml_entity_expansion_protection() {
+        // Test XML with entity references that could cause expansion attacks
+        let entity_xml = r#"
+            <!DOCTYPE event [
+                <!ENTITY lol "lol">
+                <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+                <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+            ]>
+            <Event>
+                <EventData>
+                    <Data Name='attack'>&lol3;</Data>
+                </EventData>
+            </Event>
+        "#;
+
+        // Should not cause memory exhaustion
+        let result = EventLogParser::parse_event_data_xml(entity_xml);
+        
+        // Should either parse safely or reject
+        match result {
+            Ok(data) => {
+                // If parsed, should not contain expanded entities
+                if let Some(attack_data) = data.get("attack") {
+                    assert!(
+                        attack_data.len() < 1000,
+                        "Entity expansion should be limited"
+                    );
+                }
+            }
+            Err(_) => {
+                // Rejection is acceptable for entity-containing XML
+            }
+        }
+    }
+
+    /// Test handling of XML with excessive attributes
+    #[test]
+    fn test_excessive_xml_attributes_handling() {
+        // Create XML with many attributes
+        let mut xml_with_attrs = "<Event><EventData>".to_string();
+        for i in 0..5000 {
+            xml_with_attrs.push_str(&format!("<Data Name='attr{}' Value='value{}'>data{}</Data>", i, i, i));
+        }
+        xml_with_attrs.push_str("</EventData></Event>");
+
+        // Should handle gracefully without memory exhaustion
+        let result = EventLogParser::parse_event_data_xml(&xml_with_attrs);
+        
+        match result {
+            Ok(data) => {
+                // Should have reasonable limits on parsed attributes
+                assert!(data.len() <= 1000, "Should limit number of parsed attributes");
+            }
+            Err(e) => {
+                // Should fail with appropriate limit error
+                assert!(
+                    e.to_string().contains("limit") || e.to_string().contains("exceeded"),
+                    "Should mention limits in error: {}",
+                    e
+                );
+            }
+        }
+    }
+}
+
+// ================================================================================================
+// CONCURRENCY AND RACE CONDITION TESTS  
+// ================================================================================================
+
+#[cfg(test)]
+mod concurrency_tests {
+    use super::*;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    /// Test concurrent bookmark file access
+    #[tokio::test]
+    async fn test_concurrent_bookmark_access() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let bookmark_path = temp_file.path().to_path_buf();
+        
+        let config = WindowsEventLogConfig {
+            channels: vec!["System".to_string()],
+            bookmark_db_path: Some(bookmark_path.clone()),
+            ..create_test_config()
+        };
+
+        // Create multiple subscription instances that might access bookmarks concurrently
+        let subscription1 = Arc::new(Mutex::new(
+            EventLogSubscription {
+                config: config.clone(),
+                bookmark_file: Some(bookmark_path.clone()),
+                last_bookmarks: HashMap::new(),
+            }
+        ));
+
+        let subscription2 = Arc::new(Mutex::new(
+            EventLogSubscription {
+                config: config.clone(),
+                bookmark_file: Some(bookmark_path),
+                last_bookmarks: HashMap::new(),
+            }
+        ));
+
+        // Simulate concurrent bookmark operations
+        let handle1 = {
+            let sub = Arc::clone(&subscription1);
+            tokio::spawn(async move {
+                let mut s = sub.lock().await;
+                s.load_bookmarks().await
+            })
+        };
+
+        let handle2 = {
+            let sub = Arc::clone(&subscription2);
+            tokio::spawn(async move {
+                let mut s = sub.lock().await;
+                s.load_bookmarks().await
+            })
+        };
+
+        // Both operations should complete without deadlock or corruption
+        let result1 = handle1.await.unwrap();
+        let result2 = handle2.await.unwrap();
+
+        // At least one should succeed (the other might fail due to file locking)
+        assert!(
+            result1.is_ok() || result2.is_ok(),
+            "At least one bookmark operation should succeed"
+        );
+    }
+}
+
+// ================================================================================================
+// ERROR INJECTION AND FAULT TOLERANCE TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod fault_tolerance_tests {
+    use super::*;
+
+    /// Test handling of corrupted bookmark files
+    #[tokio::test]
+    async fn test_corrupted_bookmark_file_handling() {
+        use tempfile::NamedTempFile;
+        use tokio::fs;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let bookmark_path = temp_file.path().to_path_buf();
+
+        // Write corrupted data to bookmark file
+        let corrupted_data = "invalid\0bookmark\xFF\xFE\xFDdata\r\n\x00corrupt";
+        fs::write(&bookmark_path, corrupted_data).await.unwrap();
+
+        let mut subscription = EventLogSubscription {
+            config: create_test_config(),
+            bookmark_file: Some(bookmark_path),
+            last_bookmarks: HashMap::new(),
+        };
+
+        // Should handle corrupted file gracefully
+        let result = subscription.load_bookmarks().await;
+        match result {
+            Ok(()) => {
+                // Should skip invalid lines and continue
+                // Bookmarks should be empty or contain only valid entries
+            }
+            Err(e) => {
+                // Should fail with appropriate error message
+                assert!(
+                    e.to_string().contains("bookmark") || e.to_string().contains("corrupt"),
+                    "Error should mention bookmark or corruption: {}",
+                    e
+                );
+            }
+        }
+    }
+
+    /// Test handling of extremely large bookmark files
+    #[tokio::test]
+    async fn test_large_bookmark_file_handling() {
+        use tempfile::NamedTempFile;
+        use tokio::fs;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let bookmark_path = temp_file.path().to_path_buf();
+
+        // Create a very large bookmark file (2MB)
+        let large_data = "System=record:12345\n".repeat(100000);
+        fs::write(&bookmark_path, large_data).await.unwrap();
+
+        let mut subscription = EventLogSubscription {
+            config: create_test_config(),
+            bookmark_file: Some(bookmark_path),
+            last_bookmarks: HashMap::new(),
+        };
+
+        // Should reject excessively large files
+        let result = subscription.load_bookmarks().await;
+        assert!(
+            result.is_err(),
+            "Should reject excessively large bookmark files"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("too large"),
+            "Error should mention file size limit"
+        );
+    }
+
+    /// Test handling of bookmark files with excessive line counts
+    #[tokio::test]
+    async fn test_excessive_bookmark_lines_handling() {
+        use tempfile::NamedTempFile;
+        use tokio::fs;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let bookmark_path = temp_file.path().to_path_buf();
+
+        // Create bookmark file with excessive number of lines
+        let mut excessive_lines = String::new();
+        for i in 0..20000 {
+            excessive_lines.push_str(&format!("Channel{}=record:{}\n", i, i));
+        }
+        fs::write(&bookmark_path, excessive_lines).await.unwrap();
+
+        let mut subscription = EventLogSubscription {
+            config: create_test_config(),
+            bookmark_file: Some(bookmark_path),
+            last_bookmarks: HashMap::new(),
+        };
+
+        // Should reject files with too many lines
+        let result = subscription.load_bookmarks().await;
+        assert!(
+            result.is_err(),
+            "Should reject bookmark files with excessive line count"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("too many lines"),
+            "Error should mention line count limit"
+        );
+    }
+}
