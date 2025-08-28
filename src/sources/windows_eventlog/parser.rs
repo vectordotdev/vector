@@ -229,20 +229,17 @@ impl EventLogParser {
 
         // If include_fields is specified, remove fields not in the list
         if let Some(ref include_fields) = filter.include_fields {
-            let include_set: std::collections::HashSet<_> = include_fields.iter().collect();
-
-            // Get all current field names
-            let current_fields: Vec<String> = log_event.keys().map(|k| k.to_string()).collect();
-
-            // Remove fields not in include list
-            for field in current_fields {
-                if !include_set.contains(&field.as_str()) {
-                    log_event.remove(&field);
-                }
+            // Pre-allocate HashSet with known capacity for better performance
+            let mut include_set = std::collections::HashSet::with_capacity(include_fields.len());
+            for field in include_fields {
+                include_set.insert(field.as_str());
             }
+
+            // Use retain instead of collecting and iterating to reduce allocations
+            log_event.retain(|key, _| include_set.contains(key.as_str()));
         }
 
-        // Remove fields in exclude_fields list
+        // Remove fields in exclude_fields list - single pass removal
         if let Some(ref exclude_fields) = filter.exclude_fields {
             for field in exclude_fields {
                 log_event.remove(field);
@@ -336,55 +333,75 @@ impl EventLogParser {
         }
     }
 
-    /// Parse XML event data section
+    /// Parse XML event data section with performance optimizations
     pub fn parse_event_data_xml(
         xml: &str,
     ) -> Result<std::collections::HashMap<String, String>, WindowsEventLogError> {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
 
-        let mut event_data = std::collections::HashMap::new();
-        let mut current_element = String::new();
+        // Pre-allocate HashMap with reasonable capacity
+        let mut event_data = std::collections::HashMap::with_capacity(16);
         let mut current_name = String::new();
         let mut in_event_data = false;
+        let mut in_data_element = false;
+
+        // Reuse buffer for better memory efficiency
+        let mut buf = Vec::with_capacity(1024);
+
+        // Add DoS protection - limit iterations
+        const MAX_ITERATIONS: usize = 1000;
+        let mut iterations = 0;
 
         loop {
-            match reader.read_event() {
-                Ok(XmlEvent::Start(ref e)) => {
-                    let name = String::from_utf8_lossy(e.name().as_ref());
+            if iterations >= MAX_ITERATIONS {
+                return Err(WindowsEventLogError::FilterError {
+                    message: "XML parsing iteration limit exceeded".to_string(),
+                });
+            }
+            iterations += 1;
 
-                    if name == "EventData" {
+            match reader.read_event_into(&mut buf) {
+                Ok(XmlEvent::Start(ref e)) => {
+                    let name = e.name().as_ref();
+
+                    if name == b"EventData" {
                         in_event_data = true;
-                    } else if in_event_data && name == "Data" {
-                        // Extract the Name attribute
+                    } else if in_event_data && name == b"Data" {
+                        in_data_element = true;
+                        current_name.clear();
+
+                        // Extract the Name attribute efficiently
                         for attr in e.attributes() {
                             let attr = attr.map_err(WindowsEventLogError::ParseXmlError)?;
                             if attr.key.as_ref() == b"Name" {
-                                current_name = String::from_utf8_lossy(&attr.value).to_string();
+                                // Avoid allocation by writing directly to our string
+                                current_name = String::from_utf8_lossy(&attr.value).into_owned();
                                 break;
                             }
                         }
                     }
-                    current_element = name.to_string();
                 }
                 Ok(XmlEvent::End(ref e)) => {
-                    let name = String::from_utf8_lossy(e.name().as_ref());
-                    if name == "EventData" {
+                    let name = e.name().as_ref();
+                    if name == b"EventData" {
                         in_event_data = false;
+                    } else if name == b"Data" {
+                        in_data_element = false;
                     }
-                    current_element.clear();
                 }
                 Ok(XmlEvent::Text(ref e)) => {
-                    if in_event_data && current_element == "Data" && !current_name.is_empty() {
+                    if in_event_data && in_data_element && !current_name.is_empty() {
                         let value = e.unescape().map_err(WindowsEventLogError::ParseXmlError)?;
-                        event_data.insert(current_name.clone(), value.to_string());
-                        current_name.clear();
+                        event_data.insert(std::mem::take(&mut current_name), value.into_owned());
                     }
                 }
                 Ok(XmlEvent::Eof) => break,
                 Err(e) => return Err(WindowsEventLogError::ParseXmlError { source: e }),
                 _ => {}
             }
+
+            buf.clear();
         }
 
         Ok(event_data)
