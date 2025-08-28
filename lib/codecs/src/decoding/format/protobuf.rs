@@ -12,6 +12,10 @@ use vector_core::{
     event::Event,
     schema,
 };
+use vrl::protobuf::{
+    descriptor::get_message_descriptor,
+    parse::{Options, proto_to_value},
+};
 use vrl::value::Kind;
 
 use super::Deserializer;
@@ -100,8 +104,11 @@ impl Deserializer for ProtobufDeserializer {
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
             .map_err(|error| format!("Error parsing protobuf: {error:?}"))?;
 
-        let proto_vrl =
-            vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;
+        let proto_vrl = proto_to_value(
+            &prost_reflect::Value::Message(dynamic_message),
+            None,
+            &Options::default(),
+        )?;
         let mut event = Event::Log(LogEvent::from(proto_vrl));
         let event = match log_namespace {
             LogNamespace::Vector => event,
@@ -124,10 +131,8 @@ impl Deserializer for ProtobufDeserializer {
 impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
-        let message_descriptor = vrl::protobuf::get_message_descriptor(
-            &config.protobuf.desc_file,
-            &config.protobuf.message_type,
-        )?;
+        let message_descriptor =
+            get_message_descriptor(&config.protobuf.desc_file, &config.protobuf.message_type)?;
         Ok(Self::new(message_descriptor))
     }
 }
@@ -153,8 +158,7 @@ mod tests {
         validate_log: fn(&LogEvent),
     ) {
         let input = Bytes::from(protobuf_bin_message);
-        let message_descriptor =
-            vrl::protobuf::get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
+        let message_descriptor = get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
         let deserializer = ProtobufDeserializer::new(message_descriptor);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
@@ -250,7 +254,7 @@ mod tests {
     #[test]
     fn deserialize_error_invalid_protobuf() {
         let input = Bytes::from("{ foo");
-        let message_descriptor = vrl::protobuf::get_message_descriptor(
+        let message_descriptor = get_message_descriptor(
             &test_data_dir().join("protos/test_protobuf.desc"),
             "test_protobuf.Person",
         )
