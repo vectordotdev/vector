@@ -380,15 +380,15 @@ mod test {
                 COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
                 assert_source_error,
             },
-            random_string, send_lines, send_lines_tls,
+            random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
     };
 
     type Guard<'a> = MutexGuard<'a, ()>;
 
-    async fn wait_for_tcp<'a>(guard: Guard<'a>, addr: SocketAddr) {
-        crate::test_util::wait_for_tcp(addr).await;
+    async fn wait_for_tcp_and_release<'a>(guard: Guard<'a>, addr: SocketAddr) {
+        wait_for_tcp(addr).await;
         drop(guard) // Now we're sure the socket was bound by the server and we can release the lock
     }
 
@@ -480,7 +480,7 @@ mod test {
                 .unwrap();
             tokio::spawn(server);
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
 
             let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
                 .await
@@ -508,7 +508,7 @@ mod test {
                 .unwrap();
             tokio::spawn(server);
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
 
             let addr = send_lines(addr, vec!["test".to_owned()].into_iter())
                 .await
@@ -547,7 +547,7 @@ mod test {
                 .unwrap();
             tokio::spawn(server);
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
 
             send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
                 .await
@@ -580,7 +580,7 @@ mod test {
                 .unwrap();
             tokio::spawn(server);
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
             send_lines(addr, vec!["test".to_owned()].into_iter())
                 .await
                 .unwrap();
@@ -617,7 +617,7 @@ mod test {
                 "more short".to_owned(),
             ];
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
             send_lines(addr, lines.into_iter()).await.unwrap();
 
             let event = rx.next().await.unwrap();
@@ -664,7 +664,7 @@ mod test {
 
             let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
             send_lines_tls(
                 addr,
                 "localhost".into(),
@@ -729,7 +729,7 @@ mod test {
 
             let lines = vec!["one line".to_owned(), "another line".to_owned()];
 
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
             send_lines_tls(
                 addr,
                 "localhost".into(),
@@ -790,7 +790,7 @@ mod test {
             let source_handle = tokio::spawn(server);
 
             // Send data to Source.
-            wait_for_tcp(guard, addr).await;
+            wait_for_tcp_and_release(guard, addr).await;
             send_lines(addr, vec!["test".to_owned()].into_iter())
                 .await
                 .unwrap();
@@ -836,7 +836,7 @@ mod test {
 
         // Spawn the source task and wait until we're sure it's listening:
         let source_handle = tokio::spawn(source_task);
-        wait_for_tcp(guard, addr).await;
+        wait_for_tcp_and_release(guard, addr).await;
 
         // Now we create a TCP _sink_ which we'll feed with an infinite stream of events to ship to
         // our TCP source.  This will ensure that our TCP source is fully-loaded as we try to shut
@@ -910,7 +910,7 @@ mod test {
 
         // Spawn the source task and wait until we're sure it's listening:
         drop(tokio::spawn(source_task));
-        wait_for_tcp(guard, addr).await;
+        wait_for_tcp_and_release(guard, addr).await;
 
         let mut stream: TcpStream = TcpStream::connect(addr)
             .await
