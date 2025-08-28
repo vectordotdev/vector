@@ -209,7 +209,7 @@ generated: configuration: configuration: {
 			}
 			ttl_field: {
 				type: string: default: ""
-				description:   "Field to read from the incoming value to use as TTL override."
+				description:   "Field in the incoming value used as the TTL override."
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
