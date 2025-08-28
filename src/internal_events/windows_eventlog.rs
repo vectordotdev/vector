@@ -6,7 +6,7 @@ use metrics::counter;
 use tracing::{debug, error, info, trace, warn};
 use vector_lib::emit;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
 #[cfg(all(windows, feature = "sources-windows_eventlog"))]
 use crate::sources::windows_eventlog::error::WindowsEventLogError;
@@ -20,8 +20,12 @@ pub struct WindowsEventLogSubscriptionStarted<'a> {
 impl<'a> InternalEvent for WindowsEventLogSubscriptionStarted<'a> {
     fn emit(self) {
         let channels_str = self.channels.join(", ");
-        let mode = if self.use_subscription { "subscription" } else { "polling" };
-        
+        let mode = if self.use_subscription {
+            "subscription"
+        } else {
+            "polling"
+        };
+
         info!(
             message = "Windows Event Log subscription started.",
             channels = %channels_str,
@@ -30,7 +34,8 @@ impl<'a> InternalEvent for WindowsEventLogSubscriptionStarted<'a> {
         counter!(
             "windows_eventlog_subscription_started_total",
             "mode" => mode,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -43,7 +48,7 @@ pub struct WindowsEventLogSubscriptionStopped<'a> {
 impl<'a> InternalEvent for WindowsEventLogSubscriptionStopped<'a> {
     fn emit(self) {
         let channels_str = self.channels.join(", ");
-        
+
         info!(
             message = "Windows Event Log subscription stopped.",
             channels = %channels_str,
@@ -93,11 +98,16 @@ impl InternalEvent for WindowsEventLogChannelClosed {
                 );
             }
         }
-        let with_error = if self.error.is_some() { "true" } else { "false" };
+        let with_error = if self.error.is_some() {
+            "true"
+        } else {
+            "false"
+        };
         counter!(
             "windows_eventlog_channel_closed_total",
             "with_error" => with_error,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -163,7 +173,8 @@ impl InternalEvent for WindowsEventLogParseError {
             "error_code" => "parse_failed",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -185,10 +196,11 @@ impl InternalEvent for WindowsEventLogPermissionError {
         );
         counter!(
             "component_errors_total",
-            "error_code" => "permission_denied", 
+            "error_code" => "permission_denied",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::RECEIVING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -211,7 +223,8 @@ impl InternalEvent for WindowsEventLogChannelNotFoundError {
             "error_code" => "channel_not_found",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::RECEIVING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -226,7 +239,7 @@ impl InternalEvent for WindowsEventLogQueryError {
     fn emit(self) {
         // Assume errors are recoverable by default
         let recoverable = true;
-        
+
         warn!(
             message = "Failed to query Windows Event Log.",
             channel = %self.channel,
@@ -238,7 +251,11 @@ impl InternalEvent for WindowsEventLogQueryError {
             stage = error_stage::RECEIVING,
             internal_log_rate_limit = true,
         );
-        let error_type_str = if recoverable { error_type::REQUEST_FAILED } else { error_type::CONDITION_FAILED };
+        let error_type_str = if recoverable {
+            error_type::REQUEST_FAILED
+        } else {
+            error_type::CONDITION_FAILED
+        };
         let recoverable_str = if recoverable { "true" } else { "false" };
         counter!(
             "component_errors_total",
@@ -246,7 +263,8 @@ impl InternalEvent for WindowsEventLogQueryError {
             "error_type" => error_type_str,
             "stage" => error_stage::RECEIVING,
             "recoverable" => recoverable_str,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -260,7 +278,7 @@ impl InternalEvent for WindowsEventLogSubscriptionError {
     fn emit(self) {
         let channels_str = self.channels.join(", ");
         let recoverable = true; // Assume recoverable
-        
+
         error!(
             message = "Windows Event Log subscription error.",
             channels = %channels_str,
@@ -270,15 +288,20 @@ impl InternalEvent for WindowsEventLogSubscriptionError {
             error_type = if recoverable { error_type::CONNECTION_FAILED } else { error_type::CONDITION_FAILED },
             stage = error_stage::RECEIVING,
         );
-        let error_type_str = if recoverable { error_type::CONNECTION_FAILED } else { error_type::CONDITION_FAILED };
+        let error_type_str = if recoverable {
+            error_type::CONNECTION_FAILED
+        } else {
+            error_type::CONDITION_FAILED
+        };
         let recoverable_str = if recoverable { "true" } else { "false" };
         counter!(
-            "component_errors_total", 
+            "component_errors_total",
             "error_code" => "subscription_failed",
             "error_type" => error_type_str,
             "stage" => error_stage::RECEIVING,
             "recoverable" => recoverable_str,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -304,7 +327,8 @@ impl InternalEvent for WindowsEventLogBookmarkError {
             "error_code" => "bookmark_failed",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -330,7 +354,8 @@ impl InternalEvent for WindowsEventLogTimeout {
             "error_code" => "timeout",
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -353,9 +378,10 @@ impl InternalEvent for WindowsEventLogResourceExhausted {
         counter!(
             "component_errors_total",
             "error_code" => "resource_exhausted",
-            "error_type" => error_type::REQUEST_FAILED, 
+            "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
-        ).increment(1);
+        )
+        .increment(1);
     }
 }
 
@@ -424,7 +450,7 @@ impl InternalEvent for WindowsEventLogBatchLimitReached {
 mod tests {
     use super::*;
     use std::time::Duration;
-    
+
     #[cfg(all(windows, feature = "sources-windows_eventlog"))]
     use crate::sources::windows_eventlog::error::WindowsEventLogError;
 
@@ -435,19 +461,19 @@ mod tests {
             channels: &channels,
             use_subscription: true,
         };
-        
+
         // Should emit without panic
         event.emit();
     }
 
-    #[test] 
+    #[test]
     fn test_subscription_stopped_event() {
         let channels = vec!["System".to_string()];
         let event = WindowsEventLogSubscriptionStopped {
             channels: &channels,
             duration: Duration::from_secs(60),
         };
-        
+
         event.emit();
     }
 
@@ -480,7 +506,7 @@ mod tests {
     fn test_parse_error() {
         let event = WindowsEventLogParseError {
             error: "Test error".to_string(),
-            channel: "System".to_string(), 
+            channel: "System".to_string(),
             event_id: Some(1000),
         };
         event.emit();
@@ -502,7 +528,7 @@ mod tests {
             query: Some("*[System]".to_string()),
             error: "Operation timed out".to_string(),
         };
-        
+
         // Should emit as warning since timeout is recoverable
         event.emit();
     }
@@ -514,7 +540,7 @@ mod tests {
             query: Some("invalid".to_string()),
             error: "Invalid XPath query syntax".to_string(),
         };
-        
+
         // Should emit as error since query error is not recoverable
         event.emit();
     }
