@@ -62,7 +62,7 @@ pub struct MemoryConfig {
     #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
-    /// Field to read from the incoming value to use as TTL override.
+    /// Field in the incoming value used as the TTL override.
     #[configurable(derived)]
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
