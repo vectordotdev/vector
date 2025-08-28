@@ -1,15 +1,14 @@
-use std::net::SocketAddr;
-
 use futures::FutureExt;
-use futures_util::{future::join, TryFutureExt};
+use futures_util::{TryFutureExt, future::join};
+use std::net::SocketAddr;
 
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 use vector_lib::{
     codecs::decoding::ProtobufDeserializer,
-    config::{log_schema, LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
-    lookup::{owned_value_path, OwnedTargetPath},
+    lookup::{OwnedTargetPath, owned_value_path},
     opentelemetry::{
         logs::{
             ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
@@ -34,17 +33,17 @@ use crate::{
     http::KeepaliveConfig,
     serde::bool_or_struct,
     sources::{
+        Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
         util::grpc::run_grpc_server_with_routes,
-        Source,
     },
 };
 
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
@@ -364,9 +363,14 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
+        let metrics_output = if self.use_oltp_decoding {
+            SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(METRICS)
+        } else {
+            SourceOutput::new_metrics().with_port(METRICS)
+        };
         vec![
             SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS),
-            SourceOutput::new_metrics().with_port(METRICS),
+            metrics_output,
             SourceOutput::new_traces().with_port(TRACES),
         ]
     }
