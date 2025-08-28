@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result};
 
