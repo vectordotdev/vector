@@ -94,6 +94,8 @@ pub mod syslog;
 pub mod vector;
 #[cfg(feature = "sources-websocket")]
 pub mod websocket;
+#[cfg(all(windows, feature = "sources-windows_eventlog"))]
+pub mod windows_eventlog;
 
 pub mod util;
 
