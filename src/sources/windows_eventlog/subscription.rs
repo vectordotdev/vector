@@ -5,6 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use quick_xml::{Reader, events::Event as XmlEvent};
 use snafu::{OptionExt, ResultExt};
 use tokio::{
     fs,
@@ -148,19 +149,34 @@ impl EventLogSubscription {
         }
         .map_err(|e| WindowsEventLogError::QueryEventsError { source: e })?;
 
-        let mut events = Vec::new();
-        let mut event_handles = vec![EVT_HANDLE::default(); max_events.min(100)];
+        // RAII wrapper for safe handle management
+        struct SafeEventHandle(EVT_HANDLE);
+        impl Drop for SafeEventHandle {
+            fn drop(&mut self) {
+                if !self.0.is_invalid() {
+                    unsafe { EvtClose(self.0) };
+                }
+            }
+        }
+
+        // Wrap query handle for automatic cleanup
+        let query_handle = SafeEventHandle(query_handle);
+        let mut events = Vec::with_capacity(max_events.min(1000)); // Pre-allocate
+
+        // Use smaller batches to prevent memory pressure
+        const BATCH_SIZE: usize = 50;
+        let mut event_handles = vec![EVT_HANDLE::default(); BATCH_SIZE];
 
         loop {
             let mut returned = 0u32;
 
             let result = unsafe {
                 EvtNext(
-                    query_handle,
+                    query_handle.0,
                     event_handles.len() as u32,
                     event_handles.as_mut_ptr(),
-                    10000, // 10 second timeout
-                    0,     // Flags
+                    5000, // 5 second timeout to prevent hanging
+                    0,    // Flags
                     &mut returned,
                 )
             };
@@ -169,43 +185,45 @@ impl EventLogSubscription {
                 break;
             }
 
-            for i in 0..returned as usize {
-                let event_handle = event_handles[i];
+            // Process handles with RAII protection
+            let safe_handles: Vec<SafeEventHandle> = (0..returned as usize)
+                .map(|i| SafeEventHandle(event_handles[i]))
+                .collect();
 
-                match self.process_event_handle(event_handle, channel).await {
+            for (i, handle_wrapper) in safe_handles.iter().enumerate() {
+                match self.process_event_handle(handle_wrapper.0, channel).await {
                     Ok(Some(event)) => {
                         events.push(event);
                         if events.len() >= max_events {
-                            // Clean up remaining handles
-                            for j in i..returned as usize {
-                                unsafe { EvtClose(event_handles[j]) };
-                            }
-                            unsafe { EvtClose(query_handle) };
                             return Ok(events);
                         }
                     }
                     Ok(None) => {
-                        // Event was filtered out
+                        // Event was filtered out - this is normal
+                        trace!(
+                            message = "Event filtered out",
+                            channel = %channel,
+                            event_index = i,
+                        );
                     }
                     Err(e) => {
                         warn!(
                             message = "Failed to process event",
                             error = %e,
                             channel = %channel,
+                            event_index = i,
                             internal_log_rate_limit = true
                         );
                     }
                 }
-
-                unsafe { EvtClose(event_handle) };
             }
+            // Handles automatically cleaned up by Drop
 
             if events.len() >= max_events {
                 break;
             }
         }
 
-        unsafe { EvtClose(query_handle) };
         Ok(events)
     }
 
@@ -216,6 +234,9 @@ impl EventLogSubscription {
         channel: &str,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
+
+        // Prevent excessive buffer allocation - limit to 1MB
+        const MAX_BUFFER_SIZE: u32 = 1024 * 1024;
 
         // Get the event XML
         let mut buffer_size = 0u32;
@@ -240,7 +261,33 @@ impl EventLogSubscription {
             });
         }
 
-        let mut buffer = vec![0u16; (buffer_size / 2) as usize];
+        // Prevent DoS attacks via excessive memory allocation with strict validation
+        if buffer_size == 0 || buffer_size > MAX_BUFFER_SIZE {
+            warn!(
+                message = "Event XML buffer size invalid, skipping event",
+                buffer_size = %buffer_size,
+                max_size = %MAX_BUFFER_SIZE,
+                channel = %channel,
+                internal_log_rate_limit = true
+            );
+            return Ok(None);
+        }
+
+        // Use checked arithmetic to prevent overflow
+        let buffer_len = match buffer_size.checked_div(2) {
+            Some(len) if len > 0 && len <= (MAX_BUFFER_SIZE / 2) => len as usize,
+            _ => {
+                warn!(
+                    message = "Invalid buffer size calculation, skipping event",
+                    buffer_size = %buffer_size,
+                    channel = %channel,
+                    internal_log_rate_limit = true
+                );
+                return Ok(None);
+            }
+        };
+        
+        let mut buffer = vec![0u16; buffer_len];
 
         let result = unsafe {
             EvtRender(
@@ -255,12 +302,40 @@ impl EventLogSubscription {
         };
 
         if !result.as_bool() {
+            let last_error = windows::core::Error::from_win32();
             return Err(WindowsEventLogError::ReadEventError {
-                source: windows::core::Error::from_win32(),
+                source: last_error,
             });
         }
 
-        let xml = String::from_utf16_lossy(&buffer[..((buffer_used / 2) as usize)]);
+        // Additional safety check: ensure buffer_used doesn't exceed allocated buffer
+        if buffer_used as usize > buffer_size as usize {
+            warn!(
+                message = "Buffer overrun detected in EvtRender, skipping event",
+                buffer_used = %buffer_used,
+                buffer_size = %buffer_size,
+                channel = %channel,
+                internal_log_rate_limit = true
+            );
+            return Ok(None);
+        }
+
+        // Safely calculate buffer slice with bounds checking
+        let used_len = match buffer_used.checked_div(2) {
+            Some(len) if len <= buffer.len() as u32 => len as usize,
+            _ => {
+                warn!(
+                    message = "Invalid buffer usage calculation, skipping event",
+                    buffer_used = %buffer_used,
+                    buffer_len = %buffer.len(),
+                    channel = %channel,
+                    internal_log_rate_limit = true
+                );
+                return Ok(None);
+            }
+        };
+        
+        let xml = String::from_utf16_lossy(&buffer[..used_len]);
 
         // Parse the XML to extract event data
         self.parse_event_xml(xml, channel)
@@ -274,19 +349,18 @@ impl EventLogSubscription {
         // This is a simplified parser - in a real implementation, we'd use a proper XML parser
         // For now, we'll extract basic information using string parsing
 
+        // Safely parse numeric values with proper error handling
         let record_id = Self::extract_xml_value(&xml, "RecordID")
-            .unwrap_or_else(|| "0".to_string())
-            .parse::<u64>()
+            .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
 
         let event_id = Self::extract_xml_value(&xml, "EventID")
-            .unwrap_or_else(|| "0".to_string())
-            .parse::<u32>()
+            .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
 
         let level = Self::extract_xml_value(&xml, "Level")
-            .unwrap_or_else(|| "4".to_string())
-            .parse::<u8>()
+            .and_then(|s| s.parse::<u8>().ok())
+            .filter(|&l| l <= 5) // Validate level is within expected range
             .unwrap_or(4);
 
         // Apply event ID filters
@@ -300,11 +374,30 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-        let time_created_str =
-            Self::extract_xml_value(&xml, "TimeCreated").unwrap_or_else(|| Utc::now().to_rfc3339());
-        let time_created = DateTime::parse_from_rfc3339(&time_created_str)
-            .unwrap_or_else(|_| Utc::now().into())
-            .with_timezone(&Utc);
+        // Safe timestamp parsing with validation
+        let time_created = match Self::extract_xml_value(&xml, "TimeCreated")
+            .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+        {
+            Some(dt) => {
+                // Validate timestamp is reasonable (not too far in future/past)
+                let now = Utc::now();
+                let dt_utc = dt.with_timezone(&Utc);
+                let diff = (now - dt_utc).num_days().abs();
+                
+                if diff > 365 * 10 { // More than 10 years difference
+                    warn!(
+                        message = "Event timestamp seems unrealistic, using current time",
+                        event_timestamp = %dt_utc,
+                        channel = %channel,
+                        internal_log_rate_limit = true
+                    );
+                    now
+                } else {
+                    dt_utc
+                }
+            }
+            None => Utc::now(),
+        };
 
         // Apply age filter
         if let Some(max_age_secs) = self.config.max_event_age_secs {
@@ -314,20 +407,22 @@ impl EventLogSubscription {
             }
         }
 
-        let provider_name =
-            Self::extract_xml_value(&xml, "Provider").unwrap_or_else(|| "Unknown".to_string());
+        // Safe string field extraction with length validation
+        let provider_name = Self::extract_xml_value(&xml, "Provider")
+            .filter(|s| !s.is_empty() && s.len() <= 256)
+            .unwrap_or_else(|| "Unknown".to_string());
 
-        let computer =
-            Self::extract_xml_value(&xml, "Computer").unwrap_or_else(|| "localhost".to_string());
+        let computer = Self::extract_xml_value(&xml, "Computer")
+            .filter(|s| !s.is_empty() && s.len() <= 256)
+            .unwrap_or_else(|| "localhost".to_string());
 
+        // Safe numeric parsing with validation
         let process_id = Self::extract_xml_value(&xml, "ProcessID")
-            .unwrap_or_else(|| "0".to_string())
-            .parse::<u32>()
+            .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
 
         let thread_id = Self::extract_xml_value(&xml, "ThreadID")
-            .unwrap_or_else(|| "0".to_string())
-            .parse::<u32>()
+            .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
 
         let event = WindowsEvent {
@@ -360,20 +455,74 @@ impl EventLogSubscription {
         Ok(Some(event))
     }
 
+    /// Safely extract XML value using proper XML parser
     fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
-        // Simple XML value extraction - would use proper XML parser in production
-        let start_tag = format!("<{}", tag);
-        let end_tag = format!("</{}>", tag);
+        let mut reader = Reader::from_str(xml);
+        reader.trim_text(true);
 
-        if let Some(start_pos) = xml.find(&start_tag) {
-            if let Some(content_start) = xml[start_pos..].find('>') {
-                let content_start = start_pos + content_start + 1;
-                if let Some(content_end) = xml[content_start..].find(&end_tag) {
-                    let content_end = content_start + content_end;
-                    return Some(xml[content_start..content_end].trim().to_string());
-                }
+        let mut buf = Vec::new();
+        let mut inside_target = false;
+        let mut current_element = String::new();
+
+        // Limit parsing to prevent DoS attacks
+        const MAX_ITERATIONS: usize = 10000;
+        let mut iterations = 0;
+
+        loop {
+            if iterations >= MAX_ITERATIONS {
+                warn!(
+                    message = "XML parsing iteration limit exceeded",
+                    target_tag = %tag,
+                    internal_log_rate_limit = true,
+                );
+                return None;
             }
+            iterations += 1;
+
+            match reader.read_event_into(&mut buf) {
+                Ok(XmlEvent::Start(ref e)) => {
+                    let element_name = String::from_utf8_lossy(e.name().as_ref());
+                    if element_name == tag {
+                        inside_target = true;
+                        current_element.clear();
+                    }
+                }
+                Ok(XmlEvent::Text(ref e)) => {
+                    if inside_target {
+                        match e.unescape() {
+                            Ok(text) => current_element.push_str(&text),
+                            Err(_) => {
+                                warn!(
+                                    message = "Failed to unescape XML text",
+                                    target_tag = %tag,
+                                    internal_log_rate_limit = true,
+                                );
+                                return None;
+                            }
+                        }
+                    }
+                }
+                Ok(XmlEvent::End(ref e)) => {
+                    let element_name = String::from_utf8_lossy(e.name().as_ref());
+                    if element_name == tag && inside_target {
+                        return Some(current_element.trim().to_string());
+                    }
+                }
+                Ok(XmlEvent::Eof) => break,
+                Err(_) => {
+                    warn!(
+                        message = "XML parsing error",
+                        target_tag = %tag,
+                        internal_log_rate_limit = true,
+                    );
+                    return None;
+                }
+                _ => {}
+            }
+
+            buf.clear();
         }
+
         None
     }
 
@@ -438,12 +587,66 @@ impl EventLogSubscription {
 
     async fn load_bookmarks(&mut self) -> Result<(), WindowsEventLogError> {
         if let Some(ref path) = self.bookmark_file {
-            if let Ok(content) = fs::read_to_string(path).await {
-                for line in content.lines() {
-                    if let Some((channel, bookmark)) = line.split_once('=') {
-                        self.last_bookmarks
-                            .insert(channel.trim().to_string(), bookmark.trim().to_string());
+            match fs::read_to_string(path).await {
+                Ok(content) => {
+                    // Validate file size to prevent memory exhaustion
+                    if content.len() > 1024 * 1024 { // 1MB limit
+                        return Err(WindowsEventLogError::BookmarkPersistenceError {
+                            message: "Bookmark file is too large".to_string(),
+                        });
                     }
+                    
+                    let mut line_count = 0;
+                    for line in content.lines() {
+                        line_count += 1;
+                        
+                        // Prevent excessive lines
+                        if line_count > 10000 {
+                            return Err(WindowsEventLogError::BookmarkPersistenceError {
+                                message: "Bookmark file contains too many lines".to_string(),
+                            });
+                        }
+                        
+                        if let Some((channel, bookmark)) = line.split_once('=') {
+                            let channel = channel.trim();
+                            let bookmark = bookmark.trim();
+                            
+                            // Validate bookmark data
+                            if channel.is_empty() || bookmark.is_empty() {
+                                continue; // Skip invalid lines
+                            }
+                            
+                            if channel.len() > 256 || bookmark.len() > 256 {
+                                warn!(
+                                    message = "Invalid bookmark data length, skipping",
+                                    channel = %channel,
+                                    internal_log_rate_limit = true
+                                );
+                                continue;
+                            }
+                            
+                            // Validate channel name format
+                            if !channel.chars().all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c)) {
+                                warn!(
+                                    message = "Invalid channel name in bookmark, skipping",
+                                    channel = %channel,
+                                    internal_log_rate_limit = true
+                                );
+                                continue;
+                            }
+                            
+                            self.last_bookmarks.insert(channel.to_string(), bookmark.to_string());
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    // File doesn't exist yet - this is OK for first run
+                    debug!("Bookmark file not found, starting fresh");
+                }
+                Err(e) => {
+                    return Err(WindowsEventLogError::BookmarkPersistenceError {
+                        message: format!("Failed to read bookmark file: {}", e),
+                    });
                 }
             }
         }
@@ -462,7 +665,7 @@ impl EventLogSubscription {
             // Group events by channel and get the latest bookmark for each
             let mut channel_bookmarks = HashMap::new();
             for event in events {
-                // Use record ID as bookmark
+                // Use record ID as bookmark with validation
                 let bookmark = format!("record:{}", event.record_id);
                 channel_bookmarks.insert(&event.channel, bookmark);
             }
@@ -473,16 +676,43 @@ impl EventLogSubscription {
                     .insert(channel.to_string(), bookmark.clone());
             }
 
-            // Write all bookmarks to file
-            let mut content = String::new();
+            // Atomic file write to prevent TOCTOU races and corruption
+            let mut content = String::with_capacity(self.last_bookmarks.len() * 64);
             for (channel, bookmark) in &self.last_bookmarks {
+                // Validate bookmark data before writing
+                if channel.len() > 256 || bookmark.len() > 256 {
+                    warn!(
+                        message = "Bookmark data too long, skipping",
+                        channel = %channel,
+                        bookmark_len = %bookmark.len(),
+                        internal_log_rate_limit = true
+                    );
+                    continue;
+                }
                 content.push_str(&format!("{}={}\n", channel, bookmark));
             }
 
-            if let Err(e) = fs::write(path, content).await {
-                return Err(WindowsEventLogError::BookmarkPersistenceError {
-                    message: format!("Failed to write bookmarks to file: {}", e),
-                });
+            // Use temporary file + rename for atomic operation
+            let temp_path = path.with_extension("tmp");
+            
+            match fs::write(&temp_path, &content).await {
+                Ok(()) => {
+                    // Atomic rename to final destination
+                    if let Err(e) = fs::rename(&temp_path, path).await {
+                        // Clean up temp file on failure
+                        let _ = fs::remove_file(&temp_path).await;
+                        return Err(WindowsEventLogError::BookmarkPersistenceError {
+                            message: format!("Failed to rename bookmark file: {}", e),
+                        });
+                    }
+                }
+                Err(e) => {
+                    // Clean up temp file on failure
+                    let _ = fs::remove_file(&temp_path).await;
+                    return Err(WindowsEventLogError::BookmarkPersistenceError {
+                        message: format!("Failed to write bookmarks to temporary file: {}", e),
+                    });
+                }
             }
         }
 

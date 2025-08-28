@@ -213,38 +213,189 @@ impl WindowsEventLogConfig {
             }));
         }
 
-        if self.poll_interval_secs == 0 {
+        // Enhanced security validation for poll intervals to prevent DoS
+        if self.poll_interval_secs == 0 || self.poll_interval_secs > 3600 {
             return Err(Box::new(BuildError::InvalidConfiguration {
-                message: "Poll interval must be greater than 0".to_string(),
+                message: "Poll interval must be between 1 and 3600 seconds".to_string(),
             }));
         }
 
-        if self.batch_size == 0 {
+        // Prevent resource exhaustion via excessive batch sizes
+        if self.batch_size == 0 || self.batch_size > 10000 {
             return Err(Box::new(BuildError::InvalidConfiguration {
-                message: "Batch size must be greater than 0".to_string(),
+                message: "Batch size must be between 1 and 10000".to_string(),
             }));
         }
 
-        if self.read_limit_bytes == 0 {
+        // Validate read limits to prevent memory exhaustion
+        if self.read_limit_bytes == 0 || self.read_limit_bytes > 100 * 1024 * 1024 {
             return Err(Box::new(BuildError::InvalidConfiguration {
-                message: "Read limit must be greater than 0".to_string(),
+                message: "Read limit must be between 1 byte and 100MB".to_string(),
             }));
         }
 
-        // Validate channels contain valid Windows Event Log channel names
+        // Enhanced channel name validation with security checks
         for channel in &self.channels {
             if channel.trim().is_empty() {
                 return Err(Box::new(BuildError::InvalidConfiguration {
                     message: "Channel names cannot be empty".to_string(),
                 }));
             }
+            
+            // Prevent excessively long channel names
+            if channel.len() > 256 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: format!("Channel name '{}' exceeds maximum length of 256 characters", channel),
+                }));
+            }
+            
+            // Validate channel name contains only safe characters
+            if !channel.chars().all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c)) {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: format!("Channel name '{}' contains invalid characters", channel),
+                }));
+            }
         }
 
-        // Validate XPath query syntax if provided
+        // Enhanced XPath query validation with injection protection
         if let Some(ref query) = self.event_query {
             if query.trim().is_empty() {
                 return Err(Box::new(BuildError::InvalidConfiguration {
                     message: "Event query cannot be empty".to_string(),
+                }));
+            }
+            
+            // Prevent excessively long XPath queries
+            if query.len() > 4096 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Event query exceeds maximum length of 4096 characters".to_string(),
+                }));
+            }
+            
+            // Check for potentially dangerous patterns that could indicate XPath injection
+            let dangerous_patterns = [
+                "javascript:", "vbscript:", "file:", "http:", "https:", "ftp:",
+                "<script", "</script", "eval(", "expression(", "document.",
+                "import ", "exec(", "system(", "cmd.exe", "powershell"
+            ];
+            
+            let query_lower = query.to_lowercase();
+            for pattern in &dangerous_patterns {
+                if query_lower.contains(pattern) {
+                    return Err(Box::new(BuildError::InvalidConfiguration {
+                        message: format!("Event query contains potentially unsafe pattern: '{}'", pattern),
+                    }));
+                }
+            }
+            
+            // Basic XPath syntax validation - check balanced brackets and parentheses
+            let mut bracket_count = 0i32;
+            let mut paren_count = 0i32;
+            for ch in query.chars() {
+                match ch {
+                    '[' => bracket_count += 1,
+                    ']' => bracket_count -= 1,
+                    '(' => paren_count += 1,
+                    ')' => paren_count -= 1,
+                    _ => {}
+                }
+                
+                // Prevent negative counts which indicate malformed syntax
+                if bracket_count < 0 || paren_count < 0 {
+                    return Err(Box::new(BuildError::InvalidConfiguration {
+                        message: "Event query has malformed syntax - unbalanced brackets or parentheses".to_string(),
+                    }));
+                }
+            }
+            
+            if bracket_count != 0 || paren_count != 0 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Event query has unbalanced brackets or parentheses".to_string(),
+                }));
+            }
+        }
+
+        // Validate event ID filter lists to prevent resource exhaustion
+        if let Some(ref event_ids) = self.only_event_ids {
+            if event_ids.is_empty() {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Only event IDs list cannot be empty when specified".to_string(),
+                }));
+            }
+            
+            if event_ids.len() > 1000 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Only event IDs list cannot contain more than 1000 entries".to_string(),
+                }));
+            }
+        }
+        
+        if self.ignore_event_ids.len() > 1000 {
+            return Err(Box::new(BuildError::InvalidConfiguration {
+                message: "Ignore event IDs list cannot contain more than 1000 entries".to_string(),
+            }));
+        }
+
+        // Validate field filter settings
+        if let Some(ref include_fields) = self.field_filter.include_fields {
+            if include_fields.is_empty() {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Include fields list cannot be empty when specified".to_string(),
+                }));
+            }
+            
+            if include_fields.len() > 100 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Include fields list cannot contain more than 100 entries".to_string(),
+                }));
+            }
+            
+            for field in include_fields {
+                if field.trim().is_empty() || field.len() > 128 {
+                    return Err(Box::new(BuildError::InvalidConfiguration {
+                        message: format!("Invalid field name: '{}'", field),
+                    }));
+                }
+            }
+        }
+
+        if let Some(ref exclude_fields) = self.field_filter.exclude_fields {
+            if exclude_fields.is_empty() {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Exclude fields list cannot be empty when specified".to_string(),
+                }));
+            }
+            
+            if exclude_fields.len() > 100 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Exclude fields list cannot contain more than 100 entries".to_string(),
+                }));
+            }
+            
+            for field in exclude_fields {
+                if field.trim().is_empty() || field.len() > 128 {
+                    return Err(Box::new(BuildError::InvalidConfiguration {
+                        message: format!("Invalid field name: '{}'", field),
+                    }));
+                }
+            }
+        }
+
+        // Validate bookmark database path for path traversal attacks
+        if let Some(ref db_path) = self.bookmark_db_path {
+            let path_str = db_path.to_string_lossy();
+            
+            // Prevent path traversal attacks
+            if path_str.contains("..") {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Bookmark database path cannot contain '..' components".to_string(),
+                }));
+            }
+            
+            // Prevent excessively long paths
+            if path_str.len() > 512 {
+                return Err(Box::new(BuildError::InvalidConfiguration {
+                    message: "Bookmark database path is too long".to_string(),
                 }));
             }
         }
