@@ -235,8 +235,6 @@ impl Deserializer for GelfDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{LazyLock, Mutex};
-
     use super::*;
     use bytes::Bytes;
     use lookup::event_path;
@@ -255,13 +253,9 @@ mod tests {
         deserializer.parse(buffer, LogNamespace::Legacy)
     }
 
-    static LOG_SCHEMA_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-
     /// Validates all the spec'd fields of GELF are deserialized correctly.
     #[test]
     fn gelf_deserialize_correctness() {
-        let _guard = LOG_SCHEMA_LOCK.lock();
-
         let add_on_int_in = "_an.add-field_int";
         let add_on_str_in = "_an.add-field_str";
 
@@ -335,8 +329,6 @@ mod tests {
     /// Validates deserialization succeeds for edge case inputs.
     #[test]
     fn gelf_deserializing_edge_cases() {
-        let _guard = LOG_SCHEMA_LOCK.lock();
-
         // timestamp is set if omitted from input
         {
             let input = json!({
