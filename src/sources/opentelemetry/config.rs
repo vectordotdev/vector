@@ -1,15 +1,15 @@
 use std::net::SocketAddr;
 
 use futures::FutureExt;
-use futures_util::{TryFutureExt, future::join};
+use futures_util::{future::join, TryFutureExt};
 
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 use vector_lib::{
     codecs::decoding::ProtobufDeserializer,
-    config::{LegacyKey, LogNamespace, log_schema},
+    config::{log_schema, LegacyKey, LogNamespace},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
-    lookup::{OwnedTargetPath, owned_value_path},
+    lookup::{owned_value_path, OwnedTargetPath},
     opentelemetry::{
         logs::{
             ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
@@ -34,17 +34,17 @@ use crate::{
     http::KeepaliveConfig,
     serde::bool_or_struct,
     sources::{
-        Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
         util::grpc::run_grpc_server_with_routes,
+        Source,
     },
 };
 
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{kind::Collection, Kind};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
@@ -78,6 +78,10 @@ pub struct OpentelemetryConfig {
     pub log_namespace: Option<bool>,
 
     /// Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
+    ///
+    /// One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OLTP format.
+    /// This means that components that work on metrics, will not be compatible with this output.
+    /// However, these events can be forwarded directly to a downstream OTEL collector.
     #[configurable(derived)]
     #[serde(default)]
     pub use_oltp_decoding: bool,

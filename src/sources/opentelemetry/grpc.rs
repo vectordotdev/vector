@@ -1,31 +1,31 @@
 use crate::sources::opentelemetry::config::METRICS;
 use crate::{
-    SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::config::{LOGS, TRACES},
+    SourceSender,
 };
 use futures::TryFutureExt;
 use prost::Message;
 use tonic::{Request, Response, Status};
-use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::codecs::decoding::format::Deserializer;
+use vector_lib::codecs::decoding::ProtobufDeserializer;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::opentelemetry::proto::collector::{
     logs::v1::{
-        ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
+        logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
     },
     metrics::v1::{
-        ExportMetricsServiceRequest, ExportMetricsServiceResponse,
-        metrics_service_server::MetricsService,
+        metrics_service_server::MetricsService, ExportMetricsServiceRequest,
+        ExportMetricsServiceResponse,
     },
     trace::v1::{
-        ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
+        trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
     },
 };
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    EstimatedJsonEncodedSizeOf,
 };
 
 #[derive(Clone)]
@@ -101,13 +101,23 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        // Protobuf deserializer doesn't support metrics.
-        let events: Vec<Event> = request
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            // Major caveat here, the output event will be logs.
+            let bytes = bytes::Bytes::from(raw_bytes);
+            deserializer
+                .parse(bytes, self.log_namespace)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
+        } else {
+            request
             .into_inner()
             .resource_metrics
             .into_iter()
             .flat_map(|v| v.into_event_iter())
-            .collect();
+                .collect()
+        };
+
         self.handle_events(events, METRICS).await?;
 
         Ok(Response::new(ExportMetricsServiceResponse {
