@@ -391,15 +391,15 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn on_retriable_error(&self, error: &Self::Error) {
-        if let RedisSinkError::SendError { source, generation } = error {
-            if matches!(
+        if let RedisSinkError::SendError { source, generation } = error
+            && matches!(
                 source.kind(),
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
-            ) {
-                self.connection.signal_broken(*generation);
-            }
+            )
+        {
+            self.connection.signal_broken(*generation);
         }
     }
 

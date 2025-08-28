@@ -69,7 +69,7 @@ impl TlsEnableableConfig {
     }
 }
 
-/// TlsEnableableConfig for `sources`, adding metadata from the client certificate.
+/// `TlsEnableableConfig` for `sources`, adding metadata from the client certificate.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
@@ -644,10 +644,10 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// file "name" contains a PEM start marker, it is assumed to contain
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
-    if let Some(filename) = filename.to_str() {
-        if filename.contains(PEM_START_MARKER) {
-            return Ok((Vec::from(filename), "inline text".into()));
-        }
+    if let Some(filename) = filename.to_str()
+        && filename.contains(PEM_START_MARKER)
+    {
+        return Ok((Vec::from(filename), "inline text".into()));
     }
 
     let mut text = Vec::<u8>::new();

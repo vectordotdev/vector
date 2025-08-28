@@ -86,10 +86,10 @@ where
     }
 
     pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
-        if let Some(sender) = &self.sender {
-            if let Err(error) = sender.send((receiver, entry)) {
-                error!(message = "FinalizerSet task ended prematurely.", %error);
-            }
+        if let Some(sender) = &self.sender
+            && let Err(error) = sender.send((receiver, entry))
+        {
+            error!(message = "FinalizerSet task ended prematurely.", %error);
         }
     }
 
