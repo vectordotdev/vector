@@ -141,6 +141,8 @@ mod websocket;
 mod websocket_server;
 #[cfg(feature = "transforms-window")]
 mod window;
+#[cfg(feature = "sources-windows_eventlog")]
+mod windows_eventlog;
 
 #[cfg(any(
     feature = "sources-file",
@@ -292,6 +294,8 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
+#[cfg(all(windows, feature = "sources-windows_eventlog"))]
+pub(crate) use self::windows_eventlog::*;
 
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
