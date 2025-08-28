@@ -4,16 +4,16 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, TraceEvent};
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
 use vrl::protobuf::descriptor::{get_message_descriptor, get_message_descriptor_from_bytes};
-use vrl::protobuf::parse::{proto_to_value, Options};
+use vrl::protobuf::parse::{Options, proto_to_value};
 use vrl::value::{Kind, Value};
 
 use super::Deserializer;
@@ -102,8 +102,7 @@ impl ProtobufDeserializer {
         message_type: &str,
         options: Options,
     ) -> vector_common::Result<Self> {
-        let message_descriptor =
-            get_message_descriptor_from_bytes(desc_bytes, message_type)?;
+        let message_descriptor = get_message_descriptor_from_bytes(desc_bytes, message_type)?;
         Ok(Self {
             message_descriptor,
             options,
@@ -162,10 +161,8 @@ impl Deserializer for ProtobufDeserializer {
 impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     type Error = vector_common::Error;
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
-        let message_descriptor = get_message_descriptor(
-            &config.protobuf.desc_file,
-            &config.protobuf.message_type,
-        )?;
+        let message_descriptor =
+            get_message_descriptor(&config.protobuf.desc_file, &config.protobuf.message_type)?;
         Ok(Self::new(message_descriptor))
     }
 }
