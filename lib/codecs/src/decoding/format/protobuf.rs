@@ -4,16 +4,16 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::event::{LogEvent, TraceEvent};
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
 use vrl::protobuf::descriptor::{get_message_descriptor, get_message_descriptor_from_bytes};
-use vrl::protobuf::parse::{proto_to_value, Options};
+use vrl::protobuf::parse::{Options, proto_to_value};
 use vrl::value::{Kind, Value};
 
 use super::Deserializer;
@@ -188,8 +188,7 @@ mod tests {
         validate_log: fn(&LogEvent),
     ) {
         let input = Bytes::from(protobuf_bin_message);
-        let message_descriptor =
-            get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
+        let message_descriptor = get_message_descriptor(&protobuf_desc_path, message_type).unwrap();
         let deserializer = ProtobufDeserializer::new(message_descriptor);
 
         for namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
