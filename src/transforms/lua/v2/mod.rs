@@ -11,7 +11,7 @@ use crate::config::{ComponentKey, OutputId};
 use crate::event::lua::event::LuaEvent;
 use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
+    config::{self, CONFIG_PATHS, DataType, Input, TransformOutput},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
@@ -255,7 +255,7 @@ impl Lua {
             let current_paths = package
                 .get::<String>("path")
                 .unwrap_or_else(|_| ";".to_string());
-            let paths = format!("{};{}", additional_paths, current_paths);
+            let paths = format!("{additional_paths};{current_paths}");
             package.set("path", paths)?;
         }
 
@@ -461,8 +461,8 @@ mod tests {
     use std::{future::Future, sync::Arc};
 
     use similar_asserts::assert_eq;
-    use tokio::sync::mpsc::{self, Receiver, Sender};
     use tokio::sync::Mutex;
+    use tokio::sync::mpsc::{self, Receiver, Sender};
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
@@ -470,8 +470,8 @@ mod tests {
     use crate::transforms::test::create_topology;
     use crate::{
         event::{
-            metric::{Metric, MetricKind, MetricValue},
             Event, LogEvent, Value,
+            metric::{Metric, MetricKind, MetricValue},
         },
         test_util,
     };
@@ -1001,8 +1001,7 @@ mod tests {
             "#,
             |tx, out| async move {
                 let n: usize = 10;
-                let events =
-                    (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
+                let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {i}"))));
                 for event in events {
                     tx.send(event).await.unwrap();
                     assert!(out.lock().await.recv().await.is_some());

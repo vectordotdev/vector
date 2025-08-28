@@ -1,24 +1,24 @@
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
-use hyper::{body, Body};
+use hyper::{Body, body};
 use serde::Deserialize;
 use snafu::ResultExt;
-use vector_lib::config::proxy::ProxyConfig;
 use vector_lib::config::LogNamespace;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
-    request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
-    InvalidHostSnafu, Request, VersionType,
+    ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request, VersionType,
+    request_builder::ElasticsearchRequestBuilder,
 };
 use crate::{
     http::{HttpClient, MaybeAuth, ParameterValue, QueryParameterValue, QueryParameters},
     sinks::{
+        HealthcheckError,
         elasticsearch::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
             OpenSearchServiceType, ParseError,
         },
-        util::{auth::Auth, http::RequestConfig, UriSerde},
-        HealthcheckError,
+        util::{UriSerde, auth::Auth, http::RequestConfig},
     },
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
@@ -93,13 +93,13 @@ impl ElasticsearchCommon {
             ))),
         );
 
-        if let Some(pipeline) = &config.pipeline {
-            if !pipeline.is_empty() {
-                query_params.insert(
-                    "pipeline".into(),
-                    QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
-                );
-            }
+        if let Some(pipeline) = &config.pipeline
+            && !pipeline.is_empty()
+        {
+            query_params.insert(
+                "pipeline".into(),
+                QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
+            );
         }
 
         let bulk_url = {
@@ -196,7 +196,9 @@ impl ElasticsearchCommon {
 
         let doc_type = config.doc_type.clone();
         let suppress_type_name = if config.suppress_type_name {
-            warn!(message = "DEPRECATION, use of deprecated option `suppress_type_name`. Please use `api_version` option instead.");
+            warn!(
+                message = "DEPRECATION, use of deprecated option `suppress_type_name`. Please use `api_version` option instead."
+            );
             config.suppress_type_name
         } else {
             version >= 7
@@ -225,7 +227,7 @@ impl ElasticsearchCommon {
     }
 
     fn check_endpoint(endpoint: &str) -> crate::Result<()> {
-        let uri = format!("{}/_test", endpoint);
+        let uri = format!("{endpoint}/_test");
         let uri = uri
             .parse::<Uri>()
             .with_context(|_| InvalidHostSnafu { host: endpoint })?;
@@ -241,7 +243,7 @@ impl ElasticsearchCommon {
     // extract the authentication from config or endpoint
     async fn extract_auth(
         config: &ElasticsearchConfig,
-        proxy_config: &ProxyConfig,
+        #[cfg_attr(not(feature = "aws-core"), allow(unused_variables))] proxy_config: &ProxyConfig,
         uri: &UriSerde,
     ) -> crate::Result<Option<Auth>> {
         let auth = match &config.auth {
@@ -292,7 +294,9 @@ impl ElasticsearchCommon {
     ) -> crate::Result<Vec<Self>> {
         let mut version = None;
         if let Some(endpoint) = config.endpoint.as_ref() {
-            warn!(message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead.");
+            warn!(
+                message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead."
+            );
             if config.endpoints.is_empty() {
                 Ok(vec![
                     Self::parse_config(config, endpoint, proxy_config, &mut version).await?,
@@ -323,7 +327,9 @@ impl ElasticsearchCommon {
 
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         if self.service_type == OpenSearchServiceType::Serverless {
-            warn!(message = "Amazon OpenSearch Serverless does not support healthchecks. Skipping healthcheck...");
+            warn!(
+                message = "Amazon OpenSearch Serverless does not support healthchecks. Skipping healthcheck..."
+            );
             Ok(())
         } else {
             match get(
@@ -393,20 +399,20 @@ async fn get_version(
         "/",
     )
     .await
-    .map_err(|error| format!("Failed to get Elasticsearch API version: {}", error))?;
+    .map_err(|error| format!("Failed to get Elasticsearch API version: {error}"))?;
 
     let (_, body) = response.into_parts();
     let mut body = body::aggregate(body).await?;
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
-    if let Some(version) = version {
-        if let Some(number) = version.number {
-            let v: Vec<&str> = number.split('.').collect();
-            if !v.is_empty() {
-                if let Ok(major_version) = v[0].parse::<usize>() {
-                    return Ok(major_version);
-                }
-            }
+    if let Some(version) = version
+        && let Some(number) = version.number
+    {
+        let v: Vec<&str> = number.split('.').collect();
+        if !v.is_empty()
+            && let Ok(major_version) = v[0].parse::<usize>()
+        {
+            return Ok(major_version);
         }
     }
     Err("Unexpected response from Elasticsearch endpoint `/`. Consider setting `api_version` option.".into())
@@ -420,7 +426,7 @@ async fn get(
     client: HttpClient,
     path: &str,
 ) -> crate::Result<Response<Body>> {
-    let mut builder = Request::get(format!("{}{}", base_url, path));
+    let mut builder = Request::get(format!("{base_url}{path}"));
 
     for (header, value) in &request.headers {
         builder = builder.header(&header[..], &value[..]);

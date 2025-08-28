@@ -2,21 +2,20 @@
 use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
-use headers::{authorization::Credentials, Authorization};
-use http::{header::AUTHORIZATION, HeaderMap, HeaderValue, StatusCode};
+use headers::{Authorization, authorization::Credentials};
+use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use serde::{
-    de::{Error, MapAccess, Visitor},
     Deserialize,
+    de::{Error, MapAccess, Visitor},
 };
 use vector_config::configurable_component;
 use vector_lib::{
-    compile_vrl,
+    TimeZone, compile_vrl,
     event::{Event, LogEvent, VrlTarget},
     sensitive_string::SensitiveString,
-    TimeZone,
 };
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, CompileConfig, Program},
+    compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
     diagnostic::Formatter,
     prelude::TypeState,
@@ -181,6 +180,7 @@ impl HttpServerAuthConfig {
 
 /// Built auth matcher with validated configuration
 /// Can be used directly in a component to validate authentication in HTTP requests
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum HttpServerAuthMatcher {
     /// Matcher for comparing exact value of Authorization header

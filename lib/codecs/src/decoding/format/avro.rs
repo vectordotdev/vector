@@ -5,10 +5,10 @@ use bytes::Bytes;
 use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::{Event, LogEvent},
     schema,
 };
@@ -41,7 +41,7 @@ impl AvroDeserializerConfig {
     /// Build the `AvroDeserializer` from this configuration.
     pub fn build(&self) -> AvroDeserializer {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {}", error))
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))
             .unwrap();
         AvroDeserializer {
             schema,
@@ -90,7 +90,7 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 #[derive(Clone, Debug)]
 pub struct AvroDeserializerOptions {
     /// The Avro schema definition.
-    /// Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+    /// **Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
     /// * `Date`
     /// * `Decimal`
     /// * `Duration`
@@ -103,7 +103,7 @@ pub struct AvroDeserializerOptions {
     ))]
     pub schema: String,
 
-    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
     /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
     pub strip_schema_id_prefix: bool,
 }

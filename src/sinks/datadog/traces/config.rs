@@ -3,13 +3,13 @@ use std::sync::{Arc, Mutex};
 use http::Uri;
 use indoc::indoc;
 use snafu::ResultExt;
-use tokio::sync::oneshot::{channel, Sender};
+use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
-use vector_lib::config::{proxy::ProxyConfig, AcknowledgementsConfig};
+use vector_lib::config::{AcknowledgementsConfig, proxy::ProxyConfig};
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    apm_stats::{flush_apm_stats_thread, Aggregator},
+    apm_stats::{Aggregator, flush_apm_stats_thread},
     service::TraceApiRetry,
 };
 use crate::common::datadog;
@@ -17,18 +17,18 @@ use crate::{
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
+        Healthcheck, UriParseSnafu, VectorSink,
         datadog::{
+            DatadogCommonConfig, LocalDatadogCommonConfig,
             traces::{
                 request_builder::DatadogTracesRequestBuilder, service::TraceApiService,
                 sink::TracesSink,
             },
-            DatadogCommonConfig, LocalDatadogCommonConfig,
         },
         util::{
-            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
-            TowerRequestConfig,
+            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt,
         },
-        Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -235,7 +235,7 @@ impl SinkConfig for DatadogTracesConfig {
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{}{}", host, endpoint)
+    let result = format!("{host}{endpoint}")
         .parse::<Uri>()
         .context(UriParseSnafu)?;
     Ok(result)

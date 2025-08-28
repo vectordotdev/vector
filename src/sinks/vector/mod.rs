@@ -41,12 +41,12 @@ mod test {
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, Bytes, BytesMut};
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{StreamExt, channel::mpsc};
     use http::request::Parts;
     use hyper::Method;
     use prost::Message;
     use vector_lib::{
-        config::{init_telemetry, Tags, Telemetry},
+        config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
     };
 
@@ -59,8 +59,8 @@ mod tests {
         sinks::util::test::build_test_server_generic,
         test_util::{
             components::{
-                run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-                DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+                DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
+                run_and_assert_sink_compliance,
             },
             next_addr, random_lines_with_stream,
         },
@@ -84,7 +84,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();
@@ -156,7 +156,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = format!(r#"address = "http://{}/""#, in_addr);
+        let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::default();

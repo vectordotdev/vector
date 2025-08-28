@@ -24,7 +24,7 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions,
+    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
 use std::fmt::Debug;
@@ -51,8 +51,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({error})"),
         }
     }
 }
@@ -105,6 +105,10 @@ pub enum FramingConfig {
     ///
     /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
     ChunkedGelf(ChunkedGelfDecoderConfig),
+
+    /// Byte frames which are prefixed by a varint indicating the length.
+    /// This is compatible with protobuf's length-delimited encoding.
+    VarintLengthDelimited(VarintLengthDelimitedDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -143,6 +147,12 @@ impl From<ChunkedGelfDecoderConfig> for FramingConfig {
     }
 }
 
+impl From<VarintLengthDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: VarintLengthDelimitedDecoderConfig) -> Self {
+        Self::VarintLengthDelimited(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
@@ -153,6 +163,9 @@ impl FramingConfig {
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
             FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
+            }
         }
     }
 }
@@ -174,6 +187,8 @@ pub enum Framer {
     Boxed(BoxedFramer),
     /// Uses a `ChunkedGelfDecoder` for framing.
     ChunkedGelf(ChunkedGelfDecoder),
+    /// Uses a `VarintLengthDelimitedDecoder` for framing.
+    VarintLengthDelimited(VarintLengthDelimitedDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -189,6 +204,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
             Framer::ChunkedGelf(framer) => framer.decode(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode(src),
         }
     }
 
@@ -201,6 +217,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
             Framer::ChunkedGelf(framer) => framer.decode_eof(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode_eof(src),
         }
     }
 }
@@ -260,7 +277,7 @@ pub enum DeserializerConfig {
     /// This codec is experimental for the following reason:
     ///
     /// The GELF specification is more strict than the actual Graylog receiver.
-    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// Vector's decoder adheres more strictly to the GELF spec, with
     /// the exception that some characters such as `@`  are allowed in field names.
     ///
     /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
@@ -468,6 +485,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.

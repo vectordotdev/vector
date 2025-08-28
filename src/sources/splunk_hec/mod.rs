@@ -12,12 +12,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{service::make_service_fn, Server};
-use serde::de::DeserializeOwned;
+use hyper::{Server, service::make_service_fn};
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{
-    de::{Read as JsonRead, StrRead},
     Deserializer, Value as JsonValue,
+    de::{Read as JsonRead, StrRead},
 };
 use snafu::Snafu;
 use tokio::net::TcpStream;
@@ -28,16 +28,16 @@ use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::lookup::{self, event_path, owned_value_path};
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
     schema::meaning,
-    EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
 use vrl::path::OwnedTargetPath;
-use vrl::value::{kind::Collection, Kind};
-use warp::http::header::{HeaderValue, CONTENT_TYPE};
-use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+use vrl::value::{Kind, kind::Collection};
+use warp::http::header::{CONTENT_TYPE, HeaderValue};
+use warp::{Filter, Reply, filters::BoxedFilter, path, reject::Rejection, reply::Response};
 
 use self::{
     acknowledgements::{
@@ -47,16 +47,16 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
+    SourceSender,
+    config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
-    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 mod acknowledgements;
@@ -426,10 +426,10 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty() {
-                            if let Err(ClosedError) = out.send_batch(events).await {
-                                return Err(Rejection::from(ApiError::ServerShutdown));
-                            }
+                        if !events.is_empty()
+                            && let Err(ClosedError) = out.send_batch(events).await
+                        {
+                            return Err(Rejection::from(ApiError::ServerShutdown));
                         }
 
                         if let Some(error) = error {
@@ -1016,16 +1016,16 @@ impl DefaultExtractor {
         }
 
         // Add data field
-        if let Some(index) = self.value.as_ref() {
-            if let Some(metadata_key) = self.to_field.path.as_ref() {
-                self.log_namespace.insert_source_metadata(
-                    SplunkConfig::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite(metadata_key)),
-                    &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
-                    index.clone(),
-                )
-            }
+        if let Some(index) = self.value.as_ref()
+            && let Some(metadata_key) = self.to_field.path.as_ref()
+        {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(metadata_key)),
+                &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
+                index.clone(),
+            )
         }
     }
 }
@@ -1296,8 +1296,8 @@ mod tests {
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
     use vector_lib::codecs::{
-        decoding::DeserializerConfig, BytesDecoderConfig, JsonSerializerConfig,
-        TextSerializerConfig,
+        BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
+        decoding::DeserializerConfig,
     };
     use vector_lib::sensitive_string::SensitiveString;
     use vector_lib::{event::EventStatus, schema::Definition};
@@ -1305,25 +1305,25 @@ mod tests {
 
     use super::*;
     use crate::{
+        SourceSender,
         codecs::{DecodingConfig, EncodingConfig},
         components::validation::prelude::*,
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        config::{SinkConfig, SinkContext, SourceConfig, SourceContext, log_schema},
         event::{Event, LogEvent},
         sinks::{
+            Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
             util::{BatchConfig, Compression, TowerRequestConfig},
-            Healthcheck, VectorSink,
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
             components::{
-                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-                HTTP_PUSH_SOURCE_TAGS,
+                COMPONENT_ERROR_TAGS, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance,
+                assert_source_error,
             },
             next_addr, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]
@@ -1346,7 +1346,7 @@ mod tests {
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin + use<>, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
@@ -1380,7 +1380,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{}", address),
+            endpoint: format!("http://{address}"),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -1465,8 +1465,8 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(format!("http://{}/{}", address, api))
-            .header("Authorization", format!("Splunk {}", token));
+            .post(format!("http://{address}/{api}"))
+            .header("Authorization", format!("Splunk {token}"));
 
         b = match opts.channel {
             Some(c) => match c {
@@ -1565,7 +1565,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_text_event_{}", i))
+            .map(|i| format!("multiple_simple_text_event_{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1618,7 +1618,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_json_event{}", i))
+            .map(|i| format!("multiple_simple_json_event{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1902,7 +1902,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(format!("http://{}/services/collector/health", address))
+            .get(format!("http://{address}/services/collector/health"))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1916,7 +1916,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(format!("http://{}/services/collector/health", address))
+            .get(format!("http://{address}/services/collector/health"))
             .send()
             .await
             .unwrap();
@@ -2142,7 +2142,7 @@ mod tests {
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
-            .header("Authorization", format!("Splunk {}", TOKEN))
+            .header("Authorization", format!("Splunk {TOKEN}"))
             .body::<&[u8]>(message);
 
         assert_eq!(200, b.send().await.unwrap().status().as_u16());
@@ -2252,10 +2252,12 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
-            assert!(event
-                .as_log()
-                .get((PathPrefix::Event, log_schema().host_key().unwrap()))
-                .is_none());
+            assert!(
+                event
+                    .as_log()
+                    .get((PathPrefix::Event, log_schema().host_key().unwrap()))
+                    .is_none()
+            );
         })
         .await;
     }
@@ -2555,8 +2557,8 @@ mod tests {
         .unwrap();
 
         let res = reqwest::Client::new()
-            .post(format!("http://{}/services/collector/ack", address))
-            .header("Authorization", format!("Splunk {}", TOKEN))
+            .post(format!("http://{address}/services/collector/ack"))
+            .header("Authorization", format!("Splunk {TOKEN}"))
             .header("x-splunk-request-channel", "guid")
             .header("Content-Type", "application/json; some-random-text; hello")
             .body(body)

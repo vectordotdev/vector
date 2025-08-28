@@ -12,17 +12,17 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
+    EventDataEq,
     byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
     request_metadata::GetEventCountTags,
-    EventDataEq,
 };
 use vector_config::configurable_component;
 
 use super::{
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-    EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
 
@@ -667,7 +667,7 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
 mod test {
     use std::collections::BTreeSet;
 
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use similar_asserts::assert_eq;
 
     use super::*;

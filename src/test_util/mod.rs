@@ -3,25 +3,25 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
-    future::{ready, Future},
+    future::{Future, ready},
     io::Read,
     iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use chrono::{DateTime, SubsecRound, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, stream, task::noop_waker_ref};
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
@@ -29,7 +29,7 @@ use tokio::{
     runtime,
     sync::oneshot,
     task::JoinHandle,
-    time::{sleep, Duration, Instant},
+    time::{Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
@@ -75,7 +75,7 @@ pub mod integration;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
-    ($e:expr, $t:ty, $v:pat) => {{
+    ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
@@ -85,7 +85,7 @@ macro_rules! assert_downcast_matches {
 
 #[macro_export]
 macro_rules! log_event {
-    ($($key:expr => $value:expr),*  $(,)?) => {
+    ($($key:expr_2021 => $value:expr_2021),*  $(,)?) => {
         #[allow(unused_variables)]
         {
             let mut event = $crate::event::Event::Log($crate::event::LogEvent::default());
@@ -105,7 +105,7 @@ where
     let cfg = toml::to_string(&T::generate_config()).unwrap();
 
     toml::from_str::<T>(&cfg)
-        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{}\n'{}'", e, cfg));
+        .unwrap_or_else(|e| panic!("Invalid config generated from string:\n\n{e}\n'{cfg}'"));
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {

@@ -13,7 +13,7 @@ use crate::{
         TlsSnafu,
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    sinks::{mqtt::sink::MqttSink, prelude::*, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
     tls::MaybeTlsSettings,
 };
 
@@ -148,6 +148,7 @@ impl MqttSinkConfig {
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(TlsSnafu)?;
         let mut options = MqttOptions::new(&client_id, &self.common.host, self.common.port);
         options.set_keep_alive(Duration::from_secs(self.common.keep_alive.into()));
+        options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
         options.set_clean_session(self.clean_session);
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {

@@ -9,9 +9,8 @@ use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, schema, BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config,
-    EnrichmentTableOuter, HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
+    HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter, compiler, schema,
 };
 
 /// A complete Vector configuration.
@@ -231,22 +230,22 @@ impl ConfigBuilder {
 
         with.enrichment_tables.keys().for_each(|k| {
             if self.enrichment_tables.contains_key(k) {
-                errors.push(format!("duplicate enrichment_table name found: {}", k));
+                errors.push(format!("duplicate enrichment_table name found: {k}"));
             }
         });
         with.sources.keys().for_each(|k| {
             if self.sources.contains_key(k) {
-                errors.push(format!("duplicate source id found: {}", k));
+                errors.push(format!("duplicate source id found: {k}"));
             }
         });
         with.sinks.keys().for_each(|k| {
             if self.sinks.contains_key(k) {
-                errors.push(format!("duplicate sink id found: {}", k));
+                errors.push(format!("duplicate sink id found: {k}"));
             }
         });
         with.transforms.keys().for_each(|k| {
             if self.transforms.contains_key(k) {
-                errors.push(format!("duplicate transform id found: {}", k));
+                errors.push(format!("duplicate transform id found: {k}"));
             }
         });
         with.tests.iter().for_each(|wt| {
@@ -256,7 +255,7 @@ impl ConfigBuilder {
         });
         with.secret.keys().for_each(|k| {
             if self.secret.contains_key(k) {
-                errors.push(format!("duplicate secret id found: {}", k));
+                errors.push(format!("duplicate secret id found: {k}"));
             }
         });
         if !errors.is_empty() {

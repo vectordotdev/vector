@@ -2,8 +2,8 @@ use std::{
     convert::Infallible,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -14,20 +14,20 @@ use futures::{
 use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 use vector_lib::lookup::PathPrefix;
 use warp::Filter;
 
 use crate::{
     codecs::{TimestampFormat, Transformer},
-    config::{log_schema, SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, log_schema},
     sinks::{
         clickhouse::config::ClickhouseConfig,
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };
@@ -199,16 +199,15 @@ async fn insert_events_unix_timestamps_toml_config() {
 
     let config: ClickhouseConfig = toml::from_str(&format!(
         r#"
-host = "{}"
-table = "{}"
+host = "{host}"
+table = "{table}"
 compression = "none"
 [request]
 retry_attempts = 1
 [batch]
 max_events = 1
 [encoding]
-timestamp_format = "unix""#,
-        host, table
+timestamp_format = "unix""#
     ))
     .unwrap();
 
@@ -375,20 +374,18 @@ async fn templated_table() {
 
     for (table, event, mut receiver) in table_events {
         let output = client.select_all(&table).await;
-        assert_eq!(1, output.rows, "table {} should have 1 row", table);
+        assert_eq!(1, output.rows, "table {table} should have 1 row");
 
         let expected = serde_json::to_value(event.into_log()).unwrap();
         assert_eq!(
             expected, output.data[0],
-            "table \"{}\"'s one row should have the correct data",
-            table
+            "table \"{table}\"'s one row should have the correct data"
         );
 
         assert_eq!(
             receiver.try_recv(),
             Ok(BatchStatus::Delivered),
-            "table \"{}\"'s event should have been delivered",
-            table
+            "table \"{table}\"'s event should have been delivered"
         );
     }
 }
@@ -418,11 +415,10 @@ impl ClickhouseClient {
             .client
             .post(&self.host)
             .body(format!(
-                "CREATE TABLE {}
-                    ({})
+                "CREATE TABLE {table}
+                    ({schema})
                     ENGINE = MergeTree()
-                    ORDER BY (host, timestamp);",
-                table, schema
+                    ORDER BY (host, timestamp);"
             ))
             .send()
             .await
@@ -437,7 +433,7 @@ impl ClickhouseClient {
         let response = self
             .client
             .post(&self.host)
-            .body(format!("SELECT * FROM {} FORMAT JSON", table))
+            .body(format!("SELECT * FROM {table} FORMAT JSON"))
             .send()
             .await
             .unwrap();
@@ -448,7 +444,7 @@ impl ClickhouseClient {
             let text = response.text().await.unwrap();
             match serde_json::from_str(&text) {
                 Ok(value) => value,
-                Err(_) => panic!("json failed: {:?}", text),
+                Err(_) => panic!("json failed: {text:?}"),
             }
         }
     }

@@ -1,15 +1,15 @@
-use crate::config::ComponentConfig;
-use std::collections::HashSet;
+use crate::config::{ComponentConfig, ComponentType};
+use std::collections::HashMap;
 use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
 use std::{
-    sync::mpsc::{channel, Receiver},
+    sync::mpsc::{Receiver, channel},
     thread,
 };
 
-use notify::{recommended_watcher, EventKind, RecursiveMode};
+use notify::{EventKind, RecursiveMode, recommended_watcher};
 
 use crate::Error;
 
@@ -61,7 +61,7 @@ impl Watcher {
     }
 }
 
-/// Sends a ReloadFromDisk on config_path changes.
+/// Sends a ReloadFromDisk or ReloadEnrichmentTables on config_path changes.
 /// Accumulates file changes until no change for given duration has occurred.
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
@@ -89,67 +89,86 @@ pub fn spawn_thread<'a>(
 
     info!("Watching configuration files.");
 
-    thread::spawn(move || loop {
-        if let Some((mut watcher, receiver)) = watcher.take() {
-            while let Ok(Ok(event)) = receiver.recv() {
-                if matches!(
-                    event.kind,
-                    EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
-                ) {
-                    debug!(message = "Configuration file change detected.", event = ?event);
+    thread::spawn(move || {
+        loop {
+            if let Some((mut watcher, receiver)) = watcher.take() {
+                while let Ok(Ok(event)) = receiver.recv() {
+                    if matches!(
+                        event.kind,
+                        EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
+                    ) {
+                        debug!(message = "Configuration file change detected.", event = ?event);
 
-                    // Consume events until delay amount of time has passed since the latest event.
-                    while receiver.recv_timeout(delay).is_ok() {}
+                        // Consume events until delay amount of time has passed since the latest event.
+                        while receiver.recv_timeout(delay).is_ok() {}
 
-                    debug!(message = "Consumed file change events for delay.", delay = ?delay);
+                        debug!(message = "Consumed file change events for delay.", delay = ?delay);
 
-                    let component_keys: HashSet<_> = component_configs
-                        .clone()
-                        .into_iter()
-                        .flat_map(|p| p.contains(&event.paths))
-                        .collect();
+                        let changed_components: HashMap<_, _> = component_configs
+                            .clone()
+                            .into_iter()
+                            .flat_map(|p| p.contains(&event.paths))
+                            .collect();
 
-                    // We need to read paths to resolve any inode changes that may have happened.
-                    // And we need to do it before raising sighup to avoid missing any change.
-                    if let Err(error) = watcher.add_paths(&config_paths) {
-                        error!(message = "Failed to read files to watch.", %error);
-                        break;
-                    }
+                        // We need to read paths to resolve any inode changes that may have happened.
+                        // And we need to do it before raising sighup to avoid missing any change.
+                        if let Err(error) = watcher.add_paths(&config_paths) {
+                            error!(message = "Failed to read files to watch.", %error);
+                            break;
+                        }
 
-                    debug!(message = "Reloaded paths.");
+                        debug!(message = "Reloaded paths.");
 
-                    info!("Configuration file changed.");
-                    if !component_keys.is_empty() {
-                        info!("Component {:?} configuration changed.", component_keys);
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(component_keys)).map_err(|error| {
-                            error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                        });
-                    } else {
-                        _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
-                            .map_err(|error| {
-                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
+                        info!("Configuration file changed.");
+                        if !changed_components.is_empty() {
+                            info!(
+                                internal_log_rate_limit = true,
+                                "Component {:?} configuration changed.",
+                                changed_components.keys()
+                            );
+                            if changed_components
+                                .iter()
+                                .all(|(_, t)| *t == ComponentType::EnrichmentTable)
+                            {
+                                info!(
+                                    internal_log_rate_limit = true,
+                                    "Only enrichment tables have changed."
+                                );
+                                _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
+                                error!(message = "Unable to reload enrichment tables.", cause = %error, internal_log_rate_limit = true)
                             });
+                            } else {
+                                _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
+                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
+                            });
+                            }
+                        } else {
+                            _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
+                            .map_err(|error| {
+                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
+                            });
+                        }
+                    } else {
+                        debug!(message = "Ignoring event.", event = ?event)
                     }
-                } else {
-                    debug!(message = "Ignoring event.", event = ?event)
                 }
             }
-        }
 
-        thread::sleep(RETRY_TIMEOUT);
+            thread::sleep(RETRY_TIMEOUT);
 
-        watcher = create_watcher(&watcher_conf, &config_paths)
-            .map_err(|error| error!(message = "Failed to create file watcher.", %error))
-            .ok();
+            watcher = create_watcher(&watcher_conf, &config_paths)
+                .map_err(|error| error!(message = "Failed to create file watcher.", %error))
+                .ok();
 
-        if watcher.is_some() {
-            // Config files could have changed while we weren't watching,
-            // so for a good measure raise SIGHUP and let reload logic
-            // determine if anything changed.
-            info!("Speculating that configuration files have changed.");
-            _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk).map_err(|error| {
+            if watcher.is_some() {
+                // Config files could have changed while we weren't watching,
+                // so for a good measure raise SIGHUP and let reload logic
+                // determine if anything changed.
+                info!("Speculating that configuration files have changed.");
+                _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk).map_err(|error| {
                 error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
             });
+            }
         }
     });
 
@@ -187,7 +206,7 @@ mod tests {
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{fs::File, io::Write, time::Duration};
+    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
     use tokio::sync::broadcast;
 
     async fn test_signal(
@@ -221,8 +240,11 @@ mod tests {
             .iter()
             .map(|file| File::create(file).unwrap())
             .collect();
-        let component_config =
-            ComponentConfig::new(component_file_path.clone(), http_component.clone());
+        let component_config = ComponentConfig::new(
+            component_file_path.clone(),
+            http_component.clone(),
+            ComponentType::Sink,
+        );
 
         let (signal_tx, signal_rx) = broadcast::channel(128);
         spawn_thread(
@@ -240,7 +262,7 @@ mod tests {
         if !test_signal(
             &mut component_files[0],
             crate::signal::SignalTo::ReloadComponents(HashSet::from_iter(vec![
-                http_component.clone()
+                http_component.clone(),
             ])),
             delay * 5,
             signal_rx,
@@ -253,7 +275,7 @@ mod tests {
         if !test_signal(
             &mut component_files[1],
             crate::signal::SignalTo::ReloadComponents(HashSet::from_iter(vec![
-                http_component.clone()
+                http_component.clone(),
             ])),
             delay * 5,
             signal_rx2,

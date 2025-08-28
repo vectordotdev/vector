@@ -1,5 +1,5 @@
 use crate::app::CommandExt as _;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
 use std::{collections::HashSet, process::Command};
 
@@ -40,10 +40,10 @@ pub fn changed_files() -> Result<Vec<String>> {
     // M   relative/path/to/file.modified
     let output = run_and_check_output(&["diff", "--name-status", "origin/master..."])?;
     for line in output.lines() {
-        if !is_warning_line(line) {
-            if let Some((_, path)) = line.split_once('\t') {
-                files.insert(path.to_string());
-            }
+        if !is_warning_line(line)
+            && let Some((_, path)) = line.split_once('\t')
+        {
+            files.insert(path.to_string());
         }
     }
 

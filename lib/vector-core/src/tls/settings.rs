@@ -9,9 +9,9 @@ use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
     stack::Stack,
-    x509::{store::X509StoreBuilder, X509},
+    x509::{X509, store::X509StoreBuilder},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -43,7 +43,7 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsEnableableConfig {
-    /// Whether or not to require TLS for incoming or outgoing connections.
+    /// Whether to require TLS for incoming or outgoing connections.
     ///
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
@@ -69,7 +69,7 @@ impl TlsEnableableConfig {
     }
 }
 
-/// TlsEnableableConfig for `sources`, adding metadata from the client certificate.
+/// `TlsEnableableConfig` for `sources`, adding metadata from the client certificate.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
@@ -203,7 +203,9 @@ impl TlsSettings {
                 );
             }
             if options.verify_hostname == Some(false) {
-                warn!("The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities.");
+                warn!(
+                    "The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities."
+                );
             }
         }
 
@@ -642,10 +644,10 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// file "name" contains a PEM start marker, it is assumed to contain
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
-    if let Some(filename) = filename.to_str() {
-        if filename.contains(PEM_START_MARKER) {
-            return Ok((Vec::from(filename), "inline text".into()));
-        }
+    if let Some(filename) = filename.to_str()
+        && filename.contains(PEM_START_MARKER)
+    {
+        return Ok((Vec::from(filename), "inline text".into()));
     }
 
     let mut text = Vec::<u8>::new();

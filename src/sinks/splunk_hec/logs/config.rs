@@ -11,10 +11,10 @@ use crate::{
     sinks::{
         prelude::*,
         splunk_hec::common::{
+            EndpointTarget, SplunkHecDefaultBatchSettings,
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
-            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::http::HttpRetryLogic,
     },
@@ -241,7 +241,7 @@ impl HecLogsSinkConfig {
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
-            .settings(request_settings, HttpRetryLogic)
+            .settings(request_settings, HttpRetryLogic::default())
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
@@ -286,7 +286,7 @@ mod tests {
     use super::*;
     use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
 

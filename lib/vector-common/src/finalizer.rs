@@ -4,9 +4,9 @@ use std::marker::{PhantomData, Unpin};
 use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
 
 use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{future::OptionFuture, FutureExt, Stream, StreamExt};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::{FutureExt, Stream, StreamExt, future::OptionFuture};
 use tokio::sync::Notify;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::finalization::{BatchStatus, BatchStatusReceiver};
 use crate::shutdown::ShutdownSignal;
@@ -86,10 +86,10 @@ where
     }
 
     pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
-        if let Some(sender) = &self.sender {
-            if let Err(error) = sender.send((receiver, entry)) {
-                error!(message = "FinalizerSet task ended prematurely.", %error);
-            }
+        if let Some(sender) = &self.sender
+            && let Err(error) = sender.send((receiver, entry))
+        {
+            error!(message = "FinalizerSet task ended prematurely.", %error);
         }
     }
 

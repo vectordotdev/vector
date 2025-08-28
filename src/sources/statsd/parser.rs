@@ -191,11 +191,7 @@ fn sanitize_key(key: &str, sanitize: bool) -> String {
 }
 
 fn sanitize_sampling(sampling: f64) -> f64 {
-    if sampling == 0.0 {
-        1.0
-    } else {
-        sampling
-    }
+    if sampling == 0.0 { 1.0 } else { sampling }
 }
 
 fn convert_to_statistic(unit: &str) -> StatisticKind {
@@ -216,7 +212,7 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Statsd parse error: {:?}", self)
+        write!(f, "Statsd parse error: {self:?}")
     }
 }
 
@@ -241,7 +237,7 @@ mod test {
     use vector_lib::assert_event_data_eq;
     use vector_lib::{event::metric::TagValue, metric_tags};
 
-    use super::{sanitize_key, sanitize_sampling, ParseError, Parser};
+    use super::{ParseError, Parser, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sources::statsd::ConversionUnit;
 

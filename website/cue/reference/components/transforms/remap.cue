@@ -13,7 +13,7 @@ components: transforms: "remap": {
 
 	classes: {
 		commonly_used: true
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
 	}

@@ -1,4 +1,4 @@
-use super::proto::common::v1::{any_value::Value as PBValue, KeyValue};
+use super::proto::common::v1::{KeyValue, any_value::Value as PBValue};
 use bytes::Bytes;
 use ordered_float::NotNan;
 use vector_core::event::metric::TagValue;
@@ -79,7 +79,7 @@ mod tests {
             Value::Float(f) => {
                 assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_positive())
             }
-            _ => panic!("Expected Float value, got {:?}", result),
+            _ => panic!("Expected Float value, got {result:?}"),
         }
 
         let neg_inf_value = PBValue::DoubleValue(f64::NEG_INFINITY);
@@ -88,7 +88,7 @@ mod tests {
             Value::Float(f) => {
                 assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_negative())
             }
-            _ => panic!("Expected Float value, got {:?}", result),
+            _ => panic!("Expected Float value, got {result:?}"),
         }
     }
 }

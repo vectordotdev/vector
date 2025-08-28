@@ -4,11 +4,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::event::LogEvent;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
@@ -98,7 +98,7 @@ impl Deserializer for ProtobufDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let dynamic_message = DynamicMessage::decode(self.message_descriptor.clone(), bytes)
-            .map_err(|error| format!("Error parsing protobuf: {:?}", error))?;
+            .map_err(|error| format!("Error parsing protobuf: {error:?}"))?;
 
         let proto_vrl =
             vrl::protobuf::proto_to_value(&prost_reflect::Value::Message(dynamic_message), None)?;

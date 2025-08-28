@@ -1,4 +1,4 @@
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group};
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
@@ -23,7 +23,7 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     controller.reset();
 
     for idx in 0..cardinality {
-        metrics::counter!("test", 1, "idx" => idx.to_string());
+        metrics::counter!("test", "idx" => idx.to_string()).increment(1);
     }
 
     controller

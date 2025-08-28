@@ -16,9 +16,9 @@ use crate::{
     http::{Auth, HttpClient},
     schema,
     sinks::util::{
-        http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
+        http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
     template::{Template, TemplateRenderingError},
 };
@@ -367,7 +367,7 @@ impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
         let host = &self.endpoint.uri;
 
-        let uri = format!("{}{}?{}", host, PATH, query);
+        let uri = format!("{host}{PATH}?{query}");
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
@@ -394,9 +394,9 @@ async fn healthcheck(config: MezmoConfig, client: HttpClient) -> crate::Result<(
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc, StreamExt};
+    use futures::{StreamExt, channel::mpsc};
     use futures_util::stream;
-    use http::{request::Parts, StatusCode};
+    use http::{StatusCode, request::Parts};
     use serde_json::json;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
@@ -405,7 +405,7 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
-            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, assert_sink_compliance},
             next_addr, random_lines,
         },
     };
@@ -482,7 +482,7 @@ mod tests {
         // Swap out the host so we can force send it
         // to our local server
         let endpoint = UriSerde {
-            uri: format!("http://{}", addr).parse::<http::Uri>().unwrap(),
+            uri: format!("http://{addr}").parse::<http::Uri>().unwrap(),
             auth: None,
         };
         config.endpoint = endpoint;
@@ -542,7 +542,7 @@ mod tests {
                 let (p, host) = hosts
                     .iter()
                     .enumerate()
-                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .find(|(_, host)| query.contains(&format!("hostname={host}")))
                     .expect("invalid hostname");
                 let lines = &partitions[p];
 

@@ -5,9 +5,9 @@ use vector_common::TimeZone;
 use vector_config::{configurable_component, impl_generate_config_from_default};
 
 use super::super::default_data_dir;
-use super::metrics_expiration::PerMetricSetExpiration;
 use super::Telemetry;
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use super::metrics_expiration::PerMetricSetExpiration;
+use super::{AcknowledgementsConfig, LogSchema, proxy::ProxyConfig};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
@@ -119,7 +119,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Deprecated: use expire_metrics_secs instead
+    /// Deprecated: use `expire_metrics_secs` instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::hidden))]

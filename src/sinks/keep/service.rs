@@ -5,8 +5,8 @@ use http::{Request, Uri};
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::sinks::{
-    util::http::{HttpRequest, HttpServiceRequestBuilder},
     HTTPRequestBuilderSnafu,
+    util::http::{HttpRequest, HttpServiceRequestBuilder},
 };
 use snafu::ResultExt;
 

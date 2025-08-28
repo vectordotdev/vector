@@ -2,7 +2,7 @@ use std::{
     collections::BTreeSet, collections::HashMap, ffi::OsStr, fs, path::Path, sync::LazyLock,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -64,8 +64,8 @@ struct Component {
 }
 
 pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
-    let config =
-        fs::read_to_string(filename).with_context(|| format!("failed to read {filename:?}"))?;
+    let config = fs::read_to_string(filename)
+        .with_context(|| format!("failed to read {}", filename.display()))?;
 
     let config: VectorConfig = match filename
         .extension()

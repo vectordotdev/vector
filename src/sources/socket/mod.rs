@@ -4,10 +4,10 @@ pub mod udp;
 mod unix;
 
 use vector_lib::codecs::decoding::DeserializerConfig;
-use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace, log_schema};
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use crate::{
     codecs::DecodingConfig,
@@ -321,25 +321,25 @@ mod test {
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
         sync::{
-            atomic::{AtomicBool, Ordering},
             Arc,
+            atomic::{AtomicBool, Ordering},
         },
         thread,
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
-    use futures::{stream, StreamExt};
-    use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+    use futures::{StreamExt, stream};
+    use rand::{SeedableRng, rngs::SmallRng, seq::SliceRandom};
     use serde_json::json;
     use tokio::io::AsyncReadExt;
     use tokio::net::TcpStream;
     use tokio::{
         task::JoinHandle,
-        time::{timeout, Duration, Instant},
+        time::{Duration, Instant, timeout},
     };
     #[cfg(unix)]
     use vector_lib::codecs::{
-        decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig,
+        CharacterDelimitedDecoderConfig, decoding::CharacterDelimitedDecoderOptions,
     };
     use vector_lib::codecs::{GelfDeserializerConfig, NewlineDelimitedDecoderConfig};
     use vector_lib::event::EventContainer;
@@ -349,7 +349,7 @@ mod test {
 
     #[cfg(unix)]
     use {
-        super::{unix::UnixConfig, Mode},
+        super::{Mode, unix::UnixConfig},
         crate::sources::util::unix::UNNAMED_SOCKET_HOST,
         crate::test_util::wait_for,
         futures::{SinkExt, Stream},
@@ -364,9 +364,10 @@ mod test {
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
-    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    use super::{SocketConfig, tcp::TcpConfig, udp::UdpConfig};
     use crate::{
-        config::{log_schema, ComponentKey, GlobalOptions, SourceConfig, SourceContext},
+        SourceSender,
+        config::{ComponentKey, GlobalOptions, SourceConfig, SourceContext, log_schema},
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -374,13 +375,12 @@ mod test {
         test_util::{
             collect_n, collect_n_limited,
             components::{
-                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-                SOCKET_PUSH_SOURCE_TAGS,
+                COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
+                assert_source_error,
             },
             next_addr, next_addr_any, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
-        SourceSender,
     };
 
     fn get_gelf_payload(message: &str) -> String {
@@ -894,7 +894,7 @@ mod test {
                     // read resulting with 0 bytes -> the connection was closed
                     Ok(0) => assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3),
                     Ok(_) => panic!("unexpectedly read data from stream"),
-                    Err(e) => panic!("{:}", e)
+                    Err(e) => panic!("{e:}")
                  }
              }
         }
@@ -923,7 +923,7 @@ mod test {
         packets: impl IntoIterator<Item = Bytes>,
     ) -> SocketAddr {
         let socket = UdpSocket::bind(from)
-            .map_err(|error| panic!("{:}", error))
+            .map_err(|error| panic!("{error:}"))
             .ok()
             .unwrap();
 
@@ -931,7 +931,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(&packet, to)
-                    .map_err(|error| panic!("{:}", error))
+                    .map_err(|error| panic!("{error:}"))
                     .ok()
                     .unwrap(),
                 packet.len()
@@ -1504,7 +1504,7 @@ mod test {
         message: &str,
         stream: bool,
         use_vector_namespace: bool,
-    ) -> (PathBuf, impl Stream<Item = Event>) {
+    ) -> (PathBuf, impl Stream<Item = Event> + use<>) {
         let (tx, rx) = SourceSender::new_test();
         let path = init_unix(tx, stream, use_vector_namespace).await;
         let path_clone = path.clone();
@@ -1537,10 +1537,9 @@ mod test {
     fn parses_unix_config(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }
@@ -1549,11 +1548,10 @@ mod test {
     fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
         toml::from_str::<SocketConfig>(&format!(
             r#"
-               mode = "{}"
+               mode = "{mode}"
                path = "/does/not/exist"
                socket_file_mode = 0o777
-            "#,
-            mode
+            "#
         ))
         .unwrap()
     }

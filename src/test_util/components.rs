@@ -9,17 +9,17 @@
 
 use std::{env, sync::LazyLock, time::Duration};
 
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt, stream};
 use futures_util::Future;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
     metrics::Controller,
     sinks::VectorSink,
-    SourceSender,
 };
 
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
@@ -195,7 +195,7 @@ impl ComponentTester {
             event_test_util::debug_print_events();
             metrics.sort_by(|a, b| a.name().cmp(b.name()));
             for metric in &metrics {
-                println!("{}", metric);
+                println!("{metric}");
             }
         }
 
@@ -204,9 +204,11 @@ impl ComponentTester {
     }
 
     fn emitted_all_counters(&mut self, names: &[&str], tags: &[&str]) {
-        let tag_suffix = (!tags.is_empty())
-            .then(|| format!("{{{}}}", tags.join(",")))
-            .unwrap_or_default();
+        let tag_suffix = if !tags.is_empty() {
+            format!("{{{}}}", tags.join(","))
+        } else {
+            String::new()
+        };
 
         for name in names {
             if !self.metrics.iter().any(|m| {
@@ -234,10 +236,8 @@ impl ComponentTester {
                     .collect::<Vec<_>>();
                 let partial = partial_matches.join("");
 
-                self.errors.push(format!(
-                    "  - Missing metric `{}{}`{}",
-                    name, tag_suffix, partial
-                ));
+                self.errors
+                    .push(format!("  - Missing metric `{name}{tag_suffix}`{partial}"));
             }
         }
     }
@@ -245,7 +245,7 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if let Err(err_msg) = event_test_util::contains_name_once(name) {
-                self.errors.push(format!("  - {}", err_msg));
+                self.errors.push(format!("  - {err_msg}"));
             }
         }
     }
@@ -375,10 +375,10 @@ where
         // the meantime.  We store these locally and return them all at the end.
         loop {
             // If an event count was given, and we've hit it, break out of the loop.
-            if let Some(count) = event_count {
-                if events.len() == count {
-                    break;
-                }
+            if let Some(count) = event_count
+                && events.len() == count
+            {
+                break;
             }
 
             select! {
@@ -396,10 +396,10 @@ where
         // until no more are left, which avoids timing issues with missing events that came in right when the timeout
         // fired.
         while let Some(event) = rx.next().await {
-            if let Some(count) = event_count {
-                if events.len() == count {
-                    break;
-                }
+            if let Some(count) = event_count
+                && events.len() == count
+            {
+                break;
             }
 
             events.push(event);

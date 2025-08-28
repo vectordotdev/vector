@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use dnstap_parser::parser::DnstapParser;
 use dnstap_parser::schema::DnstapEventSchema;
@@ -11,15 +11,15 @@ use vector_lib::internal_event::{
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
 use vrl::path::{OwnedValuePath, PathPrefix};
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::util::framestream::{
-    build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
+    FrameHandler, build_framestream_tcp_source, build_framestream_unix_source,
 };
 use crate::internal_events::DnstapParseError;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     Result,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
 };
 use dnstap_parser::schema::DNSTAP_VALUE_PATHS;
 
@@ -62,7 +62,7 @@ pub struct DnstapConfig {
     pub multithreaded: Option<bool>,
 
     /// Maximum number of frames that can be processed concurrently.
-    pub max_frame_handling_tasks: Option<u32>,
+    pub max_frame_handling_tasks: Option<usize>,
 
     /// Whether to downcase all DNSTAP hostnames received for consistency
     #[serde(default = "crate::serde::default_false")]
@@ -116,14 +116,10 @@ impl DnstapConfig {
             LogNamespace::Legacy => {
                 let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
-                if self.raw_data_only() {
-                    if let Some(message_key) = log_schema().message_key() {
-                        return schema.with_event_field(
-                            message_key,
-                            Kind::bytes(),
-                            Some("message"),
-                        );
-                    }
+                if self.raw_data_only()
+                    && let Some(message_key) = log_schema().message_key()
+                {
+                    return schema.with_event_field(message_key, Kind::bytes(), Some("message"));
                 }
                 event_schema.schema_definition(schema)
             }
@@ -222,7 +218,7 @@ struct CommonFrameHandler {
     content_type: String,
     raw_data_only: bool,
     multithreaded: bool,
-    max_frame_handling_tasks: u32,
+    max_frame_handling_tasks: usize,
     host_key: Option<OwnedValuePath>,
     timestamp_key: Option<OwnedValuePath>,
     source_type_key: Option<OwnedValuePath>,
@@ -298,7 +294,7 @@ impl FrameHandler for CommonFrameHandler {
             },
         ) {
             emit!(DnstapParseError {
-                error: format!("Dnstap protobuf decode error {:?}.", err)
+                error: format!("Dnstap protobuf decode error {err:?}.")
             });
             return None;
         }
@@ -327,7 +323,7 @@ impl FrameHandler for CommonFrameHandler {
         self.multithreaded
     }
 
-    fn max_frame_handling_tasks(&self) -> u32 {
+    fn max_frame_handling_tasks(&self) -> usize {
         self.max_frame_handling_tasks
     }
 
@@ -414,8 +410,8 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use bollard::exec::{CreateExecOptions, StartExecOptions};
     use bollard::Docker;
+    use bollard::exec::{CreateExecOptions, StartExecOptions};
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
@@ -426,12 +422,12 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        SourceSender,
         event::Value,
         test_util::{
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             wait_for,
         },
-        SourceSender,
     };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
@@ -478,7 +474,7 @@ mod integration_tests {
                         break;
                     }
                     Err(e) => {
-                        println!("Error: {}", e);
+                        println!("Error: {e}");
                         break;
                     }
                 }
@@ -664,7 +660,7 @@ mod integration_tests {
         dnstap_exec(vec![
             "nslookup",
             "-type=A",
-            format!("-port={}", port).as_str(),
+            format!("-port={port}").as_str(),
             "h1.example.com",
             "localhost",
         ])

@@ -13,7 +13,7 @@ use crate::{
     sinks::{prometheus::remote_write::config::RemoteWriteConfig, util::test::build_test_server},
     test_util::{
         self,
-        components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, assert_sink_compliance},
     },
 };
 
@@ -23,7 +23,7 @@ fn generate_config() {
 }
 
 macro_rules! labels {
-        ( $( $name:expr => $value:expr ),* ) => {
+        ( $( $name:expr_2021 => $value:expr_2021 ),* ) => {
             vec![ $( proto::Label {
                 name: $name.to_string(),
                 value: $value.to_string()
@@ -235,7 +235,7 @@ async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto
         let (rx, trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+        let config = format!("endpoint = \"http://{addr}/write\"\n{config}");
         let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
         let cx = SinkContext::default();
 

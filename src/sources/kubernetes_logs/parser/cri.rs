@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
-use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace, log_schema};
 use vector_lib::conversion;
 use vector_lib::lookup::path;
 
@@ -8,7 +8,7 @@ use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
     event::{self, Event, Value},
     internal_events::{
-        ParserConversionError, ParserMatchError, ParserMissingFieldError, DROP_EVENT,
+        DROP_EVENT, ParserConversionError, ParserMatchError, ParserMissingFieldError,
     },
     sources::kubernetes_logs::Config,
     transforms::{FunctionTransform, OutputBuffer},
@@ -143,7 +143,7 @@ const fn is_delimiter(c: &u8) -> bool {
 ///
 /// Equivalent to regex: `(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$`
 #[inline]
-fn parse_log_line(line: &[u8]) -> Option<ParsedLog> {
+fn parse_log_line(line: &[u8]) -> Option<ParsedLog<'_>> {
     let rest = line;
 
     let after_timestamp_pos = rest.iter().position(is_delimiter)?;

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use aws_sdk_s3::{
+    Client as S3Client,
     operation::put_object::PutObjectError,
     types::{ObjectCannedAcl, ServerSideEncryption, StorageClass},
-    Client as S3Client,
 };
 use aws_smithy_runtime_api::{
     client::{orchestrator::HttpResponse, result::SdkError},
@@ -13,13 +13,13 @@ use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
-use super::service::{S3Response, S3Service};
+use super::service::{S3Request, S3Response, S3Service};
 use crate::{
-    aws::{create_client, is_retriable_error, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client, is_retriable_error},
     common::s3::S3ClientBuilder,
     config::ProxyConfig,
     http::status,
-    sinks::{util::retries::RetryLogic, Healthcheck},
+    sinks::{Healthcheck, util::retries::RetryLogic},
     tls::TlsConfig,
 };
 
@@ -360,6 +360,7 @@ pub enum RetryStrategy {
 
 impl RetryLogic for RetryStrategy {
     type Error = SdkError<PutObjectError, HttpResponse>;
+    type Request = S3Request;
     type Response = S3Response;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -455,10 +456,8 @@ mod tests {
             ("STANDARD_IA", S3StorageClass::StandardIa),
         ] {
             assert_eq!(name, to_string(storage_class));
-            let result: S3StorageClass = serde_json::from_str(&format!("{:?}", name))
-                .unwrap_or_else(|error| {
-                    panic!("Unparsable storage class name {:?}: {}", name, error)
-                });
+            let result: S3StorageClass = serde_json::from_str(&format!("{name:?}"))
+                .unwrap_or_else(|error| panic!("Unparsable storage class name {name:?}: {error}"));
             assert_eq!(result, storage_class);
         }
     }

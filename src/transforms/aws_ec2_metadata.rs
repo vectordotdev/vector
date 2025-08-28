@@ -4,20 +4,20 @@ use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
-use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::{body::to_bytes as body_to_bytes, Body};
+use http::{Request, StatusCode, Uri, uri::PathAndQuery};
+use hyper::{Body, body::to_bytes as body_to_bytes};
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::OwnedTargetPath;
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
 use vector_lib::lookup::owned_value_path;
-use vector_lib::lookup::OwnedTargetPath;
-use vrl::value::kind::Collection;
 use vrl::value::Kind;
+use vrl::value::kind::Collection;
 
 use crate::config::OutputId;
 use crate::{
@@ -474,95 +474,90 @@ impl MetadataClient {
                 new_state.push((self.keys.region_key.clone(), document.region.into()));
             }
 
-            if self.fields.contains(AVAILABILITY_ZONE_KEY) {
-                if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
-                    new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
-                }
+            if self.fields.contains(AVAILABILITY_ZONE_KEY)
+                && let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await?
+            {
+                new_state.push((self.keys.availability_zone_key.clone(), availability_zone));
             }
 
-            if self.fields.contains(LOCAL_HOSTNAME_KEY) {
-                if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
-                    new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
-                }
+            if self.fields.contains(LOCAL_HOSTNAME_KEY)
+                && let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await?
+            {
+                new_state.push((self.keys.local_hostname_key.clone(), local_hostname));
             }
 
-            if self.fields.contains(LOCAL_IPV4_KEY) {
-                if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
-                    new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
-                }
+            if self.fields.contains(LOCAL_IPV4_KEY)
+                && let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await?
+            {
+                new_state.push((self.keys.local_ipv4_key.clone(), local_ipv4));
             }
 
-            if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
-                if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
-                    new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
-                }
+            if self.fields.contains(PUBLIC_HOSTNAME_KEY)
+                && let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await?
+            {
+                new_state.push((self.keys.public_hostname_key.clone(), public_hostname));
             }
 
-            if self.fields.contains(PUBLIC_IPV4_KEY) {
-                if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
-                    new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
-                }
+            if self.fields.contains(PUBLIC_IPV4_KEY)
+                && let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await?
+            {
+                new_state.push((self.keys.public_ipv4_key.clone(), public_ipv4));
             }
 
-            if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
-                if let Some(mac) = self.get_metadata(&MAC).await? {
-                    let mac = String::from_utf8_lossy(&mac[..]);
+            if (self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY))
+                && let Some(mac) = self.get_metadata(&MAC).await?
+            {
+                let mac = String::from_utf8_lossy(&mac[..]);
 
-                    if self.fields.contains(SUBNET_ID_KEY) {
-                        let subnet_path = format!(
-                            "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                            mac
-                        );
+                if self.fields.contains(SUBNET_ID_KEY) {
+                    let subnet_path =
+                        format!("/latest/meta-data/network/interfaces/macs/{mac}/subnet-id");
 
-                        let subnet_path = subnet_path.parse().context(ParsePathSnafu {
-                            value: subnet_path.clone(),
-                        })?;
+                    let subnet_path = subnet_path.parse().context(ParsePathSnafu {
+                        value: subnet_path.clone(),
+                    })?;
 
-                        if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                            new_state.push((self.keys.subnet_id_key.clone(), subnet_id));
-                        }
+                    if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
+                        new_state.push((self.keys.subnet_id_key.clone(), subnet_id));
                     }
+                }
 
-                    if self.fields.contains(VPC_ID_KEY) {
-                        let vpc_path =
-                            format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+                if self.fields.contains(VPC_ID_KEY) {
+                    let vpc_path =
+                        format!("/latest/meta-data/network/interfaces/macs/{mac}/vpc-id");
 
-                        let vpc_path = vpc_path.parse().context(ParsePathSnafu {
-                            value: vpc_path.clone(),
-                        })?;
+                    let vpc_path = vpc_path.parse().context(ParsePathSnafu {
+                        value: vpc_path.clone(),
+                    })?;
 
-                        if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                            new_state.push((self.keys.vpc_id_key.clone(), vpc_id));
-                        }
+                    if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
+                        new_state.push((self.keys.vpc_id_key.clone(), vpc_id));
                     }
                 }
             }
 
-            if self.fields.contains(ROLE_NAME_KEY) {
-                if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
-                    let role_names = String::from_utf8_lossy(&role_names[..]);
+            if self.fields.contains(ROLE_NAME_KEY)
+                && let Some(role_names) = self.get_metadata(&ROLE_NAME).await?
+            {
+                let role_names = String::from_utf8_lossy(&role_names[..]);
 
-                    for (i, role_name) in role_names.lines().enumerate() {
-                        new_state.push((
-                            MetadataKey {
-                                log_path: self
-                                    .keys
-                                    .role_name_key
-                                    .log_path
-                                    .with_index_appended(i as isize),
-                                metric_tag: format!(
-                                    "{}[{}]",
-                                    self.keys.role_name_key.metric_tag, i
-                                ),
-                            },
-                            role_name.to_string().into(),
-                        ));
-                    }
+                for (i, role_name) in role_names.lines().enumerate() {
+                    new_state.push((
+                        MetadataKey {
+                            log_path: self
+                                .keys
+                                .role_name_key
+                                .log_path
+                                .with_index_appended(i as isize),
+                            metric_tag: format!("{}[{}]", self.keys.role_name_key.metric_tag, i),
+                        },
+                        role_name.to_string().into(),
+                    ));
                 }
             }
 
             for tag in self.tags.clone() {
-                let tag_path = format!("/latest/meta-data/tags/instance/{}", tag);
+                let tag_path = format!("/latest/meta-data/tags/instance/{tag}");
 
                 let tag_path = tag_path.parse().context(ParsePathSnafu {
                     value: tag_path.clone(),
@@ -746,11 +741,11 @@ mod integration_tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use vector_lib::lookup::{event_path, PathPrefix};
+    use vector_lib::lookup::{PathPrefix, event_path};
 
     use super::*;
     use crate::{
-        event::{metric, LogEvent, Metric},
+        event::{LogEvent, Metric, metric},
         test_util::{components::assert_transform_compliance, next_addr},
         transforms::test::create_topology,
     };
@@ -906,7 +901,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             ..Default::default()
         };
@@ -937,7 +932,7 @@ mod integration_tests {
         let _server = tokio::spawn(server);
 
         let config = Ec2Metadata {
-            endpoint: format!("http://{}", addr),
+            endpoint: format!("http://{addr}"),
             refresh_timeout_secs: Duration::from_secs(1),
             required: false,
             ..Default::default()
@@ -1016,10 +1011,10 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{}\"", PUBLIC_IPV4_KEY).as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{}\"", REGION_KEY).as_str(), "us-east-1");
+            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
+            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{}\"", TAGS_KEY).as_str(),
+                format!("\"{TAGS_KEY}\"").as_str(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),

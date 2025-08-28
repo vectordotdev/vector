@@ -10,9 +10,9 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use futures::{StreamExt, poll, stream::BoxStream, task::Poll};
 use nix::{
-    sys::signal::{kill, Signal},
+    sys::signal::{Signal, kill},
     unistd::Pid,
 };
 use serde_json::{Error as JsonError, Value as JsonValue};
@@ -25,13 +25,13 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
+use vector_lib::codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError};
 use vector_lib::configurable::configurable_component;
 use vector_lib::lookup::{metadata_path, owned_value_path, path};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
     schema::Definition,
-    EstimatedJsonEncodedSizeOf,
 };
 use vector_lib::{
     finalizer::OrderedFinalizer,
@@ -40,12 +40,13 @@ use vector_lib::{
     },
 };
 use vrl::event_path;
-use vrl::value::{kind::Collection, Kind, Value};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
+    SourceSender,
     config::{
-        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -55,7 +56,6 @@ use crate::{
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -330,7 +330,9 @@ type Record = HashMap<String, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
-            warn!("DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+            warn!(
+                "DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
+            );
         }
 
         let data_dir = cx
@@ -683,7 +685,7 @@ impl StartJournalctl {
         }
 
         if let Some(namespace) = &self.journal_namespace {
-            command.arg(format!("--namespace={}", namespace));
+            command.arg(format!("--namespace={namespace}"));
         }
 
         if self.current_boot_only {
@@ -691,7 +693,7 @@ impl StartJournalctl {
         }
 
         if let Some(cursor) = checkpoint {
-            command.arg(format!("--after-cursor={}", cursor));
+            command.arg(format!("--after-cursor={cursor}"));
         } else if self.since_now {
             command.arg("--since=now");
         } else {
@@ -846,7 +848,7 @@ fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
-        format!("{}.service", unit)
+        format!("{unit}.service")
     }
 }
 
@@ -996,7 +998,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file.write_all(format!("{}\n", token).as_bytes()).await
+        self.file.write_all(format!("{token}\n").as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -1091,7 +1093,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("first test\n"));
 
         checkpointer
@@ -1101,7 +1103,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("second\n"));
     }
 }
@@ -1111,8 +1113,8 @@ mod tests {
     use std::{fs, path::Path};
 
     use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration, Instant};
-    use vrl::value::{kind::Collection, Value};
+    use tokio::time::{Duration, Instant, sleep, timeout};
+    use vrl::value::{Value, kind::Collection};
 
     use super::*;
     use crate::{
@@ -1488,7 +1490,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
@@ -1508,7 +1510,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
@@ -1526,7 +1528,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));

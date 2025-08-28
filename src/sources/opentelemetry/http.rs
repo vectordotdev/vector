@@ -4,7 +4,7 @@ use std::{convert::Infallible, net::SocketAddr};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
-use hyper::{service::make_service_fn, Server};
+use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
@@ -20,12 +20,12 @@ use vector_lib::opentelemetry::proto::collector::{
 };
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
-    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
-    filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response, Filter, Reply,
+    Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
 };
 
 use crate::common::http::ErrorMessage;
@@ -33,17 +33,17 @@ use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::sources::http_server::HttpConfigParamKind;
 use crate::sources::util::add_headers;
 use crate::{
+    SourceSender,
     event::Event,
     http::build_http_trace_layer,
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::util::decode,
     tls::MaybeTlsSettings,
-    SourceSender,
 };
 
-use super::OpentelemetryConfig;
 use super::{reply::protobuf, status::Status};
+use crate::sources::opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -171,7 +171,7 @@ fn build_warp_log_filter(
                     events,
                     acknowledgements,
                     out.clone(),
-                    super::LOGS,
+                    LOGS,
                     ExportLogsServiceResponse::default(),
                 )
             },
@@ -203,7 +203,7 @@ fn build_warp_metrics_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::METRICS,
+                METRICS,
                 ExportMetricsServiceResponse::default(),
             )
         })
@@ -234,7 +234,7 @@ fn build_warp_trace_filter(
                 events,
                 acknowledgements,
                 out.clone(),
-                super::TRACES,
+                TRACES,
                 ExportTraceServiceResponse::default(),
             )
         })
@@ -248,7 +248,7 @@ fn decode_trace_body(
     let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -274,7 +274,7 @@ fn decode_log_body(
     let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -299,7 +299,7 @@ fn decode_metrics_body(
     let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {}", error),
+            format!("Could not decode request: {error}"),
         )
     })?;
 
@@ -367,7 +367,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
     } else {
         let reply = protobuf(Status {
             code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{:?}", err),
+            message: format!("{err:?}"),
             ..Default::default()
         });
 

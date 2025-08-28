@@ -379,7 +379,7 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use std::{fs::File, io::Read};
 
-    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Timelike, Utc};
+    use chrono::{DateTime, SecondsFormat, Timelike, Utc, offset::TimeZone};
     use vector_lib::metric_tags;
 
     use super::*;
@@ -416,9 +416,7 @@ pub mod test_util {
         for field in fields.into_iter() {
             assert!(
                 encoded_fields.contains(&field),
-                "Fields: {} has to have: {}",
-                value,
-                field
+                "Fields: {value} has to have: {field}"
             )
         }
     }
@@ -471,7 +469,7 @@ pub mod test_util {
 
     pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
         client()
-            .get(format!("{}/query", endpoint))
+            .get(format!("{endpoint}/query"))
             .query(&[("q", query)])
             .send()
             .await
@@ -480,10 +478,10 @@ pub mod test_util {
 
     pub(crate) async fn onboarding_v1(endpoint: &str) -> String {
         let database = next_database();
-        let status = query_v1(endpoint, &format!("create database {}", database))
+        let status = query_v1(endpoint, &format!("create database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
         // Some times InfluxDB will return OK before it can actually
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
@@ -494,7 +492,7 @@ pub mod test_util {
                 match client()
                     .post(&write_url)
                     .header("Content-Type", "text/plain")
-                    .header("Authorization", &format!("Token {}", TOKEN))
+                    .header("Authorization", &format!("Token {TOKEN}"))
                     .body("")
                     .send()
                     .await
@@ -503,7 +501,7 @@ pub mod test_util {
                 {
                     http::StatusCode::NO_CONTENT => true,
                     http::StatusCode::NOT_FOUND => false,
-                    status => panic!("Unexpected status: {}", status),
+                    status => panic!("Unexpected status: {status}"),
                 }
             }
         })
@@ -512,10 +510,10 @@ pub mod test_util {
     }
 
     pub(crate) async fn cleanup_v1(endpoint: &str, database: &str) {
-        let status = query_v1(endpoint, &format!("drop database {}", database))
+        let status = query_v1(endpoint, &format!("drop database {database}"))
             .await
             .status();
-        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
+        assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {status}");
     }
 
     pub(crate) async fn onboarding_v2(endpoint: &str) {
@@ -532,7 +530,7 @@ pub mod test_util {
             .unwrap();
 
         let res = client
-            .post(format!("{}/api/v2/setup", endpoint))
+            .post(format!("{endpoint}/api/v2/setup"))
             .json(&body)
             .header("accept", "application/json")
             .send()
@@ -543,8 +541,7 @@ pub mod test_util {
 
         assert!(
             status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
-            "UnexpectedStatus: {}",
-            status
+            "UnexpectedStatus: {status}"
         );
     }
 
@@ -640,7 +637,10 @@ mod tests {
         let uri = settings
             .write_uri("http://localhost:8086".to_owned())
             .unwrap();
-        assert_eq!("http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns", uri.to_string())
+        assert_eq!(
+            "http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns",
+            uri.to_string()
+        )
     }
 
     #[test]
@@ -903,9 +903,8 @@ mod integration_tests {
         config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
-            healthcheck,
-            test_util::{address_v1, address_v2, next_database, onboarding_v2, BUCKET, ORG, TOKEN},
-            InfluxDb1Settings, InfluxDb2Settings,
+            InfluxDb1Settings, InfluxDb2Settings, healthcheck,
+            test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
     };
 

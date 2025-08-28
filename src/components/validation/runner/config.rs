@@ -2,10 +2,10 @@ use vector_lib::config::LogNamespace;
 
 use crate::{
     components::validation::{
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
         component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,
@@ -33,8 +33,7 @@ impl TopologyBuilder {
         let component_configuration = configuration
             .component_configuration_for_test_case(config_name)
             .ok_or(format!(
-                "No test case name defined for configuration {:?}.",
-                config_name
+                "No test case name defined for configuration {config_name:?}."
             ))?;
 
         Ok(match component_configuration {

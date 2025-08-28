@@ -12,10 +12,10 @@ use tokio::time::timeout;
 
 use super::MqttSourceConfig;
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext},
+    SourceSender,
+    config::{SourceConfig, SourceContext, log_schema},
     event::Event,
     test_util::components::assert_source_compliance,
-    SourceSender,
 };
 
 fn mqtt_broker_address() -> String {
@@ -108,7 +108,7 @@ async fn mqtt_happy() {
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             }
         }
         assert!(expected_messages.is_empty());

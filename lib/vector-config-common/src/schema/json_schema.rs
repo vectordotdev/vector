@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{iter, ops::Deref};
 
-use super::{Map, Set, DEFINITIONS_PREFIX};
+use super::{DEFINITIONS_PREFIX, Map, Set};
 
 /// A JSON Schema.
 #[allow(clippy::large_enum_variant)]
@@ -615,8 +615,7 @@ pub fn get_cleaned_schema_reference(schema_ref: &str) -> &str {
         cleaned
     } else {
         panic!(
-            "Tried to clean schema reference that does not start with the definition prefix: {}",
-            schema_ref
+            "Tried to clean schema reference that does not start with the definition prefix: {schema_ref}"
         );
     }
 }

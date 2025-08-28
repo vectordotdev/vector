@@ -6,20 +6,20 @@ use std::{
 };
 
 use aws_sdk_s3::{
+    Client as S3Client,
     operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
     types::{
         DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
         ObjectLockRule,
     },
-    Client as S3Client,
 };
 use aws_smithy_runtime_api::client::result::SdkError;
 use bytes::Buf;
 use flate2::read::MultiGzDecoder;
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
-use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
+use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 use vector_lib::{
     config::proxy::ProxyConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
@@ -27,7 +27,7 @@ use vector_lib::{
 
 use super::S3SinkConfig;
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
     config::SinkContext,
     sinks::{
@@ -37,8 +37,8 @@ use crate::{
     },
     test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, AWS_SINK_TAGS,
-            COMPONENT_ERROR_TAGS,
+            AWS_SINK_TAGS, COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_sink_error,
         },
         random_lines_with_stream, random_string,
     },
@@ -402,11 +402,13 @@ async fn s3_healthchecks_invalid_bucket() {
         .create_service(&ProxyConfig::from_env())
         .await
         .unwrap();
-    assert!(config
-        .build_healthcheck(service.client())
-        .unwrap()
-        .await
-        .is_err());
+    assert!(
+        config
+            .build_healthcheck(service.client())
+            .unwrap()
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -466,12 +468,14 @@ async fn s3_flush_on_exhaustion() {
     // outputs for the in-flight batch are flushed. By timing out in 3 seconds with a
     // flush period of ten seconds, we verify that the flush is triggered *at stream
     // completion* and not because of periodic flushing.
-    assert!(tokio::time::timeout(
-        Duration::from_secs(3),
-        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS)
-    )
-    .await
-    .is_ok());
+    assert!(
+        tokio::time::timeout(
+            Duration::from_secs(3),
+            run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS)
+        )
+        .await
+        .is_ok()
+    );
 
     let keys = get_keys(&bucket, prefix).await;
     assert_eq!(keys.len(), 1);
@@ -561,9 +565,9 @@ async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
         Err(err) => match err {
             SdkError::ServiceError(inner) => match &inner.err() {
                 CreateBucketError::BucketAlreadyOwnedByYou(_) => {}
-                err => panic!("Failed to create bucket: {:?}", err),
+                err => panic!("Failed to create bucket: {err:?}"),
             },
-            err => panic!("Failed to create bucket: {:?}", err),
+            err => panic!("Failed to create bucket: {err:?}"),
         },
     }
 }

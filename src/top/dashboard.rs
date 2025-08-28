@@ -1,21 +1,21 @@
 use crate::internal_telemetry::is_allocation_tracking_enabled;
 use crossterm::{
+    ExecutableCommand,
     cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     tty::IsTty,
-    ExecutableCommand,
 };
 use num_format::{Locale, ToFormattedString};
 use number_prefix::NumberPrefix;
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
-    Frame, Terminal,
 };
 use std::{io::stdout, time::Duration};
 use tokio::sync::oneshot;
@@ -71,7 +71,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::decimal(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}"),
             },
         }
     }
@@ -83,7 +83,7 @@ impl HumanFormatter for i64 {
             0 => "--".into(),
             n => match NumberPrefix::binary(*n as f64) {
                 NumberPrefix::Standalone(n) => n.to_string(),
-                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}B", n, p),
+                NumberPrefix::Prefixed(p, n) => format!("{n:.2} {p}B"),
             },
         }
     }
@@ -212,10 +212,12 @@ impl<'a> Widgets<'a> {
         for (_, r) in state.components.iter() {
             let mut data = vec![
                 r.key.id().to_string(),
-                (!r.has_displayable_outputs())
-                    .then_some("--")
-                    .unwrap_or_default()
-                    .to_string(),
+                if !r.has_displayable_outputs() {
+                    "--"
+                } else {
+                    Default::default()
+                }
+                .to_string(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];

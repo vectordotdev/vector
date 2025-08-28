@@ -1,11 +1,11 @@
 use futures::FutureExt;
-use http::{header::AUTHORIZATION, Request, Uri};
+use http::{Request, Uri, header::AUTHORIZATION};
 use hyper::Body;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
-    config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
+    config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -13,12 +13,12 @@ use crate::{
     codecs::Transformer,
     http::HttpClient,
     sinks::{
+        BuildError, Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
-            http::HttpStatusRetryLogic, BatchConfig, Compression, ServiceBuilderExt,
-            SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            http::HttpStatusRetryLogic,
         },
-        BuildError, Healthcheck, HealthcheckError, VectorSink,
     },
 };
 
@@ -146,7 +146,7 @@ impl SinkConfig for AppsignalConfig {
 }
 
 async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {}", push_api_key));
+    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {
@@ -169,7 +169,7 @@ pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use super::{endpoint_uri, AppsignalConfig};
+    use super::{AppsignalConfig, endpoint_uri};
 
     #[test]
     fn generate_config() {

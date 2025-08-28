@@ -9,17 +9,17 @@ use vector_lib::lookup::{lookup_v2::OptionalValuePath, path};
 use vector_lib::shutdown::ShutdownSignal;
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     serde::default_decoding,
     sources::{
-        util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
+        util::{build_unix_datagram_source, build_unix_stream_source},
     },
-    SourceSender,
 };
 
-use super::{default_host_key, SocketConfig};
+use super::{SocketConfig, default_host_key};
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
@@ -99,7 +99,7 @@ fn handle_events(
     let now = Utc::now();
 
     for event in events {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
 
             if let Some(ref host) = received_from {

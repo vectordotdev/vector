@@ -1,8 +1,8 @@
 use super::{
-    schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput, WildcardMatching,
+    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
+    TransformOutput, WildcardMatching, schema,
 };
-use indexmap::{set::IndexSet, IndexMap};
+use indexmap::{IndexMap, set::IndexSet};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
@@ -26,7 +26,7 @@ impl fmt::Display for Node {
             Node::Source { outputs } => {
                 write!(f, "component_kind: source\n  outputs:")?;
                 for output in outputs {
-                    write!(f, "\n    {}", output)?;
+                    write!(f, "\n    {output}")?;
                 }
                 Ok(())
             }
@@ -36,7 +36,7 @@ impl fmt::Display for Node {
                     "component_kind: source\n  input_types: {in_ty}\n  outputs:"
                 )?;
                 for output in outputs {
-                    write!(f, "\n    {}", output)?;
+                    write!(f, "\n    {output}")?;
                 }
                 Ok(())
             }
@@ -177,7 +177,9 @@ impl Graph {
                     // using value != glob::Pattern::escape(value) to check if value is a glob
                     // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
                     if from != glob::Pattern::escape(from) {
-                        info!("Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled.");
+                        info!(
+                            "Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled."
+                        );
                         return Ok(());
                     }
                 }
@@ -187,7 +189,7 @@ impl Graph {
                 "Available components:\n{}",
                 self.nodes
                     .iter()
-                    .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
+                    .map(|(key, node)| format!("\"{key}\":\n  {node}"))
                     .collect::<Vec<_>>()
                     .join("\n")
             );
@@ -353,7 +355,7 @@ impl Graph {
 
         for id in self.valid_inputs() {
             if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
-                errors.insert(format!("Input specifier {} is ambiguous", id));
+                errors.insert(format!("Input specifier {id} is ambiguous"));
             }
         }
 

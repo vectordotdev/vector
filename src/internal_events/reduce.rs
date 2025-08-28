@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type, InternalEvent};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 use vrl::path::PathParseError;
 use vrl::value::KeyString;
 
@@ -26,7 +26,7 @@ impl InternalEvent for ReduceAddEventError {
             error = ?self.error,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

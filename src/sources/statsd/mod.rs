@@ -8,19 +8,20 @@ use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde_with::serde_as;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use tokio_util::udp::UdpFramed;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::codecs::{
-    decoding::{self, Deserializer, Framer},
     NewlineDelimitedDecoder,
+    decoding::{self, Deserializer, Framer},
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use self::parser::ParseError;
-use super::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource};
+use super::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket};
 use crate::{
+    SourceSender,
     codecs::Decoder,
     config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
     event::Event,
@@ -32,7 +33,6 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    SourceSender,
 };
 
 pub mod parser;
@@ -42,7 +42,7 @@ mod unix;
 use parser::Parser;
 
 #[cfg(unix)]
-use unix::{statsd_unix, UnixConfig};
+use unix::{UnixConfig, statsd_unix};
 use vector_lib::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
@@ -294,13 +294,13 @@ impl decoding::format::Deserializer for StatsdDeserializer {
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
         // The other modes already emit BytesReceived
-        if let Some(mode) = self.socket_mode {
-            if mode == SocketMode::Udp {
-                emit!(SocketBytesReceived {
-                    mode,
-                    byte_size: bytes.len(),
-                });
-            }
+        if let Some(mode) = self.socket_mode
+            && mode == SocketMode::Udp
+        {
+            emit!(SocketBytesReceived {
+                mode,
+                byte_size: bytes.len(),
+            });
         }
 
         match std::str::from_utf8(&bytes).map_err(ParseError::InvalidUtf8) {
@@ -335,10 +335,10 @@ async fn statsd_udp(
         })
         .await?;
 
-    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-        }
+    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
+        && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
     }
 
     info!(
@@ -409,19 +409,19 @@ mod test {
     use tokio::{
         io::AsyncWriteExt,
         net::UdpSocket,
-        time::{sleep, Duration, Instant},
+        time::{Duration, Instant, sleep},
     };
     use vector_lib::{
         config::ComponentKey,
-        event::{metric::TagValue, EventContainer},
+        event::{EventContainer, metric::TagValue},
     };
 
     use super::*;
     use crate::test_util::{
         collect_limited,
         components::{
-            assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-            SOCKET_PUSH_SOURCE_TAGS,
+            COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
+            assert_source_error,
         },
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,

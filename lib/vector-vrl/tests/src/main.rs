@@ -6,7 +6,7 @@ mod test_enrichment;
 
 use std::env;
 use std::path::PathBuf;
-use vrl::test::{get_tests_from_functions, run_tests, Test, TestConfig};
+use vrl::test::{Test, TestConfig, get_tests_from_functions, run_tests};
 
 use chrono_tz::Tz;
 use clap::Parser;
@@ -56,7 +56,7 @@ pub struct Cmd {
 impl Cmd {
     fn timezone(&self) -> TimeZone {
         if let Some(ref tz) = self.timezone {
-            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {}", tz))
+            TimeZone::parse(tz).unwrap_or_else(|| panic!("couldn't parse timezone: {tz}"))
         } else {
             TimeZone::Named(Tz::UTC)
         }
@@ -68,10 +68,10 @@ fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
         return false;
     }
 
-    if let Some(pat) = pat {
-        if !name.contains(pat) {
-            return false;
-        }
+    if let Some(pat) = pat
+        && !name.contains(pat)
+    {
+        return false;
     }
 
     true

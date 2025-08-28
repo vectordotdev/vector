@@ -1,17 +1,17 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use super::{
-    builder::{self, TopologyPieces},
+    BuiltBuffer, TaskHandle,
+    builder::{self, TopologyPieces, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
-    BuiltBuffer, TaskHandle,
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -21,11 +21,11 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
-use futures::{future, Future, FutureExt};
+use futures::{Future, FutureExt, future};
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
+    time::{Duration, Instant, interval, sleep_until},
 };
 use tracing::Instrument;
 use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
@@ -195,18 +195,29 @@ impl RunningTopology {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let time_remaining = deadline
-                    .map(|d| match d.checked_duration_since(Instant::now()) {
-                        Some(remaining) => format!("{} seconds left", remaining.as_secs()),
-                        None => "overdue".to_string(),
-                    })
-                    .unwrap_or("no time limit".to_string());
+                let (deadline_passed, time_remaining) = match deadline {
+                    Some(d) => match d.checked_duration_since(Instant::now()) {
+                        Some(remaining) => (false, format!("{} seconds left", remaining.as_secs())),
+                        None => (true, "overdue".to_string()),
+                    },
+                    None => (false, "no time limit".to_string()),
+                };
 
                 info!(
                     remaining_components = ?remaining_components,
                     time_remaining = ?time_remaining,
                     "Shutting down... Waiting on running components."
                 );
+
+                let all_done = check_handles.is_empty();
+
+                if all_done {
+                    info!("Shutdown reporter exiting: all components shut down.");
+                    break;
+                } else if deadline_passed {
+                    error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
+                    break;
+                }
             }
         };
 
@@ -253,8 +264,7 @@ impl RunningTopology {
 
         if self.config.global != new_config.global {
             error!(
-                message =
-                "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
+                message = "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
             );
             return Ok(false);
         }
@@ -316,23 +326,26 @@ impl RunningTopology {
         if let Some(mut new_pieces) =
             TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
                 .await
-        {
-            if self
+            && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
-            {
-                self.connect_diff(&diff, &mut new_pieces).await;
-                self.spawn_diff(&diff, new_pieces);
+        {
+            self.connect_diff(&diff, &mut new_pieces).await;
+            self.spawn_diff(&diff, new_pieces);
 
-                info!("Old configuration restored successfully.");
+            info!("Old configuration restored successfully.");
 
-                return Ok(false);
-            }
+            return Ok(false);
         }
 
         error!("Failed to restore old configuration.");
 
         Err(())
+    }
+
+    /// Attempts to reload enrichment tables.
+    pub(crate) async fn reload_enrichment_tables(&self) {
+        reload_enrichment_tables(&self.config).await;
     }
 
     pub(crate) async fn run_healthchecks(
@@ -1196,8 +1209,8 @@ impl RunningTopology {
         ) {
             (Some(e), None) => {
                 warn!(
-                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-            );
+                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+                );
                 if e < Duration::from_secs(0) {
                     None
                 } else {
