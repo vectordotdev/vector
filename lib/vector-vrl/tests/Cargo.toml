@@ -16,7 +16,7 @@ clap.workspace = true
 glob.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"] }
+tracing-subscriber = { workspace = true, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6.0" }

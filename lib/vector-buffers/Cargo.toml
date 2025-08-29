@@ -49,7 +49,7 @@ serde_yaml.workspace = true
 temp-dir = "0.1.16"
 tokio-test = "0.4.4"
 tracing-fluent-assertions = { version = "0.3" }
-tracing-subscriber = { version = "0.3.20", default-features = false, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 
 [[bench]]
 name = "sized_records"
