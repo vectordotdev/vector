@@ -451,8 +451,6 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    #[cfg(all(windows, feature = "sources-windows_eventlog"))]
-    use crate::sources::windows_eventlog::error::WindowsEventLogError;
 
     #[test]
     fn test_subscription_started_event() {

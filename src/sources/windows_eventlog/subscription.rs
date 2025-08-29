@@ -572,8 +572,7 @@ impl EventLogSubscription {
         }
 
         // Safe string field extraction with length validation
-        let provider_name = Self::extract_xml_attribute(&xml, "Name")
-            .or_else(|| Self::extract_xml_value(&xml, "Provider"))
+        let provider_name = Self::extract_provider_name(&xml)
             .filter(|s| !s.is_empty() && s.len() <= 256)
             .unwrap_or_else(|| "Unknown".to_string());
 
@@ -591,6 +590,10 @@ impl EventLogSubscription {
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
 
+        // Extract rendered message before moving values
+        let rendered_message = Self::extract_message_from_xml(&xml, event_id, &provider_name, &computer);
+        let event_data = Self::extract_event_data(&xml);
+        
         let event = WindowsEvent {
             record_id,
             event_id,
@@ -609,12 +612,12 @@ impl EventLogSubscription {
             activity_id: Self::extract_xml_value(&xml, "ActivityID"),
             related_activity_id: Self::extract_xml_value(&xml, "RelatedActivityID"),
             raw_xml: if self.config.include_xml {
-                xml
+                xml.clone()
             } else {
                 String::new()
             },
-            rendered_message: None, // Would be rendered in full implementation
-            event_data: HashMap::new(), // Would be extracted from EventData section
+            rendered_message,
+            event_data,
             user_data: HashMap::new(), // Would be extracted from UserData section
         };
 
@@ -703,6 +706,128 @@ impl EventLogSubscription {
         }
 
         None
+    }
+
+    /// Extract provider name from Windows Event Log XML
+    /// Handles the specific format: <Provider Name='EventLog'/>
+    fn extract_provider_name(xml: &str) -> Option<String> {
+        // Look for Provider element with Name attribute pattern: <Provider Name="..." or <Provider Name='...'
+        let pattern = r#"<Provider\s+Name=['"]([^'"]+)['"]"#;
+        if let Ok(re) = regex::Regex::new(pattern) {
+            if let Some(cap) = re.captures(xml) {
+                return cap.get(1).map(|m| m.as_str().to_string());
+            }
+        }
+        None
+    }
+
+    /// Extract EventData from Windows Event Log XML
+    fn extract_event_data(xml: &str) -> HashMap<String, String> {
+        let mut event_data = HashMap::new();
+        
+        // Parse EventData section and extract Data elements
+        let mut reader = Reader::from_str(xml);
+        reader.trim_text(true);
+        
+        let mut buf = Vec::new();
+        let mut inside_event_data = false;
+        let mut inside_data = false;
+        let mut current_data_name = String::new();
+        let mut current_data_value = String::new();
+        
+        const MAX_ITERATIONS: usize = 1000;
+        let mut iterations = 0;
+        
+        loop {
+            if iterations >= MAX_ITERATIONS {
+                break;
+            }
+            iterations += 1;
+            
+            match reader.read_event_into(&mut buf) {
+                Ok(XmlEvent::Start(ref e)) => {
+                    let name = e.name();
+                    if name.as_ref() == b"EventData" {
+                        inside_event_data = true;
+                    } else if inside_event_data && name.as_ref() == b"Data" {
+                        inside_data = true;
+                        current_data_name.clear();
+                        current_data_value.clear();
+                        
+                        // Look for Name attribute
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                if attr.key.as_ref() == b"Name" {
+                                    current_data_name = String::from_utf8_lossy(&attr.value).into_owned();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(XmlEvent::End(ref e)) => {
+                    let name = e.name();
+                    if name.as_ref() == b"EventData" {
+                        inside_event_data = false;
+                    } else if name.as_ref() == b"Data" && inside_data {
+                        inside_data = false;
+                        // If we have both name and value, add to map
+                        if !current_data_name.is_empty() {
+                            event_data.insert(current_data_name.clone(), current_data_value.clone());
+                        } else {
+                            // Use numeric index for unnamed data elements
+                            let index = event_data.len();
+                            event_data.insert(format!("Data_{}", index), current_data_value.clone());
+                        }
+                    }
+                }
+                Ok(XmlEvent::Text(ref e)) => {
+                    if inside_event_data && inside_data {
+                        if let Ok(text) = e.unescape() {
+                            current_data_value.push_str(&text);
+                        }
+                    }
+                }
+                Ok(XmlEvent::Eof) => break,
+                Err(_) => break,
+                _ => {}
+            }
+            
+            buf.clear();
+        }
+        
+        event_data
+    }
+
+    /// Extract or construct a meaningful message from the event
+    fn extract_message_from_xml(xml: &str, event_id: u32, provider_name: &str, computer: &str) -> Option<String> {
+        // First try to extract event data for context
+        let event_data = Self::extract_event_data(xml);
+        
+        // For some well-known event types, construct meaningful messages
+        match event_id {
+            6009 => {
+                // Microsoft Windows kernel version message
+                if let (Some(version), Some(build)) = (event_data.get("Data_0"), event_data.get("Data_1")) {
+                    return Some(format!("Microsoft Windows kernel version {} build {} started", version, build));
+                }
+            }
+            _ => {
+                // For other events, try to construct from available data
+                if !event_data.is_empty() {
+                    let data_summary: Vec<String> = event_data.iter()
+                        .take(3) // Limit to first 3 data items
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect();
+                    if !data_summary.is_empty() {
+                        return Some(format!("Event ID {} from {} ({})", event_id, provider_name, data_summary.join(", ")));
+                    }
+                }
+            }
+        }
+        
+        // Fall back to generic message with provider name
+        Some(format!("Event ID {} from {} on {}", event_id, provider_name, computer))
     }
 
     fn build_xpath_query(&self, channel: &str) -> Result<String, WindowsEventLogError> {
@@ -847,7 +972,7 @@ impl EventLogSubscription {
         events: &[WindowsEvent],
     ) -> Result<(), WindowsEventLogError> {
         if let Some(ref path) = self.bookmark_file {
-            if events.is_empty() {
+            if events.is_empty() && self.last_bookmarks.is_empty() {
                 return Ok(());
             }
 

@@ -269,7 +269,7 @@ impl EventLogParser {
         for (field_name, format) in &self.config.event_data_format {
             if let Some(current_value) = log_event.get(field_name.as_str()) {
                 let formatted_value = self.format_value(current_value, format)?;
-                log_event.try_insert(field_name.as_str(), formatted_value);
+                log_event.insert(field_name.as_str(), formatted_value);
             }
         }
 
