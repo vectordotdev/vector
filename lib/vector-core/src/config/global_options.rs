@@ -448,7 +448,7 @@ mod tests {
         );
     }
 
-     #[test]
+    #[test]
     fn diff_detects_changed_keys() {
         let old = GlobalOptions {
             data_dir: Some(std::path::PathBuf::from("/path1")),
@@ -463,7 +463,7 @@ mod tests {
             vec!["data_dir".to_string()]
         );
     }
-    
+
     fn merge<P: Debug, T>(
         name: &str,
         dd1: Option<P>,
