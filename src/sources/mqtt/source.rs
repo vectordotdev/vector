@@ -54,7 +54,7 @@ impl MqttSource {
                 client
                     .subscribe_many(
                         topics
-                            .into_iter()
+                            .iter()
                             .cloned()
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
