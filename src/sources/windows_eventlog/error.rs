@@ -1,5 +1,4 @@
 use snafu::Snafu;
-use std::fmt;
 
 /// Errors that can occur when working with Windows Event Logs.
 #[derive(Debug, Snafu)]

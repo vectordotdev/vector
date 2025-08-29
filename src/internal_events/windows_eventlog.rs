@@ -8,8 +8,8 @@ use vector_lib::emit;
 use vector_lib::internal_event::InternalEvent;
 use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
-#[cfg(all(windows, feature = "sources-windows_eventlog"))]
-use crate::sources::windows_eventlog::error::WindowsEventLogError;
+// #[cfg(all(windows, feature = "sources-windows_eventlog"))]
+// use crate::sources::windows_eventlog::error::WindowsEventLogError;
 
 #[derive(Debug)]
 pub struct WindowsEventLogSubscriptionStarted<'a> {
