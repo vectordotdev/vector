@@ -2,6 +2,7 @@
 #![cfg(test)]
 
 use crate::common::mqtt::MqttCommonConfig;
+use crate::serde::OneOrMany;
 use crate::test_util::trace_init;
 use crate::test_util::{components::SOURCE_TAGS, random_lines_with_stream, random_string};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
@@ -76,7 +77,7 @@ async fn mqtt_happy() {
 
         let config = MqttSourceConfig {
             common,
-            topic: topic.to_owned(),
+            topic: OneOrMany::One(topic.to_owned()),
             ..MqttSourceConfig::default()
         };
 

@@ -9,11 +9,12 @@ use crate::{
     event::BatchNotifier,
     event::Event,
     internal_events::{EndpointBytesReceived, StreamClosedError},
+    serde::OneOrMany,
     shutdown::ShutdownSignal,
     sources::mqtt::MqttSourceConfig,
     sources::util,
 };
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::config::LegacyKey;
 use vector_lib::lookup::path;
 
@@ -42,10 +43,25 @@ impl MqttSource {
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, mut connection) = self.connector.connect();
 
-        client
-            .subscribe(&self.config.topic, QoS::AtLeastOnce)
-            .await
-            .map_err(|_| ())?;
+        match &self.config.topic {
+            OneOrMany::One(topic) => {
+                client
+                    .subscribe(topic, QoS::AtLeastOnce)
+                    .await
+                    .map_err(|_| ())?;
+            }
+            OneOrMany::Many(topics) => {
+                client
+                    .subscribe_many(
+                        topics
+                            .iter()
+                            .cloned()
+                            .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
+                    )
+                    .await
+                    .map_err(|_| ())?;
+            }
+        }
 
         loop {
             tokio::select! {
