@@ -113,11 +113,9 @@ fn find_rel_next_link(header: &str) -> Option<String> {
         if let Some(url) = relpart
             .first()
             .map(|s| s.trim().trim_matches(|c| c == '<' || c == '>'))
-        {
-            if part.contains("rel=\"next\"") {
+            && part.contains("rel=\"next\"") {
                 return Some(url.to_string());
             }
-        }
     }
     None
 }
