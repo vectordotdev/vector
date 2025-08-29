@@ -515,4 +515,25 @@ generated: components: sinks: file: configuration: {
 		required: false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
+	truncate: {
+		description: "Configuration for truncating files."
+		required:    false
+		type: object: options: {
+			after_closetime_secs: {
+				description: "If this is set, files will be truncated after being closed for set amount of seconds."
+				required:    false
+				type: uint: {}
+			}
+			after_modifiedtime_secs: {
+				description: "If this is set, files will be truncated after set amount of seconds of no modifications."
+				required:    false
+				type: uint: {}
+			}
+			after_secs: {
+				description: "If this is set, files will be truncated after set amount of seconds regardless of the state."
+				required:    false
+				type: uint: {}
+			}
+		}
+	}
 }
