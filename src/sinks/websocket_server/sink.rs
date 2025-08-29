@@ -95,7 +95,8 @@ impl WebSocketListenerSink {
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) | Syslog(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
+            | Syslog(_) => false,
         }
     }
 

@@ -79,12 +79,14 @@ impl WebSocketSink {
 
     const fn should_encode_as_binary(&self) -> bool {
         use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text, Syslog,
+            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Syslog,
+            Text,
         };
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) | Syslog(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
+            | Syslog(_) => false,
         }
     }
 

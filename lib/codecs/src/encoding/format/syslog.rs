@@ -1,21 +1,16 @@
 use bytes::{BufMut, BytesMut};
-use tokio_util::codec::Encoder;
-use vector_core::{config::DataType, event::{Event, LogEvent}, schema};
-use chrono::{DateTime, SecondsFormat, SubsecRound, Utc};
-use vrl::value::{ObjectMap, Value};
-use vector_config::configurable_component;
-
+use chrono::{DateTime, NaiveDate, SecondsFormat, SubsecRound, Utc};
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
-
-// All of this block is to support the Facility + Severity enums with convenience of string or ordinal config value:
-use std::str::FromStr;
-use strum::{FromRepr, EnumString, VariantNames};
-// `akin` macro for DRY impl to share with both enums due to lack of a `FromRepr` trait:
-use akin::akin;
-// Custom deserialization with serde needed:
-use serde::{Deserialize, Deserializer, de::Error};
-use serde_aux::field_attributes::deserialize_number_from_string;
-use snafu::{Snafu, OptionExt};
+use strum::{EnumString, FromRepr, VariantNames};
+use tokio_util::codec::Encoder;
+use vector_config::configurable_component;
+use vector_core::{
+    config::DataType,
+    event::{Event, LogEvent, Value},
+    schema,
+};
+use vrl::value::ObjectMap;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -23,13 +18,13 @@ use snafu::{Snafu, OptionExt};
 #[serde(default)]
 pub struct SyslogSerializerConfig {
     /// Options for the Syslog serializer.
-    pub syslog: SyslogSerializerOptions
+    pub syslog: SyslogSerializerOptions,
 }
 
 impl SyslogSerializerConfig {
     /// Build the `SyslogSerializer` from this configuration.
     pub fn build(&self) -> SyslogSerializer {
-        SyslogSerializer::new(&self)
+        SyslogSerializer::new(self)
     }
 
     /// The data type of events that are accepted by `SyslogSerializer`.
@@ -43,45 +38,124 @@ impl SyslogSerializerConfig {
     }
 }
 
+/// A configuration value that can be either a static value or a dynamic path.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DynamicOrStatic<T: 'static> {
+    /// A static, fixed value.
+    Static(T),
+    /// A dynamic value read from a field in the event.
+    Dynamic(String),
+}
+
 /// Syslog serializer options.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
-// Serde default makes all config keys optional.
-// Each field assigns either a fixed value, or field name (lookup field key to retrieve dynamic value per `LogEvent`).
-#[serde(default)]
+#[derive(Clone, Debug)]
 pub struct SyslogSerializerOptions {
-    /// RFC
+    /// RFC to use for formatting.
+    #[serde(default)]
     rfc: SyslogRFC,
-    /// Facility
-    #[serde(deserialize_with = "Facility::deserialize")]
-    facility: Facility,
-    /// Severity
-    #[serde(deserialize_with = "Severity::deserialize")]
-    severity: Severity,
-
-    /// App Name
+    /// Syslog facility.
+    #[serde(
+        default = "default_facility",
+        deserialize_with = "deserialize_facility"
+    )]
+    facility: DynamicOrStatic<Facility>,
+    /// Syslog severity.
+    #[serde(
+        default = "default_severity",
+        deserialize_with = "deserialize_severity"
+    )]
+    severity: DynamicOrStatic<Severity>,
+    /// App Name. Can be a static string or a dynamic field path like "$.app".
     app_name: Option<String>,
-    /// Proc ID
+    /// Proc ID. Can be a static string or a dynamic field path like "$.pid".
     proc_id: Option<String>,
-    /// Msg ID
+    /// Msg ID. Can be a static string or a dynamic field path like "$.request_id".
     msg_id: Option<String>,
+    /// The key to use for the main message payload.
+    payload_key: Option<String>,
+}
 
-    /// Payload key
-    payload_key: String,
+impl Default for SyslogSerializerOptions {
+    fn default() -> Self {
+        Self {
+            rfc: SyslogRFC::default(),
+            facility: default_facility(),
+            severity: default_severity(),
+            app_name: None,
+            proc_id: None,
+            msg_id: None,
+            payload_key: Some("message".to_string()),
+        }
+    }
+}
 
-    // Q: The majority of the fields above pragmatically only make sense as config for keys to query?
+fn default_facility() -> DynamicOrStatic<Facility> {
+    DynamicOrStatic::Static(Facility::User)
+}
+fn default_severity() -> DynamicOrStatic<Severity> {
+    DynamicOrStatic::Static(Severity::Informational)
+}
+
+fn deserialize_facility<'de, D>(deserializer: D) -> Result<DynamicOrStatic<Facility>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.starts_with("$.") {
+        Ok(DynamicOrStatic::Dynamic(s))
+    } else if let Ok(val) = s.parse::<Facility>() {
+        Ok(DynamicOrStatic::Static(val))
+    } else if let Ok(num) = s.parse::<usize>() {
+        Facility::from_repr(num)
+            .map(DynamicOrStatic::Static)
+            .ok_or_else(|| {
+                serde::de::Error::custom(format!("Invalid facility number: {}. Must be 0-23.", s))
+            })
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "Invalid facility '{}'. Expected a name, integer, or path.",
+            s
+        )))
+    }
+}
+
+fn deserialize_severity<'de, D>(deserializer: D) -> Result<DynamicOrStatic<Severity>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.starts_with("$.") {
+        Ok(DynamicOrStatic::Dynamic(s))
+    } else if let Ok(val) = s.parse::<Severity>() {
+        Ok(DynamicOrStatic::Static(val))
+    } else if let Ok(num) = s.parse::<usize>() {
+        Severity::from_repr(num)
+            .map(DynamicOrStatic::Static)
+            .ok_or_else(|| {
+                serde::de::Error::custom(format!("Invalid severity number: {}. Must be 0-7.", s))
+            })
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "Invalid severity '{}'. Expected a name, integer, or path.",
+            s
+        )))
+    }
 }
 
 /// Serializer that converts an `Event` to bytes using the Syslog format.
 #[derive(Debug, Clone)]
 pub struct SyslogSerializer {
-    config: SyslogSerializerConfig
+    config: SyslogSerializerConfig,
 }
 
 impl SyslogSerializer {
     /// Creates a new `SyslogSerializer`.
     pub fn new(conf: &SyslogSerializerConfig) -> Self {
-        Self { config: conf.clone() }
+        Self {
+            config: conf.clone(),
+        }
     }
 }
 
@@ -103,40 +177,32 @@ impl Encoder<Event> for SyslogSerializer {
     }
 }
 
-// Adapts a `LogEvent` into a `SyslogMessage` based on config from `SyslogSerializerOptions`:
-// - Splits off the responsibility of encoding logic to `SyslogMessage` (which is not dependent upon Vector types).
-// - Majority of methods are only needed to support the `decant_config()` operation.
 struct ConfigDecanter {
     log: LogEvent,
 }
 
 impl ConfigDecanter {
     fn new(log: LogEvent) -> Self {
-        Self {
-            log,
-        }
+        Self { log }
     }
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
-        let y = |v| self.replace_if_proxied_opt(v);
-        let app_name = y(&config.app_name).unwrap_or("vector".to_owned());
-        let proc_id = y(&config.proc_id);
-        let msg_id = y(&config.msg_id);
-
         SyslogMessage {
             pri: Pri {
-                facility: config.facility,
-                severity: config.severity,
+                facility: self.get_facility(config),
+                severity: self.get_severity(config),
             },
             timestamp: self.get_timestamp(),
             hostname: self.value_by_key("hostname"),
             tag: Tag {
-                app_name,
-                proc_id,
-                msg_id,
+                app_name: self
+                    .replace_if_proxied_opt(&config.app_name)
+                    .unwrap_or_else(|| "vector".to_owned()),
+                proc_id: self.replace_if_proxied_opt(&config.proc_id),
+                msg_id: self.replace_if_proxied_opt(&config.msg_id),
             },
             structured_data: self.get_structured_data(),
-            message: self.get_message(&config),
+            message: self.get_message(config),
         }
     }
 
@@ -150,78 +216,88 @@ impl ConfigDecanter {
     // Q: Why `$.message.` as the prefix? (Appears to be JSONPath syntax?)
     // NOTE: Originally named in PR as: `get_field_or_config()`
     fn replace_if_proxied(&self, value: &str) -> Option<String> {
-        value
-            .strip_prefix("$.message.")
-            .map_or(
-                Some(value.to_owned()),
-                |field_key| self.value_by_key(field_key),
-            )
+        if let Some(field_key) = value.strip_prefix("$.") {
+            self.value_by_key(field_key)
+        } else {
+            Some(value.to_owned())
+        }
     }
 
     fn value_by_key(&self, field_key: &str) -> Option<String> {
-        self.log.get(field_key).map(|field_value| {
-            field_value.to_string_lossy().to_string()
-        })
+        self.log
+            .get(field_key)
+            .map(|v| v.to_string_lossy().to_string())
     }
 
     fn get_structured_data(&self) -> Option<StructuredData> {
-        self.log.get("structured_data")
-          .and_then(|v| v.clone().into_object())
-          .map(StructuredData::from)
+        self.log
+            .get("structured_data")
+            .and_then(|v| v.clone().into_object())
+            .map(StructuredData::from)
     }
 
-    fn get_timestamp(&self) -> DateTime::<Utc> {
-        // Q: Should the timestamp source be configurable? (eg: Select a field from the `remap` transform)
-        //
-        // Concerns:
-        // - A source with `log_namespace: true` seems to cause `get_timstamp()` to return `None`?
-        // Does not seem to retrieve `%vector.ingest_timestamp`?
-        // - A sink type `console` with `timestamp_format: unix_ms` converts a `Value::Timestamp` prior to the encoder logic
-        // to `Value::Integer(i64)` instead, which won't match this condition.
-        //
-        // NOTE:
-        // Vector always manages `Value::Timestamp` as `DateTime<Utc>`, any prior TZ information context is always dropped.
-        // If restoring the TZ for a log is important, it could be handled via a remap transform?
-        //
-        // Ref:
-        // `log.get_timestamp()`:
-        // https://github.com/vectordotdev/vector/blob/ad6a48efc0f79b2c18a5c1394e5d8603fdfd1bab/lib/vector-core/src/event/log_event.rs#L543-L552
-        if let Some(Value::Timestamp(timestamp)) = self.log.get_timestamp() {
+    fn get_timestamp(&self) -> DateTime<Utc> {
+        if let Some(&Value::Timestamp(timestamp)) = self.log.get("@timestamp") {
+            timestamp
+        } else if let Some(Value::Timestamp(timestamp)) = self.log.get_timestamp() {
             *timestamp
         } else {
-            // NOTE:
-            // When timezone information is missing Vector handles conversion to UTC by assuming the local TZ:
-            // https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#time-zones
-            // There is a global option for which TZ to assume (where the default is local TZ):
-            // https://vector.dev/docs/reference/configuration/global-options/#timezone
-            // https://github.com/vectordotdev/vector/blob/58a4a2ef52e606c0f9b9fa975cf114b661300584/lib/vector-core/src/config/global_options.rs#L233-L236
-            // https://github.com/vectordotdev/vrl/blob/c010300710a00191cd406e57cd0f3e001923d598/src/compiler/datetime.rs#L88-L95
-            // VRL remap can also override that:
-            // https://vector.dev/docs/reference/configuration/transforms/remap/#timezone
-            // Vector's `syslog` source type also uses `Utc::now()` internally as a fallback:
-            // https://github.com/vectordotdev/vector/blob/58a4a2ef52e606c0f9b9fa975cf114b661300584/src/sources/syslog.rs#L430-L438
+            tracing::warn!("Timestamp not found in event, using current time.");
             Utc::now()
         }
     }
 
     fn get_message(&self, config: &SyslogSerializerOptions) -> String {
-        // `payload_key` configures where to source the value for the syslog `message`:
-        // - Not configured      => Encodes the default log message.
-        // - Field key (Valid)   => Get value by lookup (value_by_key)
-        // - Field key (Invalid) => Empty string (unwrap_or_default)
-
-        // Ref:
-        // `log.get_message()`:
-        // https://github.com/vectordotdev/vector/blob/ad6a48efc0f79b2c18a5c1394e5d8603fdfd1bab/lib/vector-core/src/event/log_event.rs#L532-L541
-        // `v.to_string_lossy()`:
-        // https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value/serde.rs#L34-L55
-        let payload = if config.payload_key.is_empty() {
-            self.log.get_message().map(|v| v.to_string_lossy().to_string() )
+        if let Some(key) = &config.payload_key {
+            // If a key is configured, try to use it.
+            self.value_by_key(key).unwrap_or_default()
         } else {
-            self.value_by_key(&config.payload_key)
-        };
+            // Otherwise, fall back to the default log message.
+            self.log
+                .get_message()
+                .map(|v| v.to_string_lossy().to_string())
+                .unwrap_or_default()
+        }
+    }
 
-        payload.unwrap_or_default()
+    fn get_facility(&self, config: &SyslogSerializerOptions) -> Facility {
+        match &config.facility {
+            DynamicOrStatic::Static(f) => *f,
+            DynamicOrStatic::Dynamic(path) => self
+                .value_by_key(path.trim_start_matches("$."))
+                .and_then(|s| {
+                    s.parse::<Facility>()
+                        .ok()
+                        .or_else(|| s.parse::<usize>().ok().and_then(Facility::from_repr))
+                })
+                .unwrap_or_else(|| {
+                    tracing::warn!(
+                        message = "Failed to resolve or parse dynamic facility, using default.",
+                        ?path
+                    );
+                    Facility::default()
+                }),
+        }
+    }
+
+    fn get_severity(&self, config: &SyslogSerializerOptions) -> Severity {
+        match &config.severity {
+            DynamicOrStatic::Static(s) => *s,
+            DynamicOrStatic::Dynamic(path) => self
+                .value_by_key(path.trim_start_matches("$."))
+                .and_then(|s| {
+                    s.parse::<Severity>()
+                        .ok()
+                        .or_else(|| s.parse::<usize>().ok().and_then(Severity::from_repr))
+                })
+                .unwrap_or_else(|| {
+                    tracing::warn!(
+                        message = "Failed to resolve or parse dynamic severity, using default.",
+                        ?path
+                    );
+                    Severity::default()
+                }),
+        }
     }
 }
 
@@ -229,20 +305,19 @@ impl ConfigDecanter {
 // SyslogMessage support
 //
 
-const NIL_VALUE: &'static str = "-";
-const SYSLOG_V1: &'static str = "1";
+const NIL_VALUE: &str = "-";
+const SYSLOG_V1: &str = "1";
 
 /// Syslog RFC
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SyslogRFC {
-    /// RFC 3164
+    /// The legacy RFC3164 syslog format.
     Rfc3164,
-
+    /// The modern RFC5424 syslog format.
     #[default]
-    /// RFC 5424
-    Rfc5424
+    Rfc5424,
 }
 
 // ABNF definition:
@@ -251,7 +326,7 @@ pub enum SyslogRFC {
 #[derive(Default, Debug)]
 struct SyslogMessage {
     pri: Pri,
-    timestamp: DateTime::<Utc>,
+    timestamp: DateTime<Utc>,
     hostname: Option<String>,
     tag: Tag,
     structured_data: Option<StructuredData>,
@@ -283,44 +358,28 @@ impl SyslogMessage {
                 // by including it in the RFC 3164 `CONTENT` field (part of MSG):
                 // https://datatracker.ietf.org/doc/html/rfc5424#appendix-A.1
                 if let Some(sd) = structured_data.as_deref() {
-                    msg_start = msg_start + " " + sd
+                    msg_start.push(' ');
+                    msg_start.push_str(sd);
                 }
-
-                [
-                    timestamp.as_str(),
-                    hostname,
-                    &msg_start,
-                ].join(" ")
-            },
+                [timestamp.as_str(), hostname, &msg_start].join(" ")
+            }
             SyslogRFC::Rfc5424 => {
                 // HEADER part fields:
                 // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2
                 // TIME-FRAC max length is 6 digits (microseconds):
                 // https://datatracker.ietf.org/doc/html/rfc5424#section-6
                 // TODO: Likewise for RFC 5424, as UTC the offset will always render as `Z` if not configurable.
-                let timestamp = self.timestamp.round_subsecs(6).to_rfc3339_opts(SecondsFormat::AutoSi, true);
+                let timestamp = self
+                    .timestamp
+                    .round_subsecs(6)
+                    .to_rfc3339_opts(SecondsFormat::AutoSi, true);
                 let tag = self.tag.encode_rfc_5424();
                 let sd = structured_data.as_deref().unwrap_or(NIL_VALUE);
-
-                [
-                    SYSLOG_V1,
-                    timestamp.as_str(),
-                    hostname,
-                    &tag,
-                    sd
-                ].join(" ")
+                [SYSLOG_V1, timestamp.as_str(), hostname, &tag, sd].join(" ")
             }
         };
 
-        [
-            &self.pri.encode(),
-            &fields_encoded,
-            " ",
-            &self.message,
-        ].concat()
-
-        // Q: RFC 5424 MSG part should technically ensure UTF-8 message begins with BOM?
-        // https://datatracker.ietf.org/doc/html/rfc5424#section-6.4
+        [&self.pri.encode(), &fields_encoded, " ", &self.message].concat()
     }
 }
 
@@ -328,7 +387,7 @@ impl SyslogMessage {
 struct Tag {
     app_name: String,
     proc_id: Option<String>,
-    msg_id: Option<String>
+    msg_id: Option<String>,
 }
 
 impl Tag {
@@ -336,24 +395,22 @@ impl Tag {
     // an RFC 3164 MSG part (TAG + CONTENT fields):
     // https://datatracker.ietf.org/doc/html/rfc5424#appendix-A.1
     fn encode_rfc_3164(&self) -> String {
-        let Self { app_name, proc_id, msg_id } = self;
-
-        match proc_id.as_deref().or(msg_id.as_deref()) {
-            Some(context) => [&app_name, "[", &context, "]:"].concat(),
-            None => [&app_name, ":"].concat()
+        if let Some(context) = self.proc_id.as_deref().or(self.msg_id.as_deref()) {
+            format!("{}[{}]:", self.app_name, context)
+        } else {
+            format!("{}:", self.app_name)
         }
     }
 
     // TAG was split into separate fields: APP-NAME, PROCID, MSGID
     // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.5
     fn encode_rfc_5424(&self) -> String {
-        let Self { app_name, proc_id, msg_id } = self;
-
         [
-            &app_name,
-            proc_id.as_deref().unwrap_or(NIL_VALUE),
-            msg_id.as_deref().unwrap_or(NIL_VALUE),
-        ].join(" ")
+            &self.app_name,
+            self.proc_id.as_deref().unwrap_or(NIL_VALUE),
+            self.msg_id.as_deref().unwrap_or(NIL_VALUE),
+        ]
+        .join(" ")
     }
 }
 
@@ -363,7 +420,7 @@ impl Tag {
 type StructuredDataMap = HashMap<String, HashMap<String, String>>;
 #[derive(Debug, Default)]
 struct StructuredData {
-    elements: StructuredDataMap
+    elements: StructuredDataMap,
 }
 
 // Used by `SyslogMessage::encode()`
@@ -372,61 +429,37 @@ impl StructuredData {
         if self.elements.is_empty() {
             NIL_VALUE.to_string()
         } else {
-            let mut s = String::new();
-
-            for (sd_id, sd_params) in &self.elements {
-                s = s + "[" + sd_id;
-                for (key, value) in sd_params {
-                    s = s + " " + key + "=\"" + value + "\"";
-                }
-                s += "]";
-            }
-
-            s
+            self.elements
+                .iter()
+                .map(|(sd_id, sd_params)| {
+                    let params_encoded = sd_params
+                        .iter()
+                        .map(|(key, value)| format!(" {}=\"{}\"", key, value))
+                        .collect::<String>();
+                    format!("[{}{}]", sd_id, params_encoded)
+                })
+                .collect()
         }
     }
 }
 
-// Used by `ConfigDecanter::decant_config()`
 impl From<ObjectMap> for StructuredData {
     fn from(fields: ObjectMap) -> Self {
-        let elements = fields.into_iter().flat_map(|(sd_id, value)| {
-            let sd_params = value
-                .into_object()?
-                .into_iter()
-                .map(|(k, v)| (k.into(), value_to_string(v)))
-                .collect();
-
-            Some((sd_id.into(), sd_params))
-        }).collect::<StructuredDataMap>();
-
+        let elements = fields
+            .into_iter()
+            .flat_map(|(sd_id, value)| {
+                let sd_params = value
+                    .into_object()?
+                    .into_iter()
+                    .map(|(k, v)| (k.into(), v.to_string_lossy().to_string()))
+                    .collect();
+                Some((sd_id.into(), sd_params))
+            })
+            .collect();
         Self { elements }
     }
 }
 
-// Only used as helper to support `StructuredData::from()`
-//
-// TODO:
-// This method could be replaced in favor of calling `v.to_string_lossy().to_string()`? (As was done elsewhere in this file):
-// https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value/serde.rs#L34-L55
-// Timestamp value is handled the same way via `timestamp_to_string()`:
-// https://github.com/vectordotdev/vrl/blob/f2d71cd26cb8270230f531945d7dee4929235905/src/value/value.rs#L175-L179
-fn value_to_string(v: Value) -> String {
-    match v {
-        Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).to_string(),
-        Value::Timestamp(timestamp) => timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true),
-        _ => v.to_string()
-    }
-}
-
-//
-// Facility + Severity support
-//
-
-// PRIVAL:
-// https://www.rfc-editor.org/rfc/rfc5424#section-6.2.1
-// > The number contained within these angle brackets is known as the Priority value (PRIVAL)
-//   and represents both the Facility and Severity.
 #[derive(Default, Debug)]
 struct Pri {
     facility: Facility,
@@ -438,7 +471,7 @@ impl Pri {
     // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
     fn encode(&self) -> String {
         let prival = (self.facility as u8 * 8) + self.severity as u8;
-        ["<", &prival.to_string(), ">"].concat()
+        format!("<{}>", prival)
     }
 }
 
@@ -450,9 +483,9 @@ impl Pri {
 // - `VariantNames` assists with generating the equivalent `de::Error::unknown_variant` serde error message.
 
 /// Syslog facility
-#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
-#[configurable_component(no_deser)]
+#[configurable_component]
 enum Facility {
     /// Kern
     Kern = 0,
@@ -506,9 +539,9 @@ enum Facility {
 }
 
 /// Syslog severity
-#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
-#[configurable_component(no_deser)]
+#[configurable_component]
 enum Severity {
     /// Emergency
     Emergency = 0,
@@ -529,49 +562,120 @@ enum Severity {
     Debug = 7,
 }
 
-// Additionally support variants from string-based integers:
-// Attempts to parse a string for ordinal mapping first, otherwise try the variant name.
-// NOTE:
-// - While `serde(rename_all = "kebab-case")` attribute would deserialize like `FromStr` + `EnumString`, config input must strictly match.
-// - To retain support for ordinal config input, a custom deserialize method is needed (as `derive(Deserialize)` is too basic):
-// - Error message should roughly match `de::Error::unknown_variant`
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::BytesMut;
+    use vector_core::event::Event;
+    use vrl::{event_path, value};
 
-akin! {
-    let &enums = [Facility, Severity];
-
-    impl *enums {
-        fn deserialize<'de, D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let value = NumberOrString::deserialize(deserializer)?;
-            let variant: Option<Self> = match &value {
-              NumberOrString::Number(num) => Self::from_repr(*num),
-              NumberOrString::String(s) => Self::from_str(&s.to_ascii_lowercase()).ok(),
-            };
-
-            variant.with_context(|| InvalidVariantSnafu {
-                input: value.to_string(),
-                variants: Self::VARIANTS.join("`, `"),
-            }).map_err(D::Error::custom)
-        }
+    fn run_encode(config: SyslogSerializerConfig, event: Event) -> String {
+        let mut serializer = SyslogSerializer::new(&config);
+        let mut buffer = BytesMut::new();
+        serializer.encode(event, &mut buffer).unwrap();
+        String::from_utf8(buffer.to_vec()).unwrap()
     }
-}
 
-// An intermediary container to deserialize config value into.
-// Ensures that a string number is properly deserialized to the `usize` variant.
-#[derive(derive_more::Display, Deserialize)]
-#[serde(untagged)]
-enum NumberOrString {
-    Number(
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        usize
-    ),
-    String(String)
-}
+    fn create_simple_log() -> LogEvent {
+        let mut log = LogEvent::from("original message");
+        log.insert(
+            event_path!("@timestamp"),
+            NaiveDate::from_ymd_opt(2025, 8, 28)
+                .unwrap()
+                .and_hms_opt(18, 30, 00)
+                .unwrap()
+                .and_local_timezone(Utc)
+                .unwrap(),
+        );
+        log.insert(event_path!("hostname"), "test-host.com");
+        log
+    }
 
-#[derive(Debug, Snafu)]
-enum StrumDeserializeError {
-    #[snafu(display("Unknown variant `{}`, expected one of `{}`", input, variants))]
-    InvalidVariant { input: String, variants: String },
+    fn create_test_log() -> LogEvent {
+        let mut log = create_simple_log();
+        log.insert(event_path!("app_name"), "my-app");
+        log.insert(event_path!("proc_id"), "12345");
+        log.insert(event_path!("msg_id"), "req-abc-789");
+        log.insert(event_path!("syslog_facility"), "daemon");
+        log.insert(event_path!("syslog_severity"), Value::from(2u64)); // Critical
+        log.insert(
+            event_path!("structured_data"),
+            value!({"metrics": {"retries": 3}}),
+        );
+        log
+    }
+
+    #[test]
+    fn test_rfc5424_basic_static_config() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc5424"
+            facility = "user"
+            severity = "notice"
+            app_name = "static-app"
+            proc_id = "987"
+            msg_id = "static-msg-id"
+            payload_key = "message"
+        "#,
+        )
+        .unwrap();
+        let log = create_simple_log();
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<13>1 2025-08-28T18:30:00Z test-host.com static-app 987 static-msg-id - original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_rfc5424_all_fields_dynamic() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            app_name = "$.app_name"
+            proc_id = "$.proc_id"
+            msg_id = "$.msg_id"
+        "#,
+        )
+        .unwrap();
+        let log = create_test_log();
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>1 2025-08-28T18:30:00Z test-host.com my-app 12345 req-abc-789 [metrics retries=\"3\"] original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_rfc3164_all_fields_dynamic() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            rfc = "rfc3164"
+            facility = "auth"
+            severity = "informational"
+            app_name = "$.app_name"
+            proc_id = "$.proc_id"
+        "#,
+        )
+        .unwrap();
+        let log = create_test_log();
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<38>Aug 28 18:30:00 test-host.com my-app[12345]: [metrics retries=\"3\"] original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_dynamic_facility_and_severity() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+            [syslog]
+            facility = "$.syslog_facility"
+            severity = "$.syslog_severity"
+        "#,
+        )
+        .unwrap();
+        let log = create_test_log();
+        let output = run_encode(config, Event::Log(log));
+        // Facility "daemon" (3) and Severity "critical" (2) -> 3 * 8 + 2 = 26
+        let expected = "<26>1 2025-08-28T18:30:00Z test-host.com vector - - [metrics retries=\"3\"] original message";
+        assert_eq!(output, expected);
+    }
 }

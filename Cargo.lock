@@ -2307,6 +2307,7 @@ dependencies = [
  "syslog_loose",
  "tokio",
  "tokio-util",
+ "toml 0.9.4",
  "tracing 0.1.41",
  "tracing-test",
  "uuid",
