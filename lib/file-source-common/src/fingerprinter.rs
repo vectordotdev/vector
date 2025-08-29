@@ -185,10 +185,20 @@ impl Fingerprinter {
         match self.strategy {
             FingerprintStrategy::DevInode => {
                 let file_handle = File::open(path).await?;
-                let metadata = file_handle.metadata().await?;
-                let dev = metadata.portable_dev().await?;
-                let ino = metadata.portable_ino().await?;
-                Ok(DevInode(dev, ino))
+                #[cfg(unix)]
+                {
+                    let metadata = file_handle.metadata().await?;
+                    let dev = metadata.portable_dev().await?;
+                    let ino = metadata.portable_ino().await?;
+                    Ok(DevInode(dev, ino))
+                }
+
+                #[cfg(windows)]
+                {
+                    let dev = file_handle.portable_dev().await?;
+                    let ino = file_handle.portable_ino().await?;
+                    Ok(DevInode(dev, ino))
+                }
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,

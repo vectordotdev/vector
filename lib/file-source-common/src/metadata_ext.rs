@@ -28,8 +28,8 @@ pub trait AsyncPortableFileExt {
 
 #[cfg(windows)]
 pub trait AsyncPortableFileExt: std::os::windows::io::AsRawHandle {
-    fn portable_dev(&self) -> std::io::Result<u64>;
-    fn portable_ino(&self) -> std::io::Result<u64>;
+    async fn portable_dev(&self) -> std::io::Result<u64>;
+    async fn portable_ino(&self) -> std::io::Result<u64>;
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
     #[allow(unused_assignments, unused_variables)]
     fn reparse_point<'a>(
@@ -94,12 +94,14 @@ impl AsyncPortableFileExt for Metadata {
 #[cfg(windows)]
 impl AsyncPortableFileExt for File {
     async fn portable_dev(&self) -> std::io::Result<u64> {
-        let info = self.get_file_info()?;
+        // FIXME unwrap
+        let info = tokio::task::spawn_blocking(move || self.get_file_info()).unwrap()?;
         Ok(info.dwVolumeSerialNumber.into())
     }
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
     async fn portable_ino(&self) -> std::io::Result<u64> {
-        let info = self.get_file_info()?;
+        // FIXME unwrap
+        let info = tokio::task::spawn_blocking(move || self.get_file_info()).unwrap()?;
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
         Ok((info.nFileIndexLow as u64) | ((info.nFileIndexHigh as u64) << 32))
     }
