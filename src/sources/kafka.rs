@@ -622,11 +622,10 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered {
-                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                            if status == BatchStatus::Delivered
+                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
                                     emit!(KafkaOffsetUpdateError { error });
                                 }
-                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -1861,10 +1860,10 @@ mod integration_test {
             .expect("create_topics failed");
 
         for result in topic_results {
-            if let Err((topic, err)) = result {
-                if err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
-                    panic!("Creating a topic failed: {:?}", (topic, err))
-                }
+            if let Err((topic, err)) = result
+                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                panic!("Creating a topic failed: {:?}", (topic, err))
             }
         }
     }

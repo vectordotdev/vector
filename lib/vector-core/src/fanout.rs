@@ -622,7 +622,10 @@ mod tests {
         fanout.send(clones, None).await.expect("should not fail");
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
+            assert_eq!(
+                collect_ready(receiver.into_stream()),
+                std::slice::from_ref(&events)
+            );
         }
     }
 

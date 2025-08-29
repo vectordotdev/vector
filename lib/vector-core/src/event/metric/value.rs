@@ -536,7 +536,7 @@ pub enum StatisticKind {
 pub enum MetricSketch {
     /// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
     ///
-    /// While DDSketch has open-source implementations based on the white paper, the version used in
+    /// While `DDSketch` has open-source implementations based on the white paper, the version used in
     /// the Datadog Agent itself is subtly different. This version is suitable for sending directly
     /// to Datadog's sketch ingest endpoint.
     ///
