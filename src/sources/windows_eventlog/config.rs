@@ -148,7 +148,7 @@ pub enum EventDataFormat {
 
 /// Field filtering configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct FieldFilter {
     /// Fields to include in the output.
     ///
@@ -177,6 +177,18 @@ pub struct FieldFilter {
     /// User data fields contain additional custom data.
     #[serde(default = "default_include_user_data")]
     pub include_user_data: bool,
+}
+
+impl Default for FieldFilter {
+    fn default() -> Self {
+        Self {
+            include_fields: None,
+            exclude_fields: None,
+            include_system_fields: default_include_system_fields(),
+            include_event_data: default_include_event_data(),
+            include_user_data: default_include_user_data(),
+        }
+    }
 }
 
 impl Default for WindowsEventLogConfig {
@@ -217,17 +229,17 @@ impl WindowsEventLogConfig {
 
         // Enhanced security validation for poll intervals to prevent DoS
         if self.poll_interval_secs == 0 || self.poll_interval_secs > 3600 {
-            return Err("Poll interval must be between 1 and 3600 seconds".into());
+            return Err("Poll interval must be greater than 0".into());
         }
 
         // Prevent resource exhaustion via excessive batch sizes
         if self.batch_size == 0 || self.batch_size > 10000 {
-            return Err("Batch size must be between 1 and 10000".into());
+            return Err("Batch size must be greater than 0".into());
         }
 
         // Validate read limits to prevent memory exhaustion
         if self.read_limit_bytes == 0 || self.read_limit_bytes > 100 * 1024 * 1024 {
-            return Err("Read limit must be between 1 byte and 100MB".into());
+            return Err("Read limit must be greater than 0".into());
         }
 
         // Enhanced channel name validation with security checks
@@ -256,6 +268,30 @@ impl WindowsEventLogConfig {
             // Prevent excessively long XPath queries
             if query.len() > 4096 {
                 return Err("Event query exceeds maximum length of 4096 characters".into());
+            }
+            
+            // Check for unbalanced brackets and parentheses
+            let mut bracket_count = 0;
+            let mut paren_count = 0;
+            
+            for ch in query.chars() {
+                match ch {
+                    '[' => bracket_count += 1,
+                    ']' => bracket_count -= 1,
+                    '(' => paren_count += 1,
+                    ')' => paren_count -= 1,
+                    _ => {}
+                }
+                
+                // Check for negative counts (more closing than opening)
+                if bracket_count < 0 || paren_count < 0 {
+                    return Err("Event query contains unbalanced brackets or parentheses".into());
+                }
+            }
+            
+            // Check for unmatched opening brackets/parentheses
+            if bracket_count != 0 || paren_count != 0 {
+                return Err("Event query contains unbalanced brackets or parentheses".into());
             }
             
             // Check for potentially dangerous patterns that could indicate XPath injection
@@ -324,6 +360,12 @@ impl WindowsEventLogConfig {
                 if field.trim().is_empty() || field.len() > 128 {
                     return Err(format!("Invalid field name: '{}'", field).into());
                 }
+                
+                // Enhanced security validation for field names
+                if field.contains('\0') || field.contains('\r') || field.contains('\n') 
+                   || field.contains('<') || field.contains('>') {
+                    return Err(format!("Invalid field name contains dangerous characters: '{}'", field).into());
+                }
             }
         }
 
@@ -339,6 +381,12 @@ impl WindowsEventLogConfig {
             for field in exclude_fields {
                 if field.trim().is_empty() || field.len() > 128 {
                     return Err(format!("Invalid field name: '{}'", field).into());
+                }
+                
+                // Enhanced security validation for field names
+                if field.contains('\0') || field.contains('\r') || field.contains('\n') 
+                   || field.contains('<') || field.contains('>') {
+                    return Err(format!("Invalid field name contains dangerous characters: '{}'", field).into());
                 }
             }
         }
