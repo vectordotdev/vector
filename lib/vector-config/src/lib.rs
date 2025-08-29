@@ -159,26 +159,26 @@ where
 
     for validation in metadata.validations() {
         if let validation::Validation::Range { minimum, maximum } = validation {
-            if let Some(min_bound) = minimum {
-                if *min_bound < mechanical_min_bound {
-                    return Err(GenerateError::IncompatibleNumericBounds {
-                        numeric_type: std::any::type_name::<N>(),
-                        bound_direction: BoundDirection::Minimum,
-                        mechanical_bound: mechanical_min_bound,
-                        specified_bound: *min_bound,
-                    });
-                }
+            if let Some(min_bound) = minimum
+                && *min_bound < mechanical_min_bound
+            {
+                return Err(GenerateError::IncompatibleNumericBounds {
+                    numeric_type: std::any::type_name::<N>(),
+                    bound_direction: BoundDirection::Minimum,
+                    mechanical_bound: mechanical_min_bound,
+                    specified_bound: *min_bound,
+                });
             }
 
-            if let Some(max_bound) = maximum {
-                if *max_bound > mechanical_max_bound {
-                    return Err(GenerateError::IncompatibleNumericBounds {
-                        numeric_type: std::any::type_name::<N>(),
-                        bound_direction: BoundDirection::Maximum,
-                        mechanical_bound: mechanical_max_bound,
-                        specified_bound: *max_bound,
-                    });
-                }
+            if let Some(max_bound) = maximum
+                && *max_bound > mechanical_max_bound
+            {
+                return Err(GenerateError::IncompatibleNumericBounds {
+                    numeric_type: std::any::type_name::<N>(),
+                    bound_direction: BoundDirection::Maximum,
+                    mechanical_bound: mechanical_max_bound,
+                    specified_bound: *max_bound,
+                });
             }
         }
     }

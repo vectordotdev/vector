@@ -653,10 +653,9 @@ impl Decoder for FluentDecoder {
                     decode::Error::InvalidDataRead(ref custom)
                     | decode::Error::InvalidMarkerRead(ref custom),
                 )) = res
+                    && custom.kind() == io::ErrorKind::UnexpectedEof
                 {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+                    return Ok(None);
                 }
 
                 (des.position() as usize, res)
@@ -696,10 +695,10 @@ impl Decoder for FluentEntryStreamDecoder {
             // attempt to parse, if we get unexpected EOF, we need more data
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
-            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                }
+            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res
+                && custom.kind() == io::ErrorKind::UnexpectedEof
+            {
+                return Ok(None);
             }
 
             let byte_size = des.position();

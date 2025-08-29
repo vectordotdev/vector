@@ -32,7 +32,8 @@ Options:
   -h         Show this help and exit
   -r <NUM>   Number of retries for the "test" phase (default: 2)
   -v         Increase verbosity; repeat for more (e.g. -vv or -vvv)
-  -e <ENV>   TEST_ENVIRONMENT to export as TEST_ENVIRONMENT (default: not set)
+  -e <ENV>   One or more environments to run (repeatable or comma-separated).
+             If provided, these are used as TEST_ENVIRONMENTS instead of auto-discovery.
 
 Notes:
   - All existing two-argument invocations remain compatible:
@@ -43,7 +44,8 @@ USAGE
 
 # Parse options
 # Note: options must come before positional args (standard getopts behavior)
-while getopts ":hr:v:" opt; do
+TEST_ENV=""
+while getopts ":hr:v:e:" opt; do
   case "$opt" in
     h)
       usage
@@ -58,6 +60,9 @@ while getopts ":hr:v:" opt; do
       ;;
     v)
       VERBOSITY+="v"
+      ;;
+    e)
+      TEST_ENV="$OPTARG"
       ;;
     \?)
       echo "error: unknown option: -$OPTARG" >&2
@@ -95,14 +100,13 @@ case "$TEST_TYPE" in
     ;;
 esac
 
-# Collect all available environments
-mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
-
-if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
-  echo "Environments found: ${#TEST_ENVIRONMENTS[@]}"
-  for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
-    echo "${TEST_ENV}"
-  done
+# Determine environments to run
+if [[ ${#TEST_ENV} -gt 0 ]]; then
+  # Use the environments supplied via -e
+  TEST_ENVIRONMENTS="${TEST_ENV}"
+else
+  # Collect all available environments via auto-discovery
+  mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
 fi
 
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do

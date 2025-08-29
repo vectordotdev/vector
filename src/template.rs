@@ -236,7 +236,7 @@ impl Template {
     }
 
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.src.is_empty()
     }
 

@@ -324,9 +324,9 @@ pub(crate) fn generate_example(
     };
 
     let file = opts.file.as_ref();
-    if file.is_some() {
-        #[allow(clippy::print_stdout)]
-        match write_config(file.as_ref().unwrap(), &builder) {
+    if let Some(path) = file {
+        match write_config(path, &builder) {
+            #[allow(clippy::print_stdout)]
             Ok(_) => {
                 println!(
                     "Config file written to {:?}",

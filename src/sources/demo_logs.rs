@@ -175,7 +175,7 @@ impl OutputFormat {
     }
 
     // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
-    pub(self) fn validate(&self) -> Result<(), DemoLogsConfigError> {
+    pub(self) const fn validate(&self) -> Result<(), DemoLogsConfigError> {
         match self {
             Self::Shuffle { lines, .. } => {
                 if lines.is_empty() {

@@ -138,11 +138,11 @@ fn should_process_tracing_event() -> bool {
 
 /// Attempts to buffer an event into the early buffer.
 fn try_buffer_event(log: &LogEvent) -> bool {
-    if SHOULD_BUFFER.load(Ordering::Acquire) {
-        if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(log.clone());
-            return true;
-        }
+    if SHOULD_BUFFER.load(Ordering::Acquire)
+        && let Some(buffer) = get_early_buffer().as_mut()
+    {
+        buffer.push(log.clone());
+        return true;
     }
 
     false
