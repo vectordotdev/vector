@@ -80,6 +80,67 @@ pub enum WindowsEventLogError {
     #[snafu(display("Operation timeout after {} seconds", timeout_secs))]
     TimeoutError { timeout_secs: u64 },
 
+    #[snafu(display("Failed to create render context: {}", source))]
+    CreateRenderContextError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("Failed to create bookmark: {}", source))]
+    CreateBookmarkError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("Failed to update bookmark: {}", source))]
+    UpdateBookmarkError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("Failed to render bookmark: {}", message))]
+    RenderBookmarkError { message: String },
+
+    #[snafu(display("Failed to format message: {}", message))]
+    FormatMessageError { message: String },
+
+    #[snafu(display("Failed to render event: {}", message))]
+    RenderEventError { message: String },
+
+    #[snafu(display("Failed to render event: {}", message))]
+    RenderError { message: String },
+
+    #[snafu(display("Failed to create subscription: {}", source))]
+    SubscriptionError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("Failed to seek events: {}", source))]
+    SeekEventsError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("Failed to load publisher metadata for '{}': {}", provider, source))]
+    LoadPublisherMetadataError {
+        provider: String,
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
     #[cfg(not(windows))]
     #[snafu(display("Windows Event Log functionality is only available on Windows"))]
     NotSupportedError,
@@ -93,19 +154,32 @@ impl WindowsEventLogError {
             Self::QueryEventsError { .. }
             | Self::ReadEventError { .. }
             | Self::ResourceExhaustedError { .. }
-            | Self::TimeoutError { .. } => true,
+            | Self::TimeoutError { .. }
+            | Self::SeekEventsError { .. } => true,
 
             // Configuration and permission issues are not recoverable
             Self::OpenChannelError { .. }
             | Self::CreateSubscriptionError { .. }
+            | Self::SubscriptionError { .. }
             | Self::AccessDeniedError { .. }
             | Self::ChannelNotFoundError { .. }
             | Self::InvalidXPathQuery { .. }
             | Self::ConfigError { .. }
-            | Self::InvalidBookmarkError { .. } => false,
+            | Self::InvalidBookmarkError { .. }
+            | Self::CreateRenderContextError { .. }
+            | Self::CreateBookmarkError { .. }
+            | Self::LoadPublisherMetadataError { .. } => false,
 
             // Parsing errors might be recoverable depending on the specific error
-            Self::ParseXmlError { .. } | Self::RenderMessageError { .. } => false,
+            Self::ParseXmlError { .. } 
+            | Self::RenderMessageError { .. }
+            | Self::FormatMessageError { .. }
+            | Self::RenderEventError { .. }
+            | Self::RenderError { .. }
+            | Self::RenderBookmarkError { .. } => false,
+
+            // Bookmark update errors could be temporary
+            Self::UpdateBookmarkError { .. } => true,
 
             // I/O and bookmark errors could be temporary
             Self::BookmarkPersistenceError { .. } | Self::IoError { .. } => true,

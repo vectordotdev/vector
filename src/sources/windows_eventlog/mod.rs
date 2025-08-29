@@ -24,9 +24,14 @@ mod config;
 pub mod error;
 mod parser;
 mod subscription;
+mod winapi;
 
 #[cfg(test)]
 mod tests;
+
+// Note: Integration tests moved to separate module due to feature requirements
+// #[cfg(all(test, feature = "windows-eventlog-integration-tests"))]
+// mod integration_tests;
 
 pub use self::config::*;
 use self::{
