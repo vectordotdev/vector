@@ -295,7 +295,7 @@ pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 #[cfg(all(windows, feature = "sources-windows_eventlog"))]
-pub(crate) use self::windows_eventlog::*;
+// pub(crate) use self::windows_eventlog::*;
 
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,

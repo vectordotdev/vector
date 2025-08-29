@@ -1,16 +1,12 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    time::{Duration, SystemTime},
 };
 
 use chrono::{DateTime, Utc};
 use quick_xml::{Reader, events::Event as XmlEvent};
-use snafu::{OptionExt, ResultExt};
-use tokio::{
-    fs,
-    io::{AsyncReadExt, AsyncWriteExt},
-};
+use regex;
+use tokio::fs;
 
 use super::{config::WindowsEventLogConfig, error::*};
 
@@ -69,7 +65,7 @@ impl EventLogSubscription {
 
         let bookmark_file = config.bookmark_db_path.clone();
 
-        let mut subscription = Self {
+        let subscription = Self {
             config: config.clone(),
             bookmark_file,
             last_bookmarks: HashMap::new(),
@@ -92,16 +88,25 @@ impl EventLogSubscription {
 
         #[cfg(windows)]
         {
+            debug!(message = "Starting event poll for all channels");
+            
             // Load bookmarks on first call if needed
             if self.last_bookmarks.is_empty() {
+                debug!(message = "Loading bookmarks for first poll");
                 self.load_bookmarks().await?;
             }
 
             let mut all_events = Vec::new();
             let max_events = self.config.batch_size as usize;
 
-            for channel in &self.config.channels {
-                let events = self.poll_channel_events(channel, max_events).await?;
+            for channel in self.config.channels.clone() {
+                debug!(message = "Polling channel for events", channel = %channel);
+                let events = self.poll_channel_events(&channel, max_events).await?;
+                debug!(
+                    message = "Channel poll completed", 
+                    channel = %channel,
+                    event_count = events.len()
+                );
                 all_events.extend(events);
 
                 if all_events.len() >= max_events {
@@ -129,14 +134,34 @@ impl EventLogSubscription {
         use windows::{
             Win32::System::EventLog::{
                 EVT_HANDLE, EvtClose, EvtNext, EvtQuery, EvtQueryChannelPath,
-                EvtQueryForwardDirection, EvtRender, EvtRenderEventXml,
+                EvtQueryForwardDirection, EvtQueryReverseDirection, EvtQueryTolerateQueryErrors,
             },
             core::HSTRING,
         };
 
         let channel_hstring = HSTRING::from(channel);
         let query = self.build_xpath_query(channel)?;
-        let query_hstring = HSTRING::from(query);
+        let query_hstring = HSTRING::from(query.clone());
+
+        // Determine query flags based on configuration
+        // Use EvtQueryTolerateQueryErrors to handle query errors gracefully
+        let mut query_flags = EvtQueryChannelPath.0 | EvtQueryTolerateQueryErrors.0;
+        
+        // For existing events, use reverse direction to read from oldest first
+        // For new events only, use forward direction to read most recent first
+        query_flags |= if self.config.read_existing_events {
+            EvtQueryReverseDirection.0  // Read from oldest to newest
+        } else {
+            EvtQueryForwardDirection.0  // Read from newest first
+        };
+
+        debug!(
+            message = "Opening Windows Event Log query",
+            channel = %channel,
+            query = %query,
+            read_existing = self.config.read_existing_events,
+            query_flags = query_flags
+        );
 
         // Open query handle
         let query_handle = unsafe {
@@ -144,7 +169,7 @@ impl EventLogSubscription {
                 None, // Session handle
                 &channel_hstring,
                 &query_hstring,
-                EvtQueryChannelPath | EvtQueryForwardDirection,
+                query_flags,
             )
         }
         .map_err(|e| WindowsEventLogError::QueryEventsError { source: e })?;
@@ -154,7 +179,9 @@ impl EventLogSubscription {
         impl Drop for SafeEventHandle {
             fn drop(&mut self) {
                 if !self.0.is_invalid() {
-                    unsafe { EvtClose(self.0) };
+                    if let Err(e) = unsafe { EvtClose(self.0) } {
+                        warn!("Failed to close event handle: {}", e);
+                    }
                 }
             }
         }
@@ -173,15 +200,39 @@ impl EventLogSubscription {
             let result = unsafe {
                 EvtNext(
                     query_handle.0,
-                    event_handles.len() as u32,
-                    event_handles.as_mut_ptr(),
-                    5000, // 5 second timeout to prevent hanging
+                    std::mem::transmute::<&mut [EVT_HANDLE], &mut [isize]>(&mut event_handles[..]),
+                    5000, // 5 second timeout
                     0,    // Flags
                     &mut returned,
                 )
             };
 
-            if !result.as_bool() || returned == 0 {
+            // Better error handling for EvtNext
+            if let Err(e) = result {
+                let error_code = e.code().0;
+                // ERROR_NO_MORE_ITEMS can be 259 (positive) or -2147024637 (negative HRESULT)
+                if error_code == 259 || error_code == -2147024637 {
+                    debug!(
+                        message = "No more events available in channel",
+                        channel = %channel,
+                        events_processed = %events.len()
+                    );
+                } else {
+                    warn!(
+                        message = "EvtNext failed with error",
+                        error_code = %error_code,
+                        channel = %channel,
+                        internal_log_rate_limit = true
+                    );
+                }
+                break;
+            }
+
+            if returned == 0 {
+                debug!(
+                    message = "EvtNext returned 0 events",
+                    channel = %channel
+                );
                 break;
             }
 
@@ -191,6 +242,12 @@ impl EventLogSubscription {
                 .collect();
 
             for (i, handle_wrapper) in safe_handles.iter().enumerate() {
+                debug!(
+                    message = "Processing event handle",
+                    channel = %channel,
+                    event_index = i,
+                    handle_valid = !handle_wrapper.0.is_invalid()
+                );
                 match self.process_event_handle(handle_wrapper.0, channel).await {
                     Ok(Some(event)) => {
                         events.push(event);
@@ -234,84 +291,123 @@ impl EventLogSubscription {
         channel: &str,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
+        use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
 
-        // Prevent excessive buffer allocation - limit to 1MB
+        // Prevent excessive buffer allocation - strict limit to 1MB for security
         const MAX_BUFFER_SIZE: u32 = 1024 * 1024;
 
-        // Get the event XML
-        let mut buffer_size = 0u32;
+        // Follow Microsoft's exact pattern: use byte buffer for EvtRender
+        const DEFAULT_BUFFER_SIZE: u32 = 4096; // 4KB default buffer
+        
+        let mut buffer_size = DEFAULT_BUFFER_SIZE;
         let mut buffer_used = 0u32;
+        let mut buffer: Vec<u8> = vec![0u8; buffer_size as usize]; // Use byte buffer
 
-        // First call to get required buffer size
-        unsafe {
+        // First attempt with default buffer size
+        let mut property_count = 0u32;
+        let result = unsafe {
             EvtRender(
-                None, // Context
+                None, // No context needed for XML rendering
                 event_handle,
-                EvtRenderEventXml,
-                0,
-                std::ptr::null_mut(),
-                &mut buffer_size,
+                EvtRenderEventXml.0,
+                buffer_size,
+                Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
                 &mut buffer_used,
+                &mut property_count,
             )
         };
 
-        if buffer_size == 0 {
-            return Err(WindowsEventLogError::ReadEventError {
-                source: windows::core::Error::from_win32(),
-            });
-        }
+        debug!(
+            message = "EvtRender first attempt result",
+            success = result.is_ok(),
+            buffer_size = %buffer_size,
+            buffer_used = %buffer_used,
+            channel = %channel
+        );
 
-        // Prevent DoS attacks via excessive memory allocation with strict validation
-        if buffer_size == 0 || buffer_size > MAX_BUFFER_SIZE {
-            warn!(
-                message = "Event XML buffer size invalid, skipping event",
-                buffer_size = %buffer_size,
-                max_size = %MAX_BUFFER_SIZE,
-                channel = %channel,
-                internal_log_rate_limit = true
+        // Check if first attempt succeeded (Microsoft pattern)
+        if result.is_ok() {
+            // First call succeeded - use this data directly
+            debug!(
+                message = "EvtRender first call succeeded, using result",
+                buffer_used = %buffer_used,
+                channel = %channel
             );
-            return Ok(None);
-        }
+        } else if let Err(e) = result {
+            let error_code = e.code();
+            if error_code == ERROR_INSUFFICIENT_BUFFER.into() {
+                // Reallocate with required size
+                if buffer_used == 0 || buffer_used > MAX_BUFFER_SIZE {
+                    warn!(
+                        message = "Event XML buffer size invalid, skipping event",
+                        buffer_used = %buffer_used,
+                        max_size = %MAX_BUFFER_SIZE,
+                        channel = %channel,
+                        internal_log_rate_limit = true
+                    );
+                    return Ok(None);
+                }
 
-        // Use checked arithmetic to prevent overflow
-        let buffer_len = match buffer_size.checked_div(2) {
-            Some(len) if len > 0 && len <= (MAX_BUFFER_SIZE / 2) => len as usize,
-            _ => {
+                debug!(
+                    message = "Reallocating buffer for event XML",
+                    old_size = %buffer_size,
+                    required_size = %buffer_used,
+                    channel = %channel
+                );
+
+                // Allocate exact size required  
+                let required_size = buffer_used;
+                buffer.resize(required_size as usize, 0);
+                
+                // Important: keep original buffer_size for second call, don't reset buffer_used to 0
+                let second_buffer_size = required_size;
+                let mut second_buffer_used = 0u32;
+
+                // Second attempt with correctly sized buffer
+                let mut second_property_count = 0u32;
+                let result = unsafe {
+                    EvtRender(
+                        None,
+                        event_handle,
+                        EvtRenderEventXml.0,
+                        second_buffer_size,
+                        Some(buffer.as_mut_ptr() as *mut std::ffi::c_void),
+                        &mut second_buffer_used,
+                        &mut second_property_count,
+                    )
+                };
+
+                if let Err(e) = result {
+                    warn!(
+                        message = "EvtRender failed on second attempt",
+                        error = %e,
+                        required_size = %required_size,
+                        second_buffer_size = %second_buffer_size,
+                        second_buffer_used = %second_buffer_used,
+                        channel = %channel,
+                        internal_log_rate_limit = true
+                    );
+                    return Err(WindowsEventLogError::ReadEventError { source: e });
+                }
+                
+                // Update buffer_used for the rest of the function
+                buffer_used = second_buffer_used;
+                buffer_size = second_buffer_size;
+            } else {
                 warn!(
-                    message = "Invalid buffer size calculation, skipping event",
-                    buffer_size = %buffer_size,
+                    message = "EvtRender failed with error",
+                    error_code = %error_code.0,
                     channel = %channel,
                     internal_log_rate_limit = true
                 );
-                return Ok(None);
+                return Err(WindowsEventLogError::ReadEventError { source: e });
             }
-        };
-        
-        let mut buffer = vec![0u16; buffer_len];
-
-        let result = unsafe {
-            EvtRender(
-                None,
-                event_handle,
-                EvtRenderEventXml,
-                buffer_size,
-                buffer.as_mut_ptr() as *mut _,
-                &mut buffer_size,
-                &mut buffer_used,
-            )
-        };
-
-        if !result.as_bool() {
-            let last_error = windows::core::Error::from_win32();
-            return Err(WindowsEventLogError::ReadEventError {
-                source: last_error,
-            });
         }
 
         // Additional safety check: ensure buffer_used doesn't exceed allocated buffer
-        if buffer_used as usize > buffer_size as usize {
+        if buffer_used as usize > buffer_size as usize || buffer_used == 0 {
             warn!(
-                message = "Buffer overrun detected in EvtRender, skipping event",
+                message = "Invalid buffer usage in EvtRender, skipping event",
                 buffer_used = %buffer_used,
                 buffer_size = %buffer_size,
                 channel = %channel,
@@ -320,22 +416,65 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-        // Safely calculate buffer slice with bounds checking
-        let used_len = match buffer_used.checked_div(2) {
-            Some(len) if len <= buffer.len() as u32 => len as usize,
-            _ => {
-                warn!(
-                    message = "Invalid buffer usage calculation, skipping event",
-                    buffer_used = %buffer_used,
-                    buffer_len = %buffer.len(),
-                    channel = %channel,
-                    internal_log_rate_limit = true
-                );
-                return Ok(None);
-            }
+        debug!(
+            message = "EvtRender succeeded",
+            buffer_size = %buffer_size,
+            buffer_used = %buffer_used,
+            channel = %channel
+        );
+
+        // Convert byte buffer to UTF-16 string (Windows XML is UTF-16)
+        if buffer_used < 2 {
+            debug!(
+                message = "Event has no XML content (buffer_used < 2), trying to log raw data",
+                buffer_used = %buffer_used,
+                raw_bytes = ?&buffer[..std::cmp::min(buffer_used as usize, 16)],
+                channel = %channel,
+            );
+            return Ok(None);
+        }
+        
+        if buffer_used % 2 != 0 {
+            debug!(
+                message = "Odd buffer size for UTF-16, might be corrupted event",
+                buffer_used = %buffer_used,
+                channel = %channel,
+            );
+            return Ok(None);
+        }
+        
+        // Convert bytes to u16 slice for UTF-16 processing
+        let u16_slice = unsafe {
+            std::slice::from_raw_parts(
+                buffer.as_ptr() as *const u16,
+                buffer_used as usize / 2
+            )
         };
         
-        let xml = String::from_utf16_lossy(&buffer[..used_len]);
+        // Remove null terminator if present
+        let xml_len = if u16_slice.len() > 0 && u16_slice[u16_slice.len() - 1] == 0 {
+            u16_slice.len() - 1
+        } else {
+            u16_slice.len()
+        };
+        
+        if xml_len == 0 {
+            debug!(
+                message = "Empty XML content, skipping event", 
+                channel = %channel,
+            );
+            return Ok(None);
+        }
+        
+        let xml = String::from_utf16_lossy(&u16_slice[..xml_len]);
+
+        // Debug: Log the actual XML we're getting to understand the structure
+        debug!(
+            message = "Received Windows Event XML",
+            xml = %xml,
+            channel = %channel,
+            internal_log_rate_limit = true
+        );
 
         // Parse the XML to extract event data
         self.parse_event_xml(xml, channel)
@@ -349,16 +488,35 @@ impl EventLogSubscription {
         // This is a simplified parser - in a real implementation, we'd use a proper XML parser
         // For now, we'll extract basic information using string parsing
 
-        // Safely parse numeric values with proper error handling
-        let record_id = Self::extract_xml_value(&xml, "RecordID")
+        // Parse Windows Event XML properly
+        // Windows Event XML has structure like:
+        // <Event><System><EventID>123</EventID><Level>4</Level><EventRecordID>456</EventRecordID>...</System>...</Event>
+        
+        // If we can't parse basic event information, the XML is likely invalid/empty
+        let record_id = Self::extract_xml_attribute(&xml, "EventRecordID")
+            .or_else(|| Self::extract_xml_value(&xml, "EventRecordID"))
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
 
-        let event_id = Self::extract_xml_value(&xml, "EventID")
+        let event_id = Self::extract_xml_attribute(&xml, "EventID")
+            .or_else(|| Self::extract_xml_value(&xml, "EventID"))
             .and_then(|s| s.parse::<u32>().ok())
             .unwrap_or(0);
+        
+        // If both record_id and event_id are 0, the XML parsing likely failed
+        // This indicates we didn't get valid Windows Event Log XML
+        if record_id == 0 && event_id == 0 {
+            debug!(
+                message = "Failed to parse event XML - no valid EventID or RecordID found",
+                xml_sample = %xml.chars().take(500).collect::<String>(),
+                channel = %channel,
+                internal_log_rate_limit = true
+            );
+            return Ok(None);
+        }
 
-        let level = Self::extract_xml_value(&xml, "Level")
+        let level = Self::extract_xml_attribute(&xml, "Level")
+            .or_else(|| Self::extract_xml_value(&xml, "Level"))
             .and_then(|s| s.parse::<u8>().ok())
             .filter(|&l| l <= 5) // Validate level is within expected range
             .unwrap_or(4);
@@ -374,11 +532,18 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-        // Safe timestamp parsing with validation
-        let time_created = match Self::extract_xml_value(&xml, "TimeCreated")
-            .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-        {
-            Some(dt) => {
+        // Safe timestamp parsing with validation - try multiple Windows timestamp formats
+        let time_created = Self::extract_xml_attribute(&xml, "SystemTime")
+            .or_else(|| Self::extract_xml_value(&xml, "TimeCreated"))
+            .or_else(|| Self::extract_xml_attribute(&xml, "TimeCreated"))
+            .and_then(|s| {
+                // Try multiple timestamp formats that Windows uses
+                DateTime::parse_from_rfc3339(&s)
+                    .or_else(|_| DateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.f%z"))
+                    .or_else(|_| DateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%z"))
+                    .ok()
+            })
+            .map(|dt| {
                 // Validate timestamp is reasonable (not too far in future/past)
                 let now = Utc::now();
                 let dt_utc = dt.with_timezone(&Utc);
@@ -395,9 +560,8 @@ impl EventLogSubscription {
                 } else {
                     dt_utc
                 }
-            }
-            None => Utc::now(),
-        };
+            })
+            .unwrap_or_else(|| Utc::now());
 
         // Apply age filter
         if let Some(max_age_secs) = self.config.max_event_age_secs {
@@ -408,11 +572,13 @@ impl EventLogSubscription {
         }
 
         // Safe string field extraction with length validation
-        let provider_name = Self::extract_xml_value(&xml, "Provider")
+        let provider_name = Self::extract_xml_attribute(&xml, "Name")
+            .or_else(|| Self::extract_xml_value(&xml, "Provider"))
             .filter(|s| !s.is_empty() && s.len() <= 256)
             .unwrap_or_else(|| "Unknown".to_string());
 
-        let computer = Self::extract_xml_value(&xml, "Computer")
+        let computer = Self::extract_xml_attribute(&xml, "Computer")
+            .or_else(|| Self::extract_xml_value(&xml, "Computer"))
             .filter(|s| !s.is_empty() && s.len() <= 256)
             .unwrap_or_else(|| "localhost".to_string());
 
@@ -456,6 +622,17 @@ impl EventLogSubscription {
     }
 
     /// Safely extract XML value using proper XML parser
+    fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
+        // Look for attribute patterns like EventID="123"
+        let pattern = format!(r#"{}="([^"]+)""#, regex::escape(attr_name));
+        if let Ok(re) = regex::Regex::new(&pattern) {
+            if let Some(cap) = re.captures(xml) {
+                return cap.get(1).map(|m| m.as_str().to_string());
+            }
+        }
+        None
+    }
+
     fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
@@ -481,7 +658,8 @@ impl EventLogSubscription {
 
             match reader.read_event_into(&mut buf) {
                 Ok(XmlEvent::Start(ref e)) => {
-                    let element_name = String::from_utf8_lossy(e.name().as_ref());
+                    let name = e.name();
+                    let element_name = String::from_utf8_lossy(name.as_ref());
                     if element_name == tag {
                         inside_target = true;
                         current_element.clear();
@@ -503,7 +681,8 @@ impl EventLogSubscription {
                     }
                 }
                 Ok(XmlEvent::End(ref e)) => {
-                    let element_name = String::from_utf8_lossy(e.name().as_ref());
+                    let name = e.name();
+                    let element_name = String::from_utf8_lossy(name.as_ref());
                     if element_name == tag && inside_target {
                         return Some(current_element.trim().to_string());
                     }
@@ -527,20 +706,29 @@ impl EventLogSubscription {
     }
 
     fn build_xpath_query(&self, channel: &str) -> Result<String, WindowsEventLogError> {
-        let mut query = "*".to_string();
-
-        if let Some(ref custom_query) = self.config.event_query {
-            query = custom_query.clone();
+        let query = if let Some(ref custom_query) = self.config.event_query {
+            custom_query.clone()
         } else {
-            // Build basic query with level filtering if needed
-            query = "*[System]".to_string();
-        }
+            // Use a more specific query that should match actual Windows Event Log events
+            // "*" means all events, which should work for any channel
+            "*".to_string()
+        };
 
         // Add bookmark filtering if we have a previous position
         if let Some(bookmark) = self.last_bookmarks.get(channel) {
             // In a full implementation, we would use the bookmark to continue from last position
-            debug!("Using bookmark for channel {}: {}", channel, bookmark);
+            debug!(
+                message = "Using bookmark for channel",
+                channel = %channel,
+                bookmark = %bookmark
+            );
         }
+
+        debug!(
+            message = "Built XPath query for Windows Event Log",
+            query = %query,
+            channel = %channel
+        );
 
         Ok(query)
     }
@@ -550,14 +738,15 @@ impl EventLogSubscription {
         {
             use windows::{
                 Win32::System::EventLog::{EvtClose, EvtOpenChannelEnum},
-                core::HSTRING,
             };
 
             // Try to enumerate channels to validate they exist
             let enum_handle = unsafe { EvtOpenChannelEnum(None, 0) }
                 .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
 
-            unsafe { EvtClose(enum_handle) };
+            if let Err(e) = unsafe { EvtClose(enum_handle) } {
+                warn!("Failed to close enum handle: {}", e);
+            }
         }
 
         Ok(())
@@ -723,7 +912,56 @@ impl EventLogSubscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    
+    #[test]
+    fn test_extract_xml_value() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="Microsoft-Windows-Kernel-General" Guid="{A68CA8B7-004F-D7B6-A698-07E2DE0F1F5D}"/>
+                <EventID>1</EventID>
+                <Version>0</Version>
+                <Level>4</Level>
+                <Task>0</Task>
+                <Opcode>0</Opcode>
+                <Keywords>0x8000000000000000</Keywords>
+                <TimeCreated SystemTime="2025-08-29T00:15:41.123456Z"/>
+                <EventRecordID>12345</EventRecordID>
+                <Correlation/>
+                <Execution ProcessID="4" ThreadID="8"/>
+                <Channel>System</Channel>
+                <Computer>TEST-MACHINE</Computer>
+            </System>
+            <EventData>
+                <Data Name="param1">value1</Data>
+                <Data Name="param2">value2</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventID"), Some("1".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Level"), Some("4".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventRecordID"), Some("12345".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Channel"), Some("System".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Computer"), Some("TEST-MACHINE".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_value(xml, "NonExistent"), None);
+    }
+
+    #[test]
+    fn test_extract_xml_attribute() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="Microsoft-Windows-Kernel-General" Guid="{A68CA8B7-004F-D7B6-A698-07E2DE0F1F5D}"/>
+                <TimeCreated SystemTime="2025-08-29T00:15:41.123456Z"/>
+            </System>
+        </Event>
+        "#;
+
+        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "Name"), Some("Microsoft-Windows-Kernel-General".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "SystemTime"), Some("2025-08-29T00:15:41.123456Z".to_string()));
+        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "NonExistent"), None);
+    }
 
     #[test]
     fn test_windows_event_level_name() {

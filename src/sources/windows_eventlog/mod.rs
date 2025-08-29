@@ -1,31 +1,27 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use futures::StreamExt;
-use snafu::{ResultExt, Snafu};
-use tokio::{select, sync::mpsc, time::interval};
+use tokio::{select, time::interval};
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::{LegacyKey, LogNamespace},
+    config::LogNamespace,
 };
-use vrl::value::{Kind, Value};
+use vrl::value::Kind;
 
 use crate::{
     SourceSender,
-    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
-    event::LogEvent,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput},
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
 };
 
 mod config;
-mod error;
+pub mod error;
 mod parser;
 mod subscription;
 
@@ -37,13 +33,6 @@ use self::{
     error::WindowsEventLogError, parser::EventLogParser, subscription::EventLogSubscription,
 };
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Invalid configuration: {}", message))]
-    InvalidConfiguration { message: String },
-    #[snafu(display("Windows Event Log API error: {}", source))]
-    WindowsEventLogApiError { source: WindowsEventLogError },
-}
 
 /// Windows Event Log source implementation
 pub struct WindowsEventLogSource {
@@ -61,12 +50,12 @@ impl WindowsEventLogSource {
     async fn run_internal(
         &mut self,
         mut out: SourceSender,
-        shutdown: ShutdownSignal,
+        mut shutdown: ShutdownSignal,
     ) -> Result<(), WindowsEventLogError> {
         let mut subscription = EventLogSubscription::new(&self.config)?;
-        let mut parser = EventLogParser::new(&self.config);
+        let parser = EventLogParser::new(&self.config);
 
-        let mut events_received = register!(EventsReceived);
+        let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
         let poll_interval = Duration::from_secs(self.config.poll_interval_secs);
@@ -80,8 +69,13 @@ impl WindowsEventLogSource {
                 }
 
                 _ = interval_stream.next() => {
+                    debug!(message = "Polling Windows Event Log for events");
                     match subscription.poll_events().await {
                         Ok(events) => {
+                            debug!(
+                                message = "Polled Windows Event Log",
+                                event_count = events.len()
+                            );
                             if events.is_empty() {
                                 continue;
                             }
@@ -93,7 +87,7 @@ impl WindowsEventLogSource {
                                 match parser.parse_event(event) {
                                     Ok(log_event) => {
                                         let byte_size = log_event.estimated_json_encoded_size_of();
-                                        total_byte_size += byte_size;
+                                        total_byte_size += byte_size.get();
                                         log_events.push(log_event);
                                     }
                                     Err(e) => {
@@ -108,11 +102,11 @@ impl WindowsEventLogSource {
 
                             if !log_events.is_empty() {
                                 let count = log_events.len();
-                                events_received.emit(count);
+                                events_received.emit(CountByteSize(count, total_byte_size.into()));
                                 bytes_received.emit(ByteSize(total_byte_size));
 
-                                if let Err(error) = out.send_batch(log_events).await {
-                                    emit!(StreamClosedError { error, count });
+                                if let Err(_error) = out.send_batch(log_events).await {
+                                    emit!(StreamClosedError { count });
                                     break;
                                 }
                             }
@@ -134,6 +128,7 @@ impl WindowsEventLogSource {
 }
 
 #[async_trait]
+#[typetag::serde(name = "windows_eventlog")]
 impl SourceConfig for WindowsEventLogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = WindowsEventLogSource::new(self.clone())?;
@@ -142,6 +137,7 @@ impl SourceConfig for WindowsEventLogConfig {
             if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
                 error!(message = "Windows Event Log source failed", %error);
             }
+            Ok(())
         }))
     }
 
@@ -170,19 +166,19 @@ impl SourceConfig for WindowsEventLogConfig {
                         ("task".into(), Kind::bytes().or_undefined()),
                         ("keywords".into(), Kind::bytes().or_undefined()),
                     ])),
-                    &log_schema().log_namespace(),
+                    [LogNamespace::Legacy],
                 )
             })
             .unwrap_or_else(vector_lib::schema::Definition::any);
 
-        vec![SourceOutput::new_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_definition)]
     }
 
     fn resources(&self) -> Vec<crate::config::Resource> {
         // Windows Event Logs are local resources
         self.channels
             .iter()
-            .map(|channel| crate::config::Resource::from(format!("windows_eventlog:{}", channel)))
+            .map(|channel| crate::config::Resource::DiskBuffer(channel.clone()))
             .collect()
     }
 
@@ -191,6 +187,8 @@ impl SourceConfig for WindowsEventLogConfig {
     }
 }
 
+use vector_config::component::SourceDescription;
+
 inventory::submit! {
-    crate::config::SourceDescription::new::<WindowsEventLogConfig>("windows_eventlog")
+    SourceDescription::new::<WindowsEventLogConfig>("windows_eventlog", "", "", "")
 }

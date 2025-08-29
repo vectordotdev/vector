@@ -1,16 +1,13 @@
-use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
+#[cfg(test)]
 use quick_xml::{Reader, events::Event as XmlEvent};
-use snafu::ResultExt;
 use vector_lib::config::{LogNamespace, log_schema};
-use vector_lib::lookup::{owned_value_path, path};
 use vrl::value::{ObjectMap, Value};
 
-use crate::event::LogEvent;
+use vector_lib::event::LogEvent;
 
 use super::{
-    config::{EventDataFormat, FieldFilter, WindowsEventLogConfig},
+    config::{EventDataFormat, WindowsEventLogConfig},
     error::*,
     subscription::WindowsEvent,
 };
@@ -67,7 +64,7 @@ impl EventLogParser {
 
         // Set timestamp
         if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.insert(timestamp_key, Value::Timestamp(event.time_created.into()));
+            log_event.try_insert(timestamp_key.to_string().as_str(), Value::Timestamp(event.time_created.into()));
         }
 
         // Set message (rendered message or event data)
@@ -78,12 +75,12 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.insert(message_key, Value::Bytes(message.into()));
+            log_event.try_insert(message_key.to_string().as_str(), Value::Bytes(message.into()));
         }
 
         // Set source/host
         if let Some(host_key) = log_schema.host_key() {
-            log_event.insert(host_key, Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(host_key.to_string().as_str(), Value::Bytes(event.computer.clone().into()));
         }
 
         // Set Windows-specific fields
@@ -102,7 +99,7 @@ impl EventLogParser {
 
         // Set standard fields
         if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.insert(timestamp_key, Value::Timestamp(event.time_created.into()));
+            log_event.try_insert(timestamp_key.to_string().as_str(), Value::Timestamp(event.time_created.into()));
         }
 
         if let Some(message_key) = log_schema.message_key() {
@@ -112,11 +109,11 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.insert(message_key, Value::Bytes(message.into()));
+            log_event.try_insert(message_key.to_string().as_str(), Value::Bytes(message.into()));
         }
 
         if let Some(host_key) = log_schema.host_key() {
-            log_event.insert(host_key, Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(host_key.to_string().as_str(), Value::Bytes(event.computer.clone().into()));
         }
 
         // Set Windows-specific fields at root level
@@ -235,14 +232,30 @@ impl EventLogParser {
                 include_set.insert(field.as_str());
             }
 
-            // Use retain instead of collecting and iterating to reduce allocations
-            log_event.retain(|key, _| include_set.contains(key.as_str()));
+            // Remove fields not in include set
+            let keys_to_remove: Vec<String> = log_event
+                .all_event_fields()
+                .map(|iter| iter.collect::<Vec<_>>())
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|(key, _)| {
+                    if !include_set.contains(key.as_str()) {
+                        Some(key.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            
+            for key in keys_to_remove {
+                log_event.remove(key.as_str());
+            }
         }
 
         // Remove fields in exclude_fields list - single pass removal
         if let Some(ref exclude_fields) = filter.exclude_fields {
             for field in exclude_fields {
-                log_event.remove(field);
+                log_event.remove(field.as_str());
             }
         }
 
@@ -254,9 +267,9 @@ impl EventLogParser {
         log_event: &mut LogEvent,
     ) -> Result<(), WindowsEventLogError> {
         for (field_name, format) in &self.config.event_data_format {
-            if let Some(current_value) = log_event.get(field_name) {
+            if let Some(current_value) = log_event.get(field_name.as_str()) {
                 let formatted_value = self.format_value(current_value, format)?;
-                log_event.insert(field_name, formatted_value);
+                log_event.try_insert(field_name.as_str(), formatted_value);
             }
         }
 
@@ -273,7 +286,7 @@ impl EventLogParser {
             EventDataFormat::Integer => {
                 let int_value = match value {
                     Value::Integer(i) => *i,
-                    Value::Float(f) => *f as i64,
+                    Value::Float(f) => f.into_inner() as i64,
                     Value::Bytes(b) => String::from_utf8_lossy(b).parse::<i64>().map_err(|_| {
                         WindowsEventLogError::FilterError {
                             message: format!(
@@ -292,7 +305,7 @@ impl EventLogParser {
             }
             EventDataFormat::Float => {
                 let float_value = match value {
-                    Value::Float(f) => *f,
+                    Value::Float(f) => f.into_inner(),
                     Value::Integer(i) => *i as f64,
                     Value::Bytes(b) => String::from_utf8_lossy(b).parse::<f64>().map_err(|_| {
                         WindowsEventLogError::FilterError {
@@ -308,7 +321,7 @@ impl EventLogParser {
                         });
                     }
                 };
-                Ok(Value::Float(float_value.into()))
+                Ok(Value::Float(ordered_float::NotNan::new(float_value).unwrap_or_else(|_| ordered_float::NotNan::new(0.0).unwrap())))
             }
             EventDataFormat::Boolean => {
                 let bool_value = match value {
@@ -334,6 +347,8 @@ impl EventLogParser {
     }
 
     /// Parse XML event data section with performance optimizations
+    /// Used for processing XML event data when include_xml is enabled
+    #[cfg(test)]
     pub fn parse_event_data_xml(
         xml: &str,
     ) -> Result<std::collections::HashMap<String, String>, WindowsEventLogError> {
@@ -363,7 +378,8 @@ impl EventLogParser {
 
             match reader.read_event_into(&mut buf) {
                 Ok(XmlEvent::Start(ref e)) => {
-                    let name = e.name().as_ref();
+                    let name = e.name();
+                    let name = name.as_ref();
 
                     if name == b"EventData" {
                         in_event_data = true;
@@ -373,7 +389,7 @@ impl EventLogParser {
 
                         // Extract the Name attribute efficiently
                         for attr in e.attributes() {
-                            let attr = attr.map_err(WindowsEventLogError::ParseXmlError)?;
+                            let attr = attr.map_err(|e| WindowsEventLogError::ParseXmlError { source: quick_xml::Error::InvalidAttr(e) })?;
                             if attr.key.as_ref() == b"Name" {
                                 // Avoid allocation by writing directly to our string
                                 current_name = String::from_utf8_lossy(&attr.value).into_owned();
@@ -383,7 +399,8 @@ impl EventLogParser {
                     }
                 }
                 Ok(XmlEvent::End(ref e)) => {
-                    let name = e.name().as_ref();
+                    let name = e.name();
+                    let name = name.as_ref();
                     if name == b"EventData" {
                         in_event_data = false;
                     } else if name == b"Data" {
@@ -392,7 +409,7 @@ impl EventLogParser {
                 }
                 Ok(XmlEvent::Text(ref e)) => {
                     if in_event_data && in_data_element && !current_name.is_empty() {
-                        let value = e.unescape().map_err(WindowsEventLogError::ParseXmlError)?;
+                        let value = e.unescape().map_err(|e| WindowsEventLogError::ParseXmlError { source: e })?;
                         event_data.insert(std::mem::take(&mut current_name), value.into_owned());
                     }
                 }
