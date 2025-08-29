@@ -547,7 +547,7 @@ mod test {
                 let mut chkptr = Checkpointer::new(data_dir.path());
                 chkptr.update_checkpoint(fingerprint, position);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-                chkptr.write_checkpoints().await.ok();
+                chkptr.write_checkpoints().await.unwrap();
             }
             {
                 let mut chkptr = Checkpointer::new(data_dir.path());
@@ -581,7 +581,7 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
@@ -624,7 +624,7 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
@@ -667,7 +667,7 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
