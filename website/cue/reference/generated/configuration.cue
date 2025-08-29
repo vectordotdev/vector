@@ -207,6 +207,12 @@ generated: configuration: configuration: {
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
+			ttl_field: {
+				type: string: default: ""
+				description:   "Field in the incoming value used as the TTL override."
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
 			locale: {
 				type: string: default: "en"
 				description: """
