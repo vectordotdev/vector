@@ -29,9 +29,9 @@ mod winapi;
 #[cfg(test)]
 mod tests;
 
-// Note: Integration tests moved to separate module due to feature requirements
-// #[cfg(all(test, feature = "windows-eventlog-integration-tests"))]
-// mod integration_tests;
+// Integration tests are feature-gated to avoid requiring Windows Event Log service
+#[cfg(all(test, feature = "sources-windows_eventlog-integration-tests"))]
+mod integration_tests;
 
 pub use self::config::*;
 use self::{
@@ -195,5 +195,10 @@ impl SourceConfig for WindowsEventLogConfig {
 use vector_config::component::SourceDescription;
 
 inventory::submit! {
-    SourceDescription::new::<WindowsEventLogConfig>("windows_eventlog", "", "", "")
+    SourceDescription::new::<WindowsEventLogConfig>(
+        "windows_eventlog",
+        "Collect logs from Windows Event Log channels",
+        "A Windows-specific source that polls Windows Event Log channels and streams events.",
+        "https://vector.dev/docs/reference/configuration/sources/windows_eventlog/"
+    )
 }
