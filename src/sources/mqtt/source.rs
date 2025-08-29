@@ -40,22 +40,22 @@ impl MqttSource {
         })
     }
 
-    pub async fn run(mut self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, mut connection) = self.connector.connect();
 
-        match &mut self.config.topic {
+        match &self.config.topic {
             OneOrMany::One(topic) => {
                 client
-                    .subscribe(&*topic, QoS::AtLeastOnce)
+                    .subscribe(topic, QoS::AtLeastOnce)
                     .await
                     .map_err(|_| ())?;
             }
             OneOrMany::Many(topics) => {
-                let topics = std::mem::take(topics);
                 client
                     .subscribe_many(
                         topics
                             .into_iter()
+                            .cloned()
                             .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
                     )
                     .await
