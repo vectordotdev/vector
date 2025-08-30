@@ -1,9 +1,5 @@
-use std::time::Duration;
-
 use async_trait::async_trait;
-use futures::StreamExt;
-use tokio::{select, time::interval};
-use tokio_stream::wrappers::IntervalStream;
+use tokio::select;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
@@ -24,7 +20,6 @@ mod config;
 pub mod error;
 mod parser;
 mod subscription;
-mod winapi;
 
 #[cfg(test)]
 mod tests;
@@ -63,8 +58,7 @@ impl WindowsEventLogSource {
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
-        let poll_interval = Duration::from_secs(self.config.poll_interval_secs);
-        let mut interval_stream = IntervalStream::new(interval(poll_interval));
+        info!("Starting Windows Event Log source with event-driven subscription");
 
         loop {
             select! {
@@ -73,17 +67,18 @@ impl WindowsEventLogSource {
                     break;
                 }
 
-                _ = interval_stream.next() => {
-                    debug!(message = "Polling Windows Event Log for events");
-                    match subscription.poll_events().await {
+                events_result = subscription.next_events(self.config.batch_size as usize) => {
+                    match events_result {
                         Ok(events) => {
-                            debug!(
-                                message = "Polled Windows Event Log",
-                                event_count = events.len()
-                            );
                             if events.is_empty() {
+                                // No events received within timeout - this is normal
                                 continue;
                             }
+
+                            debug!(
+                                message = "Received Windows Event Log events",
+                                event_count = events.len()
+                            );
 
                             let mut log_events = Vec::new();
                             let mut total_byte_size = 0;
@@ -118,7 +113,7 @@ impl WindowsEventLogSource {
                         }
                         Err(e) => {
                             error!(
-                                message = "Error polling Windows Event Log",
+                                message = "Error receiving Windows Event Log events",
                                 error = %e,
                                 internal_log_rate_limit = true
                             );

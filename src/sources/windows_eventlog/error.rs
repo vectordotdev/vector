@@ -59,11 +59,6 @@ pub enum WindowsEventLogError {
     #[snafu(display("Channel '{}' not found", channel))]
     ChannelNotFoundError { channel: String },
 
-    #[snafu(display("Invalid event bookmark: {}", message))]
-    InvalidBookmarkError { message: String },
-
-    #[snafu(display("Bookmark persistence error: {}", message))]
-    BookmarkPersistenceError { message: String },
 
     #[snafu(display("I/O error: {}", source))]
     IoError { source: std::io::Error },
@@ -88,30 +83,9 @@ pub enum WindowsEventLogError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 
-    #[snafu(display("Failed to create bookmark: {}", source))]
-    CreateBookmarkError {
-        #[cfg(windows)]
-        source: windows::core::Error,
-        #[cfg(not(windows))]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-
-    #[snafu(display("Failed to update bookmark: {}", source))]
-    UpdateBookmarkError {
-        #[cfg(windows)]
-        source: windows::core::Error,
-        #[cfg(not(windows))]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-
-    #[snafu(display("Failed to render bookmark: {}", message))]
-    RenderBookmarkError { message: String },
 
     #[snafu(display("Failed to format message: {}", message))]
     FormatMessageError { message: String },
-
-    #[snafu(display("Failed to render event: {}", message))]
-    RenderEventError { message: String },
 
     #[snafu(display("Failed to render event: {}", message))]
     RenderError { message: String },
@@ -165,24 +139,17 @@ impl WindowsEventLogError {
             | Self::ChannelNotFoundError { .. }
             | Self::InvalidXPathQuery { .. }
             | Self::ConfigError { .. }
-            | Self::InvalidBookmarkError { .. }
             | Self::CreateRenderContextError { .. }
-            | Self::CreateBookmarkError { .. }
             | Self::LoadPublisherMetadataError { .. } => false,
 
             // Parsing errors might be recoverable depending on the specific error
             Self::ParseXmlError { .. } 
             | Self::RenderMessageError { .. }
             | Self::FormatMessageError { .. }
-            | Self::RenderEventError { .. }
-            | Self::RenderError { .. }
-            | Self::RenderBookmarkError { .. } => false,
+            | Self::RenderError { .. } => false,
 
-            // Bookmark update errors could be temporary
-            Self::UpdateBookmarkError { .. } => true,
-
-            // I/O and bookmark errors could be temporary
-            Self::BookmarkPersistenceError { .. } | Self::IoError { .. } => true,
+            // I/O errors could be temporary
+            Self::IoError { .. } => true,
 
             Self::FilterError { .. } => false,
 
@@ -270,8 +237,8 @@ mod tests {
                 message: "test".to_string(),
             },
             WindowsEventLogError::TimeoutError { timeout_secs: 30 },
-            WindowsEventLogError::BookmarkPersistenceError {
-                message: "test".to_string(),
+            WindowsEventLogError::IoError {
+                source: std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"),
             },
         ];
 

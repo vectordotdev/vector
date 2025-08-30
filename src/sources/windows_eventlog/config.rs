@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
@@ -30,13 +30,13 @@ pub struct WindowsEventLogConfig {
     ))]
     pub event_query: Option<String>,
 
-    /// Polling interval in seconds for reading events.
+    /// Connection timeout in seconds for event subscription.
     ///
-    /// This controls how frequently the source checks for new events.
-    #[serde(default = "default_poll_interval_secs")]
-    #[configurable(metadata(docs::examples = 1))]
+    /// This controls how long to wait for event subscription connection.
+    #[serde(default = "default_connection_timeout_secs")]
     #[configurable(metadata(docs::examples = 30))]
-    pub poll_interval_secs: u64,
+    #[configurable(metadata(docs::examples = 60))]
+    pub connection_timeout_secs: u64,
 
     /// Whether to read existing events or only new events.
     ///
@@ -44,14 +44,6 @@ pub struct WindowsEventLogConfig {
     /// When set to `false` (default), only new events will be read.
     #[serde(default = "default_read_existing_events")]
     pub read_existing_events: bool,
-
-    /// Path to the database file for storing bookmarks.
-    ///
-    /// This SQLite database is used to store the position of the last read event
-    /// to avoid duplicating events on restart.
-    #[configurable(metadata(docs::examples = "C:\\ProgramData\\vector\\winevtlog.db"))]
-    #[configurable(metadata(docs::examples = "./winevtlog.db"))]
-    pub bookmark_db_path: Option<PathBuf>,
 
     /// Batch size for event processing.
     ///
@@ -110,12 +102,13 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 604800))]
     pub max_event_age_secs: Option<u64>,
 
-    /// Whether to use real-time event subscription.
+    /// Event delivery timeout in milliseconds.
     ///
-    /// When enabled, the source will use Windows Event Log subscription
-    /// for real-time event delivery instead of polling.
-    #[serde(default = "default_use_subscription")]
-    pub use_subscription: bool,
+    /// Maximum time to wait for event delivery before timing out.
+    #[serde(default = "default_event_timeout_ms")]
+    #[configurable(metadata(docs::examples = 5000))]
+    #[configurable(metadata(docs::examples = 10000))]
+    pub event_timeout_ms: u64,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -196,9 +189,8 @@ impl Default for WindowsEventLogConfig {
         Self {
             channels: vec!["System".to_string(), "Application".to_string()],
             event_query: None,
-            poll_interval_secs: default_poll_interval_secs(),
+            connection_timeout_secs: default_connection_timeout_secs(),
             read_existing_events: default_read_existing_events(),
-            bookmark_db_path: None,
             batch_size: default_batch_size(),
             read_limit_bytes: default_read_limit_bytes(),
             render_message: default_render_message(),
@@ -207,7 +199,7 @@ impl Default for WindowsEventLogConfig {
             ignore_event_ids: Vec::new(),
             only_event_ids: None,
             max_event_age_secs: None,
-            use_subscription: default_use_subscription(),
+            event_timeout_ms: default_event_timeout_ms(),
             log_namespace: None,
             field_filter: FieldFilter::default(),
         }
@@ -227,9 +219,14 @@ impl WindowsEventLogConfig {
             return Err("At least one channel must be specified".into());
         }
 
-        // Enhanced security validation for poll intervals to prevent DoS
-        if self.poll_interval_secs == 0 || self.poll_interval_secs > 3600 {
-            return Err("Poll interval must be greater than 0".into());
+        // Enhanced security validation for connection timeout to prevent DoS
+        if self.connection_timeout_secs == 0 || self.connection_timeout_secs > 3600 {
+            return Err("Connection timeout must be between 1 and 3600 seconds".into());
+        }
+
+        // Validate event timeout 
+        if self.event_timeout_ms == 0 || self.event_timeout_ms > 60000 {
+            return Err("Event timeout must be between 1 and 60000 milliseconds".into());
         }
 
         // Prevent resource exhaustion via excessive batch sizes
@@ -391,28 +388,18 @@ impl WindowsEventLogConfig {
             }
         }
 
-        // Validate bookmark database path for path traversal attacks
-        if let Some(ref db_path) = self.bookmark_db_path {
-            let path_str = db_path.to_string_lossy();
-            
-            // Prevent path traversal attacks
-            if path_str.contains("..") {
-                return Err("Bookmark database path cannot contain '..' components".into());
-            }
-            
-            // Prevent excessively long paths
-            if path_str.len() > 512 {
-                return Err("Bookmark database path is too long".into());
-            }
-        }
 
         Ok(())
     }
 }
 
 // Default value functions
-const fn default_poll_interval_secs() -> u64 {
-    1
+const fn default_connection_timeout_secs() -> u64 {
+    30
+}
+
+const fn default_event_timeout_ms() -> u64 {
+    5000
 }
 
 const fn default_read_existing_events() -> bool {
@@ -435,10 +422,6 @@ const fn default_include_xml() -> bool {
     false
 }
 
-const fn default_use_subscription() -> bool {
-    true
-}
-
 const fn default_include_system_fields() -> bool {
     true
 }
@@ -459,12 +442,12 @@ mod tests {
     fn test_default_config() {
         let config = WindowsEventLogConfig::default();
         assert_eq!(config.channels, vec!["System", "Application"]);
-        assert_eq!(config.poll_interval_secs, 1);
+        assert_eq!(config.connection_timeout_secs, 30);
+        assert_eq!(config.event_timeout_ms, 5000);
         assert!(!config.read_existing_events);
         assert_eq!(config.batch_size, 10);
         assert!(config.render_message);
         assert!(!config.include_xml);
-        assert!(config.use_subscription);
     }
 
     #[test]
@@ -482,12 +465,12 @@ mod tests {
         config.channels = vec!["System".to_string()];
         assert!(config.validate().is_ok());
 
-        // Zero poll interval should fail
-        config.poll_interval_secs = 0;
+        // Zero connection timeout should fail
+        config.connection_timeout_secs = 0;
         assert!(config.validate().is_err());
 
-        // Reset poll interval
-        config.poll_interval_secs = 1;
+        // Reset connection timeout
+        config.connection_timeout_secs = 30;
         assert!(config.validate().is_ok());
 
         // Zero batch size should fail
@@ -528,9 +511,8 @@ mod tests {
         let config = WindowsEventLogConfig {
             channels: vec!["System".to_string(), "Application".to_string()],
             event_query: Some("*[System[Level=1]]".to_string()),
-            poll_interval_secs: 30,
+            connection_timeout_secs: 30,
             read_existing_events: true,
-            bookmark_db_path: Some(PathBuf::from("test.db")),
             batch_size: 50,
             read_limit_bytes: 1024000,
             render_message: false,
@@ -539,7 +521,7 @@ mod tests {
             ignore_event_ids: vec![4624, 4625],
             only_event_ids: Some(vec![1000, 1001]),
             max_event_age_secs: Some(86400),
-            use_subscription: false,
+            event_timeout_ms: 5000,
             log_namespace: Some(true),
             field_filter: FieldFilter::default(),
         };
@@ -551,7 +533,7 @@ mod tests {
 
         assert_eq!(config.channels, deserialized.channels);
         assert_eq!(config.event_query, deserialized.event_query);
-        assert_eq!(config.poll_interval_secs, deserialized.poll_interval_secs);
+        assert_eq!(config.connection_timeout_secs, deserialized.connection_timeout_secs);
         assert_eq!(
             config.read_existing_events,
             deserialized.read_existing_events
