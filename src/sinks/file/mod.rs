@@ -101,7 +101,7 @@ pub struct FileSinkConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct FileTruncateConfig {
-    /// If this is set, files will be truncated after being closed for set amount of seconds.
+    /// If this is set, files will be truncated after being closed for a set amount of seconds.
     #[serde(default)]
     pub after_closetime_secs: Option<NonZeroU64>,
     /// If this is set, files will be truncated after set amount of seconds of no modifications.
