@@ -10,6 +10,37 @@ use tokio::sync::mpsc;
 
 use super::{config::WindowsEventLogConfig, error::*};
 
+/// System fields from Windows Event Log XML (Single Responsibility)
+#[derive(Debug, Clone)]
+struct SystemFields {
+    pub event_id: u32,
+    pub level: u8,
+    pub task: u16,
+    pub opcode: u8,
+    pub keywords: u64,
+    pub version: Option<u8>,
+    pub qualifiers: Option<u16>,
+    pub record_id: u64,
+    pub activity_id: Option<String>,
+    pub related_activity_id: Option<String>,
+    pub process_id: u32,
+    pub thread_id: u32,
+    pub channel: String,
+    pub computer: String,
+    pub user_id: Option<String>,
+    pub time_created: DateTime<Utc>,
+    pub provider_name: String,
+    pub provider_guid: Option<String>,
+}
+
+/// Result from EventData parsing (supports both formats)
+#[derive(Debug, Clone)]
+pub struct EventDataResult {
+    pub structured_data: HashMap<String, String>, // Named fields
+    pub string_inserts: Vec<String>,              // FluentBit-style array
+    pub user_data: HashMap<String, String>,       // UserData section
+}
+
 /// Represents a Windows Event Log event
 #[derive(Debug, Clone)]
 pub struct WindowsEvent {
@@ -33,6 +64,10 @@ pub struct WindowsEvent {
     pub rendered_message: Option<String>,
     pub event_data: HashMap<String, String>,
     pub user_data: HashMap<String, String>,
+    // Additional fields for FluentBit compatibility
+    pub version: Option<u8>,
+    pub qualifiers: Option<u16>,
+    pub string_inserts: Vec<String>, // FluentBit-compatible field
 }
 
 impl WindowsEvent {
@@ -253,6 +288,59 @@ impl EventLogSubscription {
         Ok(())
     }
 
+    /// Comprehensive System section parser for all Windows Event Log fields
+    /// Extracts fields following Single Responsibility Principle
+    fn extract_system_fields(xml: &str) -> SystemFields {
+        SystemFields {
+            event_id: Self::extract_xml_value(xml, "EventID")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            level: Self::extract_xml_value(xml, "Level")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            task: Self::extract_xml_value(xml, "Task")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            opcode: Self::extract_xml_value(xml, "Opcode")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            keywords: Self::extract_xml_attribute(xml, "Keywords")
+                .and_then(|v| {
+                    // Handle both decimal and hex formats (0x prefix)
+                    if v.starts_with("0x") || v.starts_with("0X") {
+                        u64::from_str_radix(&v[2..], 16).ok()
+                    } else {
+                        v.parse().ok()
+                    }
+                })
+                .unwrap_or(0),
+            version: Self::extract_xml_value(xml, "Version")
+                .and_then(|v| v.parse().ok()),
+            qualifiers: Self::extract_xml_attribute(xml, "Qualifiers")
+                .and_then(|v| v.parse().ok()),
+            record_id: Self::extract_xml_value(xml, "EventRecordID")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            activity_id: Self::extract_xml_attribute(xml, "ActivityID"),
+            related_activity_id: Self::extract_xml_attribute(xml, "RelatedActivityID"),
+            process_id: Self::extract_xml_attribute(xml, "ProcessID")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            thread_id: Self::extract_xml_attribute(xml, "ThreadID")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            channel: Self::extract_xml_value(xml, "Channel").unwrap_or_default(),
+            computer: Self::extract_xml_value(xml, "Computer").unwrap_or_default(),
+            user_id: Self::extract_xml_attribute(xml, "UserID"),
+            time_created: Self::extract_xml_attribute(xml, "SystemTime")
+                .and_then(|v| DateTime::parse_from_rfc3339(&v).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now),
+            provider_name: Self::extract_xml_attribute(xml, "Name").unwrap_or_default(),
+            provider_guid: Self::extract_xml_attribute(xml, "Guid"),
+        }
+    }
+
     // XML parsing helper methods - cleaned up and more secure
     pub fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
         // Use regex with proper escaping to prevent injection
@@ -324,32 +412,46 @@ impl EventLogSubscription {
         None
     }
 
-    fn extract_provider_name(xml: &str) -> Option<String> {
-        let pattern = r#"<Provider\s+Name=['"]([^'"]{1,256})['"]"#; // Limit length
-        regex::Regex::new(pattern).ok()?
-            .captures(xml)?
-            .get(1)
-            .map(|m| m.as_str().to_string())
+
+    /// Enhanced EventData extraction supporting both structured data and StringInserts
+    /// Follows Open/Closed Principle - extensible without modifying existing code
+    pub fn extract_event_data(xml: &str) -> EventDataResult {
+        let mut structured_data = HashMap::new();
+        let mut string_inserts = Vec::new();
+        let mut user_data = HashMap::new();
+        
+        Self::parse_section(xml, "EventData", &mut structured_data, &mut string_inserts);
+        Self::parse_section(xml, "UserData", &mut user_data, &mut Vec::new());
+        
+        EventDataResult {
+            structured_data,
+            string_inserts,
+            user_data,
+        }
     }
 
-    pub fn extract_event_data(xml: &str) -> HashMap<String, String> {
-        let mut event_data = HashMap::new();
-        
+    /// Parse a specific XML section (EventData or UserData) - Single Responsibility
+    fn parse_section(
+        xml: &str, 
+        section_name: &str, 
+        named_data: &mut HashMap<String, String>,
+        inserts: &mut Vec<String>
+    ) {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
         
         let mut buf = Vec::new();
-        let mut inside_event_data = false;
+        let mut inside_section = false;
         let mut inside_data = false;
         let mut current_data_name = String::new();
         let mut current_data_value = String::new();
         
-        const MAX_ITERATIONS: usize = 500; // Reduced for security
-        const MAX_FIELDS: usize = 100; // Limit number of fields
+        const MAX_ITERATIONS: usize = 500; // Security limit
+        const MAX_FIELDS: usize = 100;     // Memory limit
         let mut iterations = 0;
         
         loop {
-            if iterations >= MAX_ITERATIONS || event_data.len() >= MAX_FIELDS {
+            if iterations >= MAX_ITERATIONS || named_data.len() >= MAX_FIELDS {
                 break;
             }
             iterations += 1;
@@ -357,19 +459,19 @@ impl EventLogSubscription {
             match reader.read_event_into(&mut buf) {
                 Ok(XmlEvent::Start(ref e)) => {
                     let name = e.name();
-                    if name.as_ref() == b"EventData" {
-                        inside_event_data = true;
-                    } else if inside_event_data && name.as_ref() == b"Data" {
+                    if name.as_ref() == section_name.as_bytes() {
+                        inside_section = true;
+                    } else if inside_section && name.as_ref() == b"Data" {
                         inside_data = true;
                         current_data_name.clear();
                         current_data_value.clear();
                         
-                        // Look for Name attribute
+                        // Extract Name attribute with proper validation
                         for attr in e.attributes() {
                             if let Ok(attr) = attr {
                                 if attr.key.as_ref() == b"Name" {
                                     let name_value = String::from_utf8_lossy(&attr.value);
-                                    if name_value.len() <= 128 { // Limit attribute length
+                                    if name_value.len() <= 128 && !name_value.trim().is_empty() {
                                         current_data_name = name_value.into_owned();
                                     }
                                     break;
@@ -380,26 +482,28 @@ impl EventLogSubscription {
                 }
                 Ok(XmlEvent::End(ref e)) => {
                     let name = e.name();
-                    if name.as_ref() == b"EventData" {
-                        inside_event_data = false;
+                    if name.as_ref() == section_name.as_bytes() {
+                        inside_section = false;
                     } else if name.as_ref() == b"Data" && inside_data {
                         inside_data = false;
-                        // Limit value length
+                        
+                        // Apply security limits
                         if current_data_value.len() > 1024 {
                             current_data_value.truncate(1024);
                             current_data_value.push_str("...[truncated]");
                         }
                         
+                        // Store in appropriate format based on whether Name attribute exists
                         if !current_data_name.is_empty() {
-                            event_data.insert(current_data_name.clone(), current_data_value.clone());
-                        } else {
-                            let index = event_data.len();
-                            event_data.insert(format!("Data_{}", index), current_data_value.clone());
+                            named_data.insert(current_data_name.clone(), current_data_value.clone());
+                        } else if section_name == "EventData" {
+                            // Add to StringInserts for FluentBit compatibility
+                            inserts.push(current_data_value.clone());
                         }
                     }
                 }
                 Ok(XmlEvent::Text(ref e)) => {
-                    if inside_event_data && inside_data {
+                    if inside_section && inside_data {
                         if let Ok(text) = e.unescape() {
                             if current_data_value.len() + text.len() <= 1024 {
                                 current_data_value.push_str(&text);
@@ -408,18 +512,17 @@ impl EventLogSubscription {
                     }
                 }
                 Ok(XmlEvent::Eof) => break,
-                Err(_) => break,
+                Err(_) => break, // Security: fail gracefully
                 _ => {}
             }
             
             buf.clear();
         }
-        
-        event_data
     }
 
     fn extract_message_from_xml(xml: &str, event_id: u32, provider_name: &str, computer: &str) -> Option<String> {
-        let event_data = Self::extract_event_data(xml);
+        let event_data_result = Self::extract_event_data(xml);
+        let event_data = &event_data_result.structured_data;
         
         match event_id {
             6009 => {
@@ -482,11 +585,6 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-        let level = Self::extract_xml_attribute(&xml, "Level")
-            .or_else(|| Self::extract_xml_value(&xml, "Level"))
-            .and_then(|s| s.parse::<u8>().ok())
-            .filter(|&l| l <= 5)
-            .unwrap_or(4);
 
         // Apply event ID filters early
         if let Some(ref only_ids) = config.only_event_ids {
@@ -530,47 +628,28 @@ impl EventLogSubscription {
             }
         }
 
-        // Extract other fields with length limits
-        let provider_name = Self::extract_provider_name(&xml)
-            .filter(|s| !s.is_empty() && s.len() <= 256)
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        let computer = Self::extract_xml_attribute(&xml, "Computer")
-            .or_else(|| Self::extract_xml_value(&xml, "Computer"))
-            .filter(|s| !s.is_empty() && s.len() <= 256)
-            .unwrap_or_else(|| "localhost".to_string());
-
-        let process_id = Self::extract_xml_value(&xml, "ProcessID")
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let thread_id = Self::extract_xml_value(&xml, "ThreadID")
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(0);
-
-        let rendered_message = Self::extract_message_from_xml(&xml, event_id, &provider_name, &computer);
-        let event_data = Self::extract_event_data(&xml);
+        // Use comprehensive parsing for complete field coverage
+        let system_fields = Self::extract_system_fields(&xml);
+        let event_data_result = Self::extract_event_data(&xml);
+        let rendered_message = Self::extract_message_from_xml(&xml, system_fields.event_id, &system_fields.provider_name, &system_fields.computer);
 
         let event = WindowsEvent {
-            record_id,
-            event_id,
-            level,
-            task: 0, // Would be extracted from XML in full implementation
-            opcode: 0,
-            keywords: 0,
-            time_created,
-            provider_name,
-            provider_guid: None,
-            channel: channel.to_string(),
-            computer,
-            user_id: Self::extract_xml_value(&xml, "UserID")
-                .filter(|s| s.len() <= 256),
-            process_id,
-            thread_id,
-            activity_id: Self::extract_xml_value(&xml, "ActivityID")
-                .filter(|s| s.len() <= 256),
-            related_activity_id: Self::extract_xml_value(&xml, "RelatedActivityID")
-                .filter(|s| s.len() <= 256),
+            record_id: system_fields.record_id,
+            event_id: system_fields.event_id,
+            level: system_fields.level,
+            task: system_fields.task,
+            opcode: system_fields.opcode,
+            keywords: system_fields.keywords,
+            time_created: system_fields.time_created,
+            provider_name: system_fields.provider_name,
+            provider_guid: system_fields.provider_guid,
+            channel: system_fields.channel,
+            computer: system_fields.computer,
+            user_id: system_fields.user_id,
+            process_id: system_fields.process_id,
+            thread_id: system_fields.thread_id,
+            activity_id: system_fields.activity_id,
+            related_activity_id: system_fields.related_activity_id,
             raw_xml: if config.include_xml {
                 // Limit XML size for security
                 if xml.len() > 32768 {
@@ -584,8 +663,12 @@ impl EventLogSubscription {
                 String::new()
             },
             rendered_message,
-            event_data,
-            user_data: HashMap::new(),
+            event_data: event_data_result.structured_data,
+            user_data: event_data_result.user_data,
+            // New fields for FluentBit compatibility
+            version: system_fields.version,
+            qualifiers: system_fields.qualifiers,
+            string_inserts: event_data_result.string_inserts,
         };
 
         Ok(Some(event))
@@ -818,6 +901,9 @@ mod tests {
             rendered_message: None,
             event_data: HashMap::new(),
             user_data: HashMap::new(),
+            version: Some(1),
+            qualifiers: Some(0),
+            string_inserts: vec![],
         };
 
         assert_eq!(event.level_name(), "Error");

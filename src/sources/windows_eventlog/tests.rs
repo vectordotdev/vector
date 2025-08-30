@@ -77,6 +77,10 @@ fn create_test_event() -> WindowsEvent {
         rendered_message: Some("An account was successfully logged on.".to_string()),
         event_data,
         user_data: HashMap::new(),
+        // New fields for enhanced implementation
+        version: Some(1),
+        qualifiers: Some(0),
+        string_inserts: vec!["admin".to_string(), "2".to_string()],
     }
 }
 
@@ -632,13 +636,13 @@ mod subscription_tests {
         let event_data = EventLogSubscription::extract_event_data(xml);
 
         assert_eq!(
-            event_data.get("TargetUserName"),
+            event_data.structured_data.get("TargetUserName"),
             Some(&"administrator".to_string())
         );
-        assert_eq!(event_data.get("TargetLogonId"), Some(&"0x3e7".to_string()));
-        assert_eq!(event_data.get("LogonType"), Some(&"2".to_string()));
+        assert_eq!(event_data.structured_data.get("TargetLogonId"), Some(&"0x3e7".to_string()));
+        assert_eq!(event_data.structured_data.get("LogonType"), Some(&"2".to_string()));
         assert_eq!(
-            event_data.get("WorkstationName"),
+            event_data.structured_data.get("WorkstationName"),
             Some(&"WIN-TEST".to_string())
         );
     }
@@ -1012,7 +1016,7 @@ mod buffer_safety_tests {
         let result = EventLogSubscription::extract_event_data(&large_xml);
         
         // Should have some reasonable limit on parsed data
-        assert!(result.len() <= 100, "Should limit parsed data size to prevent DoS");
+        assert!(result.structured_data.len() <= 100, "Should limit parsed data size to prevent DoS");
     }
 
     /// Test XML parsing with deeply nested structures
@@ -1034,7 +1038,7 @@ mod buffer_safety_tests {
         
         // Should handle gracefully - either succeeds or fails safely
         // The key is that it doesn't crash or consume excessive resources
-        assert!(result.len() <= 100, "Should limit parsed data for deeply nested XML");
+        assert!(result.structured_data.len() <= 100, "Should limit parsed data for deeply nested XML");
     }
 
     /// Test handling of XML with excessive attributes
@@ -1051,7 +1055,7 @@ mod buffer_safety_tests {
         let result = EventLogSubscription::extract_event_data(&xml_with_attrs);
         
         // Should have reasonable limits on parsed attributes
-        assert!(result.len() <= 100, "Should limit number of parsed attributes");
+        assert!(result.structured_data.len() <= 100, "Should limit number of parsed attributes");
     }
 }
 
@@ -1084,7 +1088,7 @@ mod fault_tolerance_tests {
         let invalid_xml = "not valid xml <tag>";
         let result = EventLogSubscription::extract_event_data(invalid_xml);
         // Should return empty result or handle gracefully without crashing
-        assert!(result.len() == 0, "Invalid XML should result in empty data");
+        assert!(result.structured_data.len() == 0, "Invalid XML should result in empty data");
     }
 
     #[tokio::test]
@@ -1099,7 +1103,7 @@ mod fault_tolerance_tests {
         for malicious_xml in &malicious_xmls {
             let result = EventLogSubscription::extract_event_data(&malicious_xml);
             // Should handle without crashing or excessive resource usage
-            assert!(result.len() <= 100, "Malicious XML should be limited in processing");
+            assert!(result.structured_data.len() <= 100, "Malicious XML should be limited in processing");
         }
     }
 }
