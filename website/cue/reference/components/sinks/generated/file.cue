@@ -520,7 +520,7 @@ generated: components: sinks: file: configuration: {
 		required:    false
 		type: object: options: {
 			after_closetime_secs: {
-				description: "If this is set, files will be truncated after being closed for set amount of seconds."
+				description: "If this is set, files will be truncated after being closed for a set amount of seconds."
 				required:    false
 				type: uint: {}
 			}
