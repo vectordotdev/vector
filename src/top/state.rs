@@ -59,7 +59,7 @@ pub enum ConnectionStatus {
 }
 
 impl ConnectionStatus {
-    pub fn as_ui_spans(&self) -> Vec<Span> {
+    pub fn as_ui_spans(&self) -> Vec<Span<'_>> {
         match self {
             Self::Pending => vec![Span::styled(
                 "Connecting...",

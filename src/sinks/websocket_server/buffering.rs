@@ -236,13 +236,12 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             message_id_path: Some(message_id_path),
             ..
         }) = self
+            && let Some(log) = event.maybe_as_log_mut()
         {
-            if let Some(log) = event.maybe_as_log_mut() {
-                let mut buffer = [0; 36];
-                let uuid = message_id.hyphenated().encode_lower(&mut buffer);
-                log.value_mut()
-                    .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
-            }
+            let mut buffer = [0; 36];
+            let uuid = message_id.hyphenated().encode_lower(&mut buffer);
+            log.value_mut()
+                .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
         }
         message_id
     }

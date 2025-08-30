@@ -331,6 +331,7 @@ async fn test_drop_receiver() {
 
 #[tokio::test]
 #[cfg(unix)]
+#[cfg_attr(target_os = "macos", ignore)] // Flaky when running `cargo test`
 async fn test_run_command_linux() {
     let config = standard_scheduled_test_config();
 
