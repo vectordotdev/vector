@@ -178,6 +178,24 @@ impl EventLogParser {
             );
         }
 
+        // New FluentBit-compatible fields
+        if let Some(version) = event.version {
+            log_event.insert("version", Value::Integer(version as i64));
+        }
+
+        if let Some(qualifiers) = event.qualifiers {
+            log_event.insert("qualifiers", Value::Integer(qualifiers as i64));
+        }
+
+        // StringInserts field for FluentBit compatibility
+        if !event.string_inserts.is_empty() {
+            let string_inserts: Vec<Value> = event.string_inserts
+                .iter()
+                .map(|s| Value::Bytes(s.clone().into()))
+                .collect();
+            log_event.insert("string_inserts", Value::Array(string_inserts));
+        }
+
         // Include raw XML if requested
         if self.config.include_xml && !event.raw_xml.is_empty() {
             log_event.insert("xml", Value::Bytes(event.raw_xml.clone().into()));
@@ -379,6 +397,9 @@ mod tests {
                 map
             },
             user_data: HashMap::new(),
+            version: Some(1),
+            qualifiers: Some(0),
+            string_inserts: vec!["value1".to_string(), "value2".to_string()],
         }
     }
 
