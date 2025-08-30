@@ -928,6 +928,13 @@ def resolve_bare_schema(root_schema, schema)
       fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
+    when nil
+      # Unconstrained/empty schema (e.g., Value without constraints).
+      # Represent it as accepting any JSON type so downstream code can render it
+      # and attach defaults/examples based on actual values.
+      @logger.debug 'Resolving unconstrained schema (any type).'
+
+      { '*' => {} }
     else
       @logger.error "Failed to resolve the schema. Schema: #{schema}"
       exit 1
