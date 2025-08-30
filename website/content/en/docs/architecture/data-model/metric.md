@@ -1,5 +1,5 @@
 ---
-title: Metric events
+title: Metric Events
 weight: 2
 tags: ["metrics", "events", "schema"]
 ---

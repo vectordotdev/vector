@@ -1,5 +1,5 @@
 ---
-title: Adaptive request concurrency (ARC)
+title: Adaptive Request Concurrency (ARC)
 short: Adaptive Concurrency
 weight: 6
 tags: ["arc", "request", "concurrency", "adaptive request concurrency", "performance", "http"]

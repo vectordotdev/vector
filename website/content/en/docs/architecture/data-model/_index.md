@@ -1,5 +1,5 @@
 ---
-title: Data model
+title: Data Model
 description: How Vector understands data
 weight: 1
 tags: ["data model", "logs", "metrics", "events"]

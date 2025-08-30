@@ -1,5 +1,5 @@
 ---
-title: Concurrency model
+title: Concurrency Model
 weight: 5
 tags: ["concurrency", "pipeline", "state"]
 ---

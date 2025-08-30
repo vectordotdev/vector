@@ -1,5 +1,5 @@
 ---
-title: Pipeline model
+title: Pipeline Model
 weight: 2
 tags: ["pipeline", "dag", "graph", "configuration"]
 ---

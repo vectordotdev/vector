@@ -1,5 +1,5 @@
 ---
-title: Buffering model
+title: Buffering Model
 weight: 4
 tags: ["buffering", "buffers", "disk"]
 ---
