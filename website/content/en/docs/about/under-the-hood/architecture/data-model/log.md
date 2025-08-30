@@ -1,5 +1,5 @@
 ---
-title: Log events
+title: Log Events
 weight: 1
 tags: ["logs", "events", "schema"]
 ---
