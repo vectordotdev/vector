@@ -1,6 +1,4 @@
 
-#[cfg(test)]
-use quick_xml::{Reader, events::Event as XmlEvent};
 use vector_lib::config::{LogNamespace, log_schema};
 use vrl::value::{ObjectMap, Value};
 
@@ -346,83 +344,6 @@ impl EventLogParser {
         }
     }
 
-    /// Parse XML event data section with performance optimizations
-    /// Used for processing XML event data when include_xml is enabled
-    #[cfg(test)]
-    pub fn parse_event_data_xml(
-        xml: &str,
-    ) -> Result<std::collections::HashMap<String, String>, WindowsEventLogError> {
-        let mut reader = Reader::from_str(xml);
-        reader.trim_text(true);
-
-        // Pre-allocate HashMap with reasonable capacity
-        let mut event_data = std::collections::HashMap::with_capacity(16);
-        let mut current_name = String::new();
-        let mut in_event_data = false;
-        let mut in_data_element = false;
-
-        // Reuse buffer for better memory efficiency
-        let mut buf = Vec::with_capacity(1024);
-
-        // Add DoS protection - limit iterations
-        const MAX_ITERATIONS: usize = 1000;
-        let mut iterations = 0;
-
-        loop {
-            if iterations >= MAX_ITERATIONS {
-                return Err(WindowsEventLogError::FilterError {
-                    message: "XML parsing iteration limit exceeded".to_string(),
-                });
-            }
-            iterations += 1;
-
-            match reader.read_event_into(&mut buf) {
-                Ok(XmlEvent::Start(ref e)) => {
-                    let name = e.name();
-                    let name = name.as_ref();
-
-                    if name == b"EventData" {
-                        in_event_data = true;
-                    } else if in_event_data && name == b"Data" {
-                        in_data_element = true;
-                        current_name.clear();
-
-                        // Extract the Name attribute efficiently
-                        for attr in e.attributes() {
-                            let attr = attr.map_err(|e| WindowsEventLogError::ParseXmlError { source: quick_xml::Error::InvalidAttr(e) })?;
-                            if attr.key.as_ref() == b"Name" {
-                                // Avoid allocation by writing directly to our string
-                                current_name = String::from_utf8_lossy(&attr.value).into_owned();
-                                break;
-                            }
-                        }
-                    }
-                }
-                Ok(XmlEvent::End(ref e)) => {
-                    let name = e.name();
-                    let name = name.as_ref();
-                    if name == b"EventData" {
-                        in_event_data = false;
-                    } else if name == b"Data" {
-                        in_data_element = false;
-                    }
-                }
-                Ok(XmlEvent::Text(ref e)) => {
-                    if in_event_data && in_data_element && !current_name.is_empty() {
-                        let value = e.unescape().map_err(|e| WindowsEventLogError::ParseXmlError { source: e })?;
-                        event_data.insert(std::mem::take(&mut current_name), value.into_owned());
-                    }
-                }
-                Ok(XmlEvent::Eof) => break,
-                Err(e) => return Err(WindowsEventLogError::ParseXmlError { source: e }),
-                _ => {}
-            }
-
-            buf.clear();
-        }
-
-        Ok(event_data)
-    }
 }
 
 #[cfg(test)]
@@ -580,27 +501,6 @@ mod tests {
         assert!(log_event.get("event_id").is_some());
     }
 
-    #[test]
-    fn test_parse_event_data_xml() {
-        let xml = r#"
-            <Event>
-                <EventData>
-                    <Data Name="TargetUserName">admin</Data>
-                    <Data Name="TargetLogonId">0x12345</Data>
-                    <Data Name="LogonType">2</Data>
-                </EventData>
-            </Event>
-        "#;
-
-        let event_data = EventLogParser::parse_event_data_xml(xml).unwrap();
-
-        assert_eq!(event_data.get("TargetUserName"), Some(&"admin".to_string()));
-        assert_eq!(
-            event_data.get("TargetLogonId"),
-            Some(&"0x12345".to_string())
-        );
-        assert_eq!(event_data.get("LogonType"), Some(&"2".to_string()));
-    }
 
     #[test]
     fn test_extract_message_from_event_data() {
