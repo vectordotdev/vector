@@ -1,36 +1,11 @@
 use std::time::Duration;
 use std::{convert::Infallible, net::SocketAddr};
 
-use bytes::Bytes;
-use futures_util::FutureExt;
-use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
-use prost::Message;
-use snafu::Snafu;
-use tokio::net::TcpStream;
-use tower::ServiceBuilder;
-use tracing::Span;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
-};
-use vector_lib::opentelemetry::proto::collector::{
-    logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
-    metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
-    trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
-};
-use vector_lib::tls::MaybeTlsIncomingStream;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    config::LogNamespace,
-    event::{BatchNotifier, BatchStatus},
-};
-use warp::{
-    Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
-};
-
+use super::{reply::protobuf, status::Status};
 use crate::common::http::ErrorMessage;
 use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::sources::http_server::HttpConfigParamKind;
+use crate::sources::opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES};
 use crate::sources::util::add_headers;
 use crate::{
     SourceSender,
@@ -41,9 +16,35 @@ use crate::{
     sources::util::decode,
     tls::MaybeTlsSettings,
 };
-
-use super::{reply::protobuf, status::Status};
-use crate::sources::opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES};
+use bytes::Bytes;
+use futures_util::FutureExt;
+use http::StatusCode;
+use hyper::{Server, service::make_service_fn};
+use prost::Message;
+use snafu::Snafu;
+use tokio::net::TcpStream;
+use tower::ServiceBuilder;
+use tracing::Span;
+use vector_lib::codecs::decoding::ProtobufDeserializer;
+use vector_lib::codecs::decoding::format::Deserializer;
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+};
+use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
+use vector_lib::opentelemetry::proto::collector::{
+    logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
+    metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
+    trace::v1::ExportTraceServiceRequest,
+};
+use vector_lib::tls::MaybeTlsIncomingStream;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    event::{BatchNotifier, BatchStatus},
+};
+use warp::{
+    Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
+};
 
 #[derive(Clone, Copy, Debug, Snafu)]
 pub(crate) enum ApiError {
@@ -94,6 +95,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -102,18 +104,21 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
+        deserializer.clone(),
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
+        deserializer.clone(),
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
         out.clone(),
         bytes_received,
         events_received,
+        deserializer,
     );
     log_filters
         .or(trace_filters)
@@ -138,16 +143,24 @@ fn enrich_events(
     );
 }
 
-fn build_warp_log_filter(
+fn build_ingest_filter<Resp, F>(
+    telemetry_type: &'static str,
     acknowledgements: bool,
-    log_namespace: LogNamespace,
     out: SourceSender,
-    bytes_received: Registered<BytesReceived>,
-    events_received: Registered<EventsReceived>,
-    headers: Vec<HttpConfigParamKind>,
-) -> BoxedFilter<(Response,)> {
+    make_events: F,
+) -> BoxedFilter<(Response,)>
+where
+    Resp: prost::Message + Default + Send + 'static,
+    F: Clone
+        + Send
+        + Sync
+        + 'static
+        + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
+{
     warp::post()
-        .and(warp::path!("v1" / "logs"))
+        .and(warp::path("v1"))
+        .and(warp::path(telemetry_type))
+        .and(warp::path::end())
         .and(warp::header::exact_ignore_case(
             "content-type",
             "application/x-protobuf",
@@ -156,89 +169,108 @@ fn build_warp_log_filter(
         .and(warp::header::headers_cloned())
         .and(warp::body::bytes())
         .and_then(
-            move |encoding_header: Option<String>, headers_config: HeaderMap, body: Bytes| {
-                let events = decode(encoding_header.as_deref(), body)
-                    .and_then(|body| {
-                        bytes_received.emit(ByteSize(body.len()));
-                        decode_log_body(body, log_namespace, &events_received)
-                    })
-                    .map(|mut events| {
-                        enrich_events(&mut events, &headers, &headers_config, log_namespace);
-                        events
-                    });
-
+            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+                let events = make_events(encoding_header, headers, body);
                 handle_request(
                     events,
                     acknowledgements,
                     out.clone(),
-                    LOGS,
-                    ExportLogsServiceResponse::default(),
+                    telemetry_type,
+                    Resp::default(),
                 )
             },
         )
         .boxed()
 }
 
-fn build_warp_metrics_filter(
+fn build_warp_log_filter(
     acknowledgements: bool,
-    out: SourceSender,
+    log_namespace: LogNamespace,
+    source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    warp::post()
-        .and(warp::path!("v1" / "metrics"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
-        .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+        if let Some(d) = deserializer.as_ref() {
+            d.parse(body, log_namespace)
+                .map(|r| r.into_vec())
+                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+        } else {
+            decode(encoding_header.as_deref(), body)
+                .and_then(|body| {
+                    bytes_received.emit(ByteSize(body.len()));
+                    decode_log_body(body, log_namespace, &events_received)
+                })
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
+                    events
+                })
+        }
+    };
+
+    build_ingest_filter::<ExportLogsServiceResponse, _>(
+        LOGS,
+        acknowledgements,
+        source_sender,
+        make_events,
+    )
+}
+fn build_warp_metrics_filter(
+    acknowledgements: bool,
+    source_sender: SourceSender,
+    bytes_received: Registered<BytesReceived>,
+    events_received: Registered<EventsReceived>,
+    deserializer: Option<ProtobufDeserializer>,
+) -> BoxedFilter<(Response,)> {
+    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+        if let Some(d) = deserializer.as_ref() {
+            d.parse(body, LogNamespace::default())
+                .map(|r| r.into_vec())
+                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+        } else {
+            decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_metrics_body(body, &events_received)
-            });
+            })
+        }
+    };
 
-            handle_request(
-                events,
-                acknowledgements,
-                out.clone(),
-                METRICS,
-                ExportMetricsServiceResponse::default(),
-            )
-        })
-        .boxed()
+    build_ingest_filter::<ExportMetricsServiceResponse, _>(
+        METRICS,
+        acknowledgements,
+        source_sender,
+        make_events,
+    )
 }
 
 fn build_warp_trace_filter(
     acknowledgements: bool,
-    out: SourceSender,
+    source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    deserializer: Option<ProtobufDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    warp::post()
-        .and(warp::path!("v1" / "traces"))
-        .and(warp::header::exact_ignore_case(
-            "content-type",
-            "application/x-protobuf",
-        ))
-        .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::body::bytes())
-        .and_then(move |encoding_header: Option<String>, body: Bytes| {
-            let events = decode(encoding_header.as_deref(), body).and_then(|body| {
+    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+        if let Some(d) = deserializer.as_ref() {
+            d.parse_traces(body)
+                .map(|r| r.into_vec())
+                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+        } else {
+            decode(encoding_header.as_deref(), body).and_then(|body| {
                 bytes_received.emit(ByteSize(body.len()));
                 decode_trace_body(body, &events_received)
-            });
+            })
+        }
+    };
 
-            handle_request(
-                events,
-                acknowledgements,
-                out.clone(),
-                TRACES,
-                ExportTraceServiceResponse::default(),
-            )
-        })
-        .boxed()
+    build_ingest_filter::<ExportTraceServiceResponse, _>(
+        TRACES,
+        acknowledgements,
+        source_sender,
+        make_events,
+    )
 }
 
 fn decode_trace_body(
