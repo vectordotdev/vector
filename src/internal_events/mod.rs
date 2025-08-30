@@ -154,6 +154,7 @@ mod windows;
 
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 mod expansion;
+pub mod config;
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 pub use self::expansion::*;
 
