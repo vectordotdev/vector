@@ -90,7 +90,7 @@ generated: components: sources: statsd: configuration: {
 		}
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		description:   "`TlsEnableableConfig` for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {

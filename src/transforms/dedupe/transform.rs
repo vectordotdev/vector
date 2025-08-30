@@ -104,18 +104,14 @@ pub(crate) fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> Cac
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            if let Some(event_fields) = event.as_log().all_event_fields() {
-                if let Some(metadata_fields) = event.as_log().all_metadata_fields() {
-                    for (field_name, value) in event_fields.chain(metadata_fields) {
-                        if let Ok(path) = ConfigTargetPath::try_from(field_name) {
-                            if !fields.contains(&path) {
-                                entry.push((
-                                    path.0,
-                                    type_id_for_value(value),
-                                    value.coerce_to_bytes(),
-                                ));
-                            }
-                        }
+            if let Some(event_fields) = event.as_log().all_event_fields()
+                && let Some(metadata_fields) = event.as_log().all_metadata_fields()
+            {
+                for (field_name, value) in event_fields.chain(metadata_fields) {
+                    if let Ok(path) = ConfigTargetPath::try_from(field_name)
+                        && !fields.contains(&path)
+                    {
+                        entry.push((path.0, type_id_for_value(value), value.coerce_to_bytes()));
                     }
                 }
             }

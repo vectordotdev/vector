@@ -1033,9 +1033,8 @@ mod test {
     fn json_value_to_vector_log_event_to_json_value() {
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
-        std::fs::read_dir(FIXTURE_ROOT)
-            .unwrap()
-            .for_each(|fixture_file| match fixture_file {
+        for fixture_file in std::fs::read_dir(FIXTURE_ROOT).unwrap() {
+            match fixture_file {
                 Ok(fixture_file) => {
                     let path = fixture_file.path();
                     tracing::trace!(?path, "Opening.");
@@ -1047,7 +1046,8 @@ mod test {
                     assert_eq!(serde_value, serde_value_again);
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
-            });
+            }
+        }
     }
 
     fn assert_merge_value(
