@@ -39,7 +39,7 @@ impl<W: io::Write> SnappyEncoder<W> {
         &self.writer
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.buffer.is_empty()
     }
 }

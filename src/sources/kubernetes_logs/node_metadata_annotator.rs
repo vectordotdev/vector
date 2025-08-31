@@ -76,19 +76,19 @@ fn annotate_from_metadata(
     metadata: &ObjectMeta,
     log_namespace: LogNamespace,
 ) {
-    if let Some(labels) = &metadata.labels {
-        if let Some(prefix_path) = &fields_spec.node_labels.path {
-            for (key, value) in labels.iter() {
-                let key_path = path!(key);
+    if let Some(labels) = &metadata.labels
+        && let Some(prefix_path) = &fields_spec.node_labels.path
+    {
+        for (key, value) in labels.iter() {
+            let key_path = path!(key);
 
-                log_namespace.insert_source_metadata(
-                    Config::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
-                    path!("node_labels", key),
-                    value.to_owned(),
-                )
-            }
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
+                path!("node_labels", key),
+                value.to_owned(),
+            )
         }
     }
 }

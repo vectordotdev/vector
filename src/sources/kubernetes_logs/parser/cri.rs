@@ -143,7 +143,7 @@ const fn is_delimiter(c: &u8) -> bool {
 ///
 /// Equivalent to regex: `(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$`
 #[inline]
-fn parse_log_line(line: &[u8]) -> Option<ParsedLog> {
+fn parse_log_line(line: &[u8]) -> Option<ParsedLog<'_>> {
     let rest = line;
 
     let after_timestamp_pos = rest.iter().position(is_delimiter)?;

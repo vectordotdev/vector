@@ -154,10 +154,10 @@ impl Controller {
         global_timeout: Option<f64>,
         expire_metrics_per_metric_set: Vec<PerMetricSetExpiration>,
     ) -> Result<()> {
-        if let Some(timeout) = global_timeout {
-            if timeout <= 0.0 {
-                return Err(Error::TimeoutMustBePositive { timeout });
-            }
+        if let Some(timeout) = global_timeout
+            && timeout <= 0.0
+        {
+            return Err(Error::TimeoutMustBePositive { timeout });
         }
         let per_metric_expiration = expire_metrics_per_metric_set
             .into_iter()

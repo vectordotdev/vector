@@ -426,10 +426,10 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty() {
-                            if let Err(ClosedError) = out.send_batch(events).await {
-                                return Err(Rejection::from(ApiError::ServerShutdown));
-                            }
+                        if !events.is_empty()
+                            && let Err(ClosedError) = out.send_batch(events).await
+                        {
+                            return Err(Rejection::from(ApiError::ServerShutdown));
                         }
 
                         if let Some(error) = error {
@@ -1016,16 +1016,16 @@ impl DefaultExtractor {
         }
 
         // Add data field
-        if let Some(index) = self.value.as_ref() {
-            if let Some(metadata_key) = self.to_field.path.as_ref() {
-                self.log_namespace.insert_source_metadata(
-                    SplunkConfig::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite(metadata_key)),
-                    &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
-                    index.clone(),
-                )
-            }
+        if let Some(index) = self.value.as_ref()
+            && let Some(metadata_key) = self.to_field.path.as_ref()
+        {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(metadata_key)),
+                &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
+                index.clone(),
+            )
         }
     }
 }

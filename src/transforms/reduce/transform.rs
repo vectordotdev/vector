@@ -218,10 +218,10 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if let Some(period) = self.end_every_period {
-                if (now - t.creation) >= period {
-                    flush_discriminants.push(k.clone());
-                }
+            if let Some(period) = self.end_every_period
+                && (now - t.creation) >= period
+            {
+                flush_discriminants.push(k.clone());
             }
 
             if (now - t.stale_since) >= self.expire_after {

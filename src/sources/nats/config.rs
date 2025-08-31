@@ -294,7 +294,7 @@ impl NatsSourceConfig {
         options.connect(server_addrs).await.context(ConnectSnafu)
     }
 
-    const fn mode(&self) -> NatsMode {
+    const fn mode(&self) -> NatsMode<'_> {
         match &self.jetstream {
             Some(config) => NatsMode::JetStream(config),
             None => NatsMode::Core,

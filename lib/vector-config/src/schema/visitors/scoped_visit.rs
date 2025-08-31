@@ -124,10 +124,10 @@ fn visit_box_scoped<SV: ScopedVisitor + ?Sized>(
     definitions: &mut Map<String, Schema>,
     target: &mut Option<Box<Schema>>,
 ) {
-    if let Some(s) = target {
-        if let Schema::Object(s) = s.as_mut() {
-            sv.visit_schema_object(definitions, s);
-        }
+    if let Some(s) = target
+        && let Schema::Object(s) = s.as_mut()
+    {
+        sv.visit_schema_object(definitions, s);
     }
 }
 

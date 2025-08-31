@@ -133,20 +133,19 @@ impl Memory {
                 update_time: now.into(),
             };
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
-            if let Some(max_byte_size) = self.config.max_byte_size {
-                if writer
+            if let Some(max_byte_size) = self.config.max_byte_size
+                && writer
                     .metadata
                     .byte_size
                     .saturating_add(new_entry_size as u64)
                     > max_byte_size
-                {
-                    // Reject new entries
-                    emit!(MemoryEnrichmentTableInsertFailed {
-                        key: &new_entry_key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                    });
-                    continue;
-                }
+            {
+                // Reject new entries
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: &new_entry_key,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                });
+                continue;
             }
             writer.metadata.byte_size = writer
                 .metadata
@@ -173,17 +172,17 @@ impl Memory {
         // Refresh will happen only after we manually invoke it after iteration
         if let Some(reader) = self.get_read_handle().read() {
             for (k, v) in reader.iter() {
-                if let Some(entry) = v.get_one() {
-                    if entry.expired(now, self.config.ttl) {
-                        // Byte size is not reduced at this point, because the actual deletion
-                        // will only happen at refresh time
-                        writer.write_handle.empty(k.clone());
-                        emit!(MemoryEnrichmentTableTtlExpired {
-                            key: k,
-                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                        });
-                        needs_flush = true;
-                    }
+                if let Some(entry) = v.get_one()
+                    && entry.expired(now, self.config.ttl)
+                {
+                    // Byte size is not reduced at this point, because the actual deletion
+                    // will only happen at refresh time
+                    writer.write_handle.empty(k.clone());
+                    emit!(MemoryEnrichmentTableTtlExpired {
+                        key: k,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    needs_flush = true;
                 }
             }
         };
@@ -375,6 +374,7 @@ impl StreamSink<Event> for Memory {
 mod tests {
     use futures::{StreamExt, future::ready};
     use futures_util::stream;
+    use std::slice::from_ref;
     use std::{num::NonZeroU64, time::Duration};
     use tokio::time;
 
@@ -483,7 +483,7 @@ mod tests {
                 ("ttl".into(), Value::from(0)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         // Force scan
@@ -549,7 +549,7 @@ mod tests {
                 ("ttl".into(), Value::from(ttl / 2)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));

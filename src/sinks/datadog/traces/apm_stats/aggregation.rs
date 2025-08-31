@@ -140,25 +140,25 @@ impl Aggregator {
 
     /// Updates cached properties from the Agent.
     pub(crate) fn update_agent_properties(&mut self, partition_key: &PartitionKey) {
-        if self.agent_env.is_none() {
-            if let Some(env) = &partition_key.env {
-                self.agent_env = Some(env.clone());
-            }
+        if self.agent_env.is_none()
+            && let Some(env) = &partition_key.env
+        {
+            self.agent_env = Some(env.clone());
         }
-        if self.agent_hostname.is_none() {
-            if let Some(hostname) = &partition_key.hostname {
-                self.agent_hostname = Some(hostname.clone());
-            }
+        if self.agent_hostname.is_none()
+            && let Some(hostname) = &partition_key.hostname
+        {
+            self.agent_hostname = Some(hostname.clone());
         }
-        if self.agent_version.is_none() {
-            if let Some(version) = &partition_key.agent_version {
-                self.agent_version = Some(version.clone());
-            }
+        if self.agent_version.is_none()
+            && let Some(version) = &partition_key.agent_version
+        {
+            self.agent_version = Some(version.clone());
         }
-        if self.api_key.is_none() {
-            if let Some(api_key) = &partition_key.api_key {
-                self.api_key = Some(Arc::<str>::clone(api_key));
-            }
+        if self.api_key.is_none()
+            && let Some(api_key) = &partition_key.api_key
+        {
+            self.api_key = Some(Arc::<str>::clone(api_key));
         }
     }
 

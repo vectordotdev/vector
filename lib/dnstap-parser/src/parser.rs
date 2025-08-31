@@ -147,21 +147,14 @@ impl DnstapParser {
                 dnstap_data_type.clone(),
             );
 
-            if dnstap_data_type == "Message" {
-                if let Some(message) = proto_msg.message {
-                    if let Err(err) =
-                        DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
-                    {
-                        emit!(DnstapParseWarning { error: &err });
-                        need_raw_data = true;
-                        DnstapParser::insert(
-                            event,
-                            &root,
-                            &DNSTAP_VALUE_PATHS.error,
-                            err.to_string(),
-                        );
-                    }
-                }
+            if dnstap_data_type == "Message"
+                && let Some(message) = proto_msg.message
+                && let Err(err) =
+                    DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
+            {
+                emit!(DnstapParseWarning { error: &err });
+                need_raw_data = true;
+                DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.error, err.to_string());
             }
         } else {
             emit!(DnstapParseWarning {

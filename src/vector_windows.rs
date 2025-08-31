@@ -54,7 +54,7 @@ pub mod service_control {
         }
     }
 
-    const fn error_display(error: &windows_service::Error) -> ErrorDisplay {
+    const fn error_display(error: &windows_service::Error) -> ErrorDisplay<'_> {
         ErrorDisplay { error }
     }
 

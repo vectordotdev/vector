@@ -140,13 +140,13 @@ impl<T: Bufferable> BufferReceiver<T> {
 
         // If instrumentation is enabled, and we got the item from the base receiver, then and only
         // then do we track sending the event out.
-        if let Some(handle) = self.instrumentation.as_ref() {
-            if from_base {
-                handle.increment_sent_event_count_and_byte_size(
-                    item.event_count() as u64,
-                    item.size_of() as u64,
-                );
-            }
+        if let Some(handle) = self.instrumentation.as_ref()
+            && from_base
+        {
+            handle.increment_sent_event_count_and_byte_size(
+                item.event_count() as u64,
+                item.size_of() as u64,
+            );
         }
 
         Some(item)

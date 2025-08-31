@@ -112,17 +112,17 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError(inner) = &err {
-                                if matches!(
+                            if let SdkError::ServiceError(inner) = &err
+                                && matches!(
                                     inner.err(),
                                     DescribeLogStreamsError::ResourceNotFoundException(_)
-                                ) && self.create_missing_group
-                                {
-                                    info!("Log group provided does not exist; creating a new one.");
+                                )
+                                && self.create_missing_group
+                            {
+                                info!("Log group provided does not exist; creating a new one.");
 
-                                    self.state = State::CreateGroup(self.client.create_log_group());
-                                    continue;
-                                }
+                                self.state = State::CreateGroup(self.client.create_log_group());
+                                continue;
                             }
                             return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
                         }

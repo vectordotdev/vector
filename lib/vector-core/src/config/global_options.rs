@@ -119,7 +119,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Deprecated: use expire_metrics_secs instead
+    /// Deprecated: use `expire_metrics_secs` instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::hidden))]
@@ -297,6 +297,39 @@ impl GlobalOptions {
     pub fn timezone(&self) -> TimeZone {
         self.timezone.unwrap_or(TimeZone::Local)
     }
+
+    /// Returns a list of top-level field names that differ between two [`GlobalOptions`] values.
+    ///
+    /// This function performs a shallow comparison by serializing both configs to JSON
+    /// and comparing their top-level keys.
+    ///
+    /// Useful for logging which global fields changed during config reload attempts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`serde_json::Error`] if either of the [`GlobalOptions`] values
+    /// cannot be serialized into a JSON object. This is unlikely under normal usage,
+    /// but may occur if serialization fails due to unexpected data structures or changes
+    /// in the type definition.
+    pub fn diff(&self, other: &Self) -> Result<Vec<String>, serde_json::Error> {
+        let old_value = serde_json::to_value(self)?;
+        let new_value = serde_json::to_value(other)?;
+
+        let serde_json::Value::Object(old_map) = old_value else {
+            return Ok(vec![]);
+        };
+        let serde_json::Value::Object(new_map) = new_value else {
+            return Ok(vec![]);
+        };
+
+        Ok(old_map
+            .iter()
+            .filter_map(|(k, v_old)| match new_map.get(k) {
+                Some(v_new) if v_new != v_old => Some(k.clone()),
+                _ => None,
+            })
+            .collect())
+    }
 }
 
 fn conflicts<T: PartialEq>(this: Option<&T>, that: Option<&T>) -> bool {
@@ -412,6 +445,22 @@ mod tests {
             Err(vec![
                 "conflicting values for 'expire_metrics_secs' found".into()
             ])
+        );
+    }
+
+    #[test]
+    fn diff_detects_changed_keys() {
+        let old = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path1")),
+            ..Default::default()
+        };
+        let new = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path2")),
+            ..Default::default()
+        };
+        assert_eq!(
+            old.diff(&new).expect("diff failed"),
+            vec!["data_dir".to_string()]
         );
     }
 

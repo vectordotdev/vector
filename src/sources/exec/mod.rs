@@ -207,7 +207,7 @@ const COMMAND_KEY: &str = "command";
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
-    fn validate(&self) -> Result<(), ExecConfigError> {
+    const fn validate(&self) -> Result<(), ExecConfigError> {
         if self.command.is_empty() {
             Err(ExecConfigError::CommandEmpty)
         } else if self.maximum_buffer_size_bytes == 0 {

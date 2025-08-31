@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
 use metrics::counter;

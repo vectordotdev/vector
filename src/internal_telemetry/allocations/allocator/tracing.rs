@@ -54,18 +54,18 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.enter();
-            }
+        if let Some(span_ref) = ctx.span(id)
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.enter();
         }
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.exit();
-            }
+        if let Some(span_ref) = ctx.span(id)
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.exit();
         }
     }
 

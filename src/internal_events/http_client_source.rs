@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
 use vector_lib::{

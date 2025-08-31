@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;

@@ -86,10 +86,10 @@ impl SqsSource {
         // Wait for all of the processes to finish.  If any one of them panics, we resume
         // that panic here to properly shutdown Vector.
         for task_handle in task_handles.drain(..) {
-            if let Err(e) = task_handle.await {
-                if e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+            if let Err(e) = task_handle.await
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
             }
         }
         Ok(())
