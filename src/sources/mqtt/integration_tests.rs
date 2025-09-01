@@ -59,13 +59,13 @@ async fn get_mqtt_client() -> AsyncClient {
 }
 
 #[tokio::test]
-async fn mqtt_happy() {
+async fn mqtt_one_topic_happy() {
     trace_init();
     let topic = "source-test";
     // We always want new client ID. If it were stable, subsequent tests could receive data sent in previous runs.
     let client_id = format!("sourceTest{}", random_string(6));
     let num_events = 10;
-    let (input, _events) = random_lines_with_stream(100, num_events, None);
+    let (input, ..) = random_lines_with_stream(100, num_events, None);
 
     assert_source_compliance(&SOURCE_TAGS, async {
         let common = MqttCommonConfig {
@@ -99,6 +99,72 @@ async fn mqtt_happy() {
         let mut expected_messages: HashSet<_> = input.into_iter().collect();
 
         let events: Vec<Event> = timeout(Duration::from_secs(2), rx.take(num_events).collect())
+            .await
+            .unwrap();
+
+        for event in events {
+            let message = event
+                .as_log()
+                .get(log_schema().message_key_target_path().unwrap())
+                .unwrap()
+                .to_string_lossy();
+            if !expected_messages.remove(message.as_ref()) {
+                panic!("Received unexpected message: {message:?}");
+            }
+        }
+        assert!(expected_messages.is_empty());
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn mqtt_many_topics_happy() {
+    trace_init();
+    let topic_prefix_1 = "source-prefix-1";
+    let topic_prefix_2 = "source-prefix-2";
+    // We always want new client ID. If it were stable, subsequent tests could receive data sent in previous runs.
+    let client_id = format!("sourceTest{}", random_string(6));
+    let num_events = 10;
+    let (input_1, ..) = random_lines_with_stream(100, num_events, None);
+    let (input_2, ..) = random_lines_with_stream(100, num_events, None);
+
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let common = MqttCommonConfig {
+            host: mqtt_broker_address(),
+            port: mqtt_broker_port(),
+            client_id: Some(client_id),
+            ..Default::default()
+        };
+
+        let config = MqttSourceConfig {
+            common,
+            topic: OneOrMany::Many(vec![
+                format!("{topic_prefix_1}/#"),
+                format!("{topic_prefix_2}/#"),
+            ]),
+            ..MqttSourceConfig::default()
+        };
+
+        let (tx, rx) = SourceSender::new_test();
+        tokio::spawn(async move {
+            config
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+        });
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let client = get_mqtt_client().await;
+        send_test_events(&client, &format!("{topic_prefix_1}/test"), &input_1).await;
+        send_test_events(&client, &format!("{topic_prefix_2}/test"), &input_2).await;
+
+        let mut expected_messages: HashSet<_> =
+            input_1.into_iter().chain(input_2.into_iter()).collect();
+
+        let events: Vec<Event> = timeout(Duration::from_secs(2), rx.take(num_events * 2).collect())
             .await
             .unwrap();
 
