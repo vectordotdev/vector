@@ -9287,7 +9287,7 @@ dependencies = [
  "openssl-probe",
  "rustls-pki-types",
  "schannel",
- "security-framework 3.2.0",
+ "security-framework 3.3.0",
 ]
 
 [[package]]
@@ -9522,9 +9522,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271720403f46ca04f7ba6f55d438f8bd878d6b8ca0a1046e8228c4145bcbb316"
+checksum = "80fb1d92c5028aa318b4b8bd7302a5bfcf48be96a37fc6fc790f806b0004ee0c"
 dependencies = [
  "bitflags 2.9.0",
  "core-foundation 0.10.1",
@@ -12336,7 +12336,7 @@ dependencies = [
  "regex",
  "ryu",
  "schannel",
- "security-framework 3.2.0",
+ "security-framework 3.3.0",
  "serde",
  "serde_json",
  "serde_with 3.14.0",
