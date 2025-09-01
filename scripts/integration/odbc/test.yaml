@@ -11,7 +11,7 @@ env:
 runner:
   volumes:
     mysql_socket: /mysql_socket
-    ../../../tests/data/odbc/odbc-init.sh: /odbc-init.sh:ro
+#    tests/data/odbc/odbc-init.sh: /odbc-init.sh:ro
 
 matrix:
   version: [ '8.0' ]
