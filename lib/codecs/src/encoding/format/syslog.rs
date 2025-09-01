@@ -17,6 +17,9 @@ use vrl::value::ObjectMap;
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
 pub struct SyslogSerializerConfig {
+    /// A list of top-level syslog fields to exclude from the output.
+    #[serde(default)]
+    pub except_fields: Vec<String>,
     /// Options for the Syslog serializer.
     pub syslog: SyslogSerializerOptions,
 }
@@ -602,6 +605,11 @@ mod tests {
             event_path!("structured_data"),
             value!({"metrics": {"retries": 3}}),
         );
+        log.insert(
+            event_path!("_internal"),
+            value!({"foo": "bar"}),
+        );
+
         log
     }
 
