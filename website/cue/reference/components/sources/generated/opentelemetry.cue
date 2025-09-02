@@ -329,7 +329,7 @@ generated: components: sources: opentelemetry: configuration: {
 		description: """
 			Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
 
-			One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OLTP format.
+			One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
 			This means that components that work on metrics, will not be compatible with this output.
 			However, these events can be forwarded directly to a downstream OTEL collector.
 			"""
