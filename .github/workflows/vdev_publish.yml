@@ -44,7 +44,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#vdev-v}
           OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
-          
+
           BIN="target/${{ matrix.target }}/release/vdev"
           cp "$BIN" "$OUTDIR/"
           tar -czf "${OUTDIR}.tgz" "$OUTDIR"
