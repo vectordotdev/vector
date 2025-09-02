@@ -49,6 +49,4 @@ git2 = { version = "0.20.2" }
 cfg-if.workspace = true
 
 [package.metadata.binstall]
-pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }.tgz"
-bin-dir = "{ name }-{ target }-v{ version }/{ bin }{ binary-ext }"
-pkg-fmt = "tgz"
+pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
