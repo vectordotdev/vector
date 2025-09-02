@@ -1,7 +1,6 @@
 use crate::git::added_files_against_merge_base;
 use crate::path_utils::get_changelog_dir;
 use anyhow::{anyhow, Context, Result};
-use std::env;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -20,15 +19,15 @@ const DEFAULT_MAX_FRAGMENTS: usize = 1000;
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
-    /// Changelog directory (defaults to $CHANGELOG_DIR or "changelog.d")
+    /// Changelog directory (defaults to `changelog.d`)
     #[arg(long)]
     changelog_dir: Option<PathBuf>,
 
-    /// Merge base to diff against (defaults to $MERGE_BASE or "origin/master")
+    /// Merge base to diff against (defaults to `origin/master`)
     #[arg(long)]
     merge_base: Option<String>,
 
-    /// Max fragments threshold (defaults to $MAX_FRAGMENTS or 1000)
+    /// Max fragments threshold (defaults to `1000`)
     #[arg(long)]
     max_fragments: Option<usize>,
 }
@@ -36,7 +35,7 @@ pub struct Cli {
 impl Cli {
     pub fn exec(&self) -> Result<()> {
         let changelog_dir = self
-            .changelog_dir.clone().unwrap_or_else(|| get_changelog_dir());
+            .changelog_dir.clone().unwrap_or_else(get_changelog_dir);
 
         if !changelog_dir.is_dir() {
             error!(
@@ -48,12 +47,10 @@ impl Cli {
 
         let merge_base = self
             .merge_base.clone()
-            .or_else(|| env::var("MERGE_BASE").ok())
             .unwrap_or_else(|| "origin/master".to_string());
 
         let max_fragments: usize = self
             .max_fragments
-            .or_else(|| env::var("MAX_FRAGMENTS").ok().and_then(|s| s.parse().ok()))
             .unwrap_or(DEFAULT_MAX_FRAGMENTS);
 
         let fragments = added_files_against_merge_base(&merge_base, &changelog_dir)
@@ -68,7 +65,7 @@ impl Cli {
         }
 
         if fragments.len() > max_fragments {
-            error!("Too many changelog fragments ({} > {}).", fragments.len(), max_fragments);
+            error!("Too many changelog fragments ({} > {max_fragments}).", fragments.len());
             std::process::exit(1);
         }
 
@@ -77,9 +74,9 @@ impl Cli {
                 if name == "README.md" {
                     continue;
                 }
-                info!("validating '{}'", name);
-                self.validate_fragment_filename(name)?;
-                self.validate_fragment_contents(&changelog_dir.join(name), name)?;
+                info!("Validating `{name}`");
+                validate_fragment_filename(name)?;
+                validate_fragment_contents(&changelog_dir.join(name), name)?;
             } else {
                 return Err(anyhow!("unexpected path (no filename): {}", path.display()));
             }
@@ -88,86 +85,65 @@ impl Cli {
         info!("changelog additions are valid.");
         Ok(())
     }
+}
 
-    fn validate_fragment_filename(&self, fname: &str) -> Result<()> {
-        // Expected: <unique_name>.<fragment_type>.md
-        let parts: Vec<&str> = fname.split('.').collect();
-        if parts.len() != 3 {
-            return Err(anyhow!(
-            "invalid fragment filename: wrong number of period delimiters. \
-             expected '<unique_name>.<fragment_type>.md'. ({})",
-            fname
+fn validate_fragment_filename(filename: &str) -> Result<()> {
+    // Expected: <unique_name>.<fragment_type>.md
+    let parts: Vec<&str> = filename.split('.').collect();
+    if parts.len() != 3 {
+        return Err(anyhow!(
+            "invalid fragment filename: {filename} - wrong number of period delimiters. \
+             expected '<unique_name>.<fragment_type>.md'",
         ));
-        }
+    }
 
-        let fragment_type = parts[1];
-        if !FRAGMENT_TYPES.contains(&fragment_type) {
-            return Err(anyhow!(
-            "invalid fragment filename: fragment type must be one of: ({}). ({})",
+    let fragment_type = parts[1];
+    if !FRAGMENT_TYPES.contains(&fragment_type) {
+        return Err(anyhow!(
+            "invalid fragment filename: {filename} - fragment type must be one of: {})",
             FRAGMENT_TYPES.join("|"),
-            fname
         ));
-        }
-
-        if parts[2] != "md" {
-            return Err(anyhow!(
-            "invalid fragment filename: extension must be markdown (.md): ({})",
-            fname
-        ));
-        }
-
-        Ok(())
     }
 
-    fn validate_fragment_contents(&self, path: &Path, fname: &str) -> Result<()> {
-        let content = std::fs::read_to_string(path).with_context(|| {
-            format!(
-                "failed to read fragment file: {}",
-                path.to_string_lossy()
-            )
-        })?;
-
-        // Emulate `tail -n 1` (last line; may be empty if file ends with newline)
-        let last_line = content
-            .rsplit_once('\n')
-            .map(|(_, tail)| tail)
-            .or_else(|| content.lines().last())
-            .unwrap_or(&content); // single-line file without newline
-
-        // Accept either "author:" or "authors:" (case-sensitive), followed by one-or-more non-space
-        // Example valid lines:
-        //   authors: Alice Bob
-        //   author: Alice
-        let trimmed = last_line.trim_end_matches(['\r', '\n']);
-        if !(trimmed.starts_with("authors:") || trimmed.starts_with("author:")) {
-            return Err(anyhow!(
-            "invalid fragment contents: last line must start with 'author: ' or 'authors: ' and include at least one name. ({})",
-            fname
+    if parts[2] != "md" {
+        return Err(anyhow!(
+            "invalid fragment filename: {filename} - extension must be markdown (.md)",
         ));
-        }
-
-        // Split on the first colon, take the remainder as names
-        let names = trimmed.splitn(2, ':').nth(1).unwrap_or("").trim();
-
-        if names.is_empty() {
-            return Err(anyhow!(
-            "invalid fragment contents: author line is empty. ({})",
-            fname
-        ));
-        }
-
-        if names.contains('@') {
-            return Err(anyhow!(
-            "invalid fragment contents: author should not be prefixed with @"
-        ));
-        }
-
-        if names.contains(',') {
-            return Err(anyhow!(
-            "invalid fragment contents: authors should be space delimited, not comma delimited."
-        ));
-        }
-
-        Ok(())
     }
+
+    Ok(())
+}
+
+fn validate_fragment_contents(path: &Path, filename: &str) -> Result<()> {
+    let content = std::fs::read_to_string(path).with_context(|| {
+        format!("failed to read fragment file: {}", path.to_string_lossy())
+    })?;
+
+    // Use last non-empty line to avoid false negatives due to trailing newline(s).
+    let last_line = content.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("");
+
+    if !last_line.starts_with("authors:") {
+        return Err(anyhow!("last line must start with 'authors: ' and include at least one name. ({filename})"));
+    }
+
+    // Split on the first colon, take the remainder as names
+    let names = last_line.split_once(':').map(|(_, rest)| rest.trim()).unwrap_or("");
+
+
+    if names.is_empty() {
+        return Err(anyhow!(
+            "author line is empty. ({})",
+            filename
+        ));
+    }
+
+    if names.contains('@') {
+        return Err(anyhow!("author should not be prefixed with @"));
+    }
+
+    if names.contains(',') {
+        return Err(anyhow!("authors should be space delimited, not comma delimited."));
+    }
+
+    Ok(())
 }
