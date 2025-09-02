@@ -8,7 +8,7 @@ sources:
       keepalive:
         max_connection_age_jitter_factor: 0.1
         max_connection_age_secs: 300
-    use_oltp_decoding: true
+    use_otlp_decoding: true
 
   internal_metrics:
     type: internal_metrics

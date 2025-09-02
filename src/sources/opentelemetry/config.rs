@@ -1,14 +1,14 @@
 use futures::FutureExt;
-use futures_util::{TryFutureExt, future::join};
+use futures_util::{future::join, TryFutureExt};
 use std::net::SocketAddr;
 
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 use vector_lib::{
     codecs::decoding::ProtobufDeserializer,
-    config::{LegacyKey, LogNamespace, log_schema},
+    config::{log_schema, LegacyKey, LogNamespace},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
-    lookup::{OwnedTargetPath, owned_value_path},
+    lookup::{owned_value_path, OwnedTargetPath},
     opentelemetry::{
         logs::{
             ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
@@ -33,17 +33,17 @@ use crate::{
     http::KeepaliveConfig,
     serde::bool_or_struct,
     sources::{
-        Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
         util::grpc::run_grpc_server_with_routes,
+        Source,
     },
 };
 
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{kind::Collection, Kind};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
@@ -78,12 +78,12 @@ pub struct OpentelemetryConfig {
 
     /// Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
     ///
-    /// One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OLTP format.
+    /// One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
     /// This means that components that work on metrics, will not be compatible with this output.
     /// However, these events can be forwarded directly to a downstream OTEL collector.
     #[configurable(derived)]
     #[serde(default)]
-    pub use_oltp_decoding: bool,
+    pub use_otlp_decoding: bool,
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -161,7 +161,7 @@ impl GenerateConfig for OpentelemetryConfig {
             http: example_http_config(),
             acknowledgements: Default::default(),
             log_namespace: None,
-            use_oltp_decoding: false,
+            use_otlp_decoding: false,
         })
         .unwrap()
     }
@@ -172,7 +172,7 @@ impl OpentelemetryConfig {
         &self,
         message_type: &str,
     ) -> vector_common::Result<Option<ProtobufDeserializer>> {
-        if self.use_oltp_decoding {
+        if self.use_otlp_decoding {
             let deserializer = ProtobufDeserializer::new_from_bytes(
                 vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES,
                 message_type,
@@ -363,7 +363,7 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
-        let metrics_output = if self.use_oltp_decoding {
+        let metrics_output = if self.use_otlp_decoding {
             SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(METRICS)
         } else {
             SourceOutput::new_metrics().with_port(METRICS)

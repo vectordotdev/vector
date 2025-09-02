@@ -325,7 +325,7 @@ generated: components: sources: opentelemetry: configuration: {
 			}
 		}
 	}
-	use_oltp_decoding: {
+	use_otlp_decoding: {
 		description: """
 			Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
 

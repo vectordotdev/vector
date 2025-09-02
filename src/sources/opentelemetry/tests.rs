@@ -2,17 +2,17 @@ use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
 use crate::{
-    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
+        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
     },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
     test_util::{
         self,
-        components::{SOURCE_TAGS, assert_source_compliance},
+        components::{assert_source_compliance, SOURCE_TAGS},
         next_addr,
     },
+    SourceSender,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -26,18 +26,18 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::{
-        logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
-        metrics::v1::{ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient},
+        logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
+        metrics::v1::{metrics_service_client::MetricsServiceClient, ExportMetricsServiceRequest},
     },
     common::v1::{
-        AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
+        any_value, any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue,
     },
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     metrics::v1::{
-        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
-        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
-        Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets, metric::Data,
-        summary_data_point::ValueAtQuantile,
+        exponential_histogram_data_point::Buckets, metric::Data, summary_data_point::ValueAtQuantile, AggregationTemporality,
+        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, Metric, NumberDataPoint,
+        ResourceMetrics, ScopeMetrics, Sum, Summary,
+        SummaryDataPoint,
     },
     resource::v1::{Resource, Resource as OtelResource},
 };
@@ -1088,7 +1088,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
-            use_oltp_decoding: false,
+            use_otlp_decoding: false,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1194,7 +1194,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
-        use_oltp_decoding: false,
+        use_otlp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
