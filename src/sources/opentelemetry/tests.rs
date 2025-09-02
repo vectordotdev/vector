@@ -2,17 +2,17 @@ use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
+        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
     },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
         self,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         next_addr,
     },
-    SourceSender,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -26,18 +26,18 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::{
-        logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-        metrics::v1::{metrics_service_client::MetricsServiceClient, ExportMetricsServiceRequest},
+        logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+        metrics::v1::{ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient},
     },
     common::v1::{
-        any_value, any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue,
+        AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
     },
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     metrics::v1::{
-        exponential_histogram_data_point::Buckets, metric::Data, summary_data_point::ValueAtQuantile, AggregationTemporality,
-        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, Metric, NumberDataPoint,
-        ResourceMetrics, ScopeMetrics, Sum, Summary,
-        SummaryDataPoint,
+        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
+        Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets, metric::Data,
+        summary_data_point::ValueAtQuantile,
     },
     resource::v1::{Resource, Resource as OtelResource},
 };
