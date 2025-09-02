@@ -318,7 +318,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
-    runs-on: release-builder-windows-2022
+    runs-on: windows-2025-8core
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
@@ -333,7 +333,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Windows-specific)
-        run: .\scripts\environment\bootstrap-windows-2022.ps1
+        run: .\scripts\environment\bootstrap-windows-2025.ps1
       - name: Install Wix
         shell: bash
         run: |
