@@ -1,0 +1,148 @@
+name: "Setup"
+description: "Setup everything"
+
+inputs:
+  cargo-cache:
+    required: false
+    default: true
+
+  mold:
+    required: false
+    default: true
+
+  # prepare.sh - rust
+  rustup:
+    required: false
+    default: false
+  cargo-deb:
+    required: false
+    default: false
+  cross:
+    required: false
+    default: false
+  cargo-nextest:
+    required: false
+    default: false
+  cargo-deny:
+    required: false
+    default: false
+  cargo-msrv:
+    required: false
+    default: false
+  dd-rust-license-tool:
+    required: false
+    default: false
+  wasm-pack:
+    required: false
+    default: false
+
+  # prepare.sh - npm
+  markdownlint:
+    required: false
+    default: false
+  datadog-ci:
+    required: false
+    default: false
+
+runs:
+  using: "composite"
+  steps:
+    - id: needs
+      name: Compute if rust is needed
+      shell: bash
+      run: |
+        rust="false"
+
+        # If any rust-related inputs are true, enable cache regardless
+        for val in "${{ inputs.mold }}" \
+                   "${{ inputs.rustup }}" \
+                   "${{ inputs.cargo-deb }}" \
+                   "${{ inputs.cross }}" \
+                   "${{ inputs.cargo-nextest }}" \
+                   "${{ inputs.cargo-deny }}" \
+                   "${{ inputs.cargo-msrv }}" \
+                   "${{ inputs.dd-rust-license-tool }}" \
+                   "${{ inputs.wasm-pack }}"; do
+          if [[ "$val" == "true" ]]; then
+            rust="true"
+          fi
+        done
+
+        echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+
+    - name: Enable rust matcher
+      run: echo "::add-matcher::.github/matchers/rust.json"
+      shell: bash
+
+    - name: Cache Cargo registry + index
+      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      name: Cache Cargo registry + index
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install mold
+      if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.mold == 'true' }}
+      run: |
+        # Install mold, because the system linker wastes a bunch of time.
+        #
+        # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
+        # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
+        # and all of that.
+
+        # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+        # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
+        TEMP=$(mktemp -d)
+        MOLD_VERSION=1.2.1
+        MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
+        curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+        --output "$TEMP/${MOLD_TARGET}.tar.gz"
+        tar \
+            -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+            -C "${TEMP}"
+        cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+        cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+        rm -rf "$TEMP"
+
+        # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+        # anything linking calls to use `mold` instead of `ld`, etc.
+        CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+        mkdir -p "$CARGO_BIN_DIR"
+
+        RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+        cat <<EOF >"$RUSTC_WRAPPER"
+        #!/bin/sh
+        exec mold -run "\$@"
+        EOF
+        chmod +x "$RUSTC_WRAPPER"
+
+        # Now configure Cargo to use our rustc wrapper script.
+        cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+        [build]
+        rustc-wrapper = "$RUSTC_WRAPPER"
+        EOF
+
+
+    - name: Run prepare.sh
+      run: |
+        modules=()
+        [[ "${{ inputs.rustup == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && modules+=("rustup")
+        [[ "${{ inputs.cargo-deb }}" == "true" ]] && modules+=("cargo-deb")
+        [[ "${{ inputs.cross }}" == "true" ]] && modules+=("cross")
+        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && modules+=("cargo-nextest")
+        [[ "${{ inputs.cargo-deny }}" == "true" ]] && modules+=("cargo-deny")
+        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && modules+=("cargo-msrv")
+        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && modules+=("dd-rust-license-tool")
+        [[ "${{ inputs.wasm-pack }}" == "true" ]] && modules+=("wasm-pack")
+        [[ "${{ inputs.markdownlint }}" == "true" ]] && modules+=("markdownlint")
+        [[ "${{ inputs.datadog-ci }}" == "true" ]] && modules+=("datadog-ci")
+        MODULES=$(IFS=,; echo "${modules[*]}")
+        ./script/environment/prepare.sh --modules "${MODULES}"
+      shell: bash
