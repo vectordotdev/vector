@@ -375,7 +375,7 @@ test-integration: test-integration-eventstoredb test-integration-fluent test-int
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
-test-integration: test-integration-datadog-traces test-integration-shutdown
+test-integration: test-integration-datadog-traces test-integration-shutdown test-integration-sentry
 
 test-integration-%-cleanup:
 	cargo vdev --verbose integration stop $*

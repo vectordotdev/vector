@@ -329,6 +329,9 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 # GreptimeDB
 greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
+# Sentry
+sentry = { version = "0.42.0", default-features = false, optional = true, features = ["reqwest", "transport", "logs"] }
+
 # External libs
 arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
@@ -789,6 +792,7 @@ sinks-logs = [
   "sinks-pulsar",
   "sinks-redis",
   "sinks-sematext",
+  "sinks-sentry",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-vector",
@@ -859,6 +863,7 @@ sinks-postgres = ["dep:sqlx"]
 sinks-pulsar = ["dep:apache-avro", "dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
+sinks-sentry = ["dep:sentry"]
 sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
@@ -911,6 +916,7 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "webhdfs-integration-tests",
+  "sentry-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
@@ -977,6 +983,7 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
+sentry-integration-tests = ["sinks-sentry"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
