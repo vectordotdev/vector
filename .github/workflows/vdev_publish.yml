@@ -26,7 +26,6 @@ jobs:
         run: |
           sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
 
-
       - name: Bootstrap runner environment (macOS)
         if: startsWith(matrix.os, 'macos')
         run: sudo -E bash scripts/environment/bootstrap-macos.sh
