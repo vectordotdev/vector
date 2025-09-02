@@ -1,5 +1,5 @@
 use crate::app::CommandExt as _;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
 use std::path::{Path, PathBuf};
 use std::{collections::HashSet, process::Command};

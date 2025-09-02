@@ -14,10 +14,10 @@ mod config;
 mod environment;
 mod features;
 mod git;
+mod path_utils;
 mod platform;
 mod testing;
 mod util;
-mod path_utils;
 
 use anyhow::Result;
 use clap::Parser;
