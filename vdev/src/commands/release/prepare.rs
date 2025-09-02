@@ -2,6 +2,7 @@
 #![allow(clippy::print_stderr)]
 
 use crate::git;
+use crate::path_utils::get_repo_root;
 use crate::util::run_command;
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
@@ -388,10 +389,6 @@ impl Prepare {
 }
 
 // FREE FUNCTIONS AFTER THIS LINE
-
-fn get_repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
-}
 
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");

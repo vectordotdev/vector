@@ -1,6 +1,7 @@
 use crate::app::CommandExt as _;
-use anyhow::{Result, anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use git2::{BranchType, ErrorCode, Repository};
+use std::path::{Path, PathBuf};
 use std::{collections::HashSet, process::Command};
 
 pub fn current_branch() -> Result<String> {
@@ -65,6 +66,30 @@ pub fn changed_files() -> Result<Vec<String>> {
     sorted.sort();
 
     Ok(sorted)
+}
+
+/// Equivalent to:
+/// git diff --name-only --diff-filter=A --merge-base "${MERGE_BASE:-origin/master}" dir
+pub fn added_files_against_merge_base(merge_base: &str, dir: &Path) -> Result<Vec<PathBuf>> {
+    // `run_and_check_output` takes &[&str], so stringify the path first.
+    let dir_s = dir.to_string_lossy().into_owned();
+
+    let stdout = run_and_check_output(&[
+        "diff",
+        "--name-only",
+        "--diff-filter=A",
+        "--merge-base",
+        merge_base,
+        &dir_s,
+    ])?;
+
+    let paths = stdout
+        .lines()
+        .filter(|s| !s.trim().is_empty())
+        .map(PathBuf::from)
+        .collect::<Vec<_>>();
+
+    Ok(paths)
 }
 
 pub fn list_files() -> Result<Vec<String>> {

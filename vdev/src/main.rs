@@ -17,6 +17,7 @@ mod git;
 mod platform;
 mod testing;
 mod util;
+mod path_utils;
 
 use anyhow::Result;
 use clap::Parser;
