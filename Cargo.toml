@@ -189,7 +189,7 @@ tonic = { version = "0.11", default-features = false, features = ["transport", "
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
-uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.18.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
