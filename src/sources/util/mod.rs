@@ -14,7 +14,11 @@ pub mod grpc;
     feature = "sources-utils-http-query"
 ))]
 pub mod http;
-#[cfg(any(feature = "sources-http_client", feature = "sources-prometheus-scrape",))]
+#[cfg(any(
+    feature = "sources-http_client",
+    feature = "sources-prometheus-scrape",
+    feature = "sources-okta"
+))]
 pub mod http_client;
 #[cfg(any(
     feature = "sources-aws_sqs",

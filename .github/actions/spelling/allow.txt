@@ -292,6 +292,7 @@ Lifetouch
 linkerd
 localdomain
 localstack
+lookback
 lucene
 Lumia
 LYF
