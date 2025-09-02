@@ -7,8 +7,8 @@ license = "MPL-2.0"
 readme = "README.md"
 repository = "https://github.com/vectordotdev/vector"
 homepage = "https://vector.dev"
-description = "CLI utilities for Vector development and workflows"
-keywords = ["cli", "developer-tools", "vector", "datadog"]
+description = "CLI utilities for Vector (vector.dev) development and CI workflows"
+keywords = ["cli", "developer-tools", "vector", "vdev"]
 categories = ["command-line-utilities"]
 include = [
   "Cargo.toml",
