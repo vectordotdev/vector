@@ -1,7 +1,7 @@
 name: release
 on:
   push:
-    tags: [ "v*.*.*" ]
+    tags: [ "vdev-v*.*.*" ]
 
 permissions:
   contents: write  # needed for creating releases
@@ -41,7 +41,7 @@ jobs:
         working-directory: vdev
         shell: bash
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          VERSION=${GITHUB_REF_NAME#vdev-v}
           OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
           
