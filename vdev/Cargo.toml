@@ -5,7 +5,16 @@ edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
 readme = "README.md"
-publish = false
+repository = "https://github.com/vectordotdev/vector"
+homepage = "https://vector.dev"
+description = "CLI utilities for Vector (vector.dev) development and CI workflows"
+keywords = ["cli", "developer-tools", "vector", "vdev"]
+categories = ["command-line-utilities"]
+include = [
+  "Cargo.toml",
+  "README.md",
+  "src/**",
+]
 
 [dependencies]
 anyhow.workspace = true
