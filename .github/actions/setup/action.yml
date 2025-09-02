@@ -77,7 +77,6 @@ runs:
     - name: Cache Cargo registry + index
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-      name: Cache Cargo registry + index
       with:
         path: |
           ~/.cargo/bin/
@@ -90,6 +89,7 @@ runs:
 
     - name: Install mold
       if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.mold == 'true' }}
+      shell: bash
       run: |
         # Install mold, because the system linker wastes a bunch of time.
         #
@@ -131,6 +131,7 @@ runs:
 
 
     - name: Run prepare.sh
+      shell: bash
       run: |
         modules=()
         [[ "${{ inputs.rustup == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && modules+=("rustup")
@@ -145,4 +146,3 @@ runs:
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && modules+=("datadog-ci")
         MODULES=$(IFS=,; echo "${modules[*]}")
         ./script/environment/prepare.sh --modules "${MODULES}"
-      shell: bash
