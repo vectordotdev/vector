@@ -1,0 +1,57 @@
+name: release
+on:
+  push:
+    tags: [ "vdev-v*.*.*" ]
+
+permissions:
+  contents: write  # needed for creating releases
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Bootstrap runner environment (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+
+      - name: Bootstrap runner environment (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: sudo -E bash scripts/environment/bootstrap-macos.sh
+
+      - run: bash scripts/environment/prepare.sh --modules=rustup
+
+      - name: Build
+        working-directory: vdev
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        working-directory: vdev
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#vdev-v}
+          OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
+          mkdir -p "$OUTDIR"
+
+          BIN="target/${{ matrix.target }}/release/vdev"
+          cp "$BIN" "$OUTDIR/"
+          tar -czf "${OUTDIR}.tgz" "$OUTDIR"
+          echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
+
+      - name: Upload asset to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
