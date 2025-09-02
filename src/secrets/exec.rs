@@ -265,7 +265,7 @@ mod tests {
         .into_iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
-        // Calling the mock_secects_exec.py program with the expected secret keys should provide
+        // Calling the mock_secrets_exec.py program with the expected secret keys should provide
         // the values expected above in `fake_secret_values`
         let fetched_keys = backend
             .retrieve(fake_secret_values.keys().cloned().collect(), &mut rx)
