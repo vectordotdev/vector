@@ -137,6 +137,7 @@ make check-licenses
 make check-fmt
 make check-clippy
 make check-component-docs
+make check-changelog-fragments
 
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
@@ -144,8 +145,6 @@ make check-docs
 make check-version
 make check-examples
 make check-scripts
-
-./scripts/check_changelog_fragments.sh
 
 # The following check is very slow.
 # make check-component-features

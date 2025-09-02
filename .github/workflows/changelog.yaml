@@ -47,7 +47,6 @@ jobs:
         with:
           ref: master
           sparse-checkout: |
-            scripts/check_changelog_fragments.sh
             changelog.d/
             vdev/
           sparse-checkout-cone-mode: false
