@@ -4,3 +4,5 @@ the `opentelemetry` sink without modifications.
 
 A caveat here is that OTLP metrics and Vector metric format differ and thus we treat as logs as they come out the source. These events
 cannot be used with existing metrics transforms. However, these can be ingested by the OTEL collectors as metrics.
+
+authors: pront
