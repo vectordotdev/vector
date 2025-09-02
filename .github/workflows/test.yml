@@ -34,8 +34,9 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: make check-fmt
 
   check-clippy:
@@ -45,8 +46,9 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-clippy
@@ -58,11 +60,11 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
-
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          datadog-ci: true
       - name: Unit Test
         run: make test
         env:
