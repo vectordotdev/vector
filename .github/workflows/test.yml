@@ -66,6 +66,7 @@ jobs:
           cargo-nextest: true
           datadog-ci: true
           protoc: true
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - name: Unit Test
         run: make test
         env:
