@@ -1,3 +1,0 @@
-Fake
-
-authors: pront
