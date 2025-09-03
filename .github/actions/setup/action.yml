@@ -85,6 +85,7 @@ runs:
     - name: Override warnings
       if: ${{ env.NEEDS_RUST == 'true' }}
       run: |
+        CARGO_OVERRIDE_DIR="${HOME}/.cargo"
         CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
         cat <<EOF >>"$CARGO_OVERRIDE_CONF"
         [target.'cfg(linux)']
