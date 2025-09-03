@@ -145,4 +145,4 @@ runs:
         [[ "${{ inputs.markdownlint }}" == "true" ]] && modules+=("markdownlint")
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && modules+=("datadog-ci")
         MODULES=$(IFS=,; echo "${modules[*]}")
-        ./script/environment/prepare.sh --modules "${MODULES}"
+        ./scripts/environment/prepare.sh --modules "${MODULES}"
