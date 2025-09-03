@@ -78,7 +78,7 @@ contains_module() {
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack)
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack vdev)
 
 REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
 unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
