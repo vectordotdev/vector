@@ -95,7 +95,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.mold == 'true' }}
+      if: ${{ inputs.mold == 'true' }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -138,14 +138,14 @@ runs:
         EOF
 
     - name: Install protoc
-      if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.protoc == 'true' }}
+      if: ${{ inputs.protoc == 'true' }}
       shell: bash
       run: |
         echo "Installing protoc"
         sudo bash ./scripts/environment/install-protoc.sh
 
     - name: Install cue
-      if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.cue == 'true' }}
+      if: ${{ inputs.cue == 'true' }}
       shell: bash
       run: |
         echo "Installing cue"
