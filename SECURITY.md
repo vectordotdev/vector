@@ -254,6 +254,10 @@ upon download. This verifies that assets have not been modified at rest.
 
 ## Meta
 
+### Review Schedule
+
+Vector reviews this policy and all user access levels on a quarterly basis.
+
 ### Vulnerability Reporting
 
 We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
