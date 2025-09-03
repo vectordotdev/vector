@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
@@ -32,7 +32,7 @@ jobs:
       PROFILE: debug
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
