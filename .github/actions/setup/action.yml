@@ -78,8 +78,18 @@ runs:
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
 
     - name: Enable rust matcher
+      if: ${{ env.NEEDS_RUST == 'true' }}
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
+
+    - name: Override warnings
+      if: ${{ env.NEEDS_RUST == 'true' }}
+      run: |
+        CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+        cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+        [target.'cfg(linux)']
+        rustflags = [ "-D", "warnings" ]
+        EOF
 
     - name: Cache Cargo registry + index
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
@@ -99,6 +109,10 @@ runs:
       shell: bash
       run: |
         echo "Installing mold"
+
+        CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+        CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+
         # Install mold, because the system linker wastes a bunch of time.
         #
         # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
@@ -115,8 +129,8 @@ runs:
         tar \
             -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
             -C "${TEMP}"
-        cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
-        cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+        sudo cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+        sudo cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
         rm -rf "$TEMP"
 
         # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
