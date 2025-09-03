@@ -11,7 +11,7 @@ inputs:
     default: true
 
   # prepare.sh - rust
-  rustup:
+  rust: # rustup module
     required: false
     default: false
   cargo-deb:
@@ -55,7 +55,7 @@ runs:
 
         # If any rust-related inputs are true, enable cache regardless
         for val in "${{ inputs.mold }}" \
-                   "${{ inputs.rustup }}" \
+                   "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
                    "${{ inputs.cross }}" \
                    "${{ inputs.cargo-nextest }}" \
@@ -134,7 +134,7 @@ runs:
       shell: bash
       run: |
         modules=()
-        [[ "${{ inputs.rustup == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && modules+=("rustup")
+        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && modules+=("rustup")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && modules+=("cargo-deb")
         [[ "${{ inputs.cross }}" == "true" ]] && modules+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && modules+=("cargo-nextest")
