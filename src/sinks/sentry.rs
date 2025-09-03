@@ -7,7 +7,12 @@ use std::time::SystemTime;
 
 use futures::FutureExt;
 use sentry::protocol::{Log, LogAttribute, LogLevel, Map, TraceId, Value};
+use tracing::warn;
 use vector_lib::configurable::configurable_component;
+use vector_lib::internal_event::{
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+};
+use vector_lib::json_size::JsonSize;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
 
@@ -100,6 +105,38 @@ impl SinkConfig for SentryConfig {
     }
 }
 
+/// Estimate the serialized byte size of a Sentry log for telemetry purposes.
+/// This provides an approximation since we don't have access to the actual serialized bytes.
+fn estimate_sentry_log_size(log: &Log) -> usize {
+    let mut size = 0;
+
+    // Base log structure overhead
+    size += 100; // Rough estimate for JSON structure, timestamp, level, etc.
+
+    // Body/message size
+    size += log.body.len();
+
+    // Trace ID (if present)
+    if let Some(trace_id) = log.trace_id {
+        size += trace_id.to_string().len();
+    }
+
+    // Attributes
+    for (key, value) in &log.attributes {
+        size += key.len();
+        size += match &value.0 {
+            sentry::protocol::Value::String(s) => s.len(),
+            sentry::protocol::Value::Number(_) => 20, // Rough estimate for number
+            sentry::protocol::Value::Bool(_) => 5,    // "true" or "false"
+            sentry::protocol::Value::Array(arr) => arr.len() * 50, // Rough estimate per array element
+            sentry::protocol::Value::Object(obj) => obj.len() * 50, // Rough estimate per object field
+            _ => 20,                                                // Fallback for other types
+        };
+    }
+
+    size
+}
+
 pub(super) struct SentrySink {
     transformer: Transformer,
     batch_settings: BatcherSettings,
@@ -138,17 +175,74 @@ impl SentrySink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // Register telemetry events
+        let bytes_sent = register!(BytesSent::from(Protocol("sentry".into())));
+        let events_sent = register!(EventsSent::from(Output(None)));
+
         input
             .batched(self.batch_settings.as_byte_size_config())
             .for_each(|events| async {
                 let transformer = self.transformer.clone();
+                let mut batch_finalizers = Vec::new();
+                let mut batch_count = 0;
+                let mut batch_json_size = JsonSize::zero();
+                let mut batch_successful = true;
 
                 for mut event in events {
+                    // Extract finalizers before processing
+                    let finalizers = event.take_finalizers();
+                    let event_byte_size = event.estimated_json_encoded_size_of();
+
                     transformer.transform(&mut event);
 
                     if let Event::Log(log) = event {
-                        sentry::Hub::main().capture_log(convert_to_sentry_log(&log));
+                        // Convert to Sentry log and send
+                        let sentry_log = convert_to_sentry_log(&log);
+
+                        // Estimate the serialized byte size of the Sentry log
+                        // This is an approximation since we don't have access to the actual bytes sent
+                        let estimated_sentry_bytes = estimate_sentry_log_size(&sentry_log);
+
+                        // Try to send to Sentry
+                        match std::panic::catch_unwind(|| {
+                            sentry::Hub::main().capture_log(sentry_log)
+                        }) {
+                            Ok(_) => {
+                                // Success - track metrics for this event
+                                batch_count += 1;
+                                batch_json_size += event_byte_size;
+                                batch_finalizers.push((
+                                    finalizers,
+                                    EventStatus::Delivered,
+                                    estimated_sentry_bytes,
+                                ));
+                            }
+                            Err(_) => {
+                                // Sentry client panicked or failed
+                                warn!("Failed to send log to Sentry");
+                                batch_finalizers.push((finalizers, EventStatus::Errored, 0));
+                                batch_successful = false;
+                            }
+                        }
+                    } else {
+                        // Non-log events are not supported by Sentry
+                        batch_finalizers.push((finalizers, EventStatus::Delivered, 0));
                     }
+                }
+
+                // Update finalizer status and emit telemetry events
+                let mut total_sentry_bytes = 0;
+                for (finalizers, status, sentry_bytes) in batch_finalizers {
+                    finalizers.update_status(status);
+                    if status == EventStatus::Delivered {
+                        total_sentry_bytes += sentry_bytes;
+                    }
+                }
+
+                // Emit telemetry events for successful batch
+                if batch_successful && batch_count > 0 {
+                    events_sent.emit(CountByteSize(batch_count, batch_json_size));
+                    bytes_sent.emit(ByteSize(total_sentry_bytes));
                 }
             })
             .await;
