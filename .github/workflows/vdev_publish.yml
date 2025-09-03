@@ -1,4 +1,4 @@
-name: release
+name: Publish vdev
 on:
   push:
     tags: [ "vdev-v*.*.*" ]
@@ -37,14 +37,20 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package
-        working-directory: vdev
         shell: bash
         run: |
           VERSION=${GITHUB_REF_NAME#vdev-v}
           OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
 
-          BIN="target/${{ matrix.target }}/release/vdev"
+          BIN_ROOT="${CARGO_TARGET_DIR:-target}"
+          BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
+          if [[ ! -f "$BIN" ]]; then
+              echo "Binary not found at: $BIN"
+              find ${BIN_ROOT} -type -d
+              exit 1
+          fi
+
           cp "$BIN" "$OUTDIR/"
           tar -czf "${OUTDIR}.tgz" "$OUTDIR"
           echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
