@@ -199,8 +199,6 @@ When possible, we'll create automated checks to enforce security policies.
 - Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
   dependency-related security vulnerabilities.
-- We verify the security of our Docker images using [Snyk's][urls.snyk] vulnerability
-  scanning.
 
 #### Vulnerability Remediation
 
@@ -302,8 +300,6 @@ it, we will periodically update you with the status of the fix.
 [urls.rust]: https://www.rust-lang.org/
 
 [urls.rust_sec]: https://rustsec.org/
-
-[urls.snyk]: https://www.snyk.io
 
 [urls.vector_chat]: https://chat.vector.dev
 
