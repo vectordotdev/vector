@@ -1,10 +1,11 @@
 name: release
 on:
   push:
-    tags: [ "vdev-v*.*.*" ]
+    tags: [ "vdev-v*.*.*" ]              # real releases
+  pull_request: # TODO remove
 
 permissions:
-  contents: write  # needed for creating releases
+  contents: write
 
 jobs:
   build:
@@ -23,8 +24,7 @@ jobs:
 
       - name: Bootstrap runner environment (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
 
       - name: Bootstrap runner environment (macOS)
         if: startsWith(matrix.os, 'macos')
@@ -40,18 +40,62 @@ jobs:
         working-directory: vdev
         shell: bash
         run: |
-          VERSION=${GITHUB_REF_NAME#vdev-v}
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
+          echo "Derived VERSION=${GITHUB_REF_NAME#vdev-v}"
+          echo "matrix.target=${{ matrix.target }}"
+          echo "CARGO_TARGET_DIR=${CARGO_TARGET_DIR-<unset>}"
+          echo "rustc:"
+          rustc -Vv || true
+          echo "cargo:"
+          cargo -V || true
+          echo "rustup:"
+          rustup show || true
+          echo "installed targets:"
+          rustup target list --installed || true
+          echo "--- repo root layout ---"
+          git rev-parse --show-toplevel
+          ls -la ..
+          echo "--- vdev dir ---"
+          ls -la
+          echo "--- target trees (if any) ---"
+          (ls -la target || true)
+          (ls -la "${CARGO_TARGET_DIR}/" || true)
+          
+          # Derive VERSION based on event type
+          case "${GITHUB_EVENT_NAME}" in
+            push)              VERSION="${GITHUB_REF_NAME#vdev-v}" ;;                # tags like vdev-v0.1.0
+            workflow_dispatch) VERSION="${{ inputs.version }}" ;;
+            pull_request)      VERSION="0.0.0-pr.${GITHUB_RUN_NUMBER}" ;;            # fake version for PR test
+            *)                  VERSION="0.0.0-dev" ;;
+          esac
+
           OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
           mkdir -p "$OUTDIR"
 
-          BIN="target/${{ matrix.target }}/release/vdev"
+          BIN_ROOT="${CARGO_TARGET_DIR:-target}"
+          BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
+          if [[ ! -f "$BIN" ]]; then
+            echo "Binary not found at $BIN"; ls -lah "${BIN_ROOT}/${{ matrix.target }}/release/" || true; exit 1
+          fi
+
           cp "$BIN" "$OUTDIR/"
           tar -czf "${OUTDIR}.tgz" "$OUTDIR"
           echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
 
+      # On tag pushes -> attach to GitHub Release
       - name: Upload asset to release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ASSET }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # On PRs/manual runs -> store as workflow artifacts (no release needed)
+      - name: Upload build artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: vdev/${{ env.ASSET }}
+          if-no-files-found: error
