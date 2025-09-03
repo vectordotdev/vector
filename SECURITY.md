@@ -254,19 +254,14 @@ upon download. This verifies that assets have not been modified at rest.
 
 ## Meta
 
-### Review Schedule
-
-Vector reviews this policy and all user access levels on a quarterly basis.
-
 ### Vulnerability Reporting
 
-We deeply appreciate any effort to discover and disclose security
-vulnerabilities responsibly.
+We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
 
-If you would like to report a vulnerability or have any security concerns with
-Vector, please e-mail security@datadoghq.com.
+Due to the nature of a open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could 
+potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure 
+via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
 
-For non-critical matters, we prefer users [open an issue][urls.new_security_report].
 For us to best investigate your request, please include any of the
 following when reporting:
 
@@ -274,25 +269,44 @@ following when reporting:
 - Any tools, including versions used
 - Any relevant output
 
+If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products, 
+please e-mail security@datadoghq.com.
+
 We take all disclosures very seriously and will do our best to rapidly respond
 and verify the vulnerability before taking the necessary steps to fix it. After
 our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
+
 [urls.cargo_deny_configuration]: https://github.com/vectordotdev/vector/blob/master/deny.toml
+
 [urls.cargo_deny_schedule]: https://github.com/vectordotdev/vector/blob/master/.github/workflows/test.yml#L267
+
 [urls.dependabot]: https://github.com/marketplace/dependabot-preview
+
 [urls.dependabot_alerts]: https://github.com/vectordotdev/vector/network/alerts
+
 [urls.git]: https://git-scm.com/
+
 [urls.github_protected_branches]: https://help.github.com/en/github/administering-a-repository/about-protected-branches
+
 [urls.least_privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
+
 [urls.new_security_report]: https://github.com/vectordotdev/vector/issues/new?labels=domain%3A+security
+
 [urls.rust]: https://www.rust-lang.org/
+
 [urls.rust_sec]: https://rustsec.org/
+
 [urls.snyk]: https://www.snyk.io
+
 [urls.vector_chat]: https://chat.vector.dev
+
 [urls.vector_issues]: https://github.com/vectordotdev/vector/issues
+
 [urls.vector_pull_requests]: https://github.com/vectordotdev/vector/pulls
+
 [urls.vector_repo]: https://github.com/vectordotdev/vector
+
 [urls.vector_roadmap]: https://github.com/vectordotdev/vector/milestones?direction=asc&sort=due_date&state=open
