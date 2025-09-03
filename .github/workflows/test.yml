@@ -161,7 +161,6 @@ jobs:
         with:
           rust: true
           protoc: true
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh # FIXME ruby
       - run: make check-component-docs
 
   check-rust-docs:
