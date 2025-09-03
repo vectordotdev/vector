@@ -133,16 +133,17 @@ runs:
     - name: Run prepare.sh
       shell: bash
       run: |
-        modules=()
-        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && modules+=("rustup")
-        [[ "${{ inputs.cargo-deb }}" == "true" ]] && modules+=("cargo-deb")
-        [[ "${{ inputs.cross }}" == "true" ]] && modules+=("cross")
-        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && modules+=("cargo-nextest")
-        [[ "${{ inputs.cargo-deny }}" == "true" ]] && modules+=("cargo-deny")
-        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && modules+=("cargo-msrv")
-        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && modules+=("dd-rust-license-tool")
-        [[ "${{ inputs.wasm-pack }}" == "true" ]] && modules+=("wasm-pack")
-        [[ "${{ inputs.markdownlint }}" == "true" ]] && modules+=("markdownlint")
-        [[ "${{ inputs.datadog-ci }}" == "true" ]] && modules+=("datadog-ci")
-        MODULES=$(IFS=,; echo "${modules[*]}")
-        ./scripts/environment/prepare.sh --modules "${MODULES}"
+        mods=()
+        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
+        [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
+        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
+        [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
+        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
+        [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
+        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
+        csm=$(IFS=,; echo "${mods[*]}")
+
+        [[ "$csm" != "" ]] && ./scripts/environment/prepare.sh --modules="${csm}"
