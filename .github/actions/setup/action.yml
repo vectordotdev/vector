@@ -98,6 +98,7 @@ runs:
       if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.mold == 'true' }}
       shell: bash
       run: |
+        echo "Installing mold"
         # Install mold, because the system linker wastes a bunch of time.
         #
         # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
@@ -139,13 +140,15 @@ runs:
     - name: Install protoc
       if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.protoc == 'true' }}
       shell: bash
-      run: sudo bash ./scripts/environment/install-protoc.sh
+      run: |
+        echo "Installing protoc"
+        sudo bash ./scripts/environment/install-protoc.sh
 
     - name: Install cue
       if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.cue == 'true' }}
       shell: bash
       run: |
-        # Cue
+        echo "Installing cue"
         TEMP=$(mktemp -d)
         curl \
           -L https://github.com/cue-lang/cue/releases/download/v0.10.0/cue_v0.10.0_linux_amd64.tar.gz \
