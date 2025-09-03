@@ -47,7 +47,7 @@ jobs:
           BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
           if [[ ! -f "$BIN" ]]; then
               echo "Binary not found at: $BIN"
-              find ${BIN_ROOT} -type -d 
+              find ${BIN_ROOT} -type -d
               exit 1
           fi
 
