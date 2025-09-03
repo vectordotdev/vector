@@ -155,7 +155,7 @@ futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.2", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.2.0", default-features = false }
-indexmap = { version = "2.10.0", default-features = false, features = ["serde", "std"] }
+indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
@@ -189,7 +189,7 @@ tonic = { version = "0.11", default-features = false, features = ["transport", "
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
-uuid = { version = "1.17.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.18.0", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
