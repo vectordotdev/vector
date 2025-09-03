@@ -318,7 +318,7 @@ jobs:
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
-    runs-on: release-builder-windows-2022
+    runs-on: windows-2025-8core
     timeout-minutes: 90
     needs: generate-publish-metadata
     env:
@@ -333,7 +333,7 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Bootstrap runner environment (Windows-specific)
-        run: .\scripts\environment\bootstrap-windows-2022.ps1
+        run: .\scripts\environment\bootstrap-windows-2025.ps1
       - name: Install Wix
         shell: bash
         run: |
@@ -518,12 +518,12 @@ jobs:
         with:
           ref: ${{ inputs.git_ref }}
       - name: Login to DockerHub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
