@@ -1,12 +1,14 @@
 //! A collection of support structures that are used in the process of encoding
 //! events into bytes.
 
+pub mod chunking;
 pub mod format;
 pub mod framing;
 
 use std::fmt::Debug;
 
 use bytes::BytesMut;
+pub use chunking::*;
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,

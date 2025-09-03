@@ -9,6 +9,7 @@ use tokio::net::UdpSocket;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
 use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::codecs::encoding::Chunker;
 use vector_lib::internal_event::RegisterInternalEvent;
 use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
 
@@ -27,11 +28,15 @@ pub enum DatagramSocket {
     Unix(UnixDatagram, PathBuf),
 }
 
-pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>>(
+pub async fn send_datagrams<
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>,
+    C: Chunker,
+>(
     input: &mut Peekable<BoxStream<'_, Event>>,
     mut socket: DatagramSocket,
     transformer: &Transformer,
     encoder: &mut E,
+    chunker: &C,
     bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
 ) {
     while let Some(mut event) = input.next().await {
@@ -47,39 +52,46 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
             continue;
         }
 
-        match send_datagram(&mut socket, &bytes).await {
-            Ok(()) => {
-                emit!(SocketEventsSent {
-                    mode: match socket {
-                        DatagramSocket::Udp(_) => SocketMode::Udp,
-                        #[cfg(unix)]
-                        DatagramSocket::Unix(..) => SocketMode::Unix,
-                    },
-                    count: 1,
-                    byte_size,
-                });
+        let chunked_result = chunker.chunk(bytes.freeze());
+        if chunked_result.is_err() {
+            continue;
+        }
 
-                bytes_sent.emit(ByteSize(bytes.len()));
-                finalizers.update_status(EventStatus::Delivered);
-            }
-            Err(error) => {
-                match socket {
-                    DatagramSocket::Udp(_) => emit!(SocketSendError {
-                        mode: SocketMode::Udp,
-                        error
-                    }),
-                    #[cfg(unix)]
-                    DatagramSocket::Unix(_, path) => {
-                        emit!(UnixSocketSendError {
-                            path: path.as_path(),
-                            error: &error
-                        })
-                    }
-                };
-                finalizers.update_status(EventStatus::Errored);
-                return;
+        for bytes in chunked_result.unwrap() {
+            match send_datagram(&mut socket, &bytes).await {
+                Ok(()) => {
+                    emit!(SocketEventsSent {
+                        mode: match socket {
+                            DatagramSocket::Udp(_) => SocketMode::Udp,
+                            #[cfg(unix)]
+                            DatagramSocket::Unix(..) => SocketMode::Unix,
+                        },
+                        count: 1,
+                        byte_size,
+                    });
+
+                    bytes_sent.emit(ByteSize(bytes.len()));
+                }
+                Err(error) => {
+                    match socket {
+                        DatagramSocket::Udp(_) => emit!(SocketSendError {
+                            mode: SocketMode::Udp,
+                            error
+                        }),
+                        #[cfg(unix)]
+                        DatagramSocket::Unix(_, path) => {
+                            emit!(UnixSocketSendError {
+                                path: path.as_path(),
+                                error: &error
+                            })
+                        }
+                    };
+                    finalizers.update_status(EventStatus::Errored);
+                    return;
+                }
             }
         }
+        finalizers.update_status(EventStatus::Delivered);
     }
 }
 

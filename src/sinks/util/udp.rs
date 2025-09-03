@@ -9,8 +9,8 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{BytesSent, Protocol, Registered};
+use vector_lib::{codecs::encoding::GelfChunker, configurable::configurable_component};
 
 use super::{
     SinkBuildError,
@@ -193,6 +193,7 @@ where
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();
+        let chunker = GelfChunker::default();
         while Pin::new(&mut input).peek().await.is_some() {
             let socket = self.connector.connect_backoff().await;
             send_datagrams(
@@ -200,6 +201,7 @@ where
                 DatagramSocket::Udp(socket),
                 &self.transformer,
                 &mut encoder,
+                &chunker,
                 &self.bytes_sent,
             )
             .await;
