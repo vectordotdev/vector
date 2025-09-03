@@ -90,6 +90,7 @@ runs:
         [target.'cfg(linux)']
         rustflags = [ "-D", "warnings" ]
         EOF
+      shell: bash
 
     - name: Cache Cargo registry + index
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
