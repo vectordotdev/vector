@@ -10,6 +10,10 @@ inputs:
     required: false
     default: true
 
+  protoc:
+    required: false
+    default: false
+
   # prepare.sh - rust
   rust: # rustup module
     required: false
@@ -129,7 +133,6 @@ runs:
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
 
-
     - name: Run prepare.sh
       shell: bash
       run: |
@@ -147,3 +150,9 @@ runs:
         csm=$(IFS=,; echo "${mods[*]}")
 
         [[ "$csm" != "" ]] && ./scripts/environment/prepare.sh --modules="${csm}"
+
+    - name: Install protoc
+      if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.protoc == 'true' }}
+      shell: bash
+      run: sudo bash ./scripts/environment/install-protoc.sh
+
