@@ -136,24 +136,6 @@ runs:
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
 
-    - name: Run prepare.sh
-      shell: bash
-      run: |
-        mods=()
-        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
-        [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
-        [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
-        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
-        [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
-        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
-        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
-        [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
-        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
-        [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
-        csm=$(IFS=,; echo "${mods[*]}")
-
-        [[ "$csm" != "" ]] && ./scripts/environment/prepare.sh --modules="${csm}"
-
     - name: Install protoc
       if: ${{ startsWith(matrix.os, 'ubuntu') && inputs.protoc == 'true' }}
       shell: bash
@@ -173,4 +155,22 @@ runs:
           -C "${TEMP}"
         cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
+
+    - name: Run prepare.sh
+      shell: bash
+      run: |
+        mods=()
+        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
+        [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
+        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
+        [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
+        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
+        [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
+        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
+        csm=$(IFS=,; echo "${mods[*]}")
+
+        [[ "$csm" != "" ]] && ./scripts/environment/prepare.sh --modules="${csm}"
 
