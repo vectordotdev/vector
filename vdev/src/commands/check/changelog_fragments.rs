@@ -127,8 +127,7 @@ fn validate_fragment_contents(path: &Path, filename: &str) -> Result<()> {
     }
 
     // Split on the first colon, take the remainder as names
-    let names = last_line.split_once(':').map(|(_, rest)| rest.trim()).unwrap_or("");
-
+    let names = last_line.split_once(':').map_or("", |(_, rest)| rest.trim());
 
     if names.is_empty() {
         return Err(anyhow!(

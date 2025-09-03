@@ -48,7 +48,6 @@ jobs:
           ref: master
           sparse-checkout: |
             changelog.d/
-            vdev/
           sparse-checkout-cone-mode: false
 
       # Checkout PR's changelog.d/ into tmp/
@@ -60,6 +59,9 @@ jobs:
           path: tmp
           sparse-checkout: changelog.d/
 
+      - name: Prepare vdev
+        run: bash ./scripts/environment/prepare.sh --modules=vdev
+
       - name: Run changelog fragment checker
         if: env.SHOULD_RUN == 'true'
         run: |
@@ -68,4 +70,4 @@ jobs:
 
           # Add files and then compare with HEAD instead of origin/master
           git add changelog.d/
-          MERGE_BASE=HEAD cd vdev && cargo run -- check changelog-fragments --merge-base HEAD 
+          vdev check changelog-fragments --merge-base HEAD 
