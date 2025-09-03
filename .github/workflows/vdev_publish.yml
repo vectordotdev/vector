@@ -28,7 +28,7 @@ jobs:
 
       - name: Bootstrap runner environment (macOS)
         if: startsWith(matrix.os, 'macos')
-        run: sudo -E bash scripts/environment/bootstrap-macos.sh
+        run: bash scripts/environment/bootstrap-macos.sh
 
       - run: bash scripts/environment/prepare.sh --modules=rustup
 
