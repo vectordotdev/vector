@@ -258,8 +258,8 @@ upon download. This verifies that assets have not been modified at rest.
 
 We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
 
-Due to the nature of a open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could 
-potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure 
+Due to the nature of a open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
+potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
 via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
 
 For us to best investigate your request, please include any of the
@@ -269,7 +269,7 @@ following when reporting:
 - Any tools, including versions used
 - Any relevant output
 
-If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products, 
+If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
 please e-mail security@datadoghq.com.
 
 We take all disclosures very seriously and will do our best to rapidly respond
