@@ -70,4 +70,4 @@ jobs:
 
           # Add files and then compare with HEAD instead of origin/master
           git add changelog.d/
-          vdev check changelog-fragments --merge-base HEAD 
+          vdev check changelog-fragments --merge-base HEAD
