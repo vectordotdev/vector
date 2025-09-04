@@ -234,9 +234,11 @@ mod tests {
 
     fn make_test_backend(protocol: ExecVersion) -> ExecBackend {
         let command_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/behavior/secrets/mock_secrets_exec");
+            .join("tests/behavior/secrets/mock_secrets_exec.py");
         ExecBackend {
-            command: [command_path.to_str().unwrap()].map(String::from).to_vec(),
+            command: ["python", command_path.to_str().unwrap()]
+                .map(String::from)
+                .to_vec(),
             timeout: 5,
             protocol,
         }

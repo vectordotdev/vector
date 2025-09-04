@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Mock secret manager implementation used for testing the secrets.exec backend type.
 This program is meant to be exec'ed by a unit test so that the implementation can be tested.
