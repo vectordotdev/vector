@@ -179,7 +179,12 @@ impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, transformer: Transformer, encoder: E, chunker: Chunkers) -> Self {
+    fn new(
+        connector: UdpConnector,
+        transformer: Transformer,
+        encoder: E,
+        chunker: Chunkers,
+    ) -> Self {
         Self {
             connector,
             transformer,

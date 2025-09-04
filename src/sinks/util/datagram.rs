@@ -31,9 +31,7 @@ pub enum DatagramSocket {
     Unix(UnixDatagram, PathBuf),
 }
 
-pub async fn send_datagrams<
-    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>,
->(
+pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>>(
     input: &mut Peekable<BoxStream<'_, Event>>,
     mut socket: DatagramSocket,
     transformer: &Transformer,

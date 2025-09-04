@@ -8,10 +8,10 @@ pub mod framing;
 use std::fmt::Debug;
 
 use bytes::BytesMut;
-pub use chunking::{Chunker, Chunkers};
+pub use chunking::{Chunker, Chunkers, GelfChunker};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfChunker, GelfSerializer, GelfSerializerConfig,
+    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,

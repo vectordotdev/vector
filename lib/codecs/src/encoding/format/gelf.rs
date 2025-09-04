@@ -1,4 +1,4 @@
-use crate::encoding::Chunker;
+use crate::encoding::GelfChunker;
 use crate::gelf::GELF_TARGET_PATHS;
 use crate::{VALID_FIELD_REGEX, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
@@ -6,20 +6,12 @@ use lookup::event_path;
 use ordered_float::NotNan;
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{
     config::{DataType, log_schema},
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };
-use vector_config_macros::configurable_component;
-
-use std::vec;
-
-use tracing::trace;
-
-const GELF_MAX_TOTAL_CHUNKS: usize = 128;
-const GELF_CHUNK_HEADERS_LENGTH: usize = 12;
-const GELF_MAGIC_BYTES: [u8; 2] = [0x1e, 0x0f];
 
 /// Config used to build a `GelfSerializer`.
 #[configurable_component]
@@ -131,7 +123,9 @@ impl GelfSerializer {
 
     /// Instantiates the GELF chunking configuration.
     pub fn chunker(&self) -> GelfChunker {
-        GelfChunker { max_chunk_size: self.options.max_chunk_size }
+        GelfChunker {
+            max_chunk_size: self.options.max_chunk_size,
+        }
     }
 }
 
@@ -143,61 +137,6 @@ impl Encoder<Event> for GelfSerializer {
         let writer = buffer.writer();
         serde_json::to_writer(writer, &log)?;
         Ok(())
-    }
-}
-
-/// Chunks with GELF native chunking format.
-/// Supports up to 128 chunks, each of a maximum configurable size.
-#[derive(Clone, Debug)]
-pub struct GelfChunker {
-    /// Max chunk size.
-    pub max_chunk_size: usize,
-}
-
-impl Chunker for GelfChunker {
-    fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
-        if bytes.len() > self.max_chunk_size {
-            let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
-            let message_id: u64 = rand::random();
-            let chunk_count = (bytes.len() + chunk_size - 1) / chunk_size;
-
-            trace!(
-                message_id = message_id,
-                chunk_count = chunk_count,
-                chunk_size = chunk_size,
-                "Generating chunks for GELF."
-            );
-
-            if chunk_count > GELF_MAX_TOTAL_CHUNKS {
-                return Err(vector_common::Error::from(format!(
-                    "Too many chunks to generate for GELF: {}, max: {}",
-                    chunk_count, GELF_MAX_TOTAL_CHUNKS
-                )));
-            }
-
-            // Split into chunks and add headers to each slice.
-            // Map with index to determine sequence number.
-            let chunks = bytes
-                .chunks(chunk_size)
-                .enumerate()
-                .map(|(i, chunk)| {
-                    let framed = bytes::Bytes::copy_from_slice(chunk);
-                    let sequence_number = i as u8;
-                    let sequence_count = chunk_count as u8;
-
-                    let mut headers = bytes::BytesMut::with_capacity(GELF_CHUNK_HEADERS_LENGTH);
-                    headers.put_slice(&GELF_MAGIC_BYTES);
-                    headers.put_u64(message_id);
-                    headers.put_u8(sequence_number);
-                    headers.put_u8(sequence_count);
-
-                    [headers.freeze(), framed].concat().into()
-                })
-                .collect();
-            Ok(chunks)
-        } else {
-            Ok(vec![bytes])
-        }
     }
 }
 
