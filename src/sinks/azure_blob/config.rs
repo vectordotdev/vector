@@ -2,27 +2,27 @@ use std::sync::Arc;
 
 use azure_storage_blobs::prelude::*;
 use tower::ServiceBuilder;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
-    Result,
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        Healthcheck, VectorSink,
         azure_common::{
             self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
+        }, util::{
+            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
+            ServiceBuilderExt, TowerRequestConfig,
         },
-        util::{
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig, partitioner::KeyPartitioner,
-        },
+        Healthcheck,
+        VectorSink,
     },
     template::Template,
+    Result,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -62,7 +62,7 @@ pub struct AzureBlobSinkConfig {
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
-    pub connection_string: Option<SensitiveString>,
+    pub connection_string: SensitiveString,
 
     /// The Azure Blob Storage Account name.
     ///
@@ -177,7 +177,7 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
             storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             endpoint: None,
@@ -199,12 +199,8 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string
-                .as_ref()
-                .map(|v| v.inner().to_string()),
-            self.storage_account.as_ref().map(|v| v.to_string()),
+            self.connection_string.clone().into(),
             self.container_name.clone(),
-            self.endpoint.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
