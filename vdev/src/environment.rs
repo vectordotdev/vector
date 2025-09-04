@@ -1,6 +1,7 @@
 use cfg_if::cfg_if;
 use std::collections::BTreeMap;
-use std::process::Command;
+
+use crate::app::VDevCommand;
 
 cfg_if! {
     if #[cfg(unix)] {
@@ -30,14 +31,18 @@ pub(crate) fn extract_present(environment: &Environment) -> BTreeMap<String, Str
         .collect()
 }
 
-pub(crate) fn append_environment_variables(command: &mut Command, environment: &Environment) {
+pub(crate) fn append_environment_variables(
+    mut command: VDevCommand,
+    environment: &Environment,
+) -> VDevCommand {
     for (key, value) in environment {
-        command.arg("--env");
+        command = command.arg("--env");
         match value {
-            Some(value) => command.arg(format!("{key}={value}")),
-            None => command.arg(key),
+            Some(value) => command = command.arg(format!("{key}={value}")),
+            None => command = command.arg(key),
         };
     }
+    command
 }
 
 cfg_if! {

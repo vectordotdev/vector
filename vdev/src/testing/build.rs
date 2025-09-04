@@ -1,12 +1,11 @@
-use crate::app;
-use crate::app::CommandExt;
+use crate::app::{self, VDevCommand};
 use crate::environment::{Environment, extract_present};
 use crate::testing::config::RustToolchainConfig;
 use crate::testing::docker::docker_command;
 use crate::util::IS_A_TTY;
 use anyhow::Result;
+use std::path::Path;
 use std::path::PathBuf;
-use std::{path::Path, process::Command};
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 
@@ -19,37 +18,33 @@ pub fn prepare_build_command(
     dockerfile: &Path,
     features: Option<&[String]>,
     config_environment_variables: &Environment,
-) -> Command {
+) -> VDevCommand {
     // Start with `docker build`
-    let mut command = docker_command(["build"]);
-
     // Ensure we run from the repo root (so `.` context is correct)
-    command.current_dir(app::path());
+    let mut command = docker_command(["build"]).in_repo();
 
     // If we're attached to a TTY, show fancy progress
     if *IS_A_TTY {
-        command.args(["--progress", "tty"]);
+        command = command.args(["--progress", "tty"]);
     }
 
     // Add all of the flags in one go
-    command.args([
-        "--pull",
-        "--tag",
-        image,
-        "--file",
-        dockerfile.to_str().unwrap(),
-        "--label",
-        "vector-test-runner=true",
-        "--build-arg",
-        &format!("RUST_VERSION={}", RustToolchainConfig::rust_version()),
-        "--build-arg",
-        &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
-    ]);
-
-    command.envs(extract_present(config_environment_variables));
-
-    command.args(["."]);
     command
+        .args([
+            "--pull",
+            "--tag",
+            image,
+            "--file",
+            dockerfile.to_str().unwrap(),
+            "--label",
+            "vector-test-runner=true",
+            "--build-arg",
+            &format!("RUST_VERSION={}", RustToolchainConfig::rust_version()),
+            "--build-arg",
+            &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
+        ])
+        .envs(extract_present(config_environment_variables))
+        .args(["."])
 }
 
 #[allow(dead_code)]
@@ -59,7 +54,7 @@ pub fn build_integration_image() -> Result<()> {
         .iter()
         .collect();
     let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
-    let mut cmd = prepare_build_command(
+    let cmd = prepare_build_command(
         &image,
         &dockerfile,
         Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),

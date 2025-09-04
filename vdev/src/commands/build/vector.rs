@@ -1,9 +1,7 @@
-use std::process::Command;
-
 use anyhow::Result;
 use clap::Args;
 
-use crate::{app::CommandExt as _, platform};
+use crate::{app::VDevCommand, platform};
 
 /// Build the `vector` executable.
 #[derive(Args, Debug)]
@@ -23,22 +21,17 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mut command = Command::new("cargo");
-        command.in_repo();
-        command.arg("build");
+        let mut command = VDevCommand::new("cargo").in_repo().arg("build");
 
         if self.release {
-            command.arg("--release");
+            command = command.arg("--release");
         }
 
-        command.features(&self.feature);
-
         let target = self.target.unwrap_or_else(platform::default_target);
-        command.args(["--target", &target]);
+        command = command.features(&self.feature).args(["--target", &target]);
 
         waiting!("Building Vector");
-        command.check_run()?;
 
-        Ok(())
+        command.check_run()
     }
 }

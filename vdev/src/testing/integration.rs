@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, fs, path::Path, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
 use tempfile::{Builder, NamedTempFile};
@@ -8,7 +8,7 @@ use super::config::{
 };
 use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
 use super::state::EnvsDir;
-use crate::app::CommandExt as _;
+use crate::app::VDevCommand;
 use crate::environment::{Environment, extract_present, rename_environment_keys};
 use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
 use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
@@ -300,38 +300,39 @@ impl Compose {
         args: &[&'static str],
         environment: Option<&Environment>,
     ) -> Result<()> {
-        let mut command = Command::new(CONTAINER_TOOL.clone());
-        command.arg("compose");
-        // When the integration test environment is already active, the tempfile path does not
-        // exist because `Compose::new()` has not been called. In this case, the `stop` command
-        // needs to use the calculated path from the integration name instead of the nonexistent
-        // tempfile path. This is because `stop` doesn't go through the same logic as `start`
-        // and doesn't create a new tempfile before calling docker compose.
-        // If stop command needs to use some of the injected bits then we need to rebuild it
-        command.arg("--file");
-        if self.temp_file.path().exists() {
-            command.arg(self.temp_file.path());
+        let mut command = VDevCommand::new(CONTAINER_TOOL.clone())
+            .arg("compose")
+            // When the integration test environment is already active, the tempfile path does not
+            // exist because `Compose::new()` has not been called. In this case, the `stop` command
+            // needs to use the calculated path from the integration name instead of the nonexistent
+            // tempfile path. This is because `stop` doesn't go through the same logic as `start`
+            // and doesn't create a new tempfile before calling docker compose.
+            // If stop command needs to use some of the injected bits then we need to rebuild it
+            .arg("--file");
+
+        let path = if self.temp_file.path().exists() {
+            self.temp_file.path()
         } else {
-            command.arg(&self.original_path);
-        }
+            &self.original_path
+        };
 
-        command.args(args);
+        command = command.arg(path).args(args);
 
-        command.current_dir(&self.test_dir);
+        command.inner.current_dir(&self.test_dir);
 
-        command.env("DOCKER_SOCKET", &*DOCKER_SOCKET);
-        command.env(NETWORK_ENV_VAR, &self.network);
-
-        // some services require this in order to build Vector
-        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
+        command = command
+            .env("DOCKER_SOCKET", &*DOCKER_SOCKET)
+            .env(NETWORK_ENV_VAR, &self.network)
+            // some services require this in order to build Vector
+            .env("RUST_VERSION", RustToolchainConfig::rust_version());
 
         for (key, value) in &self.env {
             if let Some(value) = value {
-                command.env(key, value);
+                command = command.env(key, value);
             }
         }
         if let Some(environment) = environment {
-            command.envs(extract_present(environment));
+            command = command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");

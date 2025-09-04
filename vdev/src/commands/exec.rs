@@ -1,9 +1,7 @@
-use std::process::Command;
-
 use anyhow::Result;
 use clap::Args;
 
-use crate::app::CommandExt as _;
+use crate::app::VDevCommand;
 
 /// Execute a command within the repository
 #[derive(Args, Debug)]
@@ -15,7 +13,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let status = Command::new(&self.args[0])
+        let status = VDevCommand::new(&self.args[0])
             .in_repo()
             .args(&self.args[1..])
             .run()?;
