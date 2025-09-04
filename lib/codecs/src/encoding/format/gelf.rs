@@ -3,7 +3,6 @@ use crate::{VALID_FIELD_REGEX, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -11,6 +10,30 @@ use vector_core::{
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };
+use vector_config_macros::configurable_component;
+
+/// Config used to build a `GelfSerializer`.
+#[configurable_component]
+#[derive(Debug, Clone)]
+pub struct GelfSerializerOptions {
+    /// When chunking is used on sinks that require it (such as `udp`), sets the maximum size of individual chunk packets.
+    /// Note, the first 12 bytes are reserved for the GELF header, and are included in this limit.
+    /// This value is also the threshold where datagrams will start being chunked.
+    #[serde(default = "max_chunk_size")]
+    pub max_chunk_size: usize,
+}
+
+const fn max_chunk_size() -> usize {
+    8192
+}
+
+impl Default for GelfSerializerOptions {
+    fn default() -> Self {
+        Self {
+            max_chunk_size: max_chunk_size(),
+        }
+    }
+}
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -45,13 +68,18 @@ pub enum GelfSerializerError {
 }
 
 /// Config used to build a `GelfSerializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GelfSerializerConfig;
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct GelfSerializerConfig {
+    /// The GELF Serializer Options.
+    #[serde(default)]
+    pub gelf: GelfSerializerOptions,
+}
 
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(config: GelfSerializerOptions) -> Self {
+        Self { gelf: config }
     }
 
     /// Build the `GelfSerializer` from this configuration.
@@ -60,12 +88,12 @@ impl GelfSerializerConfig {
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
-    pub fn input_type() -> DataType {
+    pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
-    pub fn schema_requirement() -> schema::Requirement {
+    pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // JSON, we don't want to enforce that limitation to users yet.
         schema::Requirement::empty()
@@ -252,7 +280,7 @@ mod tests {
     use vrl::value::{ObjectMap, Value};
 
     fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
-        let config = GelfSerializerConfig::new();
+        let config = GelfSerializerConfig::new(GelfSerializerOptions::default());
         let mut serializer = config.build();
         let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         let mut buffer = BytesMut::new();

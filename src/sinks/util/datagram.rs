@@ -9,7 +9,7 @@ use tokio::net::UdpSocket;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
 use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::codecs::encoding::Chunker;
+use vector_lib::codecs::encoding::{Chunker, Chunkers};
 use vector_lib::internal_event::RegisterInternalEvent;
 use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
 
@@ -33,13 +33,12 @@ pub enum DatagramSocket {
 
 pub async fn send_datagrams<
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>,
-    C: Chunker,
 >(
     input: &mut Peekable<BoxStream<'_, Event>>,
     mut socket: DatagramSocket,
     transformer: &Transformer,
     encoder: &mut E,
-    chunker: &C,
+    chunker: &Chunkers,
     bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
 ) {
     while let Some(mut event) = input.next().await {

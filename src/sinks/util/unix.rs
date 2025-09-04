@@ -16,7 +16,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::codecs::encoding::NoopChunker;
+use vector_lib::codecs::encoding::Chunkers;
 use vector_lib::json_size::JsonSize;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
@@ -267,7 +267,6 @@ where
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();
-        let chunker = NoopChunker::default();
         while Pin::new(&mut input).peek().await.is_some() {
             let socket = match self.connector.connect_backoff().await {
                 UnixEither::Datagram(datagram) => datagram,
@@ -281,7 +280,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
-                &chunker,
+                &Chunkers::Noop,
                 &bytes_sent,
             )
             .await;

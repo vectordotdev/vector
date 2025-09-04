@@ -11,7 +11,7 @@ use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    codecs::encoding::Chunker,
+    codecs::encoding::Chunkers,
     internal_event::{BytesSent, Protocol, Registered},
 };
 
@@ -85,7 +85,7 @@ impl UdpSinkConfig {
         + Send
         + Sync
         + 'static,
-        chunker: impl Chunker + Clone + Send + Sync + 'static,
+        chunker: Chunkers,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
         let sink = UdpSink::new(connector.clone(), transformer, encoder, chunker);
@@ -164,24 +164,22 @@ impl UdpConnector {
     }
 }
 
-struct UdpSink<E, C>
+struct UdpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
-    C: Chunker + Clone + Send + Sync,
 {
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
-    chunker: C,
+    chunker: Chunkers,
     bytes_sent: Registered<BytesSent>,
 }
 
-impl<E, C> UdpSink<E, C>
+impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
-    C: Chunker + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, transformer: Transformer, encoder: E, chunker: C) -> Self {
+    fn new(connector: UdpConnector, transformer: Transformer, encoder: E, chunker: Chunkers) -> Self {
         Self {
             connector,
             transformer,
@@ -193,10 +191,9 @@ where
 }
 
 #[async_trait]
-impl<E, C> StreamSink<Event> for UdpSink<E, C>
+impl<E> StreamSink<Event> for UdpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
-    C: Chunker + Clone + Send + Sync,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();

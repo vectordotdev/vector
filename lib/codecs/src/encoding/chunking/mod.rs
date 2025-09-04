@@ -1,5 +1,7 @@
 //! A collection of formats that can be used to chunk events into multiple byte frames.
 
+use std::vec;
+
 use bytes::BufMut;
 use tracing::trace;
 
@@ -14,36 +16,26 @@ pub trait Chunker {
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error>;
 }
 
-/// Does not chunk.
-#[derive(Clone, Debug, Default)]
-pub struct NoopChunker;
-
-impl Chunker for NoopChunker {
-    fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
-        // No-op chunking implementation
-        Ok(vec![bytes])
-    }
-}
-
 /// Chunks with GELF native chunking format.
 /// Supports up to 128 chunks, each up to 8192 bytes (minus 12 bytes, for headers).
 #[derive(Clone, Debug)]
 pub struct GelfChunker {
-    mtu: usize,
+    /// Max chunk size.
+    pub max_chunk_size: usize,
 }
 
 impl Default for GelfChunker {
     fn default() -> Self {
         Self {
-            mtu: GELF_MAX_CHUNK_SIZE,
+            max_chunk_size: GELF_MAX_CHUNK_SIZE,
         }
     }
 }
 
 impl Chunker for GelfChunker {
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
-        if bytes.len() > self.mtu {
-            let chunk_size = self.mtu - GELF_CHUNK_HEADERS_LENGTH;
+        if bytes.len() > self.max_chunk_size {
+            let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
             let message_id: u64 = rand::random();
             let chunk_count = (bytes.len() + chunk_size - 1) / chunk_size;
 
@@ -88,10 +80,11 @@ impl Chunker for GelfChunker {
 }
 
 /// Chunkers.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Chunkers {
     /// No chunking (pass-through).
-    Noop(NoopChunker),
+    #[default]
+    Noop,
     /// Chunking in GELF format.
     Gelf(GelfChunker),
 }
@@ -99,7 +92,7 @@ pub enum Chunkers {
 impl Chunker for Chunkers {
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
         match self {
-            Chunkers::Noop(chunker) => chunker.chunk(bytes),
+            Chunkers::Noop => Ok(vec![bytes]),
             Chunkers::Gelf(chunker) => chunker.chunk(bytes),
         }
     }
