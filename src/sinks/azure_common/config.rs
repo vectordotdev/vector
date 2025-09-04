@@ -109,7 +109,7 @@ pub fn build_healthcheck(
 
         let resp: crate::Result<()> = match response {
             Ok(_) => Ok(()),
-            Err(reason) => Err(match reason.downcast_ref::<HttpError>() {
+            Err(error) => Err(match error.as_http_error() {
                 Some(err) => match StatusCode::from_u16(err.status().into()) {
                     Ok(StatusCode::FORBIDDEN) => Box::new(HealthcheckError::InvalidCredentials),
                     Ok(StatusCode::NOT_FOUND) => Box::new(HealthcheckError::UnknownContainer {
@@ -118,7 +118,7 @@ pub fn build_healthcheck(
                     Ok(status) => Box::new(HealthcheckError::Unknown { status }),
                     Err(_) => "unknown status code".into(),
                 },
-                _ => reason.into(),
+                _ => error.into(),
             }),
         };
         resp

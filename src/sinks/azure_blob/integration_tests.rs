@@ -3,26 +3,26 @@ use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use std::{
     io::{BufRead, BufReader},
     num::NonZeroU32,
 };
-use vector_lib::codecs::{
-    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
 use vector_lib::ByteSizeOf;
+use vector_lib::codecs::{
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    encoding::FramingConfig,
+};
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        azure_common, util::{Compression, TowerRequestConfig},
-        VectorSink,
+        VectorSink, azure_common,
+        util::{Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -338,12 +338,10 @@ impl AzureBlobSinkConfig {
 
         let response = match request.await {
             Ok(_) => Ok(()),
-            Err(error) => {
-                match error.as_http_error() {
-                    Some(http_error) if http_error.status() as u16 == StatusCode::Conflict => { Ok(()) },
-                    _ => Err(error),
-                }
-            }
+            Err(error) => match error.as_http_error() {
+                Some(http_error) if http_error.status() as u16 == StatusCode::Conflict => Ok(()),
+                _ => Err(error),
+            },
         };
 
         response.expect("Failed to create container")
