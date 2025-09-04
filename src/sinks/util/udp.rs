@@ -9,8 +9,11 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_lib::internal_event::{BytesSent, Protocol, Registered};
-use vector_lib::{codecs::encoding::GelfChunker, configurable::configurable_component};
+use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    codecs::encoding::Chunker,
+    internal_event::{BytesSent, Protocol, Registered},
+};
 
 use super::{
     SinkBuildError,
@@ -82,9 +85,10 @@ impl UdpSinkConfig {
         + Send
         + Sync
         + 'static,
+        chunker: impl Chunker + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let sink = UdpSink::new(connector.clone(), transformer, encoder);
+        let sink = UdpSink::new(connector.clone(), transformer, encoder, chunker);
         Ok((
             VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
@@ -160,40 +164,45 @@ impl UdpConnector {
     }
 }
 
-struct UdpSink<E>
+struct UdpSink<E, C>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
+    C: Chunker + Clone + Send + Sync,
 {
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
+    chunker: C,
     bytes_sent: Registered<BytesSent>,
 }
 
-impl<E> UdpSink<E>
+impl<E, C> UdpSink<E, C>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
+    C: Chunker + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
+    fn new(connector: UdpConnector, transformer: Transformer, encoder: E, chunker: C) -> Self {
         Self {
             connector,
             transformer,
             encoder,
+            chunker,
             bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
 }
 
 #[async_trait]
-impl<E> StreamSink<Event> for UdpSink<E>
+impl<E, C> StreamSink<Event> for UdpSink<E, C>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
+    C: Chunker + Clone + Send + Sync,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();
-        let chunker = GelfChunker::default();
+        let chunker = self.chunker.clone();
         while Pin::new(&mut input).peek().await.is_some() {
             let socket = self.connector.connect_backoff().await;
             send_datagrams(

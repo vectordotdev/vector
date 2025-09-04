@@ -1,6 +1,6 @@
 use vector_lib::codecs::{
     TextSerializerConfig,
-    encoding::{Framer, FramingConfig},
+    encoding::{Framer, FramingConfig, Chunkers, GelfChunker, NoopChunker, SerializerConfig},
 };
 use vector_lib::configurable::configurable_component;
 
@@ -147,7 +147,11 @@ impl SinkConfig for SocketSinkConfig {
                 let transformer = encoding.transformer();
                 let serializer = encoding.build()?;
                 let encoder = Encoder::<()>::new(serializer);
-                config.build(transformer, encoder)
+                let chunker = match encoding.config() {
+                    SerializerConfig::Gelf => Chunkers::Gelf(GelfChunker::default()),
+                    _ => Chunkers::Noop(NoopChunker::default()),
+                };
+                config.build(transformer, encoder, chunker)
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {

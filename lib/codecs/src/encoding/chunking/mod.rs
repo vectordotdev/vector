@@ -15,7 +15,7 @@ pub trait Chunker {
 }
 
 /// Does not chunk.
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct NoopChunker;
 
 impl Chunker for NoopChunker {
@@ -27,6 +27,7 @@ impl Chunker for NoopChunker {
 
 /// Chunks with GELF native chunking format.
 /// Supports up to 128 chunks, each up to 8192 bytes (minus 12 bytes, for headers).
+#[derive(Clone, Debug)]
 pub struct GelfChunker {
     mtu: usize,
 }
@@ -82,6 +83,24 @@ impl Chunker for GelfChunker {
             Ok(chunks)
         } else {
             Ok(vec![bytes])
+        }
+    }
+}
+
+/// Chunkers.
+#[derive(Clone, Debug)]
+pub enum Chunkers {
+    /// No chunking (pass-through).
+    Noop(NoopChunker),
+    /// Chunking in GELF format.
+    Gelf(GelfChunker),
+}
+
+impl Chunker for Chunkers {
+    fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
+        match self {
+            Chunkers::Noop(chunker) => chunker.chunk(bytes),
+            Chunkers::Gelf(chunker) => chunker.chunk(bytes),
         }
     }
 }
