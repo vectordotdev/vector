@@ -1,17 +1,17 @@
 use bytes::Bytes;
 use chrono::Utc;
 use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig}, NewlineDelimitedEncoder,
-    TextSerializerConfig,
+    NewlineDelimitedEncoder, TextSerializerConfig,
+    encoding::{Framer, FramingConfig},
 };
 use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{partition::Partitioner, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, partition::Partitioner};
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
 use crate::codecs::EncodingConfigWithFraming;
 use crate::event::{Event, LogEvent};
-use crate::sinks::util::{request_builder::RequestBuilder, Compression};
+use crate::sinks::util::{Compression, request_builder::RequestBuilder};
 use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
 
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {

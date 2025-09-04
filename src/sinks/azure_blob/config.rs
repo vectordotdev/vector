@@ -2,27 +2,27 @@ use std::sync::Arc;
 
 use azure_storage_blobs::prelude::*;
 use tower::ServiceBuilder;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
+    Result,
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck, VectorSink,
         azure_common::{
             self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
-        }, util::{
-            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
-            ServiceBuilderExt, TowerRequestConfig,
         },
-        Healthcheck,
-        VectorSink,
+        util::{
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
+            TowerRequestConfig, partitioner::KeyPartitioner,
+        },
     },
     template::Template,
-    Result,
 };
 
 #[derive(Clone, Copy, Debug)]
