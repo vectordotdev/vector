@@ -7,7 +7,7 @@ mod unix;
 use std::{
     io,
     net::SocketAddr,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::Duration,
 };
 
@@ -15,10 +15,11 @@ use std::{
 use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
 
 use crate::{
+    common::backoff::ExponentialBackoff,
     internal_events::{
         SocketOutgoingConnectionError, TcpSocketConnectionEstablished, UdpSendIncompleteError,
     },
-    sinks::{util::retries::ExponentialBackoff, Healthcheck},
+    sinks::Healthcheck,
 };
 
 #[cfg(unix)]
@@ -35,7 +36,7 @@ use self::udp::UdpConnector;
 #[cfg(unix)]
 use self::unix::UnixConnector;
 
-use futures_util::{future::BoxFuture, FutureExt};
+use futures_util::{FutureExt, future::BoxFuture};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::AsyncWriteExt,

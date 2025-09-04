@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type, InternalEvent};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
@@ -60,6 +60,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
             peer_addr = ?self.peer_addr,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -88,6 +89,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                 debug!(
                     message = "Connection error, probably a healthcheck.",
                     error = %self.error,
+                    internal_log_rate_limit = true,
                 );
             }
             _ => {
@@ -97,6 +99,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     error_code = "connection_failed",
                     error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
+                    internal_log_rate_limit = true,
                 );
                 counter!(
                     "component_errors_total",
@@ -124,6 +127,7 @@ impl InternalEvent for TcpSendAckError {
             error_code = "ack_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

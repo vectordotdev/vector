@@ -43,7 +43,7 @@ components: sinks: influxdb_metrics: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.influxdb_metrics.configuration
+	configuration: generated.components.sinks.influxdb_metrics.configuration
 
 	input: {
 		logs: false

@@ -6,17 +6,17 @@ use vector_lib::configurable::ToValue;
 use indexmap::IndexMap;
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_one_of_schema, generate_struct_schema,
-        get_or_generate_schema, SchemaGenerator, SchemaObject,
-    },
     Configurable, GenerateError, Metadata,
+    schema::{
+        SchemaGenerator, SchemaObject, apply_base_metadata, generate_one_of_schema,
+        generate_struct_schema, get_or_generate_schema,
+    },
 };
 
-use crate::sinks::util::buffer::compression::{
-    generate_string_schema, CompressionLevel, ALGORITHM_NAME, ENUM_TAGGING_MODE, LEVEL_NAME,
-};
 use crate::sinks::util::Compression;
+use crate::sinks::util::buffer::compression::{
+    ALGORITHM_NAME, CompressionLevel, ENUM_TAGGING_MODE, LEVEL_NAME, generate_string_schema,
+};
 
 /// Compression configuration.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
@@ -61,7 +61,9 @@ impl Configurable for ChronicleCompression {
         Compression::metadata()
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
@@ -79,7 +81,7 @@ impl Configurable for ChronicleCompression {
         apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), generator, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());

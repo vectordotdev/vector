@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::BoxFuture, stream, FutureExt, Stream};
+use futures::{FutureExt, Stream, future::BoxFuture, stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use openssl::x509::X509;
 use snafu::ResultExt;
@@ -18,7 +18,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 use tokio_openssl::SslStream;
-use tonic::transport::{server::Connected, Certificate};
+use tonic::transport::{Certificate, server::Connected};
 
 use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
@@ -234,8 +234,8 @@ impl<S> MaybeTlsIncomingStream<S> {
         use super::MaybeTls;
 
         match &mut self.state {
-            StreamState::Accepted(ref mut stream) => Some(match stream {
-                MaybeTls::Raw(ref mut s) => s,
+            StreamState::Accepted(stream) => Some(match stream {
+                MaybeTls::Raw(s) => s,
                 MaybeTls::Tls(s) => s.get_mut(),
             }),
             StreamState::Accepting(_) | StreamState::AcceptError(_) | StreamState::Closed => None,
@@ -320,13 +320,13 @@ impl MaybeTlsIncomingStream<TcpStream> {
                         continue;
                     }
                     Err(error) => {
-                        let error = io::Error::new(io::ErrorKind::Other, error);
+                        let error = io::Error::other(error);
                         this.state = StreamState::AcceptError(error.to_string());
                         Poll::Ready(Err(error))
                     }
                 },
                 StreamState::AcceptError(error) => {
-                    Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.clone())))
+                    Poll::Ready(Err(io::Error::other(error.clone())))
                 }
                 StreamState::Closed => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
             };
@@ -369,14 +369,12 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
                     Poll::Pending
                 }
                 Err(error) => {
-                    let error = io::Error::new(io::ErrorKind::Other, error);
+                    let error = io::Error::other(error);
                     this.state = StreamState::AcceptError(error.to_string());
                     Poll::Ready(Err(error))
                 }
             },
-            StreamState::AcceptError(error) => {
-                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.clone())))
-            }
+            StreamState::AcceptError(error) => Poll::Ready(Err(io::Error::other(error.clone()))),
             StreamState::Closed => Poll::Ready(Ok(())),
         }
     }

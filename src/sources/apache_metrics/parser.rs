@@ -112,7 +112,7 @@ pub fn parse(
     namespace: Option<&str>,
     now: DateTime<Utc>,
     tags: Option<&MetricTags>,
-) -> impl Iterator<Item = Result<Metric, ParseError>> {
+) -> impl Iterator<Item = Result<Metric, ParseError>> + use<> {
     // We use a HashMap rather than a Vector as mod_status has
     // BusyWorkers/IdleWorkers repeated
     // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
@@ -936,14 +936,16 @@ ConnsTotal: 1
 
         assert_event_data_eq!(
             metrics,
-            vec![Metric::new(
-                "connections",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 1.0 },
-            )
-            .with_namespace(Some("apache"))
-            .with_tags(Some(metric_tags!("state" => "total")))
-            .with_timestamp(Some(now)),]
+            vec![
+                Metric::new(
+                    "connections",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_namespace(Some("apache"))
+                .with_tags(Some(metric_tags!("state" => "total")))
+                .with_timestamp(Some(now)),
+            ]
         );
         assert_eq!(errors.len(), 1);
     }

@@ -8,24 +8,23 @@ use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use http::StatusCode;
-use vector_lib::codecs::{
-    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
 use vector_lib::ByteSizeOf;
+use vector_lib::codecs::{
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    encoding::FramingConfig,
+};
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        azure_common,
+        VectorSink, azure_common,
         util::{Compression, TowerRequestConfig},
-        VectorSink,
     },
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -224,7 +223,7 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address).into()),
+                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
                 storage_account: None,
                 container_name: "logs".to_string(),
                 endpoint: None,
@@ -282,13 +281,11 @@ impl AzureBlobSinkConfig {
             .expect("Failed to fetch blobs")
             .unwrap();
 
-        let blobs = response
+        response
             .blobs
             .blobs()
             .map(|blob| blob.name.clone())
-            .collect::<Vec<_>>();
-
-        blobs
+            .collect::<Vec<_>>()
     }
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
@@ -348,7 +345,7 @@ impl AzureBlobSinkConfig {
                     Ok(StatusCode::CONFLICT) => Ok(()),
                     _ => Err(format!("Unexpected status code {}", err.status())),
                 },
-                _ => Err(format!("Unexpected error {:#?}", reason)),
+                _ => Err(format!("Unexpected error {reason:#?}")),
             },
         };
 

@@ -8,7 +8,7 @@ use tokio::{
 };
 use vector_lib::metric_tags;
 
-use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
+use super::{CGroupsConfig, HostMetrics, MetricsBuffer, filter_result_sync};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
@@ -455,17 +455,17 @@ mod tests {
     use std::io::Write;
     use std::path::{Path, PathBuf};
 
-    use rand::{rngs::ThreadRng, Rng};
+    use rand::{Rng, rngs::ThreadRng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_lib::event::Metric;
 
     use super::{
         super::{
-            tests::{count_name, count_tag},
             HostMetrics, HostMetricsConfig,
+            tests::{count_name, count_tag},
         },
-        join_name, join_path, MetricsBuffer,
+        MetricsBuffer, join_name, join_path,
     };
 
     #[test]
@@ -529,8 +529,8 @@ mod tests {
         base.d("memory");
         base.d("unified");
         for subdir in SUBDIRS {
-            base.group(&format!("unified/{}", subdir), CPU_STAT, Some(""));
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("unified/{subdir}"), CPU_STAT, Some(""));
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
         base.test().await;
     }
@@ -548,11 +548,11 @@ mod tests {
         base.d("unified");
         for subdir in SUBDIRS {
             base.group(
-                &format!("unified/{}", subdir),
+                &format!("unified/{subdir}"),
                 if subdir == "." { NONE } else { CPU_STAT },
                 Some(""),
             );
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
         base.test().await;
     }
@@ -565,8 +565,8 @@ mod tests {
         base.d("cpu");
         base.d("memory");
         for subdir in SUBDIRS {
-            base.group(&format!("cpu/{}", subdir), CPU_STAT, None);
-            base.group(&format!("memory/{}", subdir), MEMORY_STAT, None);
+            base.group(&format!("cpu/{subdir}"), CPU_STAT, None);
+            base.group(&format!("memory/{subdir}"), MEMORY_STAT, None);
         }
     }
 

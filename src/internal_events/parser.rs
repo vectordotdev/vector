@@ -1,10 +1,12 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
 
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
 
-fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
     let ellipsis: &str = "[...]";
     if s.len() >= maxlen {
         let mut len = maxlen - ellipsis.len();
@@ -30,6 +32,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
             field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
+            internal_log_rate_limit = true
         );
         counter!(
             "component_errors_total",

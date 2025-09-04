@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use mlua::prelude::*;
 
 use super::super::{
+    Metric, MetricKind, MetricValue, StatisticKind,
     metric::TagValue,
     metric::{self, MetricSketch, MetricTags, TagValueSet},
-    Metric, MetricKind, MetricValue, StatisticKind,
 };
 use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::metrics::AgentDDSketch;
@@ -238,7 +238,7 @@ impl FromLua for Metric {
                     from: other.type_name(),
                     to: String::from("Metric"),
                     message: Some("Metric should be a Lua table".to_string()),
-                })
+                });
             }
         };
 
@@ -323,7 +323,7 @@ impl FromLua for Metric {
                         from: value.type_name(),
                         to: String::from("Metric"),
                         message: Some(format!("Invalid sketch type '{x}' given")),
-                    })
+                    });
                 }
             }
         } else {
@@ -344,7 +344,7 @@ impl FromLua for Metric {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Timelike, Utc};
+    use chrono::{Timelike, Utc, offset::TimeZone};
     use vector_common::assert_event_data_eq;
 
     use super::*;

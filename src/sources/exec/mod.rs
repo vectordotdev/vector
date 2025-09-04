@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-    path::PathBuf,
-    process::ExitStatus,
-};
+use std::{collections::HashMap, io::Error, path::PathBuf, process::ExitStatus};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -12,22 +7,23 @@ use snafu::Snafu;
 use tokio::{
     io::{AsyncRead, BufReader},
     process::Command,
-    sync::mpsc::{channel, Sender},
-    time::{self, sleep, Duration, Instant},
+    sync::mpsc::{Sender, channel},
+    time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey};
 use vrl::path::OwnedValuePath;
 use vrl::value::Kind;
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
@@ -37,9 +33,8 @@ use crate::{
     },
     serde::default_decoding,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
-use vector_lib::config::{log_schema, LogNamespace};
+use vector_lib::config::{LogNamespace, log_schema};
 use vector_lib::lookup::{owned_value_path, path};
 
 #[cfg(test)]
@@ -212,7 +207,7 @@ const COMMAND_KEY: &str = "command";
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
-    fn validate(&self) -> Result<(), ExecConfigError> {
+    const fn validate(&self) -> Result<(), ExecConfigError> {
         if self.command.is_empty() {
             Err(ExecConfigError::CommandEmpty)
         } else if self.maximum_buffer_size_bytes == 0 {
@@ -480,9 +475,10 @@ async fn run_command(
 
     // Optionally include stderr
     if config.include_stderr {
-        let stderr = child.stderr.take().ok_or_else(|| {
-            Error::new(ErrorKind::Other, "Unable to take stderr of spawned process")
-        })?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| Error::other("Unable to take stderr of spawned process"))?;
 
         // Create stderr async reader
         let stderr_reader = BufReader::new(stderr);
@@ -493,7 +489,7 @@ async fn run_command(
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
+        .ok_or_else(|| Error::other("Unable to take stdout of spawned process"))?;
 
     // Create stdout async reader
     let stdout_reader = BufReader::new(stdout);

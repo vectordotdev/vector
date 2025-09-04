@@ -7,15 +7,15 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         prelude::*,
-        util::{retries::RetryLogic, TowerRequestConfig},
+        util::{TowerRequestConfig, retries::RetryLogic},
     },
 };
 
 use super::{
+    KinesisResponse, KinesisService,
     record::{Record, SendRecord},
     request_builder::KinesisRequestBuilder,
     sink::{BatchKinesisRequest, KinesisSink},
-    KinesisResponse, KinesisService,
 };
 
 /// Base configuration for the `aws_kinesis_` sinks.
@@ -99,7 +99,7 @@ where
     R: Send + 'static,
     RR: Record + Record<T = R> + Clone + Send + Sync + Unpin + 'static,
     E: Send + 'static,
-    RT: RetryLogic<Response = KinesisResponse> + Default,
+    RT: RetryLogic<Request = BatchKinesisRequest<RR>, Response = KinesisResponse> + Default,
 {
     let request_limits = config.request.into_settings();
 

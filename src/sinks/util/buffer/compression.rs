@@ -5,12 +5,12 @@ use serde::{de, ser};
 use serde_json::Value;
 use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
-        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
-        SchemaObject,
-    },
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{
+        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        generate_enum_schema, generate_one_of_schema, generate_struct_schema,
+        get_or_generate_schema,
+    },
 };
 
 use crate::sinks::util::zstd::ZstdCompressionLevel;
@@ -212,9 +212,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                     let max_level = compression.max_compression_level_val();
                     if level > max_level {
                         let msg = std::format!(
-                            "invalid value `{}`, expected value in range [0, {}]",
-                            level,
-                            max_level
+                            "invalid value `{level}`, expected value in range [0, {max_level}]"
                         );
                         return Err(de::Error::custom(msg));
                     }
@@ -307,7 +305,9 @@ impl Configurable for Compression {
         metadata
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // First, we'll create the string-only subschemas for each algorithm, and wrap those up
         // within a one-of schema.
         let mut string_metadata = Metadata::with_description("Compression algorithm.");
@@ -360,7 +360,7 @@ impl Configurable for Compression {
         // `none` algorithm as part of the overall set of enum values declared for the `algorithm`
         // field in the "full" schema version.
         let compression_level_schema =
-            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), gen, None)?;
+            get_or_generate_schema(&CompressionLevel::as_configurable_ref(), generator, None)?;
 
         let mut required = BTreeSet::new();
         required.insert(ALGORITHM_NAME.to_string());
@@ -455,8 +455,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
                     de::Error::custom(format!(
-                        "unsigned integer could not be converted to u32: {}",
-                        err
+                        "unsigned integer could not be converted to u32: {err}"
                     ))
                 })
             }
@@ -466,7 +465,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                 E: de::Error,
             {
                 u32::try_from(v).map(CompressionLevel::Val).map_err(|err| {
-                    de::Error::custom(format!("integer could not be converted to u32: {}", err))
+                    de::Error::custom(format!("integer could not be converted to u32: {err}"))
                 })
             }
         }

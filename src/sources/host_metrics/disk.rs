@@ -4,7 +4,7 @@ use heim::units::information::byte;
 use vector_lib::configurable::configurable_component;
 use vector_lib::metric_tags;
 
-use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
+use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 
 /// Options for the disk metrics collector.
 #[configurable_component]
@@ -76,8 +76,8 @@ impl HostMetrics {
 mod tests {
     use super::{
         super::{
-            tests::{all_counters, assert_filtered_metrics, count_name, count_tag},
             HostMetrics, HostMetricsConfig, MetricsBuffer,
+            tests::{all_counters, assert_filtered_metrics, count_name, count_tag},
         },
         DiskConfig,
     };
@@ -103,12 +103,7 @@ mod tests {
             "disk_written_bytes_total",
             "disk_writes_completed_total",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 4,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
         }
 
         // They should all have a "device" tag

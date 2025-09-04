@@ -22,12 +22,12 @@ use std::time::Duration;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
-use chrono::{serde::ts_milliseconds, DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::service::make_service_fn;
 use hyper::Server;
+use hyper::service::make_service_fn;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -43,17 +43,18 @@ use vector_lib::lookup::owned_value_path;
 use vector_lib::schema::meaning;
 use vector_lib::tls::MaybeTlsIncomingStream;
 use vrl::path::OwnedTargetPath;
-use vrl::value::kind::Collection;
 use vrl::value::Kind;
-use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
+use vrl::value::kind::Collection;
+use warp::{Filter, Reply, filters::BoxedFilter, reject::Rejection, reply::Response};
 
 use crate::common::http::ErrorMessage;
-use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer};
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput, log_schema,
     },
     event::Event,
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
@@ -61,7 +62,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 pub const LOGS: &str = "logs";
@@ -481,8 +481,8 @@ impl DatadogAgentSource {
                     encoding => {
                         return Err(ErrorMessage::new(
                             StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                            format!("Unsupported encoding {}", encoding),
-                        ))
+                            format!("Unsupported encoding {encoding}"),
+                        ));
                     }
                 }
             }
@@ -542,7 +542,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", encoding),
+        format!("Failed decompressing payload with {encoding} decoder."),
     )
 }
 

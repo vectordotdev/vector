@@ -7,19 +7,22 @@ use metrics_util::layers::Layer;
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
+    BufferType, EventCount,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Message<const N: usize> {
     id: u64,
+    // Purpose of `_heap_allocated` is to simulate memory pressure in the buffer benchmarks when the
+    // max_size option is selected.
+    _heap_allocated: Box<[u64; N]>,
     _padding: [u64; N],
 }
 
@@ -27,6 +30,7 @@ impl<const N: usize> Message<N> {
     fn new(id: u64) -> Self {
         Message {
             id,
+            _heap_allocated: Box::new([0; N]),
             _padding: [0; N],
         }
     }
@@ -40,7 +44,7 @@ impl<const N: usize> AddBatchNotifier for Message<N> {
 
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
-        0
+        N * std::mem::size_of::<u64>()
     }
 }
 
@@ -61,7 +65,7 @@ pub struct EncodeError;
 
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -72,7 +76,7 @@ pub struct DecodeError;
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -88,8 +92,8 @@ impl<const N: usize> FixedEncodable for Message<N> {
         Self: Sized,
     {
         buffer.put_u64(self.id);
-        for _ in 0..N {
-            // this covers self._padding
+        for _ in 0..(N * 2) {
+            // this covers self._padding and self.heap_allocated
             buffer.put_u64(0);
         }
         Ok(())
@@ -101,8 +105,8 @@ impl<const N: usize> FixedEncodable for Message<N> {
         Self: Sized,
     {
         let id = buffer.get_u64();
-        for _ in 0..N {
-            // this covers self._padding
+        for _ in 0..(N * 2) {
+            // this covers self._padding and self.heap_allocated
             _ = buffer.get_u64();
         }
         Ok(Message::new(id))

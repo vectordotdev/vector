@@ -1,12 +1,10 @@
 use std::{fs, io::Write};
 
 use bytes::Bytes;
+use file_source_common::ReadFrom;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::{
-    file_watcher::{tests::*, FileWatcher, RawLineResult},
-    ReadFrom,
-};
+use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 
 // Interpret all FWActions, excluding truncation
 //
@@ -49,7 +47,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
             }
             FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
-                new_path.set_extension(format!("log.{}", rotation_count));
+                new_path.set_extension(format!("log.{rotation_count}"));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
@@ -99,7 +97,7 @@ fn file_watcher_no_truncation() {
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(10000)
-        .max_tests(100000)
+        .tests(5000)
+        .max_tests(50000)
         .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
 }

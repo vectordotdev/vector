@@ -126,7 +126,7 @@ fn counter(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Counter { value },
     )
@@ -144,7 +144,7 @@ fn gauge(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Gauge { value },
     )
@@ -340,25 +340,24 @@ fn cpu_metrics(
         );
     }
 
-    if let Some(cpu_usage) = &cpu.cpu_usage {
-        if let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
-        {
-            metrics.extend((0..online_cpus).filter_map(|index| {
-                percpu_usage.get(index).map(|value| {
-                    let mut tags = tags.clone();
-                    tags.replace("cpu".into(), index.to_string());
+    if let Some(cpu_usage) = &cpu.cpu_usage
+        && let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
+    {
+        metrics.extend((0..online_cpus).filter_map(|index| {
+            percpu_usage.get(index).map(|value| {
+                let mut tags = tags.clone();
+                tags.replace("cpu".into(), index.to_string());
 
-                    counter(
-                        usage,
-                        "usage_percpu_jiffies_total",
-                        namespace.clone(),
-                        timestamp,
-                        *value,
-                        tags,
-                    )
-                })
-            }));
-        }
+                counter(
+                    usage,
+                    "usage_percpu_jiffies_total",
+                    namespace.clone(),
+                    timestamp,
+                    *value,
+                    tags,
+                )
+            })
+        }));
     }
 
     metrics
@@ -507,6 +506,7 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 enum StatsPayload {
@@ -572,7 +572,7 @@ pub(super) fn parse(
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use vector_lib::assert_event_data_eq;
     use vector_lib::metric_tags;
 

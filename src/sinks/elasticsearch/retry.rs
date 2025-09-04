@@ -1,13 +1,19 @@
-use http::StatusCode;
-use serde::Deserialize;
-
+use crate::sinks::{
+    elasticsearch::encoder::ProcessedEvent,
+    util::{metadata::RequestMetadataBuilder, request_builder::RequestBuilder},
+};
 use crate::{
+    event::Finalizable,
     http::HttpError,
     sinks::{
-        elasticsearch::service::ElasticsearchResponse,
+        elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
         util::retries::{RetryAction, RetryLogic},
     },
 };
+use http::StatusCode;
+use serde::Deserialize;
+use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::json_size::JsonSize;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {
@@ -17,10 +23,7 @@ struct EsResultResponse {
 impl EsResultResponse {
     fn parse(body: &str) -> Result<Self, String> {
         serde_json::from_str::<EsResultResponse>(body).map_err(|json_error| {
-            format!(
-                "some messages failed, could not parse response, error: {}",
-                json_error
-            )
+            format!("some messages failed, could not parse response, error: {json_error}")
         })
     }
 
@@ -45,7 +48,7 @@ impl EsResultResponse {
             .find_map(|item| item.result().error.as_ref())
         {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
-            None => format!("error response: {}", body),
+            None => format!("error response: {body}"),
         }
     }
 }
@@ -91,13 +94,17 @@ pub struct ElasticsearchRetryLogic {
 
 impl RetryLogic for ElasticsearchRetryLogic {
     type Error = HttpError;
+    type Request = ElasticsearchRequest;
     type Response = ElasticsearchResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &ElasticsearchResponse) -> RetryAction {
+    fn should_retry_response(
+        &self,
+        response: &ElasticsearchResponse,
+    ) -> RetryAction<ElasticsearchRequest> {
         let status = response.http_response.status();
 
         match status {
@@ -115,7 +122,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
             ),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
-                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body).into())
+                RetryAction::DontRetry(format!("client-side error, {status}: {body}").into())
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
@@ -127,21 +134,57 @@ impl RetryLogic for ElasticsearchRetryLogic {
                                 // We will retry if there exists at least one item that
                                 // failed with a retriable error.
                                 // Those are backpressure and server errors.
-                                if let Some((status, error)) =
+                                let status_codes: Vec<bool> = resp
+                                    .iter_status()
+                                    .map(|(status, _)| {
+                                        status == StatusCode::TOO_MANY_REQUESTS
+                                            || status.is_server_error()
+                                    })
+                                    .collect();
+                                if let Some((_status, _error)) =
                                     resp.iter_status().find(|(status, _)| {
                                         *status == StatusCode::TOO_MANY_REQUESTS
                                             || status.is_server_error()
                                     })
                                 {
-                                    let msg = if let Some(error) = error {
-                                        format!(
-                                            "partial error, status: {}, error type: {}, reason: {}",
-                                            status, error.err_type, error.reason
-                                        )
-                                    } else {
-                                        format!("partial error, status: {}", status)
-                                    };
-                                    return RetryAction::Retry(msg.into());
+                                    return RetryAction::RetryPartial(Box::new(
+                                        move |req: ElasticsearchRequest| {
+                                            let mut failed_events: Vec<ProcessedEvent> = req
+                                                .original_events
+                                                .clone()
+                                                .into_iter()
+                                                .zip(status_codes.iter())
+                                                .filter(|&(_, &flag)| flag)
+                                                .map(|(item, _)| item)
+                                                .collect();
+                                            let finalizers = failed_events.take_finalizers();
+                                            let batch_size = failed_events.len();
+                                            let events_byte_size = failed_events
+                                                .iter()
+                                                .map(|x| x.log.estimated_json_encoded_size_of())
+                                                .fold(JsonSize::zero(), |a, b| a + b);
+                                            let encode_result = match req
+                                                .elasticsearch_request_builder
+                                                .encode_events(failed_events.clone())
+                                            {
+                                                Ok(s) => s,
+                                                Err(_) => return req,
+                                            };
+                                            let metadata_builder =
+                                                RequestMetadataBuilder::from_events(&failed_events);
+                                            let metadata = metadata_builder.build(&encode_result);
+                                            ElasticsearchRequest {
+                                                payload: encode_result.into_payload(),
+                                                finalizers,
+                                                batch_size,
+                                                events_byte_size,
+                                                metadata,
+                                                original_events: failed_events,
+                                                elasticsearch_request_builder: req
+                                                    .elasticsearch_request_builder,
+                                            }
+                                        },
+                                    ));
                                 }
                             }
 
@@ -153,7 +196,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
                     RetryAction::Successful
                 }
             }
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }
@@ -204,7 +247,7 @@ mod tests {
                 event_status: EventStatus::Errored,
                 events_byte_size: CountByteSize(1, JsonSize::new(1)).into(),
             }),
-            RetryAction::Retry(_)
+            RetryAction::RetryPartial(_)
         ));
     }
 
@@ -215,7 +258,10 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+        assert_eq!(
+            reason,
+            "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]"
+        );
     }
 
     #[test]
@@ -225,6 +271,9 @@ mod tests {
             Ok(resp) => resp.get_error_reason(json),
             Err(msg) => msg,
         };
-        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
+        assert_eq!(
+            reason,
+            "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value"
+        );
     }
 }

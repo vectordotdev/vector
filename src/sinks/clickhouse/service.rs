@@ -1,39 +1,41 @@
 //! Service implementation for the `Clickhouse` sink.
 
+use super::config::QuerySettingsConfig;
 use super::sink::PartitionKey;
 use crate::{
     http::{Auth, HttpError},
     sinks::{
+        HTTPRequestBuilderSnafu, UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
             http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
-        HTTPRequestBuilderSnafu, UriParseSnafu,
     },
 };
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic,
+    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
+    type Request = HttpRequest<PartitionKey>;
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         match response.http_response.status() {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.http_response.body();
@@ -67,6 +69,7 @@ pub(super) struct ClickhouseServiceRequestBuilder {
     pub(super) date_time_best_effort: bool,
     pub(super) insert_random_shard: bool,
     pub(super) compression: Compression,
+    pub(super) query_settings: QuerySettingsConfig,
 }
 
 impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder {
@@ -84,6 +87,7 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.skip_unknown_fields,
             self.date_time_best_effort,
             self.insert_random_shard,
+            self.query_settings,
         )?;
 
         let auth: Option<Auth> = self.auth.clone();
@@ -107,6 +111,18 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
     }
 }
 
+fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
+    if let Some(val) = value {
+        uri.push_str(&format!("{}={}&", key, val.to_string()));
+    }
+}
+fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
+    if let Some(val) = value {
+        uri.push_str(&format!("{}={}&", key, if val { 1 } else { 0 }));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn set_uri_query(
     uri: &Uri,
     database: &str,
@@ -115,6 +131,7 @@ fn set_uri_query(
     skip_unknown: Option<bool>,
     date_time_best_effort: bool,
     insert_random_shard: bool,
+    query_settings: QuerySettingsConfig,
 ) -> crate::Result<Uri> {
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
@@ -135,19 +152,45 @@ fn set_uri_query(
     }
 
     uri.push_str("?input_format_import_nested_json=1&");
-    if let Some(skip_unknown) = skip_unknown {
-        if skip_unknown {
-            uri.push_str("input_format_skip_unknown_fields=1&");
-        } else {
-            uri.push_str("input_format_skip_unknown_fields=0&")
-        }
-    }
+    append_param_bool(&mut uri, "input_format_skip_unknown_fields", skip_unknown);
     if date_time_best_effort {
         uri.push_str("date_time_input_format=best_effort&")
     }
     if insert_random_shard {
         uri.push_str("insert_distributed_one_random_shard=1&")
     }
+    append_param_bool(
+        &mut uri,
+        "async_insert",
+        query_settings.async_insert_settings.enabled,
+    );
+    append_param_bool(
+        &mut uri,
+        "wait_for_async_insert",
+        query_settings.async_insert_settings.wait_for_processing,
+    );
+    append_param(
+        &mut uri,
+        "wait_for_async_insert_timeout",
+        query_settings
+            .async_insert_settings
+            .wait_for_processing_timeout,
+    );
+    append_param_bool(
+        &mut uri,
+        "async_insert_deduplicate",
+        query_settings.async_insert_settings.deduplicate,
+    );
+    append_param(
+        &mut uri,
+        "async_insert_max_data_size",
+        query_settings.async_insert_settings.max_data_size,
+    );
+    append_param(
+        &mut uri,
+        "async_insert_max_query_number",
+        query_settings.async_insert_settings.max_query_number,
+    );
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
@@ -158,6 +201,7 @@ fn set_uri_query(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::clickhouse::config::*;
 
     #[test]
     fn encode_valid() {
@@ -169,13 +213,17 @@ mod tests {
             Some(false),
             true,
             false,
+            QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+                                     query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -185,12 +233,16 @@ mod tests {
             Some(false),
             false,
             false,
+            QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=0&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -200,13 +252,17 @@ mod tests {
             Some(true),
             true,
             false,
+            QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      input_format_skip_unknown_fields=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -216,12 +272,45 @@ mod tests {
             None,
             true,
             false,
+            QuerySettingsConfig::default(),
         )
         .unwrap();
-        assert_eq!(uri.to_string(), "http://localhost:80/?\
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
                                      input_format_import_nested_json=1&\
                                      date_time_input_format=best_effort&\
-                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject");
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
+
+        let uri = set_uri_query(
+            &"http://localhost:80".parse().unwrap(),
+            "my_database",
+            "my_\"table\"",
+            Format::JsonAsObject,
+            None,
+            true,
+            false,
+            QuerySettingsConfig {
+                async_insert_settings: AsyncInsertSettingsConfig {
+                    enabled: Some(true),
+                    wait_for_processing: Some(true),
+                    wait_for_processing_timeout: Some(500),
+                    ..AsyncInsertSettingsConfig::default()
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            uri.to_string(),
+            "http://localhost:80/?\
+                                     input_format_import_nested_json=1&\
+                                     date_time_input_format=best_effort&\
+                                     async_insert=1&\
+                                     wait_for_async_insert=1&\
+                                     wait_for_async_insert_timeout=500&\
+                                     query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONAsObject"
+        );
     }
 
     #[test]
@@ -234,6 +323,7 @@ mod tests {
             Some(false),
             false,
             false,
+            QuerySettingsConfig::default(),
         )
         .unwrap_err();
     }

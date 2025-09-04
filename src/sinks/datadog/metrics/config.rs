@@ -16,9 +16,9 @@ use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{batch::BatchConfig, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig},
         Healthcheck, UriParseSnafu, VectorSink,
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
+        util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -289,7 +289,7 @@ impl DatadogMetricsConfig {
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{}{}", host, endpoint)
+    let result = format!("{host}{endpoint}")
         .parse::<Uri>()
         .context(UriParseSnafu)?;
     Ok(result)

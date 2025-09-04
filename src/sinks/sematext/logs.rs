@@ -11,12 +11,12 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
+        Healthcheck, VectorSink,
         elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            StreamSink, TowerRequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
+            TowerRequestConfig, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
 };
@@ -189,7 +189,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.endpoint = Some(format!("http://{}", addr));
+        config.endpoint = Some(format!("http://{addr}"));
 
         let (sink, _) = config.build(cx).await.unwrap();
 

@@ -2,12 +2,12 @@
 
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::stream::batcher::limiter::ItemBatchSize;
-use vector_lib::{event::Event, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, event::Event};
 
 use crate::codecs::Encoder;
 
 /// Uses the configured encoder to determine batch sizing.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(super) struct HttpBatchSizer {
     pub(super) encoder: Encoder<Framer>,
 }

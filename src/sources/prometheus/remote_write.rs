@@ -9,7 +9,7 @@ use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
-    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
@@ -19,7 +19,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, HttpSource},
+        util::{HttpSource, decode, http::HttpMethod},
     },
     tls::TlsEnableableConfig,
 };
@@ -118,13 +118,13 @@ impl RemoteWriteSource {
             });
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
+                format!("Could not decode write request: {error}"),
             )
         })?;
         parser::parse_request(request).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Could not decode write request: {}", error),
+                format!("Could not decode write request: {error}"),
             )
         })
     }
@@ -158,11 +158,11 @@ mod test {
 
     use super::*;
     use crate::{
+        SourceSender,
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
-        SourceSender,
     };
 
     #[test]
@@ -305,28 +305,32 @@ mod test {
 
         let timestamp = Utc::now().trunc_subsecs(3);
 
-        let events = vec![Metric::new(
-            "gauge_2",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 41.0 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(metric_tags! {
-            "code" => "200".to_string(),
-            "code" => "success".to_string(),
-        }))
-        .into()];
+        let events = vec![
+            Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "200".to_string(),
+                "code" => "success".to_string(),
+            }))
+            .into(),
+        ];
 
-        let expected = vec![Metric::new(
-            "gauge_2",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 41.0 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(metric_tags! {
-            "code" => "success".to_string(),
-        }))
-        .into()];
+        let expected = vec![
+            Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "success".to_string(),
+            }))
+            .into(),
+        ];
 
         let output = test_util::spawn_collect_ready(
             async move {
@@ -347,7 +351,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
+    use crate::test_util::components::{HTTP_PUSH_SOURCE_TAGS, run_and_assert_source_compliance};
 
     fn source_receive_address() -> SocketAddr {
         let address = std::env::var("REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS")

@@ -3,12 +3,12 @@ use std::{
     num::NonZeroUsize,
     panic,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures_util::{
-    stream::{Fuse, FuturesOrdered},
     Stream, StreamExt,
+    stream::{Fuse, FuturesOrdered},
 };
 use pin_project::pin_project;
 use tokio::task::JoinHandle;

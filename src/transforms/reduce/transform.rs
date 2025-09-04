@@ -1,22 +1,22 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 use crate::internal_events::ReduceAddEventError;
 use crate::transforms::reduce::merge_strategy::{
-    get_value_merger, MergeStrategy, ReduceValueMerger,
+    MergeStrategy, ReduceValueMerger, get_value_merger,
 };
 use crate::{
     conditions::Condition,
-    event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
+    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
     internal_events::ReduceStaleEventFlushed,
-    transforms::{reduce::config::ReduceConfig, TaskTransform},
+    transforms::{TaskTransform, reduce::config::ReduceConfig},
 };
 use futures::Stream;
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::{parse_target_path, OwnedTargetPath};
+use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use vrl::path::{OwnedTargetPath, parse_target_path};
 use vrl::prelude::KeyString;
 
 #[derive(Clone, Debug)]
@@ -218,10 +218,10 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if let Some(period) = self.end_every_period {
-                if (now - t.creation) >= period {
-                    flush_discriminants.push(k.clone());
-                }
+            if let Some(period) = self.end_every_period
+                && (now - t.creation) >= period
+            {
+                flush_discriminants.push(k.clone());
             }
 
             if (now - t.stale_since) >= self.expire_after {
@@ -358,7 +358,7 @@ mod test {
     use vector_lib::lookup::owned_value_path;
 
     use crate::config::schema::Definition;
-    use crate::config::{schema, LogNamespace, OutputId, TransformConfig};
+    use crate::config::{LogNamespace, OutputId, TransformConfig, schema};
     use crate::event::{LogEvent, Value};
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
@@ -640,9 +640,10 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("invalid value: integer `0`, expected a nonzero usize")),
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("invalid value: integer `0`, expected a nonzero usize")
+            ),
         }
     }
 

@@ -17,11 +17,11 @@ impl SharedTopologyController {
         Self(Arc::new(Mutex::new(inner)))
     }
 
-    pub fn blocking_lock(&self) -> MutexGuard<TopologyController> {
+    pub fn blocking_lock(&self) -> MutexGuard<'_, TopologyController> {
         self.0.blocking_lock()
     }
 
-    pub async fn lock(&self) -> MutexGuard<TopologyController> {
+    pub async fn lock(&self) -> MutexGuard<'_, TopologyController> {
         self.0.lock().await
     }
 

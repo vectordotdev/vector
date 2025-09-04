@@ -5,8 +5,8 @@ use crate::config::{
 };
 use crate::schema;
 use crate::sinks::prelude::configurable_component;
-use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use crate::transforms::Transform;
+use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use std::hash::{Hash, Hasher};
 use vector_lib::config::clone_input_definitions;
 
@@ -111,10 +111,7 @@ impl TransformConfig for ExclusiveRouteConfig {
             .collect();
 
         if !duplicates.is_empty() {
-            errors.push(format!(
-                "Found routes with duplicate names: {:?}",
-                duplicates
-            ));
+            errors.push(format!("Found routes with duplicate names: {duplicates:?}"));
         }
 
         if self

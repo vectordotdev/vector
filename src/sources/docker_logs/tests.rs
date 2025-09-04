@@ -39,7 +39,7 @@ mod integration_tests {
         },
         secret::ContainerCreateBody,
     };
-    use futures::{stream::TryStreamExt, FutureExt};
+    use futures::{FutureExt, stream::TryStreamExt};
     use itertools::Itertools as _;
     use similar_asserts::assert_eq;
     use vrl::value;
@@ -47,13 +47,13 @@ mod integration_tests {
     use crate::sources::docker_logs::*;
     use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
+        SourceSender,
         event::Event,
         test_util::{
             collect_n, collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             trace_init,
         },
-        SourceSender,
     };
 
     /// None if docker is not present on the system
@@ -61,7 +61,7 @@ mod integration_tests {
         names: &[&str],
         label: L,
         log_namespace: Option<bool>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item = Event> + use<L> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -108,7 +108,7 @@ mod integration_tests {
             vec![
                 "sh",
                 "-c",
-                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
+                format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {log}; i=$((i+1)); done").as_str(),
             ],
             docker,
             false
@@ -186,7 +186,7 @@ mod integration_tests {
                 .for_each(|item| async move {
                     let info = item.unwrap();
                     if let Some(error) = info.error {
-                        panic!("{:?}", error);
+                        panic!("{error:?}");
                     }
                 })
                 .await
@@ -262,7 +262,7 @@ mod integration_tests {
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
         }
         id
@@ -282,7 +282,7 @@ mod integration_tests {
         let id = eternal_container(name, label, log, &docker).await;
         if let Err(error) = container_start(&id, &docker).await {
             container_remove(&id, &docker).await;
-            panic!("Container start failed with error: {:?}", error);
+            panic!("Container start failed with error: {error:?}");
         }
 
         // Wait for before message
@@ -396,16 +396,18 @@ mod integration_tests {
                 meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
                 &value!(id)
             );
-            assert!(meta
-                .get(path!(DockerLogsConfig::NAME, CREATED_AT))
-                .is_some());
+            assert!(
+                meta.get(path!(DockerLogsConfig::NAME, CREATED_AT))
+                    .is_some()
+            );
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, IMAGE)).unwrap(),
                 &value!("busybox")
             );
-            assert!(meta
-                .get(path!(DockerLogsConfig::NAME, "labels", label))
-                .is_some());
+            assert!(
+                meta.get(path!(DockerLogsConfig::NAME, "labels", label))
+                    .is_some()
+            );
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, NAME)).unwrap(),
                 &value!(name)
@@ -414,10 +416,11 @@ mod integration_tests {
                 meta.get(path!("vector", "source_type")).unwrap(),
                 &value!(DockerLogsConfig::NAME)
             );
-            assert!(meta
-                .get(path!("vector", "ingest_timestamp"))
-                .unwrap()
-                .is_timestamp())
+            assert!(
+                meta.get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp()
+            )
         })
         .await;
     }
@@ -453,7 +456,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -650,7 +653,7 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log.get(format!("label.{}", label).as_str()).is_some());
+            assert!(log.get(format!("label.{label}").as_str()).is_some());
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -785,13 +788,14 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log
-                .get("label")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get(label)
-                .is_some());
+            assert!(
+                log.get("label")
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .get(label)
+                    .is_some()
+            );
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],
@@ -877,13 +881,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;
@@ -947,13 +951,13 @@ mod integration_tests {
 
             let command = emitted_messages
                 .into_iter()
-                .map(|message| format!("echo {:?}", message))
+                .map(|message| format!("echo {message:?}"))
                 .join(" && ");
 
             let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
             if let Err(error) = container_run(&id, &docker).await {
                 container_remove(&id, &docker).await;
-                panic!("Container failed to start with error: {:?}", error);
+                panic!("Container failed to start with error: {error:?}");
             }
             let events = collect_n(out, expected_messages.len()).await;
             container_remove(&id, &docker).await;

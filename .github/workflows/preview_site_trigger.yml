@@ -7,63 +7,45 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # Only run for PRs with 'website' in the branch name
-    if: ${{ contains(github.head_ref, 'website') && contains(github.head_ref, '-') }}
+    if: ${{ contains(github.head_ref, 'website') }}
     steps:
-      - name: Echo approval
+      # Validate branch name
+      - name: Validate branch name and set output
+        id: validate
         run: |
-          echo "Workflow has been allowed to run for PR ${{ github.event.number }}. Setting artifacts and then continuing workflow runs"
+          BRANCH="${{ github.head_ref }}"
+          if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "valid=false" >> $GITHUB_OUTPUT
+          else
+            echo "valid=true" >> $GITHUB_OUTPUT
+          fi
 
-      # Use GitHub Action to safely validate and store PR information
+      # Save PR information (only if branch is valid)
       - name: Validate and save PR information
-        uses: actions/github-script@v7.0.1
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const fs = require('fs').promises;
             const path = require('path');
             const crypto = require('crypto');
+            const prNumber = context.payload.number;
+            const branchName = context.payload.pull_request.head.ref;
 
-            async function createAndValidateArtifact() {
-              try {
-                // Create directory for artifact
-                await fs.mkdir('./pr', { recursive: true });
+            await fs.mkdir('./pr', { recursive: true });
+            await fs.writeFile('./pr/number', prNumber.toString());
+            await fs.writeFile('./pr/branch', branchName);
 
-                // Get PR number and validate
-                const prNumber = context.payload.number;
-                if (typeof prNumber !== 'number' || !Number.isInteger(prNumber) || prNumber <= 0) {
-                  core.setFailed(`Invalid PR number: ${prNumber}`);
-                  return;
-                }
+            const numberHash = crypto.createHash('sha256').update(prNumber.toString()).digest('hex');
+            const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
+            await fs.writeFile('./pr/integrity', `${numberHash}:${branchHash}`);
 
-                // Get branch name and validate
-                const branchName = context.payload.pull_request.head.ref;
-                // Validate branch name (only allow alphanumeric, dash, and underscore)
-                const branchNameRegex = /^[a-zA-Z0-9_\-]+$/;
-                if (!branchNameRegex.test(branchName)) {
-                  core.setFailed(`Invalid branch name detected: ${branchName}`);
-                  return;
-                }
+            core.info(`Saved PR #${prNumber} and branch ${branchName}`);
 
-                // Write validated information to files
-                await fs.writeFile('./pr/number', prNumber.toString());
-                await fs.writeFile('./pr/branch', branchName);
-
-                // Log success
-                core.info(`Successfully validated and saved PR #${prNumber} with branch ${branchName}`);
-
-                // Create hash signature of the data
-                const numberHash = crypto.createHash('sha256').update(prNumber.toString()).digest('hex');
-                const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
-                await fs.writeFile('./pr/integrity', `${numberHash}:${branchHash}`);
-              } catch (error) {
-                core.setFailed(`An error occurred: ${error.message}`);
-              }
-            }
-
-            createAndValidateArtifact();
-
-      # Upload the artifact using latest version
+      # Upload the artifact using latest version (only if branch is valid)
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v4
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr
           path: pr/

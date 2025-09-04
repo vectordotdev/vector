@@ -5,7 +5,7 @@ pub mod timeout;
 
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{
-    meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
+    Region, SdkConfig, meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig,
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
@@ -28,7 +28,7 @@ use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::HeaderMap;
-use http_body::{combinators::BoxBody, Body};
+use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
@@ -37,8 +37,8 @@ use std::{
     error::Error,
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::{Duration, SystemTime},
@@ -130,7 +130,7 @@ pub trait ClientBuilder {
 pub fn region_provider(
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
-) -> crate::Result<impl ProvideRegion> {
+) -> crate::Result<impl ProvideRegion + use<>> {
     let config = aws_config::provider_config::ProviderConfig::default()
         .with_http_client(connector(proxy, tls_options)?);
 
@@ -366,13 +366,13 @@ where
 
         HttpConnectorFuture::new(fut.inspect(move |result| {
             let byte_size = bytes_sent.load(Ordering::Relaxed);
-            if let Ok(result) = result {
-                if result.status().is_success() {
-                    emit!(AwsBytesSent {
-                        byte_size,
-                        region: Some(region),
-                    });
-                }
+            if let Ok(result) = result
+                && result.status().is_success()
+            {
+                emit!(AwsBytesSent {
+                    byte_size,
+                    region: Some(region),
+                });
             }
         }))
     }

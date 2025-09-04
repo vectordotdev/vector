@@ -1,5 +1,26 @@
 version: '3'
 
 services:
-  redis:
+  redis-primary:
     image: docker.io/redis:${CONFIG_VERSION}
+    container_name: redis-primary
+    hostname: redis-primary
+    ports:
+      - "6379:6379"
+
+  redis-sentinel:
+    image: docker.io/redis:${CONFIG_VERSION}
+    container_name: redis-sentinel
+    hostname: redis-sentinel
+    depends_on:
+      - redis-primary
+    ports:
+      - "26379:26379"
+    command: >
+      sh -c 'echo "bind 0.0.0.0" > /etc/sentinel.conf &&
+            echo "sentinel monitor vector redis-primary 6379 1" >> /etc/sentinel.conf &&
+            echo "sentinel resolve-hostnames yes" >> /etc/sentinel.conf &&
+            echo "sentinel down-after-milliseconds vector 5000" >> /etc/sentinel.conf &&
+            echo "sentinel failover-timeout vector 5000" >> /etc/sentinel.conf &&
+            echo "sentinel parallel-syncs vector 1" >> /etc/sentinel.conf &&
+            redis-sentinel /etc/sentinel.conf'

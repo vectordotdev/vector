@@ -28,7 +28,7 @@ components: transforms: route: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.route.configuration
+	configuration: generated.components.transforms.route.configuration
 
 	input: {
 		logs: true

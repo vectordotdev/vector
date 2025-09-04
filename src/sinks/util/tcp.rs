@@ -8,7 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, stream::BoxStream, task::noop_waker_ref};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -22,6 +22,7 @@ use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     codecs::Transformer,
+    common::backoff::ExponentialBackoff,
     dns,
     event::Event,
     internal_events::{
@@ -30,12 +31,11 @@ use crate::{
     },
     sink_ext::VecSinkExt,
     sinks::{
-        util::{
-            retries::ExponentialBackoff,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
-            EncodedEvent, SinkBuildError, StreamSink,
-        },
         Healthcheck, VectorSink,
+        util::{
+            EncodedEvent, SinkBuildError, StreamSink,
+            socket_bytes_sink::{BytesSink, ShutdownCheck},
+        },
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
@@ -106,10 +106,10 @@ impl TcpSinkConfig {
         &self,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -177,16 +177,16 @@ impl TcpConnector {
             .await
             .context(ConnectSnafu)
             .map(|mut maybe_tls| {
-                if let Some(keepalive) = self.keepalive {
-                    if let Err(error) = maybe_tls.set_keepalive(keepalive) {
-                        warn!(message = "Failed configuring TCP keepalive.", %error);
-                    }
+                if let Some(keepalive) = self.keepalive
+                    && let Err(error) = maybe_tls.set_keepalive(keepalive)
+                {
+                    warn!(message = "Failed configuring TCP keepalive.", %error);
                 }
 
-                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
-                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
-                    }
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes
+                    && let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes)
+                {
+                    warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
                 }
 
                 maybe_tls

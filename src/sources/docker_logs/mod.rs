@@ -5,11 +5,11 @@ use bollard::query_parameters::{
     EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
 };
 use bollard::{
+    Docker,
     container::LogOutput,
     errors::Error as DockerError,
     query_parameters::InspectContainerOptions,
     service::{ContainerInspectResponse, EventMessage},
-    Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
@@ -24,16 +24,17 @@ use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
 };
 use vector_lib::lookup::{
-    lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path, OwnedValuePath, PathPrefix,
+    OwnedValuePath, PathPrefix, lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path,
 };
 use vrl::event_path;
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
-    docker::{docker, DockerTlsConfig},
-    event::{self, merge_state::LogEventMergeState, EstimatedJsonEncodedSizeOf, LogEvent, Value},
+    SourceSender,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
+    docker::{DockerTlsConfig, docker},
+    event::{self, EstimatedJsonEncodedSizeOf, LogEvent, Value, merge_state::LogEventMergeState},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchError, DockerLogsContainerUnwatch,
@@ -42,7 +43,6 @@ use crate::{
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[cfg(test)]
@@ -222,10 +222,10 @@ impl DockerLogsConfig {
     }
 
     fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
-        if let Some(val) = &self.partial_event_marker_field {
-            if val.is_empty() {
-                self.partial_event_marker_field = None;
-            }
+        if let Some(val) = &self.partial_event_marker_field
+            && val.is_empty()
+        {
+            self.partial_event_marker_field = None;
         }
         self
     }
@@ -399,7 +399,7 @@ impl DockerLogsSourceCore {
     /// Returns event stream coming from docker.
     fn docker_logs_event_stream(
         &self,
-    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send {
+    ) -> impl Stream<Item = Result<EventMessage, DockerError>> + Send + use<> {
         let mut filters = HashMap::new();
 
         // event  | emitted on commands
@@ -1007,8 +1007,9 @@ impl ContainerLogInfo {
                 // occur when a container changes generations, and to avoid processing logs with timestamps before
                 // the created timestamp.
                 match self.last_log.as_ref() {
-                    Some(&(last, gen)) => {
-                        if last < timestamp || (last == timestamp && gen == self.generation) {
+                    Some(&(last, generation)) => {
+                        if last < timestamp || (last == timestamp && generation == self.generation)
+                        {
                             // Noop - log received in order.
                         } else {
                             // Docker returns logs in order.
@@ -1158,10 +1159,10 @@ impl ContainerLogInfo {
                 log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
             }
             LogNamespace::Legacy => {
-                if let Some(timestamp) = timestamp {
-                    if let Some(timestamp_key) = log_schema().timestamp_key() {
-                        log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
-                    }
+                if let Some(timestamp) = timestamp
+                    && let Some(timestamp_key) = log_schema().timestamp_key()
+                {
+                    log.try_insert((PathPrefix::Event, timestamp_key), timestamp);
                 }
             }
         };

@@ -13,7 +13,7 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{logs::service::LogApiService, DatadogCommonConfig, LocalDatadogCommonConfig},
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
         util::http::RequestConfig,
     },
@@ -93,7 +93,7 @@ impl DatadogLogsConfig {
             .clone()
             .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
 
-        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
+        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
     }
 
     pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
@@ -219,7 +219,7 @@ mod test {
     use crate::codecs::EncodingConfigWithFraming;
     use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
 

@@ -52,7 +52,7 @@ components: sources: mqtt: {
 		notices: []
 	}
 
-	configuration: base.components.sources.mqtt.configuration
+	configuration: generated.components.sources.mqtt.configuration
 
 	installation: {
 		platform_name: null

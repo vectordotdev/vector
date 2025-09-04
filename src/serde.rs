@@ -2,8 +2,8 @@
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
+    decoding::{DeserializerConfig, FramingConfig},
 };
 use vector_lib::configurable::configurable_component;
 pub use vector_lib::serde::{bool_or_struct, is_default};
@@ -90,7 +90,7 @@ impl<V: 'static> Fields<V> {
                     FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
                     FieldsOrValue::Fields(f) => Box::new(
                         f.all_fields()
-                            .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k), v)),
+                            .map(move |(nested_k, v)| (format!("{k}.{nested_k}"), v)),
                     ),
                 }
             })

@@ -1,24 +1,22 @@
 use crate::common::mqtt::MqttCommonConfig;
 use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::mqtt::config::MqttQoS;
 use crate::sinks::mqtt::MqttSinkConfig;
+use crate::sinks::mqtt::config::MqttQoS;
 use crate::template::Template;
-use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
+use crate::test_util::components::{SINK_TAGS, run_and_assert_sink_compliance};
 use crate::test_util::{random_lines_with_stream, trace_init};
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 
 fn mqtt_broker_address() -> String {
-    let result = std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into());
-    result
+    std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into())
 }
 
 fn mqtt_broker_port() -> u16 {
-    let result = std::env::var("MQTT_BROKER_PORT")
+    std::env::var("MQTT_BROKER_PORT")
         .unwrap_or_else(|_| "1883".into())
         .parse::<u16>()
-        .expect("Cannot parse as u16");
-    result
+        .expect("Cannot parse as u16")
 }
 
 #[tokio::test]

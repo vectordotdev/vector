@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::lookup::{self, path, OwnedTargetPath};
+use vector_lib::lookup::{self, OwnedTargetPath, path};
 
 use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
@@ -339,7 +339,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 
@@ -355,7 +355,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 }

@@ -4,8 +4,8 @@ use crate::config::{
     DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
 };
 use crate::schema;
-use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use crate::transforms::Transform;
+use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 

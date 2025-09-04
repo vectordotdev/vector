@@ -319,7 +319,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                                 } else {
                                     let formatted = success
                                         .iter()
-                                        .map(|s| format!("    - {}\n", s))
+                                        .map(|s| format!("    - {s}\n"))
                                         .collect::<Vec<_>>();
 
                                     details.push(format!(
@@ -340,7 +340,7 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                                 } else {
                                     let formatted = failure
                                         .iter()
-                                        .map(|s| format!("    - {}\n", s))
+                                        .map(|s| format!("    - {s}\n"))
                                         .collect::<Vec<_>>();
 
                                     details.push(format!(
@@ -368,10 +368,9 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
                     );
                 }
             }
-            Err(e) => panic!(
-                "Failed to complete validation run for component '{}': {}",
-                component_name, e
-            ),
+            Err(e) => {
+                panic!("Failed to complete validation run for component '{component_name}': {e}")
+            }
         }
     });
 }
@@ -437,7 +436,10 @@ fn get_validation_configuration_from_test_case_path(
 #[cfg(feature = "component-validation-runner")]
 pub fn validate_component(test_case_data_path: std::path::PathBuf) {
     if !test_case_data_path.exists() {
-        panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
+        panic!(
+            "Component validation test invoked with path to test case data that could not be found: {}",
+            test_case_data_path.to_string_lossy()
+        );
     }
 
     let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)

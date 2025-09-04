@@ -28,7 +28,7 @@
         {{ partial  "author-with-avatar.html" . }}
 
 
-        <div class="block space-y-1.5">
+        <div class="block space-y-1.5 mt-1.5">
           {{ with $badges.type }}
             {{ $color := cond (eq . "deprecation") "red" "blue" }}
             {{ partial "badge.html" (dict "prefix" "type" "word" . "color" $color "inline" true) }}

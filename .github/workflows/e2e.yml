@@ -4,14 +4,16 @@
 #   - PRs if there are code changes to the source files that are noted in `vdev e2e ci_paths`
 #   - MQ (always pass)
 #   - Scheduled: at midnight UTC Tues-Sat
+#   - Manual trigger via Actions UI.
 
 name: E2E Test Suite
 
 on:
+  workflow_dispatch:
   pull_request:
   # Needs to pass by default in MQ
   merge_group:
-    types: [checks_requested]
+    types: [ checks_requested ]
   schedule:
     # At midnight UTC Tue-Sat
     - cron: '0 0 * * 2-6'
@@ -37,7 +39,6 @@ env:
   # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
   # can be removed when we switch back to the upstream openssl-sys crate
   CARGO_NET_GIT_FETCH_WITH_CLI: true
-
 jobs:
 
   changes:
@@ -55,15 +56,17 @@ jobs:
     needs: changes
     if: always() && (
       github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.e2e-datadog-logs == 'true' ||
-      needs.changes.outputs.e2e-datadog-metrics == 'true'
+      needs.changes.outputs.e2e-datadog-metrics == 'true' ||
+      needs.changes.outputs.e2e-opentelemetry-logs == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - run: docker image prune -af ; docker container prune -f
 
@@ -78,23 +81,34 @@ jobs:
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"
           fi
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-logs == 'true') &&
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-datadog-logs == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-logs
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e datadog-logs
 
-      - if: (github.event_name == 'schedule' || needs.changes.outputs.e2e-datadog-metrics == 'true') &&
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-datadog-metrics == 'true') &&
           (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
         name: e2e-datadog-metrics
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
+          command: bash scripts/run-integration-test.sh e2e datadog-metrics
+
+      - if: (github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch' ||
+          needs.changes.outputs.e2e-opentelemetry-logs == 'true') &&
+          (github.event_name != 'pull_request' || env.PR_HAS_ACCESS_TO_SECRETS == 'true')
+        name: e2e-opentelemetry-logs
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
 
 
   e2e-test-suite:
@@ -103,13 +117,12 @@ jobs:
     timeout-minutes: 5
     if: always()
     needs: e2e-tests
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

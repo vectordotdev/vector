@@ -16,15 +16,15 @@ use std::{
     sync::Arc,
 };
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use indexmap::IndexMap;
 use tokio::sync::{
-    oneshot::{self, Receiver},
     Mutex,
+    oneshot::{self, Receiver},
 };
 use uuid::Uuid;
 use vrl::{
-    compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
+    compiler::{Context, TargetValue, TimeZone, state::RuntimeState},
     diagnostic::Formatter,
     value,
 };
@@ -33,16 +33,16 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, transform::get_transform_output_ids, OutputId};
+use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
 use crate::{
     conditions::Condition,
     config::{
-        self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput,
+        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestOutput, loading,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
-    topology::{builder::TopologyPieces, RunningTopology},
+    topology::{RunningTopology, builder::TopologyPieces},
 };
 
 pub struct UnitTest {
@@ -139,7 +139,7 @@ pub async fn build_unit_tests(
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
                 test_error = test_error.replace('\n', "\n  ");
-                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                test_error.insert_str(0, &format!("Failed to build test '{test_name}':\n  "));
                 build_errors.push(test_error);
             }
         }
@@ -568,8 +568,7 @@ fn build_outputs(
             match condition.build(&Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
-                    "failed to create test condition '{}': {}",
-                    index, error
+                    "failed to create test condition '{index}': {error}"
                 )),
             }
         }

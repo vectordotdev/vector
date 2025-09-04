@@ -8,11 +8,11 @@ use crate::config::{
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    client::SnsMessagePublisher, message_deduplication_id, message_group_id, BaseSSSinkConfig,
-    SSRequestBuilder, SSSink,
+    BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SnsMessagePublisher,
+    message_deduplication_id, message_group_id,
 };
-use crate::aws::create_client;
 use crate::aws::ClientBuilder;
+use crate::aws::create_client;
 
 /// Configuration for the `aws_sns` sink.
 #[configurable_component(sink(

@@ -2,18 +2,18 @@
 
 use crate::{
     event::Event,
-    sinks::util::encoding::{write_all, Encoder as SinkEncoder},
+    sinks::util::encoding::{Encoder as SinkEncoder, write_all},
 };
 use bytes::{BufMut, BytesMut};
 use std::io;
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::{
+    CharacterDelimitedEncoder,
     encoding::{
         Framer,
         Framer::{CharacterDelimited, NewlineDelimited},
         Serializer::Json,
     },
-    CharacterDelimitedEncoder,
 };
 
 use crate::sinks::prelude::*;
@@ -68,7 +68,7 @@ impl SinkEncoder<Vec<Event>> for HttpEncoder {
 
             encoder
                 .encode(event, &mut body)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode event"))?;
+                .map_err(|_| io::Error::other("unable to encode event"))?;
         }
 
         match (self.encoder.serializer(), self.encoder.framer()) {

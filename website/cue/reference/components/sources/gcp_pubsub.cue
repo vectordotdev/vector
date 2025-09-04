@@ -58,7 +58,7 @@ components: sources: gcp_pubsub: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.gcp_pubsub.configuration
+	configuration: generated.components.sources.gcp_pubsub.configuration
 
 	output: logs: record: {
 		description: "An individual Pub/Sub record"

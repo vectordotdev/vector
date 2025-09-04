@@ -1,10 +1,10 @@
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use indoc::indoc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_lib::configurable::configurable_component;
@@ -13,15 +13,15 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
     sinks::{
+        Healthcheck, UriParseSnafu, VectorSink,
         gcs_common::config::healthcheck_response,
         util::{
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
-        Healthcheck, UriParseSnafu, VectorSink,
     },
     tls::{TlsConfig, TlsSettings},
 };
@@ -269,15 +269,15 @@ mod tests {
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::gcp;
-    use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
+    use crate::test_util::components::{COMPONENT_ERROR_TAGS, run_and_assert_sink_error};
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
     };
 
@@ -367,7 +367,7 @@ mod integration_tests {
         trace_init();
 
         let (topic, _subscription) = create_topic_subscription().await;
-        let (sink, _healthcheck) = config_build(&format!("BREAK{}BREAK", topic)).await;
+        let (sink, _healthcheck) = config_build(&format!("BREAK{topic}BREAK")).await;
         // Explicitly skip healthcheck
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -381,7 +381,7 @@ mod integration_tests {
         trace_init();
 
         let (topic, _subscription) = create_topic_subscription().await;
-        let topic = format!("BAD{}", topic);
+        let topic = format!("BAD{topic}");
         let (_sink, healthcheck) = config_build(&topic).await;
         healthcheck.await.expect_err("Health check did not fail");
     }
@@ -389,14 +389,14 @@ mod integration_tests {
     async fn create_topic_subscription() -> (String, String) {
         let topic = format!("topic-{}", random_string(10));
         let subscription = format!("subscription-{}", random_string(10));
-        request(Method::PUT, &format!("topics/{}", topic), json!({}))
+        request(Method::PUT, &format!("topics/{topic}"), json!({}))
             .await
             .json::<Value>()
             .await
             .expect("Creating new topic failed");
         request(
             Method::PUT,
-            &format!("subscriptions/{}", subscription),
+            &format!("subscriptions/{subscription}"),
             json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) }),
         )
         .await
@@ -413,13 +413,13 @@ mod integration_tests {
             .json(&json)
             .send()
             .await
-            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {method} request to {url} failed"))
     }
 
     async fn pull_messages(subscription: &str, count: usize) -> PullResponse {
         request(
             Method::POST,
-            &format!("subscriptions/{}:pull", subscription),
+            &format!("subscriptions/{subscription}:pull"),
             json!({
                 "returnImmediately": true,
                 "maxMessages": count

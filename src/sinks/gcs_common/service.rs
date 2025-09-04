@@ -3,8 +3,8 @@ use std::task::Poll;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    header::{HeaderName, HeaderValue},
     Request, Uri,
+    header::{HeaderName, HeaderValue},
 };
 use hyper::Body;
 use tower::Service;

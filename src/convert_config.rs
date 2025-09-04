@@ -1,4 +1,4 @@
-use crate::config::{format, ConfigBuilder, Format};
+use crate::config::{ConfigBuilder, Format, format};
 use clap::Parser;
 use colored::*;
 use std::fs;
@@ -58,12 +58,12 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     if opts.input_path.is_file() && opts.output_path.extension().is_some() {
-        if let Some(base_dir) = opts.output_path.parent() {
-            if !base_dir.exists() {
-                fs::create_dir_all(base_dir).unwrap_or_else(|_| {
-                    panic!("Failed to create output dir(s): {:?}", &opts.output_path)
-                });
-            }
+        if let Some(base_dir) = opts.output_path.parent()
+            && !base_dir.exists()
+        {
+            fs::create_dir_all(base_dir).unwrap_or_else(|_| {
+                panic!("Failed to create output dir(s): {:?}", &opts.output_path)
+            });
         }
 
         match convert_config(&opts.input_path, &opts.output_path, opts.output_format) {
@@ -207,8 +207,8 @@ fn walk_dir_and_convert(
     feature = "sinks-console"
 ))]
 mod tests {
-    use crate::config::{format, ConfigBuilder, Format};
-    use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};
+    use crate::config::{ConfigBuilder, Format, format};
+    use crate::convert_config::{Opts, check_paths, walk_dir_and_convert};
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
     use std::{env, fs};

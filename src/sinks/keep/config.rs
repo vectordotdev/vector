@@ -12,8 +12,8 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
+            http::{HttpService, http_response_retry_logic},
         },
     },
 };
@@ -165,11 +165,7 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
         _ => {
             // Handle other unexpected statuses
             let body = String::from_utf8_lossy(&body[..]);
-            Err(format!(
-                "Server returned unexpected error status: {} body: {}",
-                status, body
-            )
-            .into())
+            Err(format!("Server returned unexpected error status: {status} body: {body}").into())
         }
     }
 }

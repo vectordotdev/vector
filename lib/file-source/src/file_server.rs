@@ -10,19 +10,21 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
-    future::{select, Either},
     Future, Sink, SinkExt,
+    future::{Either, select},
 };
 use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
-use crate::{
+use file_source_common::{
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
+};
+
+use crate::{
     file_watcher::{FileWatcher, RawLineResult},
-    fingerprinter::{FileFingerprint, Fingerprinter},
     paths_provider::PathsProvider,
-    FileSourceInternalEvents, ReadFrom,
 };
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -209,15 +211,14 @@ where
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
                                     fs::metadata(old_path).and_then(|m| m.modified()),
                                     fs::metadata(new_path).and_then(|m| m.modified()),
-                                ) {
-                                    if old_modified_time < new_modified_time {
-                                        info!(
-                                            message = "Switching to watch most recently modified file.",
-                                            new_modified_time = ?new_modified_time,
-                                            old_modified_time = ?old_modified_time,
-                                        );
-                                        watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
-                                    }
+                                ) && old_modified_time < new_modified_time
+                                {
+                                    info!(
+                                        message = "Switching to watch most recently modified file.",
+                                        new_modified_time = ?new_modified_time,
+                                        old_modified_time = ?old_modified_time,
+                                    );
+                                    watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                 }
                             }
                         } else {
@@ -305,18 +306,18 @@ where
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
                 } else {
                     // Should the file be removed
-                    if let Some(grace_period) = self.remove_after {
-                        if watcher.last_read_success().elapsed() >= grace_period {
-                            // Try to remove
-                            match remove_file(&watcher.path) {
-                                Ok(()) => {
-                                    self.emitter.emit_file_deleted(&watcher.path);
-                                    watcher.set_dead();
-                                }
-                                Err(error) => {
-                                    // We will try again after some time.
-                                    self.emitter.emit_file_delete_error(&watcher.path, error);
-                                }
+                    if let Some(grace_period) = self.remove_after
+                        && watcher.last_read_success().elapsed() >= grace_period
+                    {
+                        // Try to remove
+                        match remove_file(&watcher.path) {
+                            Ok(()) => {
+                                self.emitter.emit_file_deleted(&watcher.path);
+                                watcher.set_dead();
+                            }
+                            Err(error) => {
+                                // We will try again after some time.
+                                self.emitter.emit_file_delete_error(&watcher.path, error);
                             }
                         }
                     }

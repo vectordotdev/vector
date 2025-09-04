@@ -7,7 +7,7 @@ use futures_util::TryFutureExt;
 
 use crate::sinks::prelude::*;
 
-use super::{config::NatsPublisher, request_builder::NatsRequest, NatsError};
+use super::{NatsError, config::NatsPublisher, request_builder::NatsRequest};
 
 #[derive(Clone)]
 pub(super) struct NatsService {
@@ -48,7 +48,7 @@ impl Service<NatsRequest> for NatsService {
 
         Box::pin(async move {
             match publisher
-                .publish(req.subject, req.bytes)
+                .publish(req.subject, req.headers, req.bytes)
                 .map_err(async_nats::Error::from)
                 .await
             {
