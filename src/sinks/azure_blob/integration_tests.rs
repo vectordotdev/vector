@@ -3,26 +3,26 @@ use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{Stream, StreamExt, stream};
+use futures::{stream, Stream, StreamExt};
 use std::{
     io::{BufRead, BufReader},
     num::NonZeroU32,
 };
-use vector_lib::ByteSizeOf;
 use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::FramingConfig,
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
 };
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
-        util::{Compression, TowerRequestConfig},
+        azure_common, util::{Compression, TowerRequestConfig},
+        VectorSink,
     },
     test_util::{
-        components::{SINK_TAGS, assert_sink_compliance},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -257,8 +257,10 @@ impl AzureBlobSinkConfig {
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
@@ -282,23 +284,14 @@ impl AzureBlobSinkConfig {
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
             self.container_name.clone(),
         )
         .unwrap();
-        let blob_client = client.blob_client(blob);
-        let properties = blob_client
-            .get_properties()
-            .await
-            .expect("Failed to get blob properties");
-        let content_length = properties.blob.properties.content_length;
-        if content_length == 0 {
-            return (properties.blob.clone(), self.get_blob_content(Vec::new()));
-        }
-
-        let response = blob_client
+        let response = client
+            .blob_client(blob)
             .get()
-            .range(Range::new(0, content_length - 1))
+            .range(Range::new(0, 1024 * 1024))
             .into_stream()
             .next()
             .await
@@ -332,7 +325,7 @@ impl AzureBlobSinkConfig {
         .unwrap();
         let request = client
             .create()
-            .public_access(PublicAccess::Blob)
+            .public_access(PublicAccess::None)
             .into_future();
 
         let response = match request.await {
