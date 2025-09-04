@@ -255,7 +255,7 @@ impl AzureBlobSinkConfig {
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().map(Into::into),
+            self.connection_string.clone().into(),
             self.container_name.clone(),
         )
         .unwrap();
@@ -280,7 +280,7 @@ impl AzureBlobSinkConfig {
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().map(Into::into),
+            self.connection_string.clone().into(),
             self.container_name.clone(),
         )
         .unwrap();
