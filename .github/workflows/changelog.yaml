@@ -51,6 +51,7 @@ jobs:
           ref: master
           sparse-checkout: |
             changelog.d/
+            scripts/environment/release-flags.sh
           sparse-checkout-cone-mode: false
 
       # Checkout PR's changelog.d/ into tmp/
