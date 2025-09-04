@@ -64,6 +64,7 @@ jobs:
           sparse-checkout: changelog.d/
 
       - name: Prepare vdev
+        if: env.SHOULD_RUN == 'true'
         run: bash ./scripts/environment/prepare.sh --modules=vdev
 
       - name: Run changelog fragment checker
