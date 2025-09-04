@@ -1,5 +1,5 @@
 use std::ffi::{OsStr, OsString};
-use std::io::pipe;
+use std::io::{PipeReader, pipe};
 use std::{
     borrow::Cow, env, io::Read, path::PathBuf, process::Command, process::ExitStatus,
     process::Stdio, sync::LazyLock, sync::OnceLock, time::Duration,
@@ -167,6 +167,16 @@ impl VDevCommand {
         self.check_output_inner().map(|(_, output)| output)
     }
 
+    /// Set up the command's stdout/stderr to be piped to the reader
+    fn setup_output(&mut self) -> Result<PipeReader> {
+        let (reader, writer) = pipe()?;
+        let writer_clone = writer.try_clone()?;
+
+        self.inner.stdout(Stdio::from(writer));
+        self.inner.stderr(Stdio::from(writer_clone));
+        Ok(reader)
+    }
+
     /// Run the command and capture its output.
     fn check_output_inner(mut self) -> Result<(ExitStatus, String)> {
         let error_info = format!(
@@ -180,12 +190,7 @@ impl VDevCommand {
 
         self.pre_exec();
 
-        // Set up the command's stdout/stderr to be piped, so we can capture it
-        let (mut reader, writer) = pipe()?;
-        let writer_clone = writer.try_clone()?;
-
-        self.inner.stdout(Stdio::from(writer));
-        self.inner.stderr(Stdio::from(writer_clone));
+        let mut reader = self.setup_output()?;
 
         // Spawn the process
         let mut child = self
@@ -230,27 +235,48 @@ impl VDevCommand {
     /// Run the command, capture its output, and display a progress bar while it's
     /// executing. Intended to be used for long-running processes with little interaction.
     pub fn wait(&mut self, message: impl Into<Cow<'static, str>>) -> Result<()> {
+        let error_info = format!(
+            "\"{}\" {}",
+            self.inner.get_program().to_string_lossy(),
+            self.inner
+                .get_args()
+                .map(|arg| format!("\"{}\"", arg.to_string_lossy()))
+                .join(" ")
+        );
+
         self.pre_exec();
+
+        let mut reader = self.setup_output()?;
 
         let progress_bar = get_progress_bar()?;
         progress_bar.set_message(message);
 
-        let result = self.inner.output();
-        progress_bar.finish_and_clear();
+        // Spawn the process
+        let child = self
+            .inner
+            .spawn()
+            .with_context(|| format!("Failed to spawn process {error_info}"));
 
-        let Ok(output) = result else {
-            bail!("could not run command")
-        };
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            bail!(
-                "{}\nfailed with exit code: {}",
-                String::from_utf8(output.stdout)?, // FIXME this can be improved
-                output.status.code().unwrap()
-            )
+        if child.is_err() {
+            progress_bar.finish_and_clear();
         }
+        let status = child?.wait();
+        if status.is_err() {
+            progress_bar.finish_and_clear();
+        }
+        let status = status?;
+
+        if !status.success() {
+            let mut buffer = Vec::new();
+            reader.read_to_end(&mut buffer).unwrap();
+            let output = String::from_utf8_lossy(&buffer);
+
+            bail!(
+                "Command: {error_info}\nfailed with exit code: {}\n\noutput:\n{output}",
+                status.code().unwrap(),
+            );
+        }
+        Ok(())
     }
 
     /// Print out a pre-execution debug message.
