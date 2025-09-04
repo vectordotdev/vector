@@ -49,6 +49,7 @@ Modules:
   wasm-pack
   markdownlint
   datadog-ci
+  vdev
 
 If a module requires rust then rustup will be automatically installed.
 By default, all modules are installed. To install only a subset:
@@ -77,7 +78,7 @@ contains_module() {
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack)
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack vdev)
 
 REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
 unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
@@ -167,5 +168,11 @@ fi
 if contains_module datadog-ci; then
   if [[ "$(datadog-ci version 2>/dev/null)" != "v3.16.0" ]]; then
     sudo npm install -g @datadog/datadog-ci@3.16.0
+  fi
+fi
+
+if contains_module vdev; then
+  if [[ "$(vdev --version 2>/dev/null)" != "vdev 0.1.0" ]]; then
+    rustup run stable cargo "${install[@]}" vdev --version 0.1.0 --force --locked
   fi
 fi
