@@ -1,30 +1,28 @@
-use std::{
-    io::{BufRead, BufReader},
-    num::NonZeroU32,
-};
-
-use azure_core::error::HttpError;
+use azure_core::http::StatusCode;
 use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{Stream, StreamExt, stream};
-use http::StatusCode;
-use vector_lib::ByteSizeOf;
-use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::FramingConfig,
+use futures::{stream, Stream, StreamExt};
+use std::{
+    io::{BufRead, BufReader},
+    num::NonZeroU32,
 };
+use vector_lib::codecs::{
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
+};
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
-        util::{Compression, TowerRequestConfig},
+        azure_common, util::{Compression, TowerRequestConfig},
+        VectorSink,
     },
     test_util::{
-        components::{SINK_TAGS, assert_sink_compliance},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -340,13 +338,12 @@ impl AzureBlobSinkConfig {
 
         let response = match request.await {
             Ok(_) => Ok(()),
-            Err(reason) => match reason.downcast_ref::<HttpError>() {
-                Some(err) => match StatusCode::from_u16(err.status().into()) {
-                    Ok(StatusCode::CONFLICT) => Ok(()),
-                    _ => Err(format!("Unexpected status code {}", err.status())),
-                },
-                _ => Err(format!("Unexpected error {reason:#?}")),
-            },
+            Err(error) => {
+                match error.as_http_error() {
+                    Some(http_error) if http_error.status() as u16 == StatusCode::Conflict => { Ok(()) },
+                    _ => Err(error),
+                }
+            }
         };
 
         response.expect("Failed to create container")
