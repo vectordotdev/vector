@@ -1694,6 +1694,7 @@ mod tests {
         for i in 0..line_count {
             writeln!(&mut file, "Here's a line for you: {i}").unwrap();
         }
+        file.flush().unwrap();
         sleep_500_millis().await;
 
         // First time server runs it should pick up a bunch of lines
