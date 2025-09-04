@@ -52,6 +52,7 @@ jobs:
           sparse-checkout: |
             changelog.d/
             scripts/environment/release-flags.sh
+            scripts/environment/binstall.sh
           sparse-checkout-cone-mode: false
 
       # Checkout PR's changelog.d/ into tmp/
