@@ -20,6 +20,7 @@ pub struct GelfSerializerOptions {
     /// When chunking is used on sinks that require it (such as `udp`), sets the maximum size of individual chunk packets.
     /// Note, the first 12 bytes are reserved for the GELF header, and are included in this limit.
     /// This value is also the threshold where datagrams will start being chunked.
+    #[configurable(validation(range(min = 13, max = 65535)))]
     #[serde(default = "max_chunk_size")]
     pub max_chunk_size: usize,
 }
@@ -73,19 +74,19 @@ pub enum GelfSerializerError {
 #[derive(Debug, Clone, Default)]
 pub struct GelfSerializerConfig {
     /// The GELF Serializer Options.
-    #[serde(default)]
-    pub gelf: GelfSerializerOptions,
+    #[serde(default, rename = "gelf")]
+    pub options: GelfSerializerOptions,
 }
 
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
-    pub const fn new(config: GelfSerializerOptions) -> Self {
-        Self { gelf: config }
+    pub const fn new(options: GelfSerializerOptions) -> Self {
+        Self { options }
     }
 
     /// Build the `GelfSerializer` from this configuration.
     pub fn build(&self) -> GelfSerializer {
-        GelfSerializer::new(self.gelf.clone())
+        GelfSerializer::new(self.options.clone())
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
@@ -303,7 +304,7 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_success() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
+        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
 
         let event_fields = btreemap! {
             VERSION => "1.1",
@@ -318,7 +319,7 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_failure_to_encode() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
+        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
         let event_fields = btreemap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         assert!(serializer.supports_json());

@@ -5,7 +5,6 @@ use std::vec;
 use bytes::BufMut;
 use tracing::trace;
 
-const GELF_MAX_CHUNK_SIZE: usize = 8192;
 const GELF_MAX_TOTAL_CHUNKS: usize = 128;
 const GELF_CHUNK_HEADERS_LENGTH: usize = 12;
 const GELF_MAGIC_BYTES: [u8; 2] = [0x1e, 0x0f];
@@ -22,14 +21,6 @@ pub trait Chunker {
 pub struct GelfChunker {
     /// Max chunk size.
     pub max_chunk_size: usize,
-}
-
-impl Default for GelfChunker {
-    fn default() -> Self {
-        Self {
-            max_chunk_size: GELF_MAX_CHUNK_SIZE,
-        }
-    }
 }
 
 impl Chunker for GelfChunker {
@@ -94,6 +85,56 @@ impl Chunker for Chunkers {
         match self {
             Chunkers::Noop => Ok(vec![bytes]),
             Chunkers::Gelf(chunker) => chunker.chunk(bytes),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::encoding::{
+        Chunker, GelfChunker,
+        chunking::{GELF_CHUNK_HEADERS_LENGTH, GELF_MAGIC_BYTES},
+    };
+
+    #[test]
+    fn test_gelf_chunker_noop() {
+        let chunker = GelfChunker {
+            max_chunk_size: 8192,
+        };
+        let input = bytes::Bytes::from("1234123412341234123");
+        let chunks = chunker.chunk(input.clone()).unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], input);
+    }
+
+    #[test]
+    fn test_gelf_chunker_chunk() {
+        let chunker = GelfChunker {
+            max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 4,
+        };
+        let input = bytes::Bytes::from("1234123412341234123");
+        let chunks = chunker.chunk(input).unwrap();
+        assert_eq!(chunks.len(), 5);
+
+        for i in 0..chunks.len() {
+            if i < 4 {
+                assert_eq!(chunks[i].len(), GELF_CHUNK_HEADERS_LENGTH + 4);
+            } else {
+                assert_eq!(chunks[i].len(), GELF_CHUNK_HEADERS_LENGTH + 3);
+            }
+            // Bytes 0 and 1: Magic bytes
+            assert_eq!(chunks[i][0..2], GELF_MAGIC_BYTES);
+            // Bytes 2 to 9: Random ID (not checked)
+            // Byte 10: Sequence number
+            assert_eq!(chunks[i][10], i as u8);
+            // Byte 11: Sequence count
+            assert_eq!(chunks[i][11], chunks.len() as u8);
+            // Payload bytes
+            if i < 4 {
+                assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], b"1234");
+            } else {
+                assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], b"123");
+            }
         }
     }
 }
