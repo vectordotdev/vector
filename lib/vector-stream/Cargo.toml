@@ -14,7 +14,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
 tracing.workspace = true
-twox-hash = { version = "2.1.1", default-features = false, features = ["xxhash64"] }
+twox-hash = { version = "2.1.2", default-features = false, features = ["xxhash64"] }
 vector-common = { path = "../vector-common" }
 vector-core = { path = "../vector-core" }
 
