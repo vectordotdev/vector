@@ -1,3 +1,4 @@
+use crate::encoding::GelfChunker;
 use crate::gelf::GELF_TARGET_PATHS;
 use crate::{VALID_FIELD_REGEX, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
@@ -84,7 +85,7 @@ impl GelfSerializerConfig {
 
     /// Build the `GelfSerializer` from this configuration.
     pub fn build(&self) -> GelfSerializer {
-        GelfSerializer::new()
+        GelfSerializer::new(self.gelf.clone())
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
@@ -103,12 +104,14 @@ impl GelfSerializerConfig {
 /// Serializer that converts an `Event` to bytes using the GELF format.
 /// Spec: <https://docs.graylog.org/docs/gelf>
 #[derive(Debug, Clone)]
-pub struct GelfSerializer;
+pub struct GelfSerializer {
+    options: GelfSerializerOptions,
+}
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
-    pub fn new() -> Self {
-        GelfSerializer
+    pub fn new(options: GelfSerializerOptions) -> Self {
+        GelfSerializer { options }
     }
 
     /// Encode event and represent it as JSON value.
@@ -117,11 +120,10 @@ impl GelfSerializer {
         let log = to_gelf_event(event.into_log())?;
         serde_json::to_value(&log).map_err(|e| e.to_string().into())
     }
-}
 
-impl Default for GelfSerializer {
-    fn default() -> Self {
-        Self::new()
+    /// Instantiates the GELF chunking configuration.
+    pub fn chunker(&self) -> GelfChunker {
+        GelfChunker { max_chunk_size: self.options.max_chunk_size }
     }
 }
 

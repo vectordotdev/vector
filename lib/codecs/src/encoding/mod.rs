@@ -521,6 +521,14 @@ impl Serializer {
             }
         }
     }
+
+    /// Returns the chunking implementation for the serializer.
+    pub fn chunker(&self) -> Chunkers {
+        match self {
+            Serializer::Gelf(gelf) => Chunkers::Gelf(gelf.chunker()),
+            _ => Chunkers::Noop,
+        }
+    }
 }
 
 impl From<AvroSerializer> for Serializer {
