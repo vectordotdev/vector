@@ -331,7 +331,10 @@ impl Checkpointer {
                 f.into_inner()?.sync_all()
             })
             .await
-            .unwrap()?; // FIXME unwrap
+            .map_err(
+                |join_error| io::Error::new(io::ErrorKind::Other, join_error), // FIXME ErrorKind::Other
+                                                                               // is not ideal
+            )??;
 
             // Once the temp file is fully flushed, rename the tmp file to replace
             // the previous stable file. This is an atomic operation on POSIX
