@@ -3,26 +3,26 @@ use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{Stream, StreamExt, stream};
+use futures::{stream, Stream, StreamExt};
 use std::{
     io::{BufRead, BufReader},
     num::NonZeroU32,
 };
-use vector_lib::ByteSizeOf;
 use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::FramingConfig,
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
 };
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
-        util::{Compression, TowerRequestConfig},
+        azure_common, util::{Compression, TowerRequestConfig},
+        VectorSink,
     },
     test_util::{
-        components::{SINK_TAGS, assert_sink_compliance},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -220,9 +220,7 @@ impl AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
             connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into(),
-                storage_account: None,
                 container_name: "logs".to_string(),
-                endpoint: None,
                 blob_prefix: Default::default(),
                 blob_time_format: None,
                 blob_append_uuid: None,
@@ -258,9 +256,7 @@ impl AzureBlobSinkConfig {
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
-            self.storage_account.clone(),
             self.container_name.clone(),
-            self.endpoint.clone(),
         )
         .unwrap();
         let response = client
