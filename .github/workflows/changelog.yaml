@@ -50,6 +50,7 @@ jobs:
         with:
           ref: master
           sparse-checkout: |
+            scripts/environment/prepare.sh
             changelog.d/
           sparse-checkout-cone-mode: false
 
