@@ -40,7 +40,7 @@ pub(crate) fn append_environment_variables(
         match value {
             Some(value) => command = command.arg(format!("{key}={value}")),
             None => command = command.arg(key),
-        };
+        }
     }
     command
 }

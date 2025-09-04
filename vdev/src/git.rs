@@ -102,10 +102,10 @@ pub fn set_config_value(key: &str, value: &str) -> Result<String> {
 
 /// Checks if the current directory's repo is clean
 pub fn check_git_repository_clean() -> Result<bool> {
-    Ok(VDevCommand::new("git")
+    VDevCommand::new("git")
         .args(["diff-index", "--quiet", "HEAD"])
         .run()
-        .map(|status| status.success())?)
+        .map(|status| status.success())
 }
 
 pub fn add_files_in_current_dir() -> Result<String> {

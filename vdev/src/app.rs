@@ -223,9 +223,7 @@ impl VDevCommand {
     /// Run the command and catch its exit code.
     pub fn run(self) -> Result<ExitStatus> {
         self.pre_exec();
-        self.check_output_inner()
-            .map_err(Into::into)
-            .map(|(status, _)| status)
+        self.check_output_inner().map(|(status, _)| status)
     }
 
     pub fn check_run(self) -> Result<()> {
