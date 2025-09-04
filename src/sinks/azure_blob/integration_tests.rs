@@ -3,26 +3,26 @@ use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
-use futures::{Stream, StreamExt, stream};
+use futures::{stream, Stream, StreamExt};
 use std::{
     io::{BufRead, BufReader},
     num::NonZeroU32,
 };
-use vector_lib::ByteSizeOf;
 use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::FramingConfig,
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
 };
+use vector_lib::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
-        VectorSink, azure_common,
-        util::{Compression, TowerRequestConfig},
+        azure_common, util::{Compression, TowerRequestConfig},
+        VectorSink,
     },
     test_util::{
-        components::{SINK_TAGS, assert_sink_compliance},
+        components::{assert_sink_compliance, SINK_TAGS},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
 };
@@ -134,15 +134,21 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
         ..config
     };
     let (lines, events) = random_lines_with_stream(100, 10, None);
+    println!("lines: {:?}", lines);
 
     config.run_assert(events).await;
 
     let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
-    assert!(blobs[0].clone().ends_with(".log.gz"));
-    let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    let blob = blobs.get(0).unwrap();
+    println!("blob: {:?}", blob);
+    assert!(blob.ends_with(".log.gz"));
+
+    let (blob, blob_lines) = config.get_blob(blob.clone()).await;
     assert_eq!(blob.properties.content_encoding, Some(String::from("gzip")));
     assert_eq!(blob.properties.content_type, String::from("text/plain"));
+
+    println!("blob_lines: {:?}", blob_lines);
     assert_eq!(lines, blob_lines);
 }
 
@@ -287,6 +293,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
+        println!("get_blob {}", &blob);
         let client = azure_common::config::build_client(
             self.connection_string.clone().map(Into::into),
             self.storage_account.clone(),
@@ -294,10 +301,23 @@ impl AzureBlobSinkConfig {
             self.endpoint.clone(),
         )
         .unwrap();
-        let response = client
-            .blob_client(blob)
+        println!("client {:#?}", client);
+
+        let blob_client = client.blob_client(blob);
+        println!("get_content {:?}", blob_client.get_content().await.unwrap());
+        println!("get_metadata {:?}", blob_client.get_metadata().await.unwrap());
+        let properties = blob_client
+            .get_properties().await
+            .expect("Failed to get blob properties");
+        println!("properties {:#?}", properties);
+        let content_length = properties.blob.properties.content_length;
+        if content_length == 0 {
+            return (properties.blob.clone(), self.get_blob_content(Vec::new()));
+        }
+
+        let response = blob_client
             .get()
-            .range(Range::new(0, 1024 * 1024))
+            .range(Range::new(0, content_length - 1))
             .into_stream()
             .next()
             .await
@@ -333,7 +353,7 @@ impl AzureBlobSinkConfig {
         .unwrap();
         let request = client
             .create()
-            .public_access(PublicAccess::None)
+            .public_access(PublicAccess::Blob)
             .into_future();
 
         let response = match request.await {
