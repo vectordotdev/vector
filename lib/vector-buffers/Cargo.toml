@@ -20,7 +20,7 @@ crossbeam-utils.workspace = true
 derivative.workspace = true
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures.workspace = true
-memmap2 = { version = "0.9.7", default-features = false }
+memmap2 = { version = "0.9.8", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
 paste.workspace = true
