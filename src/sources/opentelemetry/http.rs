@@ -19,7 +19,7 @@ use crate::{
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
+use hyper::{Server, service::service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
@@ -66,7 +66,7 @@ pub(crate) async fn run_http_server(
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
-    let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+    let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
             .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {

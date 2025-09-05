@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::{convert::Infallible, fmt, net::SocketAddr};
 
 use futures::FutureExt;
-use hyper::{Server, service::make_service_fn};
+use hyper::{Server, service::service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -186,7 +186,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {

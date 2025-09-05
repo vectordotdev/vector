@@ -6,6 +6,10 @@ use std::{
     sync::Arc,
 };
 
+use crate::components::validation::{
+    RunnerMetrics,
+    sync::{Configuring, TaskCoordinator},
+};
 use axum::{
     Router,
     response::IntoResponse,
@@ -22,15 +26,11 @@ use tokio::{
     sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
-
-use crate::components::validation::{
-    RunnerMetrics,
-    sync::{Configuring, TaskCoordinator},
-};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
     codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
 };
+use warp::hyper::body::to_bytes;
 
 use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 
@@ -327,7 +327,7 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
-                    match hyper::body::to_bytes(request.into_body()).await {
+                    match to_bytes(request.into_body()).await {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let byte_size = body.len();

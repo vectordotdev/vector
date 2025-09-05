@@ -14,7 +14,8 @@
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{Uri, response::Parts};
-use hyper::{Body, Request};
+use http_body_util::Empty;
+use hyper::{Request, body::Body};
 use std::time::Duration;
 use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
@@ -191,7 +192,9 @@ pub(crate) async fn call<
             }
 
             // building an empty request should be infallible
-            let mut request = builder.body(Body::empty()).expect("error creating request");
+            let mut request = builder
+                .body(Empty::<Bytes>::new())
+                .expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
                 auth.apply(&mut request);

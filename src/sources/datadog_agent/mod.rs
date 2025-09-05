@@ -27,7 +27,7 @@ use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::Server;
-use hyper::service::make_service_fn;
+use hyper::service::service_fn;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -210,7 +210,7 @@ impl SourceConfig for DatadogAgentConfig {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {

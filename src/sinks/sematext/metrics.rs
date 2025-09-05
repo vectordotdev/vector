@@ -3,6 +3,7 @@ use std::{collections::HashMap, future::ready, task::Poll};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
 use http::{StatusCode, Uri};
+use http_body_util::Empty;
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
@@ -105,7 +106,7 @@ async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = format!("{endpoint}/health");
 
     let request = Request::get(uri)
-        .body(Body::empty())
+        .body(Empty::<Bytes>::new())
         .map_err(|e| e.to_string())?;
 
     let response = client.send(request).await?;

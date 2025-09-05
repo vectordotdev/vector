@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
+use hyper::{Server, service::service_fn};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{
@@ -176,7 +176,7 @@ impl SourceConfig for SplunkConfig {
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {

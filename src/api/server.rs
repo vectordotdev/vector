@@ -9,7 +9,10 @@ use async_graphql::{
     http::{GraphQLPlaygroundConfig, WebSocketProtocols, playground_source},
 };
 use async_graphql_warp::{GraphQLResponse, GraphQLWebSocket, graphql_protocol};
-use hyper::{Server as HyperServer, server::conn::AddrIncoming, service::make_service_fn};
+use hyper_util::rt::TokioExecutor;
+use hyper_util::server::conn::auto::Builder as HyperServerBuilder;
+use hyper_util::service::TowerToHyperService;
+use tokio::net::TcpListener;
 use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 use tower::ServiceBuilder;
@@ -18,9 +21,9 @@ use vector_lib::tap::topology;
 use warp::{Filter, Reply, filters::BoxedFilter, http::Response, ws::Ws};
 
 use super::{handler, schema};
+use crate::http::build_http_trace_layer;
 use crate::{
     config::{self, api},
-    http::build_http_trace_layer,
     internal_events::{SocketBindError, SocketMode},
 };
 
@@ -45,31 +48,54 @@ impl Server {
         let _guard = handle.enter();
 
         let addr = config.api.address.expect("No socket address");
-        let incoming = AddrIncoming::bind(&addr).inspect_err(|error| {
+        // Bind synchronously first (so we can report bind errors here),
+        // then hand it to Tokio.
+        let std_listener = std::net::TcpListener::bind(addr).inspect_err(|error| {
             emit!(SocketBindError {
                 mode: SocketMode::Tcp,
                 error,
             });
         })?;
+        std_listener.set_nonblocking(true).expect("set_nonblocking");
+        let listener = TcpListener::from_std(std_listener).expect("from_std TcpListener");
 
         let span = Span::current();
-        let make_svc = make_service_fn(move |_conn| {
-            let svc = ServiceBuilder::new()
-                .layer(build_http_trace_layer(span.clone()))
-                .service(warp::service(routes.clone()));
-            futures_util::future::ok::<_, Infallible>(svc)
-        });
 
+        // Spawn a Hyper 1.x accept loop using hyper-util.
         let server = async move {
-            HyperServer::builder(incoming)
-                .serve(make_svc)
-                .with_graceful_shutdown(async {
-                    rx.await.ok();
-                })
-                .await
-                .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
-                })
+            let builder = HyperServerBuilder::new(TokioExecutor::new());
+
+            tokio::select! {
+                _ = async {
+                    loop {
+                        let (io, _peer) = listener.accept().await?;
+
+                        // Build your Tower stack per-connection.
+                        let tower_svc = ServiceBuilder::new()
+                            .layer(build_http_trace_layer(span.clone()))
+                            .service(warp::service(routes.clone()));
+
+                        // Adapt Tower -> Hyper service.
+                        let hyper_svc = TowerToHyperService::new(tower_svc);
+
+                        // Serve the connection (HTTP/1 or HTTP/2, with upgrades).
+                        let fut = builder.serve_connection_with_upgrades(io, hyper_svc);
+                        tokio::spawn(async move {
+                            if let Err(err) = fut.await {
+                                error!(%err, "HTTP connection error");
+                            }
+                        });
+                    }
+                    #[allow(unreachable_code)]
+                    Ok::<(), std::io::Error>(())
+                } => {},
+                _ = async {
+                    // graceful shutdown signal
+                    let _ = rx.await;
+                } => {
+                    // fallthrough: exit accept loop
+                }
+            }
         };
 
         // Update component schema with the config before starting the server.

@@ -7,7 +7,11 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
 use http::{Request, StatusCode};
-use hyper::{Body, Uri, body::to_bytes as body_to_bytes};
+use http_body_util::Empty;
+use hyper::{
+    Uri,
+    body::{Body, to_bytes as body_to_bytes},
+};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
@@ -244,7 +248,7 @@ impl NginxMetrics {
     }
 
     async fn get_nginx_response(&self) -> crate::Result<Bytes> {
-        let mut request = Request::get(&self.endpoint).body(Body::empty())?;
+        let mut request = Request::get(&self.endpoint).body(Empty::<Bytes>::new())?;
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
         }

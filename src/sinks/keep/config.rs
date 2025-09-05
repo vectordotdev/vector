@@ -3,6 +3,7 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
+use http_body_util::{BodyExt, Full};
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vrl::value::Kind;
@@ -139,14 +140,13 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
-    let req: Request<Bytes> = request.body(body)?;
-    let req = req.map(hyper::Body::from);
 
+    let req: Request<Full<Bytes>> = request.body(Full::from(body))?;
     let res = client.send(req).await?;
 
+    // Extract status and body
     let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body()).await?;
-
+    let body = res.into_body().collect().await?.to_bytes();
     match status {
         StatusCode::OK => Ok(()),          // Healthcheck passed
         StatusCode::BAD_REQUEST => Ok(()), // Healthcheck failed due to client error but is still considered valid

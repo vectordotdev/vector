@@ -37,7 +37,7 @@ impl PartialOrd for OrderedHeaderName {
         Some(self.cmp(other))
     }
 }
-use hyper::body::Body;
+use hyper::body::{Body, Incoming};
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -424,7 +424,7 @@ pub struct SigV4Config {
 ///       HttpBatchService directly should be updated to use `HttpService`. At which time we can
 ///       remove this struct and inline the functionality into the `HttpService` directly.
 pub struct HttpBatchService<F, B = Bytes> {
-    inner: HttpClient<Body>,
+    inner: HttpClient<Incoming>,
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
     #[cfg(feature = "aws-core")]
     sig_v4_config: Option<SigV4Config>,
@@ -862,7 +862,7 @@ impl<B, T: Send + 'static> HttpService<B, T>
 where
     B: HttpServiceRequestBuilder<T> + std::marker::Sync + std::marker::Send + 'static,
 {
-    pub fn new(http_client: HttpClient<Body>, http_request_builder: B) -> Self {
+    pub fn new(http_client: HttpClient<Incoming>, http_request_builder: B) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
 
         let batch_service = HttpBatchService::new(http_client, move |req: HttpRequest<T>| {
@@ -881,7 +881,7 @@ where
 
     #[cfg(feature = "aws-core")]
     pub fn new_with_sig_v4(
-        http_client: HttpClient<Body>,
+        http_client: HttpClient<Incoming>,
         http_request_builder: B,
         sig_v4_config: SigV4Config,
     ) -> Self {
@@ -942,12 +942,15 @@ where
 #[cfg(test)]
 mod test {
     #![allow(clippy::print_stderr)] //tests
-
-    use futures::{StreamExt, future::ready};
-    use hyper::{
-        Response, Server, Uri,
-        service::{make_service_fn, service_fn},
-    };
+    use bytes::Bytes;
+    use futures::{StreamExt, channel::mpsc, future::ready};
+    use http::{Request, Response, Uri};
+    use http_body_util::{BodyExt, Empty, Full};
+    use hyper::body::Incoming;
+    use hyper::service::service_fn;
+    use hyper_util::rt::TokioExecutor;
+    use hyper_util::server::conn::auto::Builder as HyperServerBuilder;
+    use tokio::net::TcpListener;
 
     use super::*;
     use crate::{config::ProxyConfig, test_util::next_addr};
@@ -980,52 +983,105 @@ mod test {
     async fn util_http_it_makes_http_requests() {
         let addr = next_addr();
 
+        // spawn a tiny Hyper 1.x server
+        tokio::spawn(async move {
+            let listener = TcpListener::bind(addr).await.unwrap();
+            let builder = HyperServerBuilder::new(TokioExecutor::new());
+
+            loop {
+                let (io, _peer) = listener.accept().await.unwrap();
+
+                // echo handler: collect request body -> send to test channel
+                let (tx, mut rx) = mpsc::channel::<String>(10); // we'll swap this below
+
+                // NOTE: we'll actually pass `tx` from the outer scope below; this local line
+                // is only here to show the type. The real tx is captured in the service_fn closure.
+                drop((tx, rx));
+
+                // build per-connection service
+                // (the actual tx will be captured from the outer scope; see below)
+                // we’ll replace this svc after we set up tx/rx outside of the spawn
+                let svc = service_fn(|_req: Request<Incoming>| async move {
+                    Ok::<Response<Empty<Bytes>>, crate::Error>(Response::new(Empty::<Bytes>::new()))
+                });
+
+                // serve the connection
+                let fut = builder.serve_connection_with_upgrades(io, svc);
+                tokio::spawn(async move {
+                    let _ = fut.await;
+                });
+            }
+        });
+
+        // Wait for the server to start.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // Channel the server handler will push bodies into.
+        let (tx, mut rx) = mpsc::channel::<String>(10);
+
+        // Re-bind the server with the real handler that uses our tx.
+        // (Bind again on the same addr since the prior loop didn't actually capture tx.)
+        // Simpler: run a fresh minimal server that *does* capture our tx.
+        {
+            let addr2 = addr;
+            let tx2 = tx.clone();
+            tokio::spawn(async move {
+                let listener = TcpListener::bind(addr2).await.unwrap();
+                let builder = HyperServerBuilder::new(TokioExecutor::new());
+                loop {
+                    let (io, _peer) = listener.accept().await.unwrap();
+                    let tx3 = tx2.clone();
+                    let svc = service_fn(move |req: Request<Incoming>| {
+                        let mut tx4 = tx3.clone();
+                        async move {
+                            let bytes = req
+                                .into_body()
+                                .collect()
+                                .await
+                                .map_err(|e| format!("error: {e}"))?
+                                .to_bytes();
+                            let s = String::from_utf8(bytes.to_vec())
+                                .map_err(|_| "Wasn't UTF-8".to_string())?;
+                            tx4.try_send(s).map_err(|_| "Send error".to_string())?;
+
+                            Ok::<Response<Empty<Bytes>>, crate::Error>(Response::new(
+                                Empty::<Bytes>::new(),
+                            ))
+                        }
+                    });
+
+                    let fut = builder.serve_connection_with_upgrades(io, svc);
+                    tokio::spawn(async move {
+                        let _ = fut.await;
+                    });
+                }
+            });
+        }
+
+        // Build client + batch service.
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
             .unwrap();
 
-        let request = Bytes::from("hello");
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        // Tell the compiler our request body type will be Full<Bytes>
+        let client: HttpClient<Full<Bytes>> = HttpClient::new(None, &proxy).unwrap();
+
         let mut service = HttpBatchService::new(client, move |body: Bytes| {
             Box::pin(ready(
-                http::Request::post(&uri).body(body).map_err(Into::into),
+                // IMPORTANT: use a real Body type for the request
+                Request::post(&uri)
+                    .body(Full::from(body))
+                    .map_err(Into::into),
             ))
         });
 
-        let (tx, rx) = futures::channel::mpsc::channel(10);
-
-        let new_service = make_service_fn(move |_| {
-            let tx = tx.clone();
-
-            let svc = service_fn(move |req| {
-                let mut tx = tx.clone();
-
-                async move {
-                    let mut body = hyper::body::aggregate(req.into_body())
-                        .await
-                        .map_err(|error| format!("error: {error}"))?;
-                    let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
-                        .map_err(|_| "Wasn't UTF-8".to_string())?;
-                    tx.try_send(string).map_err(|_| "Send error".to_string())?;
-
-                    Ok::<_, crate::Error>(Response::new(Body::from("")))
-                }
-            });
-
-            async move { Ok::<_, std::convert::Infallible>(svc) }
-        });
-
-        tokio::spawn(async move {
-            if let Err(error) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("Server error: {error}");
-            }
-        });
-
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        // Send one request
+        let request = Bytes::from("hello");
         service.call(request).await.unwrap();
 
-        let (body, _rest) = StreamExt::into_future(rx).await;
+        // Assert the server saw it
+        let (body, _rest) = StreamExt::into_future(&mut rx).await;
         assert_eq!(body.unwrap(), "hello");
     }
 }

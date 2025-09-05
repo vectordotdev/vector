@@ -9,6 +9,7 @@ use bytes::{Buf, Bytes};
 use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
+use http_body_util::Empty;
 use hyper::body::Body;
 use hyper::{Method, Response, StatusCode};
 use serde::{Deserialize, de};
@@ -414,7 +415,7 @@ async fn retries_on_temporary_error() {
                 // Send a temporary error for the first two responses
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::empty())
+                    .body(Empty::<Bytes>::new())
                     .unwrap_or_else(|_| unreachable!())
             } else {
                 Response::new(Body::empty())

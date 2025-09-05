@@ -1,9 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use hyper::{
-    Body, Request, Response, Server, StatusCode,
-    service::{make_service_fn, service_fn},
-};
+use bytes::Bytes;
+use http_body_util::Empty;
+use hyper::{Request, Response, Server, StatusCode, body::Body, service::service_fn};
 use tokio::{
     sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
@@ -30,7 +29,7 @@ pub async fn respond(
     _ = waiter.lock().await;
     Ok(Response::builder()
         .status(status)
-        .body(Body::empty())
+        .body(Empty::<Bytes>::new())
         .unwrap())
 }
 
@@ -40,7 +39,7 @@ pub async fn http_server(
     status: StatusCode,
 ) -> mpsc::Receiver<()> {
     let (tx, rx) = mpsc::channel(1);
-    let service = make_service_fn(move |_| {
+    let service = service_fn(move |_| {
         let waiter = Arc::clone(&waiter);
         let tx = tx.clone();
         async move {

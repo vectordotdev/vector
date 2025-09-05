@@ -2,6 +2,7 @@ use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
+use http_body_util::Empty;
 use hyper::body::Body;
 use indoc::indoc;
 use serde_json::{Value, json};
@@ -233,7 +234,7 @@ impl HttpSink for PubsubSink {
 }
 
 async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(Empty::<Bytes>::new()).unwrap();
     auth.apply(&mut request);
 
     let response = client.send(request).await?;

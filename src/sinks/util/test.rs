@@ -3,12 +3,10 @@ use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
 use futures_util::StreamExt;
 use http::request::Parts;
+use http_body::Body as HttpBody;
+use http_body_util::Empty;
 use hyper::body::Body;
-use hyper::{
-    Request, Response, Server, StatusCode,
-    body::HttpBody,
-    service::{make_service_fn, service_fn},
-};
+use hyper::{Request, Response, Server, StatusCode, service::service_fn};
 use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},
@@ -61,7 +59,7 @@ pub fn build_test_server_status(
     build_test_server_generic(addr, move || {
         Response::builder()
             .status(status)
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .unwrap_or_else(|_| unreachable!())
     })
 }
@@ -80,7 +78,7 @@ where
     <B as HttpBody>::Error: snafu::Error + Send + Sync,
 {
     let (tx, rx) = mpsc::channel(100);
-    let service = make_service_fn(move |_| {
+    let service = service_fn(move |_| {
         let responder = responder.clone();
         let tx = tx.clone();
         async move {

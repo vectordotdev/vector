@@ -320,10 +320,7 @@ impl HttpClientContext for PrometheusScrapeContext {
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
-    use hyper::{
-        Body, Client, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use hyper::{Body, Client, Response, Server, service::service_fn};
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
     use warp::Filter;
@@ -635,7 +632,7 @@ mod test {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
+        let make_svc = service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
                     r#"

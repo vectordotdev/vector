@@ -14,6 +14,7 @@ use http::{
     Request, StatusCode,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
+use http_body_util::Empty;
 use hyper::body::Body;
 use snafu::ResultExt;
 use std::collections::HashMap;
@@ -222,7 +223,7 @@ pub(super) async fn http_healthcheck(
     auth: Option<Auth>,
 ) -> crate::Result<()> {
     let uri = format!("{endpoint}/health");
-    let mut request = Request::get(uri).body(Body::empty())?;
+    let mut request = Request::get(uri).body(Empty::<Bytes>::new())?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

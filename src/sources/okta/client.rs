@@ -15,7 +15,7 @@ use chrono::Utc;
 use futures::StreamExt as _;
 use futures_util::{FutureExt, Stream, stream};
 use http::Uri;
-
+use http_body_util::Empty;
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
 use std::sync::Arc;
@@ -344,7 +344,7 @@ async fn run(
                             let mut url_lock = url_mutex.lock().await;
                             let url = url_lock.to_string();
 
-                            let mut request = match Request::get(&url).body(Body::empty()) {
+                            let mut request = match Request::get(&url).body(Empty::<Bytes>::new()) {
                                 Ok(request) => request,
                                 Err(e) => {
                                     emit!(HttpClientHttpError {

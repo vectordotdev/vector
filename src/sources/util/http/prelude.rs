@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time:
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{Server, service::make_service_fn};
+use hyper::{Server, service::service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
@@ -187,7 +187,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let remote_addr = conn.peer_addr();
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))

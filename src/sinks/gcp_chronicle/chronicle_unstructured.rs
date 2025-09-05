@@ -7,6 +7,7 @@ use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
 use http::header::{self, HeaderName, HeaderValue};
 use http::{Request, StatusCode, Uri};
+use http_body_util::Empty;
 use hyper::body::Body;
 use indoc::indoc;
 use serde::Serialize;
@@ -280,7 +281,7 @@ pub fn build_healthcheck(
     let uri = base_url.parse::<Uri>()?;
 
     let healthcheck = async move {
-        let mut request = http::Request::get(&uri).body(Body::empty())?;
+        let mut request = http::Request::get(&uri).body(Empty::<Bytes>::new())?;
         auth.apply(&mut request);
 
         let response = client.send(request).await?;
