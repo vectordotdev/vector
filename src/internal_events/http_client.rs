@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use http::{
-    header::{self, HeaderMap, HeaderValue}, Request,
-    Response,
+    Request, Response,
+    header::{self, HeaderMap, HeaderValue},
 };
 use http_body::Body as HttpBody;
 use hyper::Error;

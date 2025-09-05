@@ -1,17 +1,18 @@
 use std::{future::ready, time::Duration};
 
 use chrono::Utc;
-use futures::{stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::uri::Scheme;
-use hyper::body::Body;
 use hyper::Request;
+use hyper::body::Body;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, metric_tags};
 
 use crate::{
+    SourceSender,
     config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
@@ -20,7 +21,6 @@ use crate::{
         HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 mod parser;
@@ -281,21 +281,21 @@ fn apache_metrics(
 #[cfg(test)]
 mod test {
     use hyper::{
-        service::{make_service_fn, service_fn}, Body, Response,
-        Server,
+        Body, Response, Server,
+        service::{make_service_fn, service_fn},
     };
     use similar_asserts::assert_eq;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     use super::*;
     use crate::{
+        Error,
         config::SourceConfig,
         test_util::{
             collect_ready,
-            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr, wait_for_tcp,
         },
-        Error,
     };
 
     #[test]

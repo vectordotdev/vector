@@ -2,7 +2,7 @@
 
 use std::{
     future::ready,
-    sync::{atomic, Arc},
+    sync::{Arc, atomic},
 };
 
 use bytes::{Buf, Bytes};
@@ -11,10 +11,10 @@ use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::body::Body;
 use hyper::{Method, Response, StatusCode};
-use serde::{de, Deserialize};
+use serde::{Deserialize, de};
 use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig}, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+    encoding::{Framer, FramingConfig},
 };
 use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use vector_lib::finalization::AddBatchNotifier;
@@ -36,8 +36,8 @@ use crate::{
     },
     test_util::{
         components::{
-            self, init_test, run_and_assert_sink_compliance, run_and_assert_sink_error_with_events, COMPONENT_ERROR_TAGS,
-            HTTP_SINK_TAGS,
+            self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
+            run_and_assert_sink_error_with_events,
         },
         create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },

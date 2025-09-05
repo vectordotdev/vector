@@ -3,22 +3,22 @@ use http::{Response, StatusCode, Uri};
 use hyper::body::Body;
 use serde::Deserialize;
 use snafu::ResultExt;
-use vector_lib::config::proxy::ProxyConfig;
 use vector_lib::config::LogNamespace;
+use vector_lib::config::proxy::ProxyConfig;
 
 use super::{
-    request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request,
-    VersionType,
+    ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request, VersionType,
+    request_builder::ElasticsearchRequestBuilder,
 };
 use crate::{
     http::{HttpClient, MaybeAuth, ParameterValue, QueryParameterValue, QueryParameters},
     sinks::{
+        HealthcheckError,
         elasticsearch::{
             ElasticsearchAuthConfig, ElasticsearchCommonMode, ElasticsearchConfig,
             OpenSearchServiceType, ParseError,
         },
-        util::{auth::Auth, http::RequestConfig, UriSerde},
-        HealthcheckError,
+        util::{UriSerde, auth::Auth, http::RequestConfig},
     },
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
