@@ -578,7 +578,7 @@ generated: components: sources: mqtt: configuration: {
 		}
 	}
 	topic: {
-		description: "MQTT topic from which messages are to be read."
+		description: "MQTT topic or topics from which messages are to be read."
 		required:    false
 		type: string: default: "vector"
 	}
