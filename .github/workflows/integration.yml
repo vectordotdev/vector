@@ -35,7 +35,7 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    if: (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci: assume ec')) || github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
       source: true
@@ -53,8 +53,9 @@ jobs:
         id: secret_check
         env:
           GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          ASSUME_EC: ${{ contains(github.event.pull_request.labels.*.name, 'ci: assume ec') }}
         run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]]; then
+          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" && "$ASSUME_EC" != "true" ]]; then
             echo "can_access_secrets=true" >> $GITHUB_OUTPUT
           else
             echo "can_access_secrets=false" >> $GITHUB_OUTPUT

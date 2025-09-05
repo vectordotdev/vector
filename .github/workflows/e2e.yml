@@ -42,7 +42,7 @@ env:
 jobs:
 
   changes:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci: assume ec')
     uses: ./.github/workflows/changes.yml
     with:
       source: false
@@ -60,7 +60,7 @@ jobs:
       needs.changes.outputs.e2e-datadog-logs == 'true' ||
       needs.changes.outputs.e2e-datadog-metrics == 'true' ||
       needs.changes.outputs.e2e-opentelemetry-logs == 'true'
-      )
+      ) && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci: assume ec'))
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -74,8 +74,9 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
+          ASSUME_EC: ${{ contains(github.event.pull_request.labels.*.name, 'ci: assume ec') }}
         run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]] ; then
+          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" && "$ASSUME_EC" != "true" ]] ; then
             echo "PR_HAS_ACCESS_TO_SECRETS=true" >> "$GITHUB_ENV"
           else
             echo "PR_HAS_ACCESS_TO_SECRETS=false" >> "$GITHUB_ENV"

@@ -51,7 +51,7 @@ env:
 jobs:
   changes:
     # Only evaluate files changed on pull request trigger
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ci: assume ec')) || github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 45
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci: assume ec')) }}
     # cargo-deb requires a release build, but we don't need optimizations for tests
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
@@ -125,7 +125,7 @@ jobs:
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci: assume ec')) }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -182,7 +182,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
     # because `changes` job might be skipped
-    if: always() && needs.build-x86_64-unknown-linux-gnu.result == 'success' && needs.compute-k8s-test-plan.result == 'success'
+    if: always() && needs.build-x86_64-unknown-linux-gnu.result == 'success' && needs.compute-k8s-test-plan.result == 'success' && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci: assume ec'))
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
@@ -243,7 +243,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
       - test-e2e-kubernetes
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'ci: assume ec'))
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
