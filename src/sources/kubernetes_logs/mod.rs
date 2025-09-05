@@ -4,9 +4,6 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::sync::Arc;
-use std::{cmp::min, path::PathBuf, time::Duration};
-
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
@@ -22,6 +19,8 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
+use std::sync::Arc;
+use std::{cmp::min, path::PathBuf, time::Duration};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::file_server::{
@@ -38,7 +37,7 @@ use vector_lib::{
 };
 use vrl::value::{kind::Collection, Kind, Value};
 
-use crate::sources::kubernetes_logs::metadata_cache::{any_to_value, K8sMetadataCache};
+use crate::sources::kubernetes_logs::metadata_cache::K8sMetadataCache;
 use crate::{
     built_info::{PKG_NAME, PKG_VERSION},
     sources::kubernetes_logs::partial_events_merger::merge_partial_events,
@@ -901,11 +900,10 @@ impl Source {
             });
 
             let cached_metadata_point = metadata_cache.get(&pod_uid, &container_name);
-            let real_val = cached_metadata_point.unwrap_or(Arc::new(Value::Null.clone()));
-            let vrl_value = any_to_value(real_val);
-            if vrl_value != Value::Null {
+            let vrl_value = cached_metadata_point.unwrap_or(Arc::new(Value::Null.clone()));
+            if vrl_value.is_null() {
                 let logx = event.as_mut_log();
-                logx.insert("kubernetes", vrl_value);
+                logx.insert("kubernetes", (*vrl_value).clone());
             } else {
                 let file_info = annotator.annotate(&mut event, &line.filename);
                 if file_info.is_none() {
