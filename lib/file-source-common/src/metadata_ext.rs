@@ -97,14 +97,14 @@ impl AsyncPortableFileExt for File {
     async fn portable_dev(&self) -> std::io::Result<u64> {
         let info = tokio::task::spawn_blocking(move || self.get_file_info())
             .await
-            .map_err(io::Error::other)??;
+            .map_err(std::io::Error::other)??;
         Ok(info.dwVolumeSerialNumber.into())
     }
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
     async fn portable_ino(&self) -> std::io::Result<u64> {
         let info = tokio::task::spawn_blocking(move || self.get_file_info())
             .await
-            .map_err(io::Error::other)??;
+            .map_err(std::io::Error::other)??;
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
         Ok((info.nFileIndexLow as u64) | ((info.nFileIndexHigh as u64) << 32))
     }
