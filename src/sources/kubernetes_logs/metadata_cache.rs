@@ -68,11 +68,7 @@ mod tests {
             "image" => "nginx:1.25",
             "ports" => vec![80, 443],
         };
-        cache.insert(
-            pod_uid.to_string(),
-            container_name.to_string(),
-            map.into(),
-        );
+        cache.insert(pod_uid, container_name, map.into());
 
         let result = cache.get(pod_uid, container_name);
         let cached_value = result.unwrap();

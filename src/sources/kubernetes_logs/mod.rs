@@ -907,26 +907,19 @@ impl Source {
                 if file_info.is_none() {
                     emit!(KubernetesLogsEventAnnotationError { event: &event });
                 } else {
-                    let namespace = file_info.as_ref().map(|info| info.pod_namespace);
-                    if let Some(name) = namespace {
-                        let ns_info = ns_annotator.annotate(&mut event, name);
-
-                        if ns_info.is_none() {
+                    if let Some(namespace) = file_info.as_ref().map(|info| info.pod_namespace) {
+                        if ns_annotator.annotate(&mut event, namespace).is_none() {
                             emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                         }
                     }
-                    let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
-                    if node_info.is_none() {
+                    if node_annotator.annotate(&mut event, self_node_name.as_str()).is_none() {
                         emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                     }
                 }
-                // build cache map
-                let loge = event.as_log();
-                let k8map = loge.as_map().unwrap();
-                let k8mapval = k8map.get("kubernetes");
-                let k8val = k8mapval.unwrap().clone();
-                // update cache
-                metadata_cache.insert(pod_uid, container_name, k8val);
+
+                if let Some(value) = event.as_log().as_map().and_then(|m| m.get("kubernetes")) {
+                    metadata_cache.insert(pod_uid, container_name, value.clone());
+                }
             }
             checkpoints.update(line.file_id, line.end_offset);
             event
