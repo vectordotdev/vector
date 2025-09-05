@@ -1,21 +1,21 @@
 use std::task::{Context, Poll};
 
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper_util::client::legacy::{connect::HttpConnector, Client};
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use prost::Message;
-use tonic::{body::BoxBody, IntoRequest};
+use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
 use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::stream::DriverResponse;
 
 use super::VectorSinkError;
 use crate::{
+    Error,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
-    Error,
 };
 
 #[derive(Clone, Debug)]

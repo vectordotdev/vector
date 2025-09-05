@@ -4,8 +4,8 @@ use std::task::{Context, Poll};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE}, Request, StatusCode,
-    Uri,
+    Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
 use hyper::body::Body;
 use snafu::ResultExt;

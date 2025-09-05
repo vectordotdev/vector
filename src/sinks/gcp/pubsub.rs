@@ -1,10 +1,10 @@
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::body::Body;
 use indoc::indoc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_lib::configurable::configurable_component;
@@ -13,15 +13,15 @@ use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
     http::HttpClient,
     sinks::{
-        gcs_common::config::healthcheck_response, util::{
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink}, BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings,
-            TowerRequestConfig,
-        }, Healthcheck,
-        UriParseSnafu,
-        VectorSink,
+        Healthcheck, UriParseSnafu, VectorSink,
+        gcs_common::config::healthcheck_response,
+        util::{
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+        },
     },
     tls::{TlsConfig, TlsSettings},
 };
@@ -269,15 +269,15 @@ mod tests {
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use vector_lib::codecs::JsonSerializerConfig;
     use vector_lib::event::{BatchNotifier, BatchStatus};
 
     use super::*;
     use crate::gcp;
-    use crate::test_util::components::{run_and_assert_sink_error, COMPONENT_ERROR_TAGS};
+    use crate::test_util::components::{COMPONENT_ERROR_TAGS, run_and_assert_sink_error};
     use crate::test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
     };
 

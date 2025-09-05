@@ -2,8 +2,8 @@
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
-    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
-    Version,
+    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
+    uri::InvalidUri,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -11,8 +11,8 @@ use hyper::{
     client::{Client, HttpConnector},
 };
 use hyper_http_proxy::ProxyConnector;
-use hyper_openssl::client::legacy::HttpsConnector;
 use hyper_openssl::HttpsConnector;
+use hyper_openssl::client::legacy::HttpsConnector;
 use hyper_util::client::legacy::connect::HttpConnector;
 use rand::Rng;
 use serde_with::serde_as;
@@ -39,8 +39,8 @@ use crate::aws::AwsAuthentication;
 
 use crate::{
     config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
+    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
 };
 
 pub mod status {
@@ -680,7 +680,7 @@ pub type QueryParameters = HashMap<String, QueryParameterValue>;
 mod tests {
     use std::convert::Infallible;
 
-    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 

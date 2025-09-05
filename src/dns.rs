@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt, future::BoxFuture};
 use hyper_util::client::legacy::connect::dns::Name;
 use snafu::ResultExt;
 use tokio::task::spawn_blocking;

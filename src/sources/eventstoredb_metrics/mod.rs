@@ -6,12 +6,12 @@ use hyper::Request;
 use serde_with::serde_as;
 use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::config::LogNamespace;
 use vector_lib::configurable::configurable_component;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use self::types::Stats;
 use crate::{
@@ -114,11 +114,7 @@ fn eventstoredb(
                     }
 
                     Ok(resp) => {
-                        let bytes = match resp
-                            .into_body()
-                            .collect()
-                            .await?
-                            .to_bytes() {
+                        let bytes = match resp.into_body().collect().await?.to_bytes() {
                             Ok(b) => b,
                             Err(error) => {
                                 emit!(EventStoreDbMetricsHttpError {
@@ -162,7 +158,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
 
     const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://eventstoredb:2113/stats";
 

@@ -7,32 +7,32 @@ use std::{
 };
 
 use axum::{
+    Router,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
-    Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
 use hyper::body::Body;
-use hyper_util::client::legacy::{connect::HttpConnector, Client};
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use hyper_util::rt::TokioExecutor;
 use tokio::net::TcpListener;
 use tokio::{
     select,
-    sync::{mpsc, oneshot, Mutex, Notify},
+    sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
 
 use crate::components::validation::{
-    sync::{Configuring, TaskCoordinator},
     RunnerMetrics,
+    sync::{Configuring, TaskCoordinator},
 };
 use vector_lib::{
-    codecs::encoding::Framer, codecs::encoding::Serializer::Json, codecs::CharacterDelimitedEncoder,
-    config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
+    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
 };
 
-use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
+use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 
 /// An HTTP resource.
 #[derive(Clone)]
