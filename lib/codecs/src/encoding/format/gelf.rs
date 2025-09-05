@@ -21,18 +21,18 @@ pub struct GelfSerializerOptions {
     /// Note, the first 12 bytes are reserved for the GELF header, and are included in this limit.
     /// This value is also the threshold where datagrams will start being chunked.
     #[configurable(validation(range(min = 13, max = 65535)))]
-    #[serde(default = "max_chunk_size")]
+    #[serde(default = "default_max_chunk_size")]
     pub max_chunk_size: usize,
 }
 
-const fn max_chunk_size() -> usize {
+const fn default_max_chunk_size() -> usize {
     8192
 }
 
 impl Default for GelfSerializerOptions {
     fn default() -> Self {
         Self {
-            max_chunk_size: max_chunk_size(),
+            max_chunk_size: default_max_chunk_size(),
         }
     }
 }

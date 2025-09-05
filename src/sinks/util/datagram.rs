@@ -8,8 +8,7 @@ use tokio::net::UdpSocket;
 #[cfg(unix)]
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::codecs::encoding::{Chunker, Chunkers};
+use vector_lib::codecs::encoding::{Chunker, Chunking};
 use vector_lib::internal_event::RegisterInternalEvent;
 use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
 
@@ -36,12 +35,10 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
     mut socket: DatagramSocket,
     transformer: &Transformer,
     encoder: &mut E,
-    chunker: &Chunkers,
+    chunker: &Option<Chunker>,
     bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
 ) {
     while let Some(mut event) = input.next().await {
-        let byte_size = event.estimated_json_encoded_size_of();
-
         transformer.transform(&mut event);
 
         let finalizers = event.take_finalizers();
@@ -52,17 +49,22 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
             continue;
         }
 
-        let data_size = bytes.len();
-        let chunked_result = chunker.chunk(bytes.freeze());
-        if chunked_result.is_err() {
-            emit!(DatagramChunkingError {
-                data_size,
-                error: chunked_result.unwrap_err()
-            });
-            continue;
-        }
+        let datagrams = if let Some(chunker) = chunker {
+            let data_size = bytes.len();
+            let chunked_result = chunker.chunk(bytes.freeze());
+            if chunked_result.is_err() {
+                emit!(DatagramChunkingError {
+                    data_size,
+                    error: chunked_result.unwrap_err()
+                });
+                continue;
+            }
+            chunked_result.unwrap()
+        } else {
+            vec![bytes.freeze()]
+        };
 
-        for bytes in chunked_result.unwrap() {
+        for bytes in datagrams {
             match send_datagram(&mut socket, &bytes).await {
                 Ok(()) => {
                     emit!(SocketEventsSent {
@@ -72,7 +74,7 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                             DatagramSocket::Unix(..) => SocketMode::Unix,
                         },
                         count: 1,
-                        byte_size,
+                        byte_size: bytes.len().into(),
                     });
 
                     bytes_sent.emit(ByteSize(bytes.len()));

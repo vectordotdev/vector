@@ -11,7 +11,7 @@ use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    codecs::encoding::Chunkers,
+    codecs::encoding::Chunker,
     internal_event::{BytesSent, Protocol, Registered},
 };
 
@@ -85,7 +85,7 @@ impl UdpSinkConfig {
         + Send
         + Sync
         + 'static,
-        chunker: Chunkers,
+        chunker: Option<Chunker>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
         let sink = UdpSink::new(connector.clone(), transformer, encoder, chunker);
@@ -171,7 +171,7 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
-    chunker: Chunkers,
+    chunker: Option<Chunker>,
     bytes_sent: Registered<BytesSent>,
 }
 
@@ -183,7 +183,7 @@ where
         connector: UdpConnector,
         transformer: Transformer,
         encoder: E,
-        chunker: Chunkers,
+        chunker: Option<Chunker>,
     ) -> Self {
         Self {
             connector,

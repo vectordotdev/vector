@@ -16,7 +16,6 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::codecs::encoding::Chunkers;
 use vector_lib::json_size::JsonSize;
 use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
@@ -280,7 +279,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
-                &Chunkers::Noop,
+                &None,
                 &bytes_sent,
             )
             .await;

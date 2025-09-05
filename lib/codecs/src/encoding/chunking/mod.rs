@@ -10,7 +10,7 @@ const GELF_CHUNK_HEADERS_LENGTH: usize = 12;
 const GELF_MAGIC_BYTES: [u8; 2] = [0x1e, 0x0f];
 
 /// For chunking.
-pub trait Chunker {
+pub trait Chunking {
     /// Chunks the input into frames.
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error>;
 }
@@ -23,7 +23,7 @@ pub struct GelfChunker {
     pub max_chunk_size: usize,
 }
 
-impl Chunker for GelfChunker {
+impl Chunking for GelfChunker {
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
         if bytes.len() > self.max_chunk_size {
             let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
@@ -70,21 +70,17 @@ impl Chunker for GelfChunker {
     }
 }
 
-/// Chunkers.
-#[derive(Clone, Debug, Default)]
-pub enum Chunkers {
-    /// No chunking (pass-through).
-    #[default]
-    Noop,
+/// Chunking implementations.
+#[derive(Clone, Debug)]
+pub enum Chunker {
     /// Chunking in GELF format.
     Gelf(GelfChunker),
 }
 
-impl Chunker for Chunkers {
+impl Chunking for Chunker {
     fn chunk(&self, bytes: bytes::Bytes) -> Result<Vec<bytes::Bytes>, vector_common::Error> {
         match self {
-            Chunkers::Noop => Ok(vec![bytes]),
-            Chunkers::Gelf(chunker) => chunker.chunk(bytes),
+            Chunker::Gelf(chunker) => chunker.chunk(bytes),
         }
     }
 }
@@ -92,7 +88,7 @@ impl Chunker for Chunkers {
 #[cfg(test)]
 mod tests {
     use crate::encoding::{
-        Chunker, GelfChunker,
+        Chunking, GelfChunker,
         chunking::{GELF_CHUNK_HEADERS_LENGTH, GELF_MAGIC_BYTES},
     };
 

@@ -8,7 +8,7 @@ pub mod framing;
 use std::fmt::Debug;
 
 use bytes::BytesMut;
-pub use chunking::{Chunker, Chunkers, GelfChunker};
+pub use chunking::{Chunker, Chunking, GelfChunker};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -522,11 +522,11 @@ impl Serializer {
         }
     }
 
-    /// Returns the chunking implementation for the serializer.
-    pub fn chunker(&self) -> Chunkers {
+    /// Returns the chunking implementation for the serializer, if any is supported.
+    pub fn chunker(&self) -> Option<Chunker> {
         match self {
-            Serializer::Gelf(gelf) => Chunkers::Gelf(gelf.chunker()),
-            _ => Chunkers::Noop,
+            Serializer::Gelf(gelf) => Some(Chunker::Gelf(gelf.chunker())),
+            _ => None,
         }
     }
 }
