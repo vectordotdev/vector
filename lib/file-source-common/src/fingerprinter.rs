@@ -17,7 +17,9 @@ use tokio::{
 };
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{internal_events::FileSourceInternalEvents, metadata_ext::AsyncPortableFileExt};
+use crate::{
+    AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
+};
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
@@ -185,20 +187,10 @@ impl Fingerprinter {
         match self.strategy {
             FingerprintStrategy::DevInode => {
                 let file_handle = File::open(path).await?;
-                #[cfg(unix)]
-                {
-                    let metadata = file_handle.metadata().await?;
-                    let dev = metadata.portable_dev().await?;
-                    let ino = metadata.portable_ino().await?;
-                    Ok(DevInode(dev, ino))
-                }
-
-                #[cfg(windows)]
-                {
-                    let dev = file_handle.portable_dev().await?;
-                    let ino = file_handle.portable_ino().await?;
-                    Ok(DevInode(dev, ino))
-                }
+                let file_info = file_handle.file_info().await?;
+                let dev = file_info.portable_dev();
+                let ino = file_info.portable_ino();
+                Ok(DevInode(dev, ino))
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,

@@ -16,7 +16,7 @@ use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
-    FilePosition, ReadFrom,
+    AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
 
@@ -78,9 +78,14 @@ impl FileWatcher {
         line_delimiter: Bytes,
     ) -> Result<FileWatcher, std::io::Error> {
         let f = File::open(&path).await?;
-        let metadata = f.metadata().await?;
-        let (devno, ino) = (metadata.dev(), metadata.ino());
+        let file_info = f.file_info().await?;
+        let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
         let mut reader = BufReader::new(f);
+
+        #[cfg(unix)]
+        let metadata = file_info;
+        #[cfg(windows)]
+        let metadata = file.metadata().await?;
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
             ignore_before,
@@ -171,8 +176,8 @@ impl FileWatcher {
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let file_handle = File::open(&path).await?;
 
-        let metadata = file_handle.metadata().await?;
-        if (metadata.dev(), metadata.ino()) != (self.devno, self.inode) {
+        let file_info = file_handle.file_info().await?;
+        if (file_info.portable_dev(), file_info.ino()) != (self.devno, self.inode) {
             let mut reader = BufReader::new(File::open(&path).await?);
             let gzipped = is_gzipped(&mut reader).await?;
             let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
@@ -187,9 +192,9 @@ impl FileWatcher {
             };
             self.reader = new_reader;
 
-            let metadata = file_handle.metadata().await?;
-            self.devno = metadata.dev();
-            self.inode = metadata.ino();
+            let file_info = file_handle.file_info().await?;
+            self.devno = file_info.portable_dev();
+            self.inode = file_info.portable_ino();
         }
         self.path = path;
         Ok(())
