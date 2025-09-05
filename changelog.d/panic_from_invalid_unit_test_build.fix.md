@@ -1,3 +1,3 @@
-Fixed panic during unit test when a `transform` is listed in both `no_outputs_from` and `output.extract_from`.
+Added validation to ensure a test that expects no output from a source, does not perform operations on said source.
 
 authors: kalopsian-tz
