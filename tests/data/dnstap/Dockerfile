@@ -1,4 +1,4 @@
-FROM docker.io/library/debian:bookworm
+FROM docker.io/library/debian:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 

@@ -1,4 +1,4 @@
-FROM docker.io/debian:bookworm-slim AS builder
+FROM docker.io/debian:trixie-slim AS builder
 
 WORKDIR /vector
 
