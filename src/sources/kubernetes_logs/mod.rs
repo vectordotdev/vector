@@ -862,7 +862,7 @@ impl Source {
             rotate_wait,
         };
 
-        let metadata_cache = K8sMetadataCache::new();
+        let metadata_cache = K8sMetadataCache::default();
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let checkpoints = checkpointer.view();
@@ -879,21 +879,20 @@ impl Source {
                 log_namespace,
             );
 
-            //only get base info, to avoid pod annotate
-            let file = annotator.get_pod_info(&line.filename);
-            let pod_uid = file
+            let file_info = annotator.get_pod_info(&line.filename);
+            let pod_uid = file_info
                 .as_ref()
-                .map(|info| info.pod_uid.to_owned())
-                .unwrap_or_else(|| "unknown_pod".to_string());
-            let container_name = file
+                .map(|info| info.pod_uid)
+                .unwrap_or_else(|| "unknown_pod");
+            let container_name = file_info
                 .as_ref()
-                .map(|info| info.container_name.to_owned())
-                .unwrap_or_else(|| "unknown_container".to_string());
+                .map(|info| info.container_name)
+                .unwrap_or_else(|| "unknown_container");
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file.as_ref().map(|info| KubernetesLogsPodInfo {
+                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
                     name: info.pod_name.to_owned(),
                     namespace: info.pod_namespace.to_owned(),
                 }),
@@ -902,8 +901,7 @@ impl Source {
             let cached_metadata_point = metadata_cache.get(&pod_uid, &container_name);
             let vrl_value = cached_metadata_point.unwrap_or(Arc::new(Value::Null.clone()));
             if vrl_value.is_null() {
-                let logx = event.as_mut_log();
-                logx.insert("kubernetes", (*vrl_value).clone());
+                event.as_mut_log().insert("kubernetes", (*vrl_value).clone());
             } else {
                 let file_info = annotator.annotate(&mut event, &line.filename);
                 if file_info.is_none() {
@@ -928,7 +926,7 @@ impl Source {
                 let k8mapval = k8map.get("kubernetes");
                 let k8val = k8mapval.unwrap().clone();
                 // update cache
-                metadata_cache.insert(pod_uid.to_string(), container_name.to_string(), k8val);
+                metadata_cache.insert(pod_uid, container_name, k8val);
             }
             checkpoints.update(line.file_id, line.end_offset);
             event
