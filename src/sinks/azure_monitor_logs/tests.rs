@@ -2,20 +2,19 @@ use std::time::Duration;
 
 use futures::{future::ready, stream};
 use http::Response;
-use hyper::body;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
 use super::{
-    config::{AzureMonitorLogsConfig, default_host},
+    config::{default_host, AzureMonitorLogsConfig},
     sink::JsonEncoding,
 };
 use crate::{
     event::LogEvent,
     sinks::{prelude::*, util::encoding::Encoder},
     test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };

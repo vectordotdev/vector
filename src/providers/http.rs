@@ -1,14 +1,14 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use hyper::Body;
+use hyper::body::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
 use vector_lib::configurable::configurable_component;
 
 use crate::{
-    config::{self, Format, ProxyConfig, provider::ProviderConfig},
+    config::{self, provider::ProviderConfig, Format, ProxyConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},

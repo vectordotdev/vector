@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
-    num::{NonZeroU8, NonZeroU64},
+    num::{NonZeroU64, NonZeroU8},
     sync::Arc,
     time::Duration,
 };
 
-use hyper::Body;
+use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::configurable::configurable_component;
@@ -285,7 +285,7 @@ pub async fn run_acknowledgements(
 mod tests {
     use std::sync::Arc;
 
-    use futures_util::{StreamExt, stream::FuturesUnordered};
+    use futures_util::{stream::FuturesUnordered, StreamExt};
     use tokio::sync::oneshot::{self, Receiver};
     use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
@@ -294,7 +294,7 @@ mod tests {
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
-                EndpointTarget, acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
+                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder, EndpointTarget,
             },
             util::Compression,
         },

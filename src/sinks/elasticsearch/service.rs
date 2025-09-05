@@ -6,10 +6,10 @@ use std::{
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
-use hyper::{Body, Request, service::Service};
+use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_lib::ByteSizeOf;
 use vector_lib::stream::DriverResponse;
+use vector_lib::ByteSizeOf;
 use vector_lib::{
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -22,9 +22,9 @@ use crate::{
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
         util::{
-            Compression, ElementCount,
-            auth::Auth,
-            http::{HttpBatchService, RequestConfig},
+            auth::Auth, http::{HttpBatchService, RequestConfig},
+            Compression,
+            ElementCount,
         },
     },
 };
@@ -183,11 +183,6 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     type Response = ElasticsearchResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: ElasticsearchRequest) -> Self::Future {

@@ -8,14 +8,14 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
-            http::{HttpService, http_response_retry_logic},
-            service::TowerRequestConfigDefaults,
+            http::{http_response_retry_logic, HttpService}, service::TowerRequestConfigDefaults,
+            BoxedRawValue,
+            RealtimeSizeBasedDefaultBatchSettings,
         },
     },
 };
 use http::{Request, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::Snafu;
 use std::collections::HashMap;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;

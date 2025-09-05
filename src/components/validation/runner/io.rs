@@ -1,13 +1,13 @@
 use std::convert::Infallible;
 
 use http::{Request, Response};
-use hyper::Body;
+use hyper::body::Body;
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
-    Status,
     body::BoxBody,
     server::NamedService,
     transport::{Channel, Endpoint},
+    Status,
 };
 use tower::Service;
 use vector_lib::shutdown::ShutdownSignal;
@@ -15,9 +15,9 @@ use vector_lib::{event::Event, tls::MaybeTlsSettings};
 
 use crate::{
     components::validation::{
-        TestEvent,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
+        TestEvent,
     },
     proto::vector::{
         Client as VectorClient, HealthCheckRequest, HealthCheckResponse, PushEventsRequest,

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -10,9 +10,9 @@ use crate::{
     gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
-        Healthcheck, HealthcheckError,
-        gcs_common::service::GcsResponse,
-        util::retries::{RetryAction, RetryLogic},
+        gcs_common::service::GcsResponse, util::retries::{RetryAction, RetryLogic},
+        Healthcheck,
+        HealthcheckError,
     },
 };
 

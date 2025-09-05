@@ -1,5 +1,6 @@
 use http::Uri;
 use hyper::client::HttpConnector;
+use hyper_http_proxy::ProxyConnector;
 use hyper_openssl::HttpsConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;

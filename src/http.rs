@@ -10,7 +10,10 @@ use hyper::{
     client,
     client::{Client, HttpConnector},
 };
+use hyper_http_proxy::ProxyConnector;
+use hyper_openssl::client::legacy::HttpsConnector;
 use hyper_openssl::HttpsConnector;
+use hyper_util::client::legacy::connect::HttpConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -236,10 +239,6 @@ where
     type Response = http::Response<Body>;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     fn call(&mut self, request: Request<B>) -> Self::Future {
         self.send(request)

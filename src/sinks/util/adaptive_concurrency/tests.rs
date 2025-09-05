@@ -15,33 +15,33 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt,
-    channel::oneshot,
-    future::{self, BoxFuture},
+    channel::oneshot, future::{self, BoxFuture},
     stream,
+    FutureExt,
+    SinkExt,
 };
-use rand::{Rng, rng};
+use rand::{rng, Rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
 use snafu::Snafu;
-use tokio::time::{self, Duration, Instant, sleep};
+use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
 use vector_lib::configurable::configurable_component;
 use vector_lib::json_size::JsonSize;
 
-use super::AdaptiveConcurrencySettings;
 use super::controller::ControllerStatistics;
+use super::AdaptiveConcurrencySettings;
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    event::{Event, metric::MetricValue},
+    event::{metric::MetricValue, Event},
     metrics,
     sinks::{
-        Healthcheck, VectorSink,
         util::{
-            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
-            retries::{JitterMode, RetryLogic},
-        },
+            retries::{JitterMode, RetryLogic}, BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig,
+            VecBuffer,
+        }, Healthcheck,
+        VectorSink,
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::{
@@ -259,10 +259,6 @@ impl Service<Vec<Event>> for TestSink {
     type Response = Response;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();

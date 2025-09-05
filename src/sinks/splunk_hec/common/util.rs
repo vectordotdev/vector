@@ -3,22 +3,22 @@ use std::{borrow::Cow, sync::Arc};
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::{ResultExt, Snafu};
 use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
 use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
 
 use super::{
-    EndpointTarget,
     request::HecRequest,
     service::{HttpRequestBuilder, MetadataFields},
+    EndpointTarget,
 };
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
     sinks::{
-        self, UriParseSnafu,
-        util::{SinkBatchSettings, http::HttpBatchService},
+        self, util::{http::HttpBatchService, SinkBatchSettings},
+        UriParseSnafu,
     },
     template::Template,
     tls::{TlsConfig, TlsSettings},
@@ -171,14 +171,14 @@ mod tests {
     use http::{HeaderValue, Uri};
     use vector_lib::config::proxy::ProxyConfig;
     use wiremock::{
-        Mock, MockServer, ResponseTemplate,
-        matchers::{header, method, path},
+        matchers::{header, method, path}, Mock, MockServer,
+        ResponseTemplate,
     };
 
     use crate::sinks::{
         splunk_hec::common::{
-            EndpointTarget, HOST_FIELD, SOURCE_FIELD, build_healthcheck, build_uri, create_client,
-            service::{HttpRequestBuilder, MetadataFields},
+            build_healthcheck, build_uri, create_client, service::{HttpRequestBuilder, MetadataFields}, EndpointTarget, HOST_FIELD,
+            SOURCE_FIELD,
         },
         util::Compression,
     };

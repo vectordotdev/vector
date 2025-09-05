@@ -1,11 +1,11 @@
 use futures::FutureExt;
-use http::{Request, Uri, header::AUTHORIZATION};
-use hyper::Body;
+use http::{header::AUTHORIZATION, Request, Uri};
+use hyper::body::Body;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
-    config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
+    config::{proxy::ProxyConfig, AcknowledgementsConfig, DataType, Input},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -13,12 +13,12 @@ use crate::{
     codecs::Transformer,
     http::HttpClient,
     sinks::{
-        BuildError, Healthcheck, HealthcheckError, VectorSink,
-        prelude::{SinkConfig, SinkContext},
-        util::{
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
-            http::HttpStatusRetryLogic,
-        },
+        prelude::{SinkConfig, SinkContext}, util::{
+            http::HttpStatusRetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
+        }, BuildError, Healthcheck,
+        HealthcheckError,
+        VectorSink,
     },
 };
 
@@ -169,7 +169,7 @@ pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
 
 #[cfg(test)]
 mod test {
-    use super::{AppsignalConfig, endpoint_uri};
+    use super::{endpoint_uri, AppsignalConfig};
 
     #[test]
     fn generate_config() {

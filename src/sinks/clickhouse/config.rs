@@ -9,13 +9,13 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{http::HttpService, RealtimeSizeBasedDefaultBatchSettings, UriSerde},
     },
 };
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use std::fmt;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
+use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 
 /// Data format.
 ///

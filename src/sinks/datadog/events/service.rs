@@ -1,12 +1,10 @@
-use std::task::{Context, Poll};
-
 use bytes::Bytes;
 use futures::{
     future,
     future::{BoxFuture, Ready},
 };
 use http::Request;
-use hyper::Body;
+use hyper::body::Body;
 use tower::{Service, ServiceExt};
 use vector_lib::stream::DriverResponse;
 use vector_lib::{
@@ -84,11 +82,6 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     type Response = DatadogEventsResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of Error internal event is handled upstream by the caller
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     // Emission of Error internal event is handled upstream by the caller
     fn call(&mut self, mut req: DatadogEventsRequest) -> Self::Future {

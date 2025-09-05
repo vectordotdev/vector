@@ -7,29 +7,32 @@ use std::{
 };
 
 use axum::{
-    Router,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
+    Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
-use hyper::{Body, Client, Server};
+use hyper::body::Body;
+use hyper_util::client::legacy::{connect::HttpConnector, Client};
+use hyper_util::rt::TokioExecutor;
+use tokio::net::TcpListener;
 use tokio::{
     select,
-    sync::{Mutex, Notify, mpsc, oneshot},
+    sync::{mpsc, oneshot, Mutex, Notify},
 };
 use tokio_util::codec::Decoder;
 
 use crate::components::validation::{
-    RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
+    RunnerMetrics,
 };
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
-    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
+    codecs::encoding::Framer, codecs::encoding::Serializer::Json, codecs::CharacterDelimitedEncoder,
+    config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
 };
 
-use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
+use super::{encode_test_event, ResourceCodec, ResourceDirection, TestEvent};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -214,7 +217,7 @@ fn spawn_input_http_client(
         started.mark_as_done();
         info!("HTTP client external input resource started.");
 
-        let client = Client::builder().build_http::<Body>();
+        let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
         let headers = config.headers.unwrap_or_default();

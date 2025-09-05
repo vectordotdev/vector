@@ -3,9 +3,8 @@
 use crate::sinks::prelude::*;
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use lapin::{BasicProperties, options::BasicPublishOptions};
+use lapin::{options::BasicPublishOptions, BasicProperties};
 use snafu::Snafu;
-use std::task::{Context, Poll};
 
 use super::channel::AmqpSinkChannels;
 
@@ -108,10 +107,6 @@ impl Service<AmqpRequest> for AmqpService {
     type Error = AmqpError;
 
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     fn call(&mut self, req: AmqpRequest) -> Self::Future {
         let channel = self.channels.clone();

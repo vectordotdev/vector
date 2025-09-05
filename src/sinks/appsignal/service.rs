@@ -5,8 +5,8 @@ use futures::{
     future,
     future::{BoxFuture, Ready},
 };
-use http::{Request, StatusCode, Uri, header::AUTHORIZATION};
-use hyper::Body;
+use http::{header::AUTHORIZATION, Request, StatusCode, Uri};
+use hyper::body::Body;
 use tower::{Service, ServiceExt};
 
 use vector_lib::stream::DriverResponse;
@@ -17,7 +17,7 @@ use vector_lib::{
 
 use crate::{
     http::HttpClient,
-    sinks::util::{Compression, http::HttpBatchService, sink::Response},
+    sinks::util::{http::HttpBatchService, sink::Response, Compression},
 };
 
 use super::request_builder::AppsignalRequest;

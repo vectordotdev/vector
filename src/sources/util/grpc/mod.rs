@@ -5,7 +5,7 @@ use crate::{
 };
 use futures::FutureExt;
 use http::{Request, Response};
-use hyper::Body;
+use hyper::body::Body;
 use std::{convert::Infallible, net::SocketAddr, time::Duration};
 use tonic::transport::server::Routes;
 use tonic::{body::BoxBody, server::NamedService, transport::server::Server};

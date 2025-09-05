@@ -3,10 +3,10 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use http::{
-    HeaderName, HeaderValue, Request, StatusCode, Uri,
-    header::{self, HeaderMap},
+    header::{self, HeaderMap}, HeaderName, HeaderValue, Request, StatusCode,
+    Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use tracing::Instrument;

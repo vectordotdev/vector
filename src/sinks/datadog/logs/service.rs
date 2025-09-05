@@ -6,10 +6,10 @@ use std::{
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    HeaderValue, Request, Uri,
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE}, HeaderValue, Request,
+    Uri,
 };
-use hyper::Body;
+use hyper::body::Body;
 use std::collections::BTreeMap;
 use tower::Service;
 use tracing::Instrument;
@@ -19,10 +19,10 @@ use vector_lib::stream::DriverResponse;
 
 use crate::{
     http::HttpClient,
-    sinks::util::{Compression, retries::RetryLogic},
+    sinks::util::{retries::RetryLogic, Compression},
     sinks::{
         datadog::DatadogApiError,
-        util::http::{OrderedHeaderName, validate_headers},
+        util::http::{validate_headers, OrderedHeaderName},
     },
 };
 

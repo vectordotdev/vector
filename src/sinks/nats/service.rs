@@ -1,13 +1,10 @@
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::sync::Arc;
 
 use futures_util::TryFutureExt;
 
 use crate::sinks::prelude::*;
 
-use super::{NatsError, config::NatsPublisher, request_builder::NatsRequest};
+use super::{config::NatsPublisher, request_builder::NatsRequest, NatsError};
 
 #[derive(Clone)]
 pub(super) struct NatsService {
@@ -38,10 +35,6 @@ impl Service<NatsRequest> for NatsService {
     type Error = NatsError;
 
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     fn call(&mut self, req: NatsRequest) -> Self::Future {
         let publisher = Arc::clone(&self.publisher);

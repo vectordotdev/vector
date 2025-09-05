@@ -6,7 +6,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::body::Body;
 use snafu::ResultExt;
 use tower::Service;
 use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
