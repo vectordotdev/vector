@@ -133,11 +133,10 @@ impl CheckpointsView {
         match state {
             State::V1 { checkpoints } => {
                 for checkpoint in checkpoints {
-                    if let Some(ignore_before) = ignore_before {
-                        if checkpoint.modified < ignore_before {
+                    if let Some(ignore_before) = ignore_before
+                        && checkpoint.modified < ignore_before {
                             continue;
                         }
-                    }
                     self.load(checkpoint);
                 }
             }
@@ -191,19 +190,15 @@ impl CheckpointsView {
             if let Ok(Some(fingerprint)) = fingerprinter
                 .get_legacy_checksum(path, fingerprint_buffer)
                 .await
-            {
-                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
                     self.update(fng, pos);
                 }
-            }
             if let Ok(Some(fingerprint)) = fingerprinter
                 .get_legacy_first_lines_checksum(path, fingerprint_buffer)
                 .await
-            {
-                if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
                     self.update(fng, pos);
                 }
-            }
         }
     }
 }
@@ -332,7 +327,7 @@ impl Checkpointer {
             })
             .await
             .map_err(
-                |join_error| io::Error::new(io::ErrorKind::Other, join_error), // FIXME ErrorKind::Other
+                io::Error::other, // FIXME ErrorKind::Other
                                                                                // is not ideal
             )??;
 
@@ -434,8 +429,8 @@ impl Checkpointer {
     async fn read_legacy_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
         for path in glob(&self.glob_string).unwrap().flatten() {
             let mut mtime = None;
-            if let Some(ignore_before) = ignore_before {
-                if let Ok(Ok(modified)) = fs::metadata(&path)
+            if let Some(ignore_before) = ignore_before
+                && let Ok(Ok(modified)) = fs::metadata(&path)
                     .await
                     .map(|metadata| metadata.modified())
                 {
@@ -446,7 +441,6 @@ impl Checkpointer {
                     }
                     mtime = Some(modified);
                 }
-            }
             let (fng, pos) = self.decode(&path);
             self.checkpoints.checkpoints.insert(fng, pos);
             if let Some(mtime) = mtime {

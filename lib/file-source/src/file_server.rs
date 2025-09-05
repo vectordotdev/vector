@@ -235,8 +235,8 @@ where
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
                                     fs::metadata(old_path).await.and_then(|m| m.modified()),
                                     fs::metadata(new_path).await.and_then(|m| m.modified()),
-                                ) {
-                                    if old_modified_time < new_modified_time {
+                                )
+                                    && old_modified_time < new_modified_time {
                                         info!(
                                             message = "Switching to watch most recently modified file.",
                                             new_modified_time = ?new_modified_time,
@@ -244,7 +244,6 @@ where
                                         );
                                         watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                                     }
-                                }
                             }
                         } else {
                             // untracked file fingerprint
@@ -263,9 +262,7 @@ where
 
                 let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
                     .iter()
-                    .filter_map(|(path, last_time_open)| {
-                        (last_time_open.elapsed() >= grace_period).then(|| path.clone())
-                    })
+                    .filter(|&(path, last_time_open)| (last_time_open.elapsed() >= grace_period)).map(|(path, last_time_open)| path.clone())
                     .map(|path| {
                         let path_ = path.clone();
                         let abort_handle =
@@ -279,7 +276,7 @@ where
                         Ok((path, Ok(()))) => {
                             let removed = known_small_files.remove(&path);
 
-                            if let Some(_) = removed {
+                            if removed.is_some() {
                                 self.emitter.emit_file_deleted(&path);
                             }
                         }
@@ -350,8 +347,8 @@ where
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
                 } else {
                     // Should the file be removed
-                    if let Some(grace_period) = self.remove_after {
-                        if watcher.last_read_success().elapsed() >= grace_period {
+                    if let Some(grace_period) = self.remove_after
+                        && watcher.last_read_success().elapsed() >= grace_period {
                             // Try to remove
                             match remove_file(&watcher.path).await {
                                 Ok(()) => {
@@ -364,7 +361,6 @@ where
                                 }
                             }
                         }
-                    }
                 }
 
                 // Do not move on to newer files if we are behind on an older file
