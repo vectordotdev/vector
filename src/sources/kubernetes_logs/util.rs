@@ -5,7 +5,6 @@ use futures::{
     future::{Either, select},
     pin_mut,
 };
-use tokio::task::spawn_blocking;
 use vector_lib::file_source::{
     file_server::{FileServer, Line, Shutdown as FileServerShutdown},
     paths_provider::PathsProvider,
@@ -21,21 +20,24 @@ pub async fn run_file_server<PP, E, C, S>(
     checkpointer: Checkpointer,
 ) -> Result<FileServerShutdown, tokio::task::JoinError>
 where
-    PP: PathsProvider + Send + 'static,
+    PP: PathsProvider + Send + Sync + 'static,
     E: FileSourceInternalEvents,
     C: Sink<Vec<Line>> + Unpin + Send + 'static,
     <C as Sink<Vec<Line>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
     <S as Future>::Output: Clone + Send + Sync,
+    <<PP as PathsProvider>::IntoIter as IntoIterator>::IntoIter: Send,
 {
     let span = info_span!("file_server");
-    let join_handle = spawn_blocking(move || {
+    let join_handle = tokio::spawn(async move {
         // These will need to be separated when this source is updated
         // to support end-to-end acknowledgements.
         let shutdown = shutdown.shared();
         let shutdown2 = shutdown.clone();
         let _enter = span.enter();
-        let result = file_server.run(chans, shutdown, shutdown2, checkpointer);
+        let result = file_server
+            .run(chans, shutdown, shutdown2, checkpointer)
+            .await;
         result.expect("file server exited with an error")
     });
     join_handle.await
