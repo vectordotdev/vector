@@ -8,11 +8,19 @@ const GELF_MAX_TOTAL_CHUNKS: usize = 128;
 const GELF_CHUNK_HEADERS_LENGTH: usize = 12;
 const GELF_MAGIC_BYTES: [u8; 2] = [0x1e, 0x0f];
 
-/// Chunks with GELF native chunking format.
-/// Supports up to 128 chunks, each up to 8192 bytes (minus 12 bytes, for headers).
+/// Chunks with GELF native chunking format, as documented from the [source][source].
+/// Supports up to 128 chunks, each with a maximum size that can be configured.
+///
+/// [source]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html#chunking
 #[derive(Clone, Debug)]
 pub struct GelfChunker {
-    /// Max chunk size.
+    /// Max chunk size. This must be at least 13 bytes (12 bytes for headers + N bytes for data).
+    /// There is no specific upper limit, since it depends on the transport protocol and network interface settings.
+    /// Most networks will limit IP frames to 64KiB; however, the actual payload size limit will be lower due to UDP and GELF headers.
+    ///
+    /// For safety it is not recommended to set this value any higher than 65,500 bytes unless your network supports [Jumbograms][jumbogram].
+    ///
+    /// [jumbogram]: https://en.wikipedia.org/wiki/Jumbogram
     pub max_chunk_size: usize,
 }
 

@@ -17,10 +17,10 @@ use vector_core::{
 #[configurable_component]
 #[derive(Debug, Clone)]
 pub struct GelfSerializerOptions {
-    /// When chunking is used on sinks that require it (such as `udp`), sets the maximum size of individual chunk packets.
-    /// Note, the first 12 bytes are reserved for the GELF header, and are included in this limit.
-    /// This value is also the threshold where datagrams will start being chunked.
-    #[configurable(validation(range(min = 13, max = 65535)))]
+    /// Maximum size for each GELF chunked datagram (including 12-byte header).
+    /// Chunking starts when datagrams exceed this size.
+    /// For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+    #[configurable(validation(range(min = 13)))]
     #[serde(default = "default_max_chunk_size")]
     pub max_chunk_size: usize,
 }
