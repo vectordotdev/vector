@@ -85,7 +85,7 @@ impl FileWatcher {
         #[cfg(unix)]
         let metadata = file_info;
         #[cfg(windows)]
-        let metadata = file.metadata().await?;
+        let metadata = f.metadata().await?;
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
             ignore_before,
@@ -177,7 +177,7 @@ impl FileWatcher {
         let file_handle = File::open(&path).await?;
 
         let file_info = file_handle.file_info().await?;
-        if (file_info.portable_dev(), file_info.ino()) != (self.devno, self.inode) {
+        if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
             let mut reader = BufReader::new(File::open(&path).await?);
             let gzipped = is_gzipped(&mut reader).await?;
             let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {

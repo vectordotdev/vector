@@ -21,7 +21,6 @@ use winapi::um::{
     winnt::FILE_ATTRIBUTE_REPARSE_POINT, winnt::MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
 };
 
-#[cfg(unix)]
 pub trait PortableFileExt {
     fn portable_dev(&self) -> u64;
     fn portable_ino(&self) -> u64;
@@ -97,10 +96,9 @@ impl PortableFileExt for Metadata {
 impl AsyncFileInfo for File {
     async fn file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
         let file = self.try_clone().await?;
-        let info = tokio::task::spawn_blocking(move || file.file_info_inner())
+        tokio::task::spawn_blocking(move || file.file_info_inner())
             .await
-            .map_err(std::io::Error::other)??;
-        Ok(info.dwVolumeSerialNumber.into())
+            .map_err(std::io::Error::other)?
     }
 }
 
