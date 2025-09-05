@@ -38,7 +38,7 @@ use vector_lib::{
     TimeZone,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
 };
-use vrl::value::{Kind, kind::Collection, Value};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
     SourceSender,
