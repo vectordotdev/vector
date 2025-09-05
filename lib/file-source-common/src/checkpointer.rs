@@ -134,9 +134,10 @@ impl CheckpointsView {
             State::V1 { checkpoints } => {
                 for checkpoint in checkpoints {
                     if let Some(ignore_before) = ignore_before
-                        && checkpoint.modified < ignore_before {
-                            continue;
-                        }
+                        && checkpoint.modified < ignore_before
+                    {
+                        continue;
+                    }
                     self.load(checkpoint);
                 }
             }
@@ -190,15 +191,17 @@ impl CheckpointsView {
             if let Ok(Some(fingerprint)) = fingerprinter
                 .get_legacy_checksum(path, fingerprint_buffer)
                 .await
-                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
-                    self.update(fng, pos);
-                }
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
+            {
+                self.update(fng, pos);
+            }
             if let Ok(Some(fingerprint)) = fingerprinter
                 .get_legacy_first_lines_checksum(path, fingerprint_buffer)
                 .await
-                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
-                    self.update(fng, pos);
-                }
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
+            {
+                self.update(fng, pos);
+            }
         }
     }
 }
@@ -328,7 +331,7 @@ impl Checkpointer {
             .await
             .map_err(
                 io::Error::other, // FIXME ErrorKind::Other
-                                                                               // is not ideal
+                                  // is not ideal
             )??;
 
             // Once the temp file is fully flushed, rename the tmp file to replace
@@ -433,14 +436,14 @@ impl Checkpointer {
                 && let Ok(Ok(modified)) = fs::metadata(&path)
                     .await
                     .map(|metadata| metadata.modified())
-                {
-                    let modified = DateTime::<Utc>::from(modified);
-                    if modified < ignore_before {
-                        fs::remove_file(path).await.ok();
-                        continue;
-                    }
-                    mtime = Some(modified);
+            {
+                let modified = DateTime::<Utc>::from(modified);
+                if modified < ignore_before {
+                    fs::remove_file(path).await.ok();
+                    continue;
                 }
+                mtime = Some(modified);
+            }
             let (fng, pos) = self.decode(&path);
             self.checkpoints.checkpoints.insert(fng, pos);
             if let Some(mtime) = mtime {
