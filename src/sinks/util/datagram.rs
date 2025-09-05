@@ -40,65 +40,83 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
 ) {
     while let Some(mut event) = input.next().await {
         transformer.transform(&mut event);
-
         let finalizers = event.take_finalizers();
         let mut bytes = BytesMut::new();
 
         // Errors are handled by `Encoder`.
         if encoder.encode(event, &mut bytes).is_err() {
+            finalizers.update_status(EventStatus::Errored);
             continue;
         }
 
-        let datagrams = if let Some(chunker) = chunker {
+        let delivered = if let Some(chunker) = chunker {
             let data_size = bytes.len();
-            let chunked_result = chunker.chunk(bytes.freeze());
-            if chunked_result.is_err() {
-                emit!(DatagramChunkingError {
-                    data_size,
-                    error: chunked_result.unwrap_err()
-                });
-                continue;
+            match chunker.chunk(bytes.freeze()) {
+                Ok(chunks) => {
+                    let mut chunks_delivered = true;
+                    for bytes in chunks {
+                        if !send_and_emit(&mut socket, &bytes, bytes_sent).await {
+                            chunks_delivered = false;
+                            break;
+                        }
+                    }
+                    chunks_delivered
+                }
+                Err(err) => {
+                    emit!(DatagramChunkingError {
+                        data_size,
+                        error: err
+                    });
+                    false
+                }
             }
-            chunked_result.unwrap()
         } else {
-            vec![bytes.freeze()]
+            send_and_emit(&mut socket, &bytes.freeze(), bytes_sent).await
         };
 
-        for bytes in datagrams {
-            match send_datagram(&mut socket, &bytes).await {
-                Ok(()) => {
-                    emit!(SocketEventsSent {
-                        mode: match socket {
-                            DatagramSocket::Udp(_) => SocketMode::Udp,
-                            #[cfg(unix)]
-                            DatagramSocket::Unix(..) => SocketMode::Unix,
-                        },
-                        count: 1,
-                        byte_size: bytes.len().into(),
-                    });
-
-                    bytes_sent.emit(ByteSize(bytes.len()));
-                }
-                Err(error) => {
-                    match socket {
-                        DatagramSocket::Udp(_) => emit!(SocketSendError {
-                            mode: SocketMode::Udp,
-                            error
-                        }),
-                        #[cfg(unix)]
-                        DatagramSocket::Unix(_, path) => {
-                            emit!(UnixSocketSendError {
-                                path: path.as_path(),
-                                error: &error
-                            })
-                        }
-                    };
-                    finalizers.update_status(EventStatus::Errored);
-                    return;
-                }
-            }
+        if delivered {
+            finalizers.update_status(EventStatus::Delivered);
+        } else {
+            finalizers.update_status(EventStatus::Errored);
         }
-        finalizers.update_status(EventStatus::Delivered);
+    }
+}
+
+async fn send_and_emit(
+    socket: &mut DatagramSocket,
+    bytes: &bytes::Bytes,
+    bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
+) -> bool {
+    match send_datagram(socket, bytes).await {
+        Ok(()) => {
+            emit!(SocketEventsSent {
+                mode: match socket {
+                    DatagramSocket::Udp(_) => SocketMode::Udp,
+                    #[cfg(unix)]
+                    DatagramSocket::Unix(..) => SocketMode::Unix,
+                },
+                count: 1,
+                byte_size: bytes.len().into(),
+            });
+            bytes_sent.emit(ByteSize(bytes.len()));
+            true
+        }
+        Err(error) => {
+            match socket {
+                DatagramSocket::Udp(_) => emit!(SocketSendError {
+                    mode: SocketMode::Udp,
+                    error
+                }),
+                #[cfg(unix)]
+                DatagramSocket::Unix(_, path) => {
+                    emit!(UnixSocketSendError {
+                        path: path.as_path(),
+                        error: &error
+                    })
+                }
+            };
+            false
+        }
     }
 }
 
