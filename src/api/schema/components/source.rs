@@ -43,7 +43,7 @@ impl Source {
     pub fn get_component_key(&self) -> &ComponentKey {
         &self.0.component_key
     }
-    pub fn get_component_type(&self) -> &str {
+    pub const fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
     }
     pub fn get_output_types(&self) -> Vec<SourceOutputType> {

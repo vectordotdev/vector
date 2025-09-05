@@ -95,10 +95,10 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
 
-    if let Some(content_type) = content_type {
-        if content_type.starts_with("application/x-protobuf") {
-            debug!("Got trace payload.");
-        }
+    if let Some(content_type) = content_type
+        && content_type.starts_with("application/x-protobuf")
+    {
+        debug!("Got trace payload.");
     }
 }
 
@@ -113,30 +113,30 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
 
-    if let Some(content_type) = content_type {
-        if content_type.starts_with("application/msgpack") {
-            debug!("`{}` server got stats payload.", state.name);
+    if let Some(content_type) = content_type
+        && content_type.starts_with("application/msgpack")
+    {
+        debug!("`{}` server got stats payload.", state.name);
 
-            let body = request.body_mut();
-            let compressed_body_bytes = hyper::body::to_bytes(body)
-                .await
-                .expect("could not decode body into bytes");
+        let body = request.body_mut();
+        let compressed_body_bytes = hyper::body::to_bytes(body)
+            .await
+            .expect("could not decode body into bytes");
 
-            let mut gz = GzDecoder::new(compressed_body_bytes.as_ref());
-            let mut decompressed_body_bytes = vec![];
-            gz.read_to_end(&mut decompressed_body_bytes)
-                .expect("unable to decompress gzip stats payload");
+        let mut gz = GzDecoder::new(compressed_body_bytes.as_ref());
+        let mut decompressed_body_bytes = vec![];
+        gz.read_to_end(&mut decompressed_body_bytes)
+            .expect("unable to decompress gzip stats payload");
 
-            let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
+        let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
 
-            info!(
-                "`{}` server received and deserialized stats payload.",
-                state.name
-            );
-            debug!("{:?}", payload);
+        info!(
+            "`{}` server received and deserialized stats payload.",
+            state.name
+        );
+        debug!("{:?}", payload);
 
-            state.tx.send(payload).await.unwrap();
-        }
+        state.tx.send(payload).await.unwrap();
     }
 }
 

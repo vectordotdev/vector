@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use metrics::{counter, gauge};
 use std::borrow::Cow;
 use vector_lib::{

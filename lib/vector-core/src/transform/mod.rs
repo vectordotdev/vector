@@ -470,7 +470,7 @@ impl OutputBuffer {
         self.0.capacity()
     }
 
-    pub fn first(&self) -> Option<EventRef> {
+    pub fn first(&self) -> Option<EventRef<'_>> {
         self.0.first().and_then(|first| match first {
             EventArray::Logs(l) => l.first().map(Into::into),
             EventArray::Metrics(m) => m.first().map(Into::into),
@@ -494,11 +494,11 @@ impl OutputBuffer {
         Ok(())
     }
 
-    fn iter_events(&self) -> impl Iterator<Item = EventRef> {
+    fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
         self.0.iter().flat_map(EventArray::iter_events)
     }
 
-    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef<'_>> {
         self.0.iter_mut().flat_map(EventArray::iter_events_mut)
     }
 

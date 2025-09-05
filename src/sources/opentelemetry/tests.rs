@@ -207,7 +207,8 @@ async fn receive_grpc_logs_legacy_namespace() {
             .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .schema_definition(true);
+            .schema_definition(true)
+            .unwrap();
 
         // send request via grpc client
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
@@ -219,9 +220,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
-        schema_definitions
-            .unwrap()
-            .assert_valid_for_event(&actual_event);
+        schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",
@@ -1089,6 +1088,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            use_otlp_decoding: false,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1194,6 +1194,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        use_otlp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());

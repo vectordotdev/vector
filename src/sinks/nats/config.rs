@@ -38,10 +38,10 @@ impl NatsHeaderConfig {
     pub fn build_headers(&self, event: &Event) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
-        if let Some(template) = &self.message_id {
-            if let Ok(value) = template.render_string(event) {
-                headers.insert(header::NATS_MESSAGE_ID, value.as_str());
-            }
+        if let Some(template) = &self.message_id
+            && let Ok(value) = template.render_string(event)
+        {
+            headers.insert(header::NATS_MESSAGE_ID, value.as_str());
         }
 
         headers

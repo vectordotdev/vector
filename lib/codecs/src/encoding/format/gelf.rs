@@ -141,13 +141,13 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
         err_missing_field(HOST)?;
     }
 
-    if !log.contains(&GELF_TARGET_PATHS.short_message) {
-        if let Some(message_key) = log_schema().message_key_target_path() {
-            if log.contains(message_key) {
-                log.rename_key(message_key, &GELF_TARGET_PATHS.short_message);
-            } else {
-                err_missing_field(SHORT_MESSAGE)?;
-            }
+    if !log.contains(&GELF_TARGET_PATHS.short_message)
+        && let Some(message_key) = log_schema().message_key_target_path()
+    {
+        if log.contains(message_key) {
+            log.rename_key(message_key, &GELF_TARGET_PATHS.short_message);
+        } else {
+            err_missing_field(SHORT_MESSAGE)?;
         }
     }
     Ok(log)

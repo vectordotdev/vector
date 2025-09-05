@@ -8,6 +8,9 @@
 //!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
+// Okta source only imports defaults but doesn't use the rest of the client
+#![cfg_attr(feature = "sources-okta", allow(dead_code))]
+
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{Uri, response::Parts};
