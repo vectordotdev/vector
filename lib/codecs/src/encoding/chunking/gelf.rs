@@ -92,6 +92,7 @@ mod tests {
         let chunker = Chunker::Gelf(GelfChunker {
             max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 4,
         });
+        // Input for 5 chunks of 4 bytes: [1234] [1234] [1234] [1234] [123]
         let input = Bytes::from("1234123412341234123");
         let chunks = chunker.chunk(input).unwrap();
         assert_eq!(chunks.len(), 5);
