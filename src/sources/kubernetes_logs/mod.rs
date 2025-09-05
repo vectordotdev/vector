@@ -10,38 +10,41 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
-use http_1::{HeaderName, HeaderValue};
+use http::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
-    Client, Config as ClientConfig,
-    api::Api,
-    config::{self, KubeConfigOptions},
-    runtime::{WatchStreamExt, reflector, watcher},
+    api::Api, config::{self, KubeConfigOptions},
+    runtime::{reflector, watcher, WatchStreamExt},
+    Client,
+    Config as ClientConfig,
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source::file_server::{
-    FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
+    calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown,
 };
 use vector_lib::file_source_common::{
     Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
 };
-use vector_lib::lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey, config::LogNamespace};
+use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
+use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
-    TimeZone,
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    TimeZone,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{kind::Collection, Kind};
 
 use crate::{
-    SourceSender,
+    built_info::{PKG_NAME, PKG_VERSION},
+    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+};
+use crate::{
     config::{
-        ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
-        SourceOutput, log_schema,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
+        SourceContext, SourceOutput,
     },
     event::Event,
     internal_events::{
@@ -54,10 +57,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, OutputBuffer},
-};
-use crate::{
-    built_info::{PKG_NAME, PKG_VERSION},
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+    SourceSender,
 };
 
 mod k8s_paths_provider;
@@ -1153,9 +1153,9 @@ fn prepare_label_selector(selector: &str) -> String {
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
+    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{Kind, kind::Collection};
+    use vrl::value::{kind::Collection, Kind};
 
     use crate::config::SourceConfig;
 

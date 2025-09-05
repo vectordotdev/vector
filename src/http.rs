@@ -2,8 +2,8 @@
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
-    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
-    uri::InvalidUri,
+    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
+    Version,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -11,7 +11,6 @@ use hyper::{
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -37,8 +36,8 @@ use crate::aws::AwsAuthentication;
 
 use crate::{
     config::ProxyConfig,
-    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
-    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
+    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 
 pub mod status {
@@ -682,7 +681,7 @@ pub type QueryParameters = HashMap<String, QueryParameterValue>;
 mod tests {
     use std::convert::Infallible;
 
-    use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
+    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 

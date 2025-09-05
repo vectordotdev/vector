@@ -22,8 +22,8 @@ float_eq = { version = "1.0", default-features = false }
 futures.workspace = true
 futures-util = { version = "0.3.29", default-features = false, features = ["std"] }
 headers = { version = "0.3.9", default-features = false }
-http = { version = "0.2.9", default-features = false }
-hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
+http.workspace = true
+hyper-http-proxy.workspace = true
 indexmap.workspace = true
 inventory.workspace = true
 ipnet = { version = "2", default-features = false, features = ["serde", "std"] }

@@ -4509,8 +4509,23 @@ checksum = "06683b93020a07e3dbcf5f8c0f6d40080d725bea7936fc01ad345c01b97dc270"
 dependencies = [
  "base64 0.21.7",
  "bytes 1.10.1",
- "headers-core",
+ "headers-core 0.2.0",
  "http 0.2.9",
+ "httpdate",
+ "mime",
+ "sha1",
+]
+
+[[package]]
+name = "headers"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3314d5adb5d94bcdf56771f2e50dbbc80bb4bdf88967526706205ac9eff24eb"
+dependencies = [
+ "base64 0.22.1",
+ "bytes 1.10.1",
+ "headers-core 0.3.0",
+ "http 1.3.1",
  "httpdate",
  "mime",
  "sha1",
@@ -4523,6 +4538,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
 dependencies = [
  "http 0.2.9",
+]
+
+[[package]]
+name = "headers-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54b4a22553d4242c49fddb9ba998a99962b5cc6f22cb5a3482bec22522403ce4"
+dependencies = [
+ "http 1.3.1",
 ]
 
 [[package]]
@@ -4913,6 +4937,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-http-proxy"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ad4b0a1e37510028bc4ba81d0e38d239c39671b0f0ce9e02dfa93a8133f7c08"
+dependencies = [
+ "bytes 1.10.1",
+ "futures-util",
+ "headers 0.4.1",
+ "http 1.3.1",
+ "hyper 1.7.0",
+ "hyper-rustls 0.27.5",
+ "hyper-util",
+ "pin-project-lite",
+ "rustls-native-certs 0.7.0",
+ "tokio",
+ "tokio-rustls 0.26.2",
+ "tower-service",
+]
+
+[[package]]
 name = "hyper-named-pipe"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4961,23 +5005,6 @@ dependencies = [
  "parking_lot 0.12.4",
  "pin-project",
  "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "hyper-proxy"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca815a891b24fdfb243fa3239c86154392b0953ee584aa1a2a1f66d20cbe75cc"
-dependencies = [
- "bytes 1.10.1",
- "futures 0.3.31",
- "headers",
- "http 0.2.9",
- "hyper 0.14.28",
- "openssl",
- "tokio",
- "tokio-openssl",
  "tower-service",
 ]
 
@@ -12101,19 +12128,18 @@ dependencies = [
  "h2 0.4.12",
  "hash_hasher",
  "hashbrown 0.14.5",
- "headers",
+ "headers 0.3.9",
  "heim",
  "hex",
  "hickory-proto",
  "hostname 0.4.0",
- "http 0.2.9",
  "http 1.3.1",
  "http-body 0.4.5",
  "http-serde",
  "humantime",
  "hyper 0.14.28",
+ "hyper-http-proxy",
  "hyper-openssl 0.9.2",
- "hyper-proxy",
  "indexmap 2.11.0",
  "indoc",
  "inventory",
@@ -12326,7 +12352,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "encoding_rs",
- "http 0.2.9",
+ "http 1.3.1",
  "indexmap 2.11.0",
  "inventory",
  "no-proxy",
@@ -12391,9 +12417,9 @@ dependencies = [
  "float_eq",
  "futures 0.3.31",
  "futures-util",
- "headers",
- "http 0.2.9",
- "hyper-proxy",
+ "headers 0.3.9",
+ "http 1.3.1",
+ "hyper-http-proxy",
  "indexmap 2.11.0",
  "inventory",
  "ipnet",
@@ -12752,7 +12778,7 @@ dependencies = [
  "bytes 1.10.1",
  "futures-channel",
  "futures-util",
- "headers",
+ "headers 0.3.9",
  "http 0.2.9",
  "hyper 0.14.28",
  "log",

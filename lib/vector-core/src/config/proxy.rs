@@ -1,6 +1,6 @@
 use headers::Authorization;
 use http::uri::InvalidUri;
-use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
+use hyper_http_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 use url::Url;
 use vector_config::configurable_component;
@@ -204,11 +204,11 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::prelude::{BASE64_STANDARD, Engine as _};
+    use base64::prelude::{Engine as _, BASE64_STANDARD};
     use env_test_util::TempEnvVar;
     use http::{
-        HeaderName, HeaderValue, Uri,
-        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
+        header::{AUTHORIZATION, PROXY_AUTHORIZATION}, HeaderName, HeaderValue,
+        Uri,
     };
     use proptest::prelude::*;
 

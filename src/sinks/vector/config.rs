@@ -1,15 +1,14 @@
 use http::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
 use tonic::body::BoxBody;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
 use super::{
-    VectorSinkError,
     service::{VectorRequest, VectorResponse, VectorService},
     sink::VectorSink,
+    VectorSinkError,
 };
 use crate::{
     config::{
@@ -19,11 +18,11 @@ use crate::{
     http::build_proxy_connector,
     proto::vector as proto,
     sinks::{
-        Healthcheck, VectorSink as VectorSinkType,
         util::{
-            BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, retries::RetryLogic,
-        },
+            retries::RetryLogic, BatchConfig, RealtimeEventBasedDefaultBatchSettings,
+            ServiceBuilderExt, TowerRequestConfig,
+        }, Healthcheck,
+        VectorSink as VectorSinkType,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
