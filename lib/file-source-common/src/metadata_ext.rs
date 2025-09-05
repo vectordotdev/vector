@@ -8,7 +8,7 @@ use std::fs::Metadata;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
-use std::{mem::zeroed, ptr};
+use std::{mem::zeroed, os::windows::io::RawHandle, ptr};
 use tokio::fs::File;
 
 #[cfg(windows)]
@@ -31,47 +31,49 @@ pub trait AsyncPortableFileExt {
 pub trait AsyncPortableFileExt: std::os::windows::io::AsRawHandle {
     async fn portable_dev(&self) -> std::io::Result<u64>;
     async fn portable_ino(&self) -> std::io::Result<u64>;
-    // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
-    #[allow(unused_assignments, unused_variables)]
-    fn reparse_point<'a>(
-        &self,
-        space: &'a mut [u8; MAXIMUM_REPARSE_DATA_BUFFER_SIZE as usize],
-    ) -> std::io::Result<(DWORD, &'a REPARSE_DATA_BUFFER)> {
-        unsafe {
-            let mut bytes = 0;
-            cvt({
-                DeviceIoControl(
-                    self.as_raw_handle(),
-                    FSCTL_GET_REPARSE_POINT,
-                    ptr::null_mut(),
-                    0,
-                    space.as_mut_ptr() as *mut _,
-                    space.len() as DWORD,
-                    &mut bytes,
-                    ptr::null_mut(),
-                )
-            })?;
-            Ok((bytes, &*(space.as_ptr() as *const REPARSE_DATA_BUFFER)))
-        }
-    }
-    // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L326-L351
-    #[allow(unused_assignments, unused_variables)]
-    fn get_file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
-        unsafe {
-            let mut info: BY_HANDLE_FILE_INFORMATION = zeroed();
-            cvt(GetFileInformationByHandle(self.as_raw_handle(), &mut info))?;
-            let mut reparse_tag = 0;
-            if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-                let mut b = [0; MAXIMUM_REPARSE_DATA_BUFFER_SIZE as usize];
-                if let Ok((_, buf)) = self.reparse_point(&mut b) {
-                    reparse_tag = buf.ReparseTag;
-                }
-            }
-            Ok(info)
-        }
-    }
 }
 
+// This code is derived from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
+#[cfg(windows)]
+#[allow(unused_assignments, unused_variables)]
+fn reparse_point<'a>(
+    raw_handle: RawHandle,
+    space: &'a mut [u8; MAXIMUM_REPARSE_DATA_BUFFER_SIZE as usize],
+) -> std::io::Result<(DWORD, &'a REPARSE_DATA_BUFFER)> {
+    unsafe {
+        let mut bytes = 0;
+        cvt({
+            DeviceIoControl(
+                raw_handle,
+                FSCTL_GET_REPARSE_POINT,
+                ptr::null_mut(),
+                0,
+                space.as_mut_ptr() as *mut _,
+                space.len() as DWORD,
+                &mut bytes,
+                ptr::null_mut(),
+            )
+        })?;
+        Ok((bytes, &*(space.as_ptr() as *const REPARSE_DATA_BUFFER)))
+    }
+}
+// This code is derived from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L326-L351
+#[cfg(windows)]
+#[allow(unused_assignments, unused_variables)]
+fn get_file_info(raw_handle: RawHandle) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
+    unsafe {
+        let mut info: BY_HANDLE_FILE_INFORMATION = zeroed();
+        cvt(GetFileInformationByHandle(raw_handle, &mut info))?;
+        let mut reparse_tag = 0;
+        if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            let mut b = [0; MAXIMUM_REPARSE_DATA_BUFFER_SIZE as usize];
+            if let Ok((_, buf)) = reparse_point(raw_handle, &mut b) {
+                reparse_tag = buf.ReparseTag;
+            }
+        }
+        Ok(info)
+    }
+}
 #[cfg(unix)]
 impl AsyncPortableFileExt for File {
     async fn portable_dev(&self) -> std::io::Result<u64> {
@@ -95,14 +97,16 @@ impl AsyncPortableFileExt for Metadata {
 #[cfg(windows)]
 impl AsyncPortableFileExt for File {
     async fn portable_dev(&self) -> std::io::Result<u64> {
-        let info = tokio::task::spawn_blocking(move || self.get_file_info())
+        let raw_handle = self.as_raw_handle();
+        let info = tokio::task::spawn_blocking(move || get_file_info(raw_handle))
             .await
             .map_err(std::io::Error::other)??;
         Ok(info.dwVolumeSerialNumber.into())
     }
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
     async fn portable_ino(&self) -> std::io::Result<u64> {
-        let info = tokio::task::spawn_blocking(move || self.get_file_info())
+        let raw_handle = self.as_raw_handle();
+        let info = tokio::task::spawn_blocking(move || get_file_info(raw_handle))
             .await
             .map_err(std::io::Error::other)??;
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
