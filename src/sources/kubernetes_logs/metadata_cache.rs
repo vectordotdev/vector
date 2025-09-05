@@ -41,12 +41,7 @@ impl K8sMetadataCache {
     /// 1. Converts `value` into `Arc<T>`
     /// 2. Type-erases to `Arc<dyn Any + Send + Sync>`
     /// 3. Locks cache briefly for insertion
-    pub fn insert(
-        &self,
-        pod_uuid: &str,
-        container_name: &str,
-        value: Value,
-    ) {
+    pub fn insert(&self, pod_uuid: &str, container_name: &str, value: Value) {
         let key = Self::generate_key(pod_uuid, container_name);
         let value = Arc::new(value);
         let mut cache = self.cache.lock().unwrap();
@@ -75,7 +70,14 @@ mod tests {
         let spec = cached_value.as_object().unwrap();
         assert_eq!(*spec.get("image").unwrap(), "nginx:1.25".into());
 
-        let actual_ports = spec.get("ports").unwrap().as_array().unwrap().iter().map(|v| v.as_integer().unwrap()).collect::<Vec<i64>>();
+        let actual_ports = spec
+            .get("ports")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_integer().unwrap())
+            .collect::<Vec<i64>>();
         assert_eq!(actual_ports, vec![80, 443]);
 
         let result2 = cache.get(pod_uid, container_name).unwrap();
