@@ -132,9 +132,9 @@ impl UncompressedReader for UncompressedReaderImpl {
             fp.seek(SeekFrom::Start(0)).await?;
             let result = fp.read_exact(&mut magic).await;
 
-            if result.is_err() {
+            if let Err(err) = result {
                 fp.seek(SeekFrom::Start(0)).await?;
-                return Err(result.unwrap_err());
+                return Err(err);
             }
 
             if magic == magic_header_bytes {
@@ -534,18 +534,18 @@ mod test {
         let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
         let one_line = prepare_test(
             "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()).await,
+            &gzip(b"hello world\n").await,
         );
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
         let one_line_duplicate_compressed = prepare_test(
             "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()).await,
+            &gzip(b"hello world\n").await,
         );
         let one_line_continued =
             prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
         let one_line_continued_compressed = prepare_test(
             "one_line_continued_compressed.log",
-            &gzip(&mut b"hello world\nthe next line\n".to_vec()).await,
+            &gzip(b"hello world\nthe next line\n").await,
         );
         let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
 
@@ -642,11 +642,11 @@ mod test {
         );
         let two_lines_duplicate_compressed = prepare_test(
             "two_lines_duplicate_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\n".to_vec()).await,
+            &gzip(b"hello world\nfrom vector\n").await,
         );
         let two_lines_continued_compressed = prepare_test(
             "two_lines_continued_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\nthe next line\n".to_vec()).await,
+            &gzip(b"hello world\nfrom vector\nthe next line\n").await,
         );
 
         let different_three_lines = prepare_test(
@@ -721,15 +721,15 @@ mod test {
         );
         let two_lines_compressed_same_header = prepare_test(
             "two_lines_compressed_same_header.log",
-            &gzip(&mut b"some-header-1\nhello world\nfrom vector\n".to_vec()).await,
+            &gzip(b"some-header-1\nhello world\nfrom vector\n").await,
         );
         let two_lines_compressed_same_header_size = prepare_test(
             "two_lines_compressed_same_header_size.log",
-            &gzip(&mut b"some-header-2\nhello world\nfrom vector\n".to_vec()).await,
+            &gzip(b"some-header-2\nhello world\nfrom vector\n").await,
         );
         let two_lines_compressed_different_header_size = prepare_test(
             "two_lines_compressed_different_header_size.log",
-            &gzip(&mut b"some-header-22\nhellow world\nfrom vector\n".to_vec()).await,
+            &gzip(b"some-header-22\nhellow world\nfrom vector\n").await,
         );
 
         let mut buf = Vec::new();
