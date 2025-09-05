@@ -3,10 +3,11 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use std::{
     io::{self, SeekFrom},
-    os::unix::fs::MetadataExt,
     path::PathBuf,
     time::Duration,
 };
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use tokio::{
     fs::File,
     io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
@@ -80,12 +81,13 @@ impl FileWatcher {
         let f = File::open(&path).await?;
         let file_info = f.file_info().await?;
         let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
-        let mut reader = BufReader::new(f);
 
         #[cfg(unix)]
         let metadata = file_info;
         #[cfg(windows)]
         let metadata = f.metadata().await?;
+
+        let mut reader = BufReader::new(f);
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
             ignore_before,
