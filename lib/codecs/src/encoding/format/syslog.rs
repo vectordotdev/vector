@@ -14,12 +14,16 @@ use vector_core::{
 use vrl::value::ObjectMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use vrl::path::parse_target_path;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 #[serde(default)]
 pub struct SyslogSerializerConfig {
+    /// A list of fields to exclude from the encoded event.
+    #[serde(default)]
+    pub except_fields: Vec<String>,
     /// Options for the Syslog serializer.
     pub syslog: SyslogSerializerOptions,
 }
@@ -91,7 +95,7 @@ impl Default for SyslogSerializerOptions {
             app_name: None,
             proc_id: None,
             msg_id: None,
-            payload_key: Some("message".to_string()),
+            payload_key: None,
         }
     }
 }
@@ -180,8 +184,8 @@ impl Encoder<Event> for SyslogSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        if let Event::Log(log_event) = event {
-            let syslog_message = ConfigDecanter::new(&log_event).decant_config(&self.config.syslog);
+        if let Event::Log(mut log_event) = event {
+            let syslog_message = ConfigDecanter::new(&mut log_event).decant_config(&self.config.syslog, &self.config.except_fields);
             let vec = syslog_message
                 .encode(&self.config.syslog.rfc)
                 .as_bytes()
@@ -193,15 +197,15 @@ impl Encoder<Event> for SyslogSerializer {
 }
 
 struct ConfigDecanter<'a> {
-    log: &'a LogEvent,
+    log: &'a mut LogEvent,
 }
 
 impl<'a> ConfigDecanter<'a> {
-    fn new(log: &'a LogEvent) -> Self {
+    fn new(log: &'a mut LogEvent) -> Self {
         Self { log }
     }
 
-    fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
+    fn decant_config(&mut self, config: &SyslogSerializerOptions, except_fields: &Vec<String>) -> SyslogMessage {
         SyslogMessage {
             pri: Pri {
                 facility: self.get_facility(config),
@@ -218,7 +222,7 @@ impl<'a> ConfigDecanter<'a> {
                 msg_id: self.get_field_or_static(&config.msg_id),
             },
             structured_data: self.get_structured_data(),
-            message: self.get_payload(config),
+            message: self.get_payload(config, except_fields),
         }
     }
 
@@ -282,7 +286,11 @@ impl<'a> ConfigDecanter<'a> {
         Utc::now()
     }
 
-    fn get_payload(&self, config: &SyslogSerializerOptions) -> String {
+    fn get_payload(&mut self, config: &SyslogSerializerOptions, except_fields: &Vec<String>) -> String {
+        for field in except_fields {
+            let parsed_path = parse_target_path(field).unwrap();
+            self.log.remove_prune(&parsed_path, false);
+        }
         let value_option = if let Some(key) = &config.payload_key {
             self.get_value(key)
         } else {
@@ -799,5 +807,37 @@ mod tests {
         severity = "warning"
     "#;
         assert!(toml::from_str::<TestConfig>(config_str).is_err());
+    }
+
+    #[test]
+    fn test_except_fields_removes_from_payload() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        except_fields = ["_internal"]
+    "#,
+        )
+            .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(
+            event_path!("_internal"),
+            value!({"secret": "do not show"}),
+        );
+
+        log.insert(
+            event_path!("include"),
+            value!({"public": "show me"}),
+        );
+
+        let output = run_encode(config, Event::Log(log));
+
+        // Assert that the final output does not contain the excluded field.
+        assert!(!output.contains("_internal"));
+        assert!(!output.contains("do not show"));
+
+        assert!(output.contains("original message"));
+        assert!(output.contains("include"));
+        assert!(output.contains("show me"));
+
     }
 }
