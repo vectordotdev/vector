@@ -73,6 +73,8 @@ impl Chunking for GelfChunker {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
+
     use super::{Chunking, GELF_CHUNK_HEADERS_LENGTH, GELF_MAGIC_BYTES, GelfChunker};
     use crate::encoding::Chunker;
 
@@ -116,6 +118,30 @@ mod tests {
             } else {
                 assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], b"123");
             }
+        }
+    }
+
+    #[test]
+    fn test_gelf_chunker_max() {
+        let chunker = Chunker::Gelf(GelfChunker {
+            max_chunk_size: GELF_CHUNK_HEADERS_LENGTH + 65500,
+        });
+        // Input for 128 chunks of 65500 bytes of data
+        let input = Bytes::from_static(&[0; 65500 * 128]);
+        let chunks = chunker.chunk(input).unwrap();
+        assert_eq!(chunks.len(), 128);
+
+        for i in 0..chunks.len() {
+            assert_eq!(chunks[i].len(), GELF_CHUNK_HEADERS_LENGTH + 65500);
+            // Bytes 0 and 1: Magic bytes
+            assert_eq!(chunks[i][0..2], GELF_MAGIC_BYTES);
+            // Bytes 2 to 9: Random ID (not checked)
+            // Byte 10: Sequence number
+            assert_eq!(chunks[i][10], i as u8);
+            // Byte 11: Sequence count
+            assert_eq!(chunks[i][11], chunks.len() as u8);
+            // Payload bytes
+            assert_eq!(&chunks[i][GELF_CHUNK_HEADERS_LENGTH..], &[0; 65500]);
         }
     }
 }

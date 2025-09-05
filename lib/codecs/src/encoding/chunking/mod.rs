@@ -7,7 +7,6 @@ mod gelf;
 use bytes::Bytes;
 pub use gelf::GelfChunker;
 
-
 /// Trait for encoding formats that optionally support chunking, for use with sinks that have payload size limits (such as UDP).
 ///
 /// Chunking is an extension to the standard `Encoder` trait, allowing large encoded events to be split into multiple frames for transmission.
