@@ -7,7 +7,7 @@ use vector_common::finalization::{
     AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable,
 };
 
-use crate::{encoding::FixedEncodable, EventCount};
+use crate::{EventCount, encoding::FixedEncodable};
 
 macro_rules! message_wrapper {
     ($id:ident: $ty:ty, $event_count:expr) => {
@@ -263,44 +263,5 @@ impl FixedEncodable for MultiEventRecord {
         let event_count = buffer.get_u32();
         buffer.advance(usize::try_from(event_count).unwrap_or(usize::MAX));
         Ok(MultiEventRecord::new(event_count))
-    }
-}
-
-message_wrapper!(PoisonPillMultiEventRecord: u32, |m: &Self| m.0);
-
-impl PoisonPillMultiEventRecord {
-    pub fn encoded_size(&self) -> usize {
-        usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
-    }
-}
-
-impl FixedEncodable for PoisonPillMultiEventRecord {
-    type EncodeError = io::Error;
-    type DecodeError = io::Error;
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::EncodeError>
-    where
-        B: BufMut,
-    {
-        if buffer.remaining_mut() < self.encoded_size() {
-            return Err(io::Error::other("not enough capacity to encode record"));
-        }
-
-        buffer.put_u32(self.0);
-        buffer.put_bytes(0x42, usize::try_from(self.0).unwrap_or(usize::MAX));
-        Ok(())
-    }
-
-    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
-    where
-        B: Buf,
-    {
-        let event_count = buffer.get_u32();
-        if event_count == 42 {
-            return Err(io::Error::other("failed to decode"));
-        }
-
-        buffer.advance(usize::try_from(event_count).unwrap_or(usize::MAX));
-        Ok(PoisonPillMultiEventRecord::new(event_count))
     }
 }

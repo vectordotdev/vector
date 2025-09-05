@@ -4,11 +4,11 @@ use std::fmt;
 
 use dashmap::DashMap;
 use tracing_core::{
+    Event, Metadata, Subscriber,
     callsite::Identifier,
-    field::{display, Field, Value, Visit},
+    field::{Field, Value, Visit, display},
     span,
     subscriber::Interest,
-    Event, Metadata, Subscriber,
 };
 use tracing_subscriber::layer::{Context, Layer};
 
@@ -445,12 +445,14 @@ impl Visit for MessageVisitor {
 #[cfg(test)]
 mod test {
     use std::{
-        sync::{Arc, Mutex},
+        sync::{Arc, LazyLock, Mutex},
         time::Duration,
     };
 
     use mock_instant::global::MockClock;
     use tracing_subscriber::layer::SubscriberExt;
+
+    static TRACING_DEFAULT_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     use super::*;
 
@@ -494,6 +496,8 @@ mod test {
 
     #[test]
     fn rate_limits() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -527,6 +531,8 @@ mod test {
 
     #[test]
     fn override_rate_limit_at_callsite() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -564,6 +570,8 @@ mod test {
 
     #[test]
     fn rate_limit_by_span_key() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -628,6 +636,8 @@ mod test {
 
     #[test]
     fn rate_limit_by_event_key() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));

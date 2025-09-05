@@ -16,7 +16,7 @@ This end-to-end (E2E) test validates that log events generated in a container ar
 
 ```shell
 # from the repo root directory
-./scripts/int-e2e-test.sh e2e opentelemetry-logs
+./scripts/run-integration-test.sh e2e opentelemetry-logs
 ```
 
 ## Notes

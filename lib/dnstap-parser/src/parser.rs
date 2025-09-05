@@ -7,7 +7,7 @@ use std::{
 };
 use vector_lib::emit;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use dnsmsg_parser::{dns_message_parser::DnsParserOptions, ede::EDE};
@@ -20,8 +20,8 @@ use snafu::Snafu;
 use vrl::{owned_value_path, path};
 
 use vector_lib::{
-    event::{LogEvent, Value},
     Error, Result,
+    event::{LogEvent, Value},
 };
 
 #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
@@ -31,12 +31,12 @@ mod dnstap_proto {
 
 use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
 use dnstap_proto::{
-    message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
-    SocketProtocol,
+    Dnstap, Message as DnstapMessage, SocketFamily, SocketProtocol,
+    message::Type as DnstapMessageType,
 };
 use vector_lib::config::log_schema;
-use vector_lib::lookup::lookup_v2::ValuePath;
 use vector_lib::lookup::PathPrefix;
+use vector_lib::lookup::lookup_v2::ValuePath;
 
 use dnsmsg_parser::{
     dns_message::{
@@ -147,21 +147,14 @@ impl DnstapParser {
                 dnstap_data_type.clone(),
             );
 
-            if dnstap_data_type == "Message" {
-                if let Some(message) = proto_msg.message {
-                    if let Err(err) =
-                        DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
-                    {
-                        emit!(DnstapParseWarning { error: &err });
-                        need_raw_data = true;
-                        DnstapParser::insert(
-                            event,
-                            &root,
-                            &DNSTAP_VALUE_PATHS.error,
-                            err.to_string(),
-                        );
-                    }
-                }
+            if dnstap_data_type == "Message"
+                && let Some(message) = proto_msg.message
+                && let Err(err) =
+                    DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
+            {
+                emit!(DnstapParseWarning { error: &err });
+                need_raw_data = true;
+                DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.error, err.to_string());
             }
         } else {
             emit!(DnstapParseWarning {

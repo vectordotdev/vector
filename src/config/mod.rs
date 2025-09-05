@@ -328,10 +328,10 @@ impl Resource {
         // Find equality based conflicts
         for (key, resources) in components {
             for resource in resources {
-                if let Resource::Port(address, protocol) = &resource {
-                    if address.ip().is_unspecified() {
-                        unspecified.push((key.clone(), *address, *protocol));
-                    }
+                if let Resource::Port(address, protocol) = &resource
+                    && address.ip().is_unspecified()
+                {
+                    unspecified.push((key.clone(), *address, *protocol));
                 }
 
                 resource_map
@@ -436,7 +436,11 @@ impl TestDefinition<String> {
             .filter_map(|(extract_from, conditions)| {
                 let mut outputs = Vec::new();
                 for from in extract_from {
-                    if let Some(output_id) = output_map.get(&from) {
+                    if no_outputs_from.contains(&from) {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{name}': '{from}' listed in no_outputs_from"#
+                        ));
+                    } else if let Some(output_id) = output_map.get(&from) {
                         outputs.push(output_id.clone());
                     } else {
                         errors.push(format!(

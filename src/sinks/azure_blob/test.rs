@@ -17,9 +17,7 @@ use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
         connection_string: Default::default(),
-        storage_account: Default::default(),
         container_name: Default::default(),
-        endpoint: Default::default(),
         blob_prefix: Default::default(),
         blob_time_format: Default::default(),
         blob_append_uuid: Default::default(),
