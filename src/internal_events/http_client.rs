@@ -1,10 +1,11 @@
 use std::time::Duration;
 
 use http::{
-    Request, Response,
-    header::{self, HeaderMap, HeaderValue},
+    header::{self, HeaderMap, HeaderValue}, Request,
+    Response,
 };
-use hyper::{Error, body::HttpBody};
+use http_body::Body as HttpBody;
+use hyper::Error;
 use metrics::{counter, histogram};
 use vector_lib::internal_event::InternalEvent;
 use vector_lib::internal_event::{error_stage, error_type};

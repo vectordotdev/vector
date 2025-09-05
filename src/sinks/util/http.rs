@@ -3,9 +3,9 @@ use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::{Buf, Bytes};
-use futures::{Sink, future::BoxFuture};
+use futures::{future::BoxFuture, Sink};
 use headers::HeaderName;
-use http::{HeaderValue, Request, Response, StatusCode, header};
+use http::{header, HeaderValue, Request, Response, StatusCode};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -37,7 +37,7 @@ impl PartialOrd for OrderedHeaderName {
         Some(self.cmp(other))
     }
 }
-use hyper::{Body, body};
+use hyper::body::Body;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -48,22 +48,22 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_lib::{
-    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
-    stream::batcher::limiter::ItemBatchSize,
+    configurable::configurable_component, stream::batcher::limiter::ItemBatchSize, ByteSizeOf,
+    EstimatedJsonEncodedSizeOf,
 };
 
 use super::{
-    Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    retries::{RetryAction, RetryLogic}, sink::{self, Response as _}, uri, Batch, EncodedEvent, Partition,
+    TowerBatchedSink,
+    TowerPartitionSink,
+    TowerRequestConfig,
     TowerRequestSettings,
-    retries::{RetryAction, RetryLogic},
-    sink::{self, Response as _},
-    uri,
 };
 
 #[cfg(feature = "aws-core")]
@@ -943,10 +943,10 @@ where
 mod test {
     #![allow(clippy::print_stderr)] //tests
 
-    use futures::{StreamExt, future::ready};
+    use futures::{future::ready, StreamExt};
     use hyper::{
-        Response, Server, Uri,
-        service::{make_service_fn, service_fn},
+        service::{make_service_fn, service_fn}, Response, Server,
+        Uri,
     };
 
     use super::*;

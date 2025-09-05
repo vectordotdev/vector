@@ -6,10 +6,11 @@ use std::{
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
-use hyper::{Body, Request, service::Service};
+use hyper::body::Body;
+use hyper::{service::Service, Request};
 use tower::ServiceExt;
-use vector_lib::ByteSizeOf;
 use vector_lib::stream::DriverResponse;
+use vector_lib::ByteSizeOf;
 use vector_lib::{
     json_size::JsonSize,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -22,9 +23,9 @@ use crate::{
     sinks::{
         elasticsearch::{encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder},
         util::{
-            Compression, ElementCount,
-            auth::Auth,
-            http::{HttpBatchService, RequestConfig},
+            auth::Auth, http::{HttpBatchService, RequestConfig},
+            Compression,
+            ElementCount,
         },
     },
 };
