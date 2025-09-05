@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use azure_core::{RetryOptions, error::HttpError};
-use azure_identity::{AutoRefreshingTokenCredential, DefaultAzureCredential};
-use azure_storage::{CloudLocation, ConnectionString, prelude::*};
+use azure_core::error::HttpError;
+use azure_core_for_storage::RetryOptions;
+use azure_storage::{CloudLocation, ConnectionString};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
@@ -106,7 +106,7 @@ pub fn build_healthcheck(
 
         let resp: crate::Result<()> = match response {
             Ok(_) => Ok(()),
-            Err(reason) => Err(match reason.downcast_ref::<HttpError>() {
+            Err(error) => Err(match error.as_http_error() {
                 Some(err) => match StatusCode::from_u16(err.status().into()) {
                     Ok(StatusCode::FORBIDDEN) => Box::new(HealthcheckError::InvalidCredentials),
                     Ok(StatusCode::NOT_FOUND) => Box::new(HealthcheckError::UnknownContainer {
@@ -115,7 +115,7 @@ pub fn build_healthcheck(
                     Ok(status) => Box::new(HealthcheckError::Unknown { status }),
                     Err(_) => "unknown status code".into(),
                 },
-                _ => reason.into(),
+                _ => error.into(),
             }),
         };
         resp
@@ -125,71 +125,35 @@ pub fn build_healthcheck(
 }
 
 pub fn build_client(
-    connection_string: Option<String>,
-    storage_account: Option<String>,
+    connection_string: String,
     container_name: String,
-    endpoint: Option<String>,
 ) -> crate::Result<Arc<ContainerClient>> {
-    let client = match (connection_string, storage_account) {
-        (Some(connection_string_p), None) => {
-            let connection_string = ConnectionString::new(&connection_string_p)?;
+    let client = {
+        let connection_string = ConnectionString::new(&connection_string)?;
+        let account_name = connection_string
+            .account_name
+            .ok_or("Account name missing in connection string")?;
 
-            match connection_string.blob_endpoint {
-                // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
-                // required to contain the full URI to the blob storage API endpoint, this means
-                // that account_name is not required to exist in the connection_string since
-                // account_name is only used with the default CloudLocation in the Azure SDK to
-                // generate the storage API endpoint
-                Some(uri) => ClientBuilder::with_location(
-                    CloudLocation::Custom {
-                        uri: uri.to_string(),
-                    },
-                    connection_string.storage_credentials()?,
-                ),
-                // Without a valid blob_endpoint in the connection_string, assume we are in Azure
-                // Commercial (AzureCloud location) and create a default Blob Storage Client that
-                // builds the API endpoint location using the account_name as input
-                None => ClientBuilder::new(
-                    connection_string
-                        .account_name
-                        .ok_or("Account name missing in connection string")?,
-                    connection_string.storage_credentials()?,
-                ),
-            }
-            .retry(RetryOptions::none())
-            .container_client(container_name)
+        match connection_string.blob_endpoint {
+            // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
+            // required to contain the full URI to the blob storage API endpoint, this means
+            // that account_name is not required to exist in the connection_string since
+            // account_name is only used with the default CloudLocation in the Azure SDK to
+            // generate the storage API endpoint
+            Some(uri) => ClientBuilder::with_location(
+                CloudLocation::Custom {
+                    uri: uri.to_string(),
+                    account: account_name.to_string(),
+                },
+                connection_string.storage_credentials()?,
+            ),
+            // Without a valid blob_endpoint in the connection_string, assume we are in Azure
+            // Commercial (AzureCloud location) and create a default Blob Storage Client that
+            // builds the API endpoint location using the account_name as input
+            None => ClientBuilder::new(account_name, connection_string.storage_credentials()?),
         }
-        (None, Some(storage_account_p)) => {
-            let creds = std::sync::Arc::new(DefaultAzureCredential::default());
-            let auto_creds = std::sync::Arc::new(AutoRefreshingTokenCredential::new(creds));
-            let storage_credentials = StorageCredentials::token_credential(auto_creds);
-
-            match endpoint {
-                // If a blob_endpoint is provided in the configuration, use it with a Custom
-                // CloudLocation, to allow overriding the blob storage API endpoint
-                Some(endpoint) => ClientBuilder::with_location(
-                    CloudLocation::Custom { uri: endpoint },
-                    storage_credentials,
-                ),
-                // Use the storage_account configuration parameter and assume we are in Azure
-                // Commercial (AzureCloud location) and build the blob storage API endpoint using
-                // the storage_account as input.
-                None => ClientBuilder::new(storage_account_p, storage_credentials),
-            }
-            .retry(RetryOptions::none())
-            .container_client(container_name)
-        }
-        (None, None) => {
-            return Err(
-                "Either `connection_string` or `storage_account` has to be provided".into(),
-            );
-        }
-        (Some(_), Some(_)) => {
-            return Err(
-                "`connection_string` and `storage_account` can't be provided at the same time"
-                    .into(),
-            );
-        }
+        .retry(RetryOptions::none())
+        .container_client(container_name)
     };
-    Ok(std::sync::Arc::new(client))
+    Ok(Arc::new(client))
 }
