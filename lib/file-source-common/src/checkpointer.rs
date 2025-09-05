@@ -330,8 +330,7 @@ impl Checkpointer {
             })
             .await
             .map_err(
-                io::Error::other, // FIXME ErrorKind::Other
-                                  // is not ideal
+                io::Error::other, // FIXME ErrorKind::Other is not ideal
             )??;
 
             // Once the temp file is fully flushed, rename the tmp file to replace
