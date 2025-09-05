@@ -14,7 +14,7 @@ use tokio::fs::File;
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
 use winapi::um::{
-    fileapi::GetFileInformationByHandle, fileapi::BY_HANDLE_FILE_INFORMATION,
+    fileapi::BY_HANDLE_FILE_INFORMATION, fileapi::GetFileInformationByHandle,
     ioapiset::DeviceIoControl, winioctl::FSCTL_GET_REPARSE_POINT,
     winnt::FILE_ATTRIBUTE_REPARSE_POINT, winnt::MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
 };

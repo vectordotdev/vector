@@ -203,12 +203,12 @@ pub use self::{
     writer::{BufferWriter, WriterError},
 };
 use crate::{
+    Bufferable,
     buffer_usage_data::BufferUsageHandle,
     topology::{
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
     },
-    Bufferable,
 };
 
 /// Error that occurred when creating/loading a disk buffer.

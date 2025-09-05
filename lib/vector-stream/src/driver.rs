@@ -1,13 +1,13 @@
 use std::{collections::VecDeque, fmt, future::poll_fn, task::Poll};
 
-use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::emit;
 use vector_common::internal_event::{
-    register, ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
-    RegisteredEventCache, SharedString, TaggedEventsSent,
+    ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
+    RegisteredEventCache, SharedString, TaggedEventsSent, register,
 };
 use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
@@ -212,10 +212,10 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some(bytes_sent) = bytes_sent {
-                        if let Some(byte_size) = response.bytes_sent() {
-                            bytes_sent.emit(ByteSize(byte_size));
-                        }
+                    if let Some(bytes_sent) = bytes_sent
+                        && let Some(byte_size) = response.bytes_sent()
+                    {
+                        bytes_sent.emit(ByteSize(byte_size));
                     }
 
                     response.events_sent().emit_event(events_sent);
@@ -246,13 +246,13 @@ mod tests {
     use std::{
         future::Future,
         pin::Pin,
-        sync::{atomic::AtomicUsize, atomic::Ordering, Arc},
-        task::{ready, Context, Poll},
+        sync::{Arc, atomic::AtomicUsize, atomic::Ordering},
+        task::{Context, Poll, ready},
         time::Duration,
     };
 
     use futures_util::stream;
-    use rand::{prelude::StdRng, SeedableRng};
+    use rand::{SeedableRng, prelude::StdRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
         sync::{OwnedSemaphorePermit, Semaphore},

@@ -10,7 +10,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use tokio_util::time::{delay_queue, DelayQueue};
+use tokio_util::time::{DelayQueue, delay_queue};
 
 /// An expired item, holding the value and the key with an expiration information.
 pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);

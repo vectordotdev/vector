@@ -16,8 +16,8 @@ use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
-    buffer::{read_until_with_max_size, ReadResult},
     FilePosition, ReadFrom,
+    buffer::{ReadResult, read_until_with_max_size},
 };
 
 #[cfg(test)]

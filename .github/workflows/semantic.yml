@@ -37,7 +37,6 @@ jobs:
             ci
             cli
             codecs
-            codecs protobuf
             compression
             config
             config provider
@@ -160,8 +159,10 @@ jobs:
             kubernetes_logs source
             logstash source
             mongodb_metrics source
+            nats source
             new source
             nginx_metrics source
+            okta source
             opentelemetry source
             postgresql_metrics source
             prometheus_remote_write source

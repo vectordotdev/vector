@@ -11,32 +11,32 @@ use std::{
 use bytes::BufMut;
 use crc32fast::Hasher;
 use rkyv::{
+    AlignedVec, Infallible,
     ser::{
+        Serializer,
         serializers::{
             AlignedSerializer, AllocScratch, AllocScratchError, BufferScratch, CompositeSerializer,
             CompositeSerializerError, FallbackScratch,
         },
-        Serializer,
     },
-    AlignedVec, Infallible,
 };
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use super::{
-    common::{create_crc32c_hasher, DiskBufferConfig},
+    common::{DiskBufferConfig, create_crc32c_hasher},
     io::Filesystem,
     ledger::Ledger,
-    record::{validate_record_archive, Record, RecordStatus},
+    record::{Record, RecordStatus, validate_record_archive},
 };
 use crate::{
+    Bufferable,
     encoding::{AsMetadata, Encodable},
     variants::disk_v2::{
         io::AsyncFile,
         reader::decode_record_payload,
-        record::{try_as_record_archive, RECORD_HEADER_LEN},
+        record::{RECORD_HEADER_LEN, try_as_record_archive},
     },
-    Bufferable,
 };
 
 /// Error that occurred during calls to [`BufferWriter`].
@@ -912,8 +912,11 @@ where
                         // likely missed flushing some records, or partially flushed the data file.
                         // Better roll over to be safe.
                         error!(
-                            ledger_next, last_record_id, record_events,
-                            "Last record written to data file is behind expected position. Events have likely been lost.");
+                            ledger_next,
+                            last_record_id,
+                            record_events,
+                            "Last record written to data file is behind expected position. Events have likely been lost."
+                        );
                         true
                     }
                     Ordering::Less => {

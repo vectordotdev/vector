@@ -2,8 +2,8 @@ use std::{fmt, future::ready};
 
 use async_trait::async_trait;
 use futures_util::{
-    stream::{self, BoxStream},
     StreamExt,
+    stream::{self, BoxStream},
 };
 use tower::Service;
 use vector_lib::internal_event::Protocol;

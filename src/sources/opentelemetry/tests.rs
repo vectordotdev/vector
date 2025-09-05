@@ -2,17 +2,17 @@ use crate::config::OutputId;
 use crate::event::metric::{Bucket, Quantile};
 use crate::event::{MetricKind, MetricTags, MetricValue};
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
+        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
     },
-    sources::opentelemetry::config::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
         self,
-        components::{assert_source_compliance, SOURCE_TAGS},
+        components::{SOURCE_TAGS, assert_source_compliance},
         next_addr,
     },
-    SourceSender,
 };
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -26,18 +26,18 @@ use vector_lib::config::LogNamespace;
 use vector_lib::lookup::path;
 use vector_lib::opentelemetry::proto::{
     collector::{
-        logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-        metrics::v1::{metrics_service_client::MetricsServiceClient, ExportMetricsServiceRequest},
+        logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+        metrics::v1::{ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient},
     },
     common::v1::{
-        any_value, any_value::Value::StringValue, AnyValue, InstrumentationScope, KeyValue,
+        AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
     },
     logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     metrics::v1::{
-        exponential_histogram_data_point::Buckets, metric::Data,
-        summary_data_point::ValueAtQuantile, AggregationTemporality, ExponentialHistogram,
-        ExponentialHistogramDataPoint, Gauge, Histogram, HistogramDataPoint, Metric,
-        NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum, Summary, SummaryDataPoint,
+        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
+        Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets, metric::Data,
+        summary_data_point::ValueAtQuantile,
     },
     resource::v1::{Resource, Resource as OtelResource},
 };
@@ -129,10 +129,11 @@ async fn receive_grpc_logs_vector_namespace() {
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
+        assert!(
+            meta.get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp()
+        );
         assert_eq!(
             meta.get(path!("opentelemetry", "resources")).unwrap(),
             &value!({res_key: "res_val"})
@@ -206,7 +207,8 @@ async fn receive_grpc_logs_legacy_namespace() {
             .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .schema_definition(true);
+            .schema_definition(true)
+            .unwrap();
 
         // send request via grpc client
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
@@ -218,9 +220,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
-        schema_definitions
-            .unwrap()
-            .assert_valid_for_event(&actual_event);
+        schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",
@@ -1088,6 +1088,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            use_otlp_decoding: false,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1193,6 +1194,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        use_otlp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());

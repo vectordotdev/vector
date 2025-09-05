@@ -6,7 +6,7 @@ use crate::event::{ObjectMap, Value};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::test_util::{
-    components::{assert_sink_compliance, SINK_TAGS},
+    components::{SINK_TAGS, assert_sink_compliance},
     random_lines_with_stream, random_string, trace_init,
 };
 use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
@@ -31,15 +31,15 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
     let prop_key_opt = cnf.properties_key.clone();
     let input_events = events.map(move |mut events| {
         // if a property_key is defined, add some properties!
-        if let Some(properties_key) = &prop_key_opt {
-            if let Some(properties_key) = &properties_key.path {
-                let mut property_values = ObjectMap::new();
-                property_values.insert(prop_1_key.into(), Value::Bytes(Bytes::from(prop_1_value)));
-                events.iter_logs_mut().for_each(move |log| {
-                    log.insert(properties_key, property_values.clone());
-                });
-                return events;
-            }
+        if let Some(properties_key) = &prop_key_opt
+            && let Some(properties_key) = &properties_key.path
+        {
+            let mut property_values = ObjectMap::new();
+            property_values.insert(prop_1_key.into(), Value::Bytes(Bytes::from(prop_1_value)));
+            events.iter_logs_mut().for_each(move |log| {
+                log.insert(properties_key, property_values.clone());
+            });
+            return events;
         }
         events
     });

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use dnstap_parser::parser::DnstapParser;
 use dnstap_parser::schema::DnstapEventSchema;
@@ -11,15 +11,15 @@ use vector_lib::internal_event::{
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
 use vrl::path::{OwnedValuePath, PathPrefix};
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::util::framestream::{
-    build_framestream_tcp_source, build_framestream_unix_source, FrameHandler,
+    FrameHandler, build_framestream_tcp_source, build_framestream_unix_source,
 };
 use crate::internal_events::DnstapParseError;
 use crate::{
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceOutput},
     Result,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
 };
 use dnstap_parser::schema::DNSTAP_VALUE_PATHS;
 
@@ -116,14 +116,10 @@ impl DnstapConfig {
             LogNamespace::Legacy => {
                 let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
-                if self.raw_data_only() {
-                    if let Some(message_key) = log_schema().message_key() {
-                        return schema.with_event_field(
-                            message_key,
-                            Kind::bytes(),
-                            Some("message"),
-                        );
-                    }
+                if self.raw_data_only()
+                    && let Some(message_key) = log_schema().message_key()
+                {
+                    return schema.with_event_field(message_key, Kind::bytes(), Some("message"));
                 }
                 event_schema.schema_definition(schema)
             }
@@ -414,8 +410,8 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use bollard::exec::{CreateExecOptions, StartExecOptions};
     use bollard::Docker;
+    use bollard::exec::{CreateExecOptions, StartExecOptions};
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
@@ -426,12 +422,12 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        SourceSender,
         event::Value,
         test_util::{
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             wait_for,
         },
-        SourceSender,
     };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {

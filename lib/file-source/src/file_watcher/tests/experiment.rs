@@ -7,7 +7,7 @@ use std::{fs, io::Write};
 use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::file_watcher::{tests::*, FileWatcher, RawLineResult};
+use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 
 use file_source_common::ReadFrom;
 

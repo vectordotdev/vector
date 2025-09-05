@@ -3,8 +3,8 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
     time::Duration,
@@ -17,7 +17,7 @@ use rand_distr::num_traits::ToPrimitive;
 use self::allocator::Tracer;
 
 pub(crate) use self::allocator::{
-    without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
+    AllocationGroupId, AllocationLayer, GroupedTraceableAllocator, without_allocation_tracing,
 };
 
 const NUM_GROUPS: usize = 256;
@@ -190,19 +190,22 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    if let Some(group_id) = AllocationGroupId::register() {
-        if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
-            let mut writer = group_lock.lock().unwrap();
-            *writer = GroupInfo {
-                component_id,
-                component_kind,
-                component_type,
-            };
+    if let Some(group_id) = AllocationGroupId::register()
+        && let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize)
+    {
+        let mut writer = group_lock.lock().unwrap();
+        *writer = GroupInfo {
+            component_id,
+            component_kind,
+            component_type,
+        };
 
-            return group_id;
-        }
+        return group_id;
     }
 
-    warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    warn!(
+        "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",
+        NUM_GROUPS, component_id
+    );
     AllocationGroupId::ROOT
 }

@@ -4,7 +4,7 @@ use bytes::Bytes;
 use file_source_common::ReadFrom;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::file_watcher::{tests::*, FileWatcher, RawLineResult};
+use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 
 // Interpret all FWActions, excluding truncation
 //

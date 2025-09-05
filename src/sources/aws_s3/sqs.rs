@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
 
-use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_sqs::Client as SqsClient;
 use aws_sdk_sqs::operation::delete_message_batch::{
     DeleteMessageBatchError, DeleteMessageBatchOutput,
 };
 use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
 use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
 use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry};
-use aws_sdk_sqs::Client as SqsClient;
 use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
 use aws_smithy_runtime_api::client::result::SdkError;
 use aws_types::region::Region;
@@ -35,6 +35,7 @@ use crate::internal_events::{
     SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
 };
 use crate::{
+    SourceSender,
     aws::AwsTimeout,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
@@ -48,11 +49,10 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
-    SourceSender,
 };
-use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
+use vector_lib::config::{LegacyKey, LogNamespace, log_schema};
 use vector_lib::event::MaybeAsLogMut;
-use vector_lib::lookup::{metadata_path, path, PathPrefix};
+use vector_lib::lookup::{PathPrefix, metadata_path, path};
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -358,10 +358,10 @@ impl Ingestor {
         // Wait for all of the processes to finish.  If any one of them panics, we resume
         // that panic here to properly shutdown Vector.
         for handle in handles.drain(..) {
-            if let Err(e) = handle.await {
-                if e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+            if let Err(e) = handle.await
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
             }
         }
 

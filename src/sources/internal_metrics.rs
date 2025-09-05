@@ -9,14 +9,14 @@ use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::LogNamespace};
 
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext, SourceOutput},
+    SourceSender,
+    config::{SourceConfig, SourceContext, SourceOutput, log_schema},
     internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 /// Configuration for the `internal_metrics` source.
@@ -170,10 +170,10 @@ impl InternalMetrics<'_> {
                     metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
-                if let Some(host_key) = &self.host_key.path {
-                    if let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                    }
+                if let Some(host_key) = &self.host_key.path
+                    && let Ok(hostname) = &hostname
+                {
+                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
                 }
                 if let Some(pid_key) = &self.pid_key {
                     metric.replace_tag(pid_key.to_owned(), pid.clone());
@@ -201,12 +201,12 @@ mod tests {
     use super::*;
     use crate::{
         event::{
-            metric::{Metric, MetricValue},
             Event,
+            metric::{Metric, MetricValue},
         },
         test_util::{
             self,
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
         },
     };
 

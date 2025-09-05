@@ -11,7 +11,7 @@ use vector_lib::{
 
 use crate::dns;
 
-use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
+use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
 
 /// TCP configuration.
 #[configurable_component]
@@ -85,16 +85,16 @@ impl TcpConnector {
             .await
             .context(FailedToConnectTLS)?;
 
-        if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = stream.set_send_buffer_bytes(send_buffer_size) {
-                warn!(%error, "Failed configuring send buffer size on TCP socket.");
-            }
+        if let Some(send_buffer_size) = self.send_buffer_size
+            && let Err(error) = stream.set_send_buffer_bytes(send_buffer_size)
+        {
+            warn!(%error, "Failed configuring send buffer size on TCP socket.");
         }
 
-        if let Some(keepalive) = self.keepalive {
-            if let Err(error) = stream.set_keepalive(keepalive) {
-                warn!(%error, "Failed configuring keepalive on TCP socket.");
-            }
+        if let Some(keepalive) = self.keepalive
+            && let Err(error) = stream.set_keepalive(keepalive)
+        {
+            warn!(%error, "Failed configuring keepalive on TCP socket.");
         }
 
         Ok((addr, stream))

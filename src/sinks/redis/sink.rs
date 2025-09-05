@@ -2,9 +2,9 @@ use snafu::prelude::*;
 use std::{future, sync::Arc, time::Duration};
 
 use redis::{
+    RedisResult,
     aio::ConnectionManager,
     sentinel::{Sentinel, SentinelNodeConnectionInfo},
-    RedisResult,
 };
 use tokio::{
     sync::watch::{self, Receiver, Sender},
@@ -15,10 +15,10 @@ use tokio::{
 use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 use super::{
+    RedisEvent, RedisRequest, RepairChannelSnafu,
     config::{DataTypeConfig, RedisSinkConfig, RedisTowerRequestConfigDefaults},
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
-    RedisEvent, RedisRequest, RepairChannelSnafu,
 };
 
 pub(super) type GenerationCount = u64;
@@ -192,7 +192,10 @@ impl RedisConnection {
                     }
                 }
                 Err(error) => {
-                    warn!(internal_log_rate_limit = true, "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}.");
+                    warn!(
+                        internal_log_rate_limit = true,
+                        "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}."
+                    );
                     sleep(Duration::from_millis(250)).await;
                     continue;
                 }
@@ -388,15 +391,15 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn on_retriable_error(&self, error: &Self::Error) {
-        if let RedisSinkError::SendError { source, generation } = error {
-            if matches!(
+        if let RedisSinkError::SendError { source, generation } = error
+            && matches!(
                 source.kind(),
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
-            ) {
-                self.connection.signal_broken(*generation);
-            }
+            )
+        {
+            self.connection.signal_broken(*generation);
         }
     }
 

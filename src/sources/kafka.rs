@@ -3,8 +3,8 @@ use std::{
     io::Cursor,
     pin::Pin,
     sync::{
-        mpsc::{sync_channel, SyncSender},
         Arc, OnceLock, Weak,
+        mpsc::{SyncSender, sync_channel},
     },
     time::Duration,
 };
@@ -15,14 +15,14 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
+    ClientConfig, ClientContext, Statistics, TopicPartitionList,
     consumer::{
-        stream_consumer::StreamPartitionQueue, BaseConsumer, CommitMode, Consumer, ConsumerContext,
-        Rebalance, StreamConsumer,
+        BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer,
+        stream_consumer::StreamPartitionQueue,
     },
     error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
     types::RDKafkaErrorCode,
-    ClientConfig, ClientContext, Statistics, TopicPartitionList,
 };
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -38,24 +38,25 @@ use tokio::{
 use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
 use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
+    decoding::{DeserializerConfig, FramingConfig},
 };
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 
 use vector_lib::configurable::configurable_component;
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
-use vrl::value::{kind::Collection, Kind, ObjectMap};
+use vrl::value::{Kind, ObjectMap, kind::Collection};
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
@@ -65,7 +66,6 @@ use crate::{
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -622,11 +622,10 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered {
-                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                            if status == BatchStatus::Delivered
+                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
                                     emit!(KafkaOffsetUpdateError { error });
                                 }
-                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -1544,6 +1543,7 @@ mod integration_test {
     use futures::Stream;
     use futures_util::stream::FuturesUnordered;
     use rdkafka::{
+        Offset, TopicPartitionList,
         admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
         client::DefaultClientContext,
         config::{ClientConfig, FromClientConfig},
@@ -1551,7 +1551,6 @@ mod integration_test {
         message::{Header, OwnedHeaders},
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
-        Offset, TopicPartitionList,
     };
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
@@ -1560,10 +1559,10 @@ mod integration_test {
 
     use super::{test::*, *};
     use crate::{
+        SourceSender,
         event::{EventArray, EventContainer},
         shutdown::ShutdownSignal,
         test_util::{collect_n, components::assert_source_compliance, random_string},
-        SourceSender,
     };
 
     const KEY: &str = "my key";
@@ -1733,10 +1732,11 @@ mod integration_test {
                     meta.get(path!("vector", "source_type")).unwrap(),
                     &value!(KafkaSourceConfig::NAME)
                 );
-                assert!(meta
-                    .get(path!("vector", "ingest_timestamp"))
-                    .unwrap()
-                    .is_timestamp());
+                assert!(
+                    meta.get(path!("vector", "ingest_timestamp"))
+                        .unwrap()
+                        .is_timestamp()
+                );
 
                 assert_eq!(
                     event.as_log().value(),
@@ -1860,10 +1860,10 @@ mod integration_test {
             .expect("create_topics failed");
 
         for result in topic_results {
-            if let Err((topic, err)) = result {
-                if err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
-                    panic!("Creating a topic failed: {:?}", (topic, err))
-                }
+            if let Err((topic, err)) = result
+                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                panic!("Creating a topic failed: {:?}", (topic, err))
             }
         }
     }
@@ -2023,7 +2023,11 @@ mod integration_test {
             0,
             "First batch of events should be non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
         );
-        assert_ne!(events2.len(), 0, "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
+        assert_ne!(
+            events2.len(),
+            0,
+            "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) "
+        );
         assert_eq!(total, expect_count);
     }
 

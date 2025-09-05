@@ -4,10 +4,11 @@ use std::{env, path::PathBuf};
 
 use anyhow::Result;
 
-use super::config::{Environment, IntegrationRunnerConfig, RustToolchainConfig};
+use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::app::{self, CommandExt as _};
+use crate::environment::{Environment, append_environment_variables};
 use crate::testing::build::prepare_build_command;
-use crate::testing::docker::{docker_command, DOCKER_SOCKET};
+use crate::testing::docker::{DOCKER_SOCKET, docker_command};
 use crate::util::{ChainArgs as _, IS_A_TTY};
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -73,31 +74,36 @@ pub trait ContainerTestRunner: TestRunner {
         let container_name = self.container_name();
 
         for line in command.check_output()?.lines() {
-            if let Some((name, state)) = line.split_once(' ') {
-                if name == container_name {
-                    return Ok(if state == "created" {
-                        RunnerState::Created
-                    } else if state == "dead" {
-                        RunnerState::Dead
-                    } else if state == "exited" || state.starts_with("Exited ") {
-                        RunnerState::Exited
-                    } else if state == "paused" {
-                        RunnerState::Paused
-                    } else if state == "restarting" {
-                        RunnerState::Restarting
-                    } else if state == "running" || state.starts_with("Up ") {
-                        RunnerState::Running
-                    } else {
-                        RunnerState::Unknown
-                    });
-                }
+            if let Some((name, state)) = line.split_once(' ')
+                && name == container_name
+            {
+                return Ok(if state == "created" {
+                    RunnerState::Created
+                } else if state == "dead" {
+                    RunnerState::Dead
+                } else if state == "exited" || state.starts_with("Exited ") {
+                    RunnerState::Exited
+                } else if state == "paused" {
+                    RunnerState::Paused
+                } else if state == "restarting" {
+                    RunnerState::Restarting
+                } else if state == "running" || state.starts_with("Up ") {
+                    RunnerState::Running
+                } else {
+                    RunnerState::Unknown
+                });
             }
         }
 
         Ok(RunnerState::Missing)
     }
 
-    fn ensure_running(&self, features: Option<&[String]>, directory: &str) -> Result<()> {
+    fn ensure_running(
+        &self,
+        features: Option<&[String]>,
+        directory: &str,
+        config_environment_variables: &Environment,
+    ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
             RunnerState::Created | RunnerState::Exited => self.start()?,
@@ -108,7 +114,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory)?;
+                self.build(features, directory, config_environment_variables)?;
                 self.ensure_volumes()?;
                 self.create()?;
                 self.start()?;
@@ -137,11 +143,18 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(())
     }
 
-    fn build(&self, features: Option<&[String]>, directory: &str) -> Result<()> {
+    fn build(
+        &self,
+        features: Option<&[String]>,
+        directory: &str,
+        config_env_vars: &Environment,
+    ) -> Result<()> {
         let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
-        let mut command = prepare_build_command(&self.image_name(), &dockerfile, features);
+
+        let mut command =
+            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
         waiting!("Building image {}", self.image_name());
         command.check_run()
     }
@@ -216,12 +229,12 @@ where
     fn test(
         &self,
         outer_env: &Environment,
-        inner_env: &Environment,
+        config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
         directory: &str,
     ) -> Result<()> {
-        self.ensure_running(features, directory)?;
+        self.ensure_running(features, directory, config_environment_variables)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -236,13 +249,7 @@ where
             }
             command.args(["--env", key]);
         }
-        for (key, value) in inner_env {
-            command.arg("--env");
-            match value {
-                Some(value) => command.arg(format!("{key}={value}")),
-                None => command.arg(key),
-            };
-        }
+        append_environment_variables(&mut command, config_environment_variables);
 
         command.arg(self.container_name());
         command.args(TEST_COMMAND);
@@ -252,6 +259,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(super) struct IntegrationTestRunner {
     // The integration is None when compiling the runner image with the `all-integration-tests` feature.
     integration: Option<String>,

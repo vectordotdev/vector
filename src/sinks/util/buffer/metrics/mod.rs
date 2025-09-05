@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
-    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
     Merged, SinkBatchSettings,
+    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
 };
 
 mod normalize;
@@ -57,7 +57,12 @@ impl Batch for MetricsBuffer {
         } else {
             let max_events = self.max_events;
             self.metrics
-                .get_or_insert_with(|| MetricSet::with_capacity(max_events))
+                .get_or_insert_with(|| {
+                    MetricSet::new(MetricSetSettings {
+                        max_events: Some(max_events),
+                        ..Default::default()
+                    })
+                })
                 .insert_update(item);
             PushResult::Ok(self.num_items() >= self.max_events)
         }

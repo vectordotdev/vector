@@ -12,10 +12,10 @@ use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    common::datadog::{is_reserved_attribute, DDTAGS, DD_RESERVED_SEMANTIC_ATTRS, MESSAGE},
+    common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
     sinks::{
         prelude::*,
-        util::{http::HttpJsonBatchSizer, Compressor},
+        util::{Compressor, http::HttpJsonBatchSizer},
     },
 };
 #[derive(Default)]
@@ -126,19 +126,19 @@ pub fn normalize_event(event: &mut Event) {
     // NOTE: we don't access by semantic meaning here because in the prior step
     // we ensured reserved attributes are in expected locations.
     let ddtags_path = event_path!(DDTAGS);
-    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path) {
-        if !tags_arr.is_empty() {
-            let all_tags: String = tags_arr
-                .iter()
-                .filter_map(|tag_kv| {
-                    tag_kv
-                        .as_bytes()
-                        .map(|bytes| String::from_utf8_lossy(bytes))
-                })
-                .join(",");
+    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path)
+        && !tags_arr.is_empty()
+    {
+        let all_tags: String = tags_arr
+            .iter()
+            .filter_map(|tag_kv| {
+                tag_kv
+                    .as_bytes()
+                    .map(|bytes| String::from_utf8_lossy(bytes))
+            })
+            .join(",");
 
-            log.insert(ddtags_path, all_tags);
-        }
+        log.insert(ddtags_path, all_tags);
     }
 
     // ensure the timestamp is in expected format
@@ -441,22 +441,23 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
-        schema::{meaning, Definition},
+        schema::{Definition, meaning},
     };
     use vrl::{
         core::Value,
         event_path, metadata_path, owned_value_path, value,
-        value::{kind::Collection, Kind},
+        value::{Kind, kind::Collection},
     };
 
     use super::{normalize_as_agent_event, normalize_event};
     use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
-        assert!(log
-            .get(event_path!("timestamp"))
-            .expect("should have timestamp")
-            .is_integer());
+        assert!(
+            log.get(event_path!("timestamp"))
+                .expect("should have timestamp")
+                .is_integer()
+        );
 
         for attr in [
             "message",

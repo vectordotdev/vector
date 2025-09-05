@@ -3,13 +3,13 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use vector::config::TransformContext;
 use vector::transforms::{
-    route::{Route, RouteConfig},
     TransformOutputsBuf,
+    route::{Route, RouteConfig},
 };
 use vector_lib::{
     config::{DataType, TransformOutput},

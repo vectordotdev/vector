@@ -13,25 +13,25 @@ use vector_lib::internal_event::{
 };
 use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{
-    codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        StreamDecodingError,
-    },
-    config::DataType,
+    EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::DataType,
 };
 use vrl::value::Kind;
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
     internal_events::{DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 /// Configuration for the `demo_logs` source.
@@ -175,7 +175,7 @@ impl OutputFormat {
     }
 
     // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
-    pub(self) fn validate(&self) -> Result<(), DemoLogsConfigError> {
+    pub(self) const fn validate(&self) -> Result<(), DemoLogsConfigError> {
         match self {
             Self::Shuffle { lines, .. } => {
                 if lines.is_empty() {
@@ -344,15 +344,15 @@ impl SourceConfig for DemoLogsConfig {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{poll, Stream, StreamExt};
+    use futures::{Stream, StreamExt, poll};
 
     use super::*;
     use crate::{
+        SourceSender,
         config::log_schema,
         event::Event,
         shutdown::ShutdownSignal,
-        test_util::components::{assert_source_compliance, SOURCE_TAGS},
-        SourceSender,
+        test_util::components::{SOURCE_TAGS, assert_source_compliance},
     };
 
     #[test]

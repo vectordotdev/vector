@@ -4,7 +4,7 @@ use async_graphql::{Enum, InputObject, Object};
 
 use crate::{
     api::schema::{
-        filter::{filter_items, CustomFilter, StringFilter},
+        filter::{CustomFilter, StringFilter, filter_items},
         metrics::{self, MetricsFilter},
         relay, sort,
     },
@@ -25,7 +25,7 @@ impl<'a> FileSourceMetricFile<'a> {
         Self { name, metrics }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub const fn get_name(&self) -> &str {
         self.name.as_str()
     }
 }
@@ -135,10 +135,11 @@ pub struct FileSourceMetricsFilesFilter {
 
 impl CustomFilter<FileSourceMetricFile<'_>> for FileSourceMetricsFilesFilter {
     fn matches(&self, file: &FileSourceMetricFile<'_>) -> bool {
-        filter_check!(self
-            .name
-            .as_ref()
-            .map(|f| f.iter().all(|f| f.filter_value(file.get_name()))));
+        filter_check!(
+            self.name
+                .as_ref()
+                .map(|f| f.iter().all(|f| f.filter_value(file.get_name())))
+        );
         true
     }
 
@@ -214,7 +215,7 @@ mod tests {
             }
         }
 
-        fn get_metric(&self) -> FileSourceMetricFile {
+        fn get_metric(&self) -> FileSourceMetricFile<'_> {
             FileSourceMetricFile::from_tuple((
                 self.name.to_string(),
                 vec![&self.bytes_metric, &self.events_metric],

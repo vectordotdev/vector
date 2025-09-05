@@ -10,15 +10,15 @@ use tokio::{
     runtime::Builder,
     select,
     sync::{
-        mpsc::{self, Receiver, Sender},
         Mutex,
+        mpsc::{self, Receiver, Sender},
     },
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
 
 use vector_lib::{
-    codecs::encoding, config::LogNamespace, event::Event, EstimatedJsonEncodedSizeOf,
+    EstimatedJsonEncodedSizeOf, codecs::encoding, config::LogNamespace, event::Event,
 };
 
 use crate::{
@@ -30,9 +30,9 @@ use crate::{
 };
 
 use super::{
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
     encode_test_event,
     sync::{Configuring, TaskCoordinator},
-    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
 };
 
 pub use self::config::TopologyBuilder;
@@ -70,8 +70,12 @@ impl RunnerInput {
         controlled_edge: Option<mpsc::Sender<TestEvent>>,
     ) -> mpsc::Sender<TestEvent> {
         match (self, controlled_edge) {
-            (Self::External(_), Some(_)) => panic!("Runner input declared as external resource, but controlled input edge was also specified."),
-            (Self::Controlled, None) => panic!("Runner input declared as controlled, but no controlled input edge was specified."),
+            (Self::External(_), Some(_)) => panic!(
+                "Runner input declared as external resource, but controlled input edge was also specified."
+            ),
+            (Self::Controlled, None) => panic!(
+                "Runner input declared as controlled, but no controlled input edge was specified."
+            ),
             (Self::External(tx), None) => tx,
             (Self::Controlled, Some(tx)) => tx,
         }
@@ -113,8 +117,12 @@ impl RunnerOutput {
         controlled_edge: Option<mpsc::Receiver<Vec<Event>>>,
     ) -> mpsc::Receiver<Vec<Event>> {
         match (self, controlled_edge) {
-            (Self::External(_), Some(_)) => panic!("Runner output declared as external resource, but controlled output edge was also specified."),
-            (Self::Controlled, None) => panic!("Runner output declared as controlled, but no controlled output edge was specified."),
+            (Self::External(_), Some(_)) => panic!(
+                "Runner output declared as external resource, but controlled output edge was also specified."
+            ),
+            (Self::Controlled, None) => panic!(
+                "Runner output declared as controlled, but no controlled output edge was specified."
+            ),
             (Self::External(rx), None) => rx,
             (Self::Controlled, Some(rx)) => rx,
         }
@@ -579,10 +587,10 @@ fn spawn_input_driver(
             // the controlled edge (vector source) adds metadata to the event when it is received.
             // thus we need to add it here so the expected values for the comparisons on transforms
             // and sinks are accurate.
-            if component_type != ComponentType::Source {
-                if let Event::Log(ref mut log) = input_event.get_event() {
-                    log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
-                }
+            if component_type != ComponentType::Source
+                && let Event::Log(log) = input_event.get_event()
+            {
+                log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
             }
 
             let (failure_case, mut event) = input_event.clone().get();
@@ -612,21 +620,18 @@ fn spawn_input_driver(
                 // For example, the `datadog_agent` source. This only takes effect when
                 // the test case YAML file defining the event, constructs it with the log
                 // builder variant, and specifies an integer in milliseconds for the timestamp.
-                if component_type == ComponentType::Source {
-                    if let Event::Log(ref mut log) = event {
-                        if let Some(ts) = log.remove_timestamp() {
-                            let ts = match ts.as_integer() {
-                                Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
-                                    .unwrap_or_else(|| {
-                                        panic!("invalid timestamp in input test event {ts}")
-                                    })
-                                    .into(),
-                                None => ts,
-                            };
-                            log.parse_path_and_insert("timestamp", ts)
-                                .expect("failed to insert timestamp");
-                        }
-                    }
+                if component_type == ComponentType::Source
+                    && let Event::Log(ref mut log) = event
+                    && let Some(ts) = log.remove_timestamp()
+                {
+                    let ts = match ts.as_integer() {
+                        Some(ts) => chrono::DateTime::from_timestamp_millis(ts)
+                            .unwrap_or_else(|| panic!("invalid timestamp in input test event {ts}"))
+                            .into(),
+                        None => ts,
+                    };
+                    log.parse_path_and_insert("timestamp", ts)
+                        .expect("failed to insert timestamp");
                 }
 
                 // This particular metric is tricky because a component can run the

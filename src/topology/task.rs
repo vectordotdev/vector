@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt, future::BoxFuture};
 use pin_project::pin_project;
 use snafu::Snafu;
 use tokio::task::JoinError;

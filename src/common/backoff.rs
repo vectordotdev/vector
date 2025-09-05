@@ -64,10 +64,10 @@ impl Iterator for ExponentialBackoff {
         };
 
         // check if we reached max delay
-        if let Some(ref max_delay) = self.max_delay {
-            if duration > *max_delay {
-                return Some(*max_delay);
-            }
+        if let Some(ref max_delay) = self.max_delay
+            && duration > *max_delay
+        {
+            return Some(*max_delay);
         }
 
         if let Some(next) = self.current.checked_mul(self.base) {

@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_lock)]
+
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, namespace, test_pod, vector::Config as VectorConfig};
@@ -10,7 +12,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let override_name = get_override_name(&namespace, "vector-aggregator");
-    let vector_endpoint = &format!("{}.{}.svc.cluster.local", override_name, namespace);
+    let vector_endpoint = &format!("{override_name}.{namespace}.svc.cluster.local");
     let datadog_namespace = get_namespace_appended(&namespace, "datadog-agent");
     let datadog_override_name = get_override_name(&namespace, "datadog-agent");
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
@@ -66,7 +68,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/{}", override_name),
+            &format!("statefulset/{override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -90,7 +92,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &datadog_namespace,
-            &format!("daemonset/{}", datadog_override_name),
+            &format!("daemonset/{datadog_override_name}"),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -114,7 +116,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         ))?)
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("statefulset/{}", override_name))?;
+    let mut log_reader = framework.logs(&namespace, &format!("statefulset/{override_name}"))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.

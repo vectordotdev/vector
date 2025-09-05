@@ -8,19 +8,18 @@ use vector_lib::configurable::configurable_component;
 
 use crate::sinks::util::retries::RetryAction;
 use crate::{
-    aws::{create_client, is_retriable_error, ClientBuilder},
+    aws::{ClientBuilder, create_client, is_retriable_error},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        util::{retries::RetryLogic, BatchConfig, SinkBatchSettings},
         Healthcheck, VectorSink,
+        util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
     },
 };
 
 use super::sink::BatchKinesisRequest;
 use super::{
-    build_sink,
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
     record::{KinesisFirehoseClient, KinesisFirehoseRecord},
-    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -178,13 +177,13 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError(inner) = error {
-            if matches!(
+        if let SdkError::ServiceError(inner) = error
+            && matches!(
                 inner.err(),
                 PutRecordBatchError::ServiceUnavailableException(_)
-            ) {
-                return true;
-            }
+            )
+        {
+            return true;
         }
         is_retriable_error(error)
     }

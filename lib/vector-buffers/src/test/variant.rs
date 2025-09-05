@@ -9,12 +9,12 @@ use tracing::Span;
 use vector_common::finalization::Finalizable;
 
 use crate::{
+    Bufferable, MemoryBufferSize, WhenFull,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
     variants::{DiskV2Buffer, MemoryBuffer},
-    Bufferable, MemoryBufferSize, WhenFull,
 };
 
 #[cfg(test)]

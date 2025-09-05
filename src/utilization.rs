@@ -1,10 +1,10 @@
 use std::{
     collections::HashMap,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
