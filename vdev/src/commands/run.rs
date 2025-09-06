@@ -1,9 +1,9 @@
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
-use crate::{app::CommandExt as _, features};
+use crate::{app::VDevCommand, features};
 
 /// Run `vector` with the minimum set of features required by the config file
 #[derive(Args, Debug)]
@@ -37,17 +37,22 @@ impl Cli {
         let mut features = features::load_and_extract(&self.config)?;
         features.extend(self.feature);
         let features = features.join(",");
-        let mut command = Command::new("cargo");
-        command.args(["run", "--no-default-features", "--features", &features]);
-        if self.release {
-            command.arg("--release");
-        }
-        command.args([
-            "--",
-            "--config",
-            self.config.to_str().expect("Invalid config file name"),
+        let mut command = VDevCommand::new("cargo").args([
+            "run",
+            "--no-default-features",
+            "--features",
+            &features,
         ]);
-        command.args(self.args);
-        command.check_run()
+        if self.release {
+            command = command.arg("--release");
+        }
+        command
+            .args([
+                "--",
+                "--config",
+                self.config.to_str().expect("Invalid config file name"),
+            ])
+            .args(self.args)
+            .check_run()
     }
 }

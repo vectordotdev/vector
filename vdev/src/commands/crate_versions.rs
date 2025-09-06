@@ -1,11 +1,11 @@
-use std::{collections::HashMap, collections::HashSet, process::Command};
+use std::{collections::HashMap, collections::HashSet};
 
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools as _;
 use regex::Regex;
 
-use crate::{app::CommandExt as _, util};
+use crate::{app::VDevCommand, util};
 
 /// Show information about crates versions pulled in by all dependencies
 #[derive(Args, Debug)]
@@ -25,7 +25,7 @@ impl Cli {
         let re_crate = Regex::new(r" (\S+) v([0-9.]+)").unwrap();
         let mut versions: HashMap<String, HashSet<String>> = HashMap::default();
 
-        for line in Command::new("cargo")
+        for line in VDevCommand::new("cargo")
             .arg("tree")
             .features(&self.feature)
             .check_output()?

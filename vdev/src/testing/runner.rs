@@ -1,11 +1,10 @@
 use std::collections::HashSet;
-use std::process::Command;
 use std::{env, path::PathBuf};
 
 use anyhow::Result;
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::app::{self, CommandExt as _};
+use crate::app::{self, VDevCommand};
 use crate::environment::{Environment, append_environment_variables};
 use crate::testing::build::prepare_build_command;
 use crate::testing::docker::{DOCKER_SOCKET, docker_command};
@@ -70,7 +69,7 @@ pub trait ContainerTestRunner: TestRunner {
     fn volumes(&self) -> Vec<String>;
 
     fn state(&self) -> Result<RunnerState> {
-        let mut command = docker_command(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
+        let command = docker_command(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
         let container_name = self.container_name();
 
         for line in command.check_output()?.lines() {
@@ -125,7 +124,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn ensure_volumes(&self) -> Result<()> {
-        let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
+        let command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
 
         let mut volumes = HashSet::new();
         volumes.insert(VOLUME_TARGET);
@@ -153,7 +152,7 @@ pub trait ContainerTestRunner: TestRunner {
             .iter()
             .collect();
 
-        let mut command =
+        let command =
             prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
         waiting!("Building image {}", self.image_name());
         command.check_run()
@@ -238,24 +237,25 @@ where
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
-            command.arg("--tty");
+            command = command.arg("--tty");
         }
 
-        command.args(["--env", "RUST_BACKTRACE=1"]);
-        command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        command = command
+            .args(["--env", "RUST_BACKTRACE=1"])
+            .args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
         for (key, value) in outer_env {
             if let Some(value) = value {
-                command.env(key, value);
+                command = command.env(key, value);
             }
-            command.args(["--env", key]);
+            command = command.args(["--env", key]);
         }
-        append_environment_variables(&mut command, config_environment_variables);
+        command = append_environment_variables(command, config_environment_variables);
 
-        command.arg(self.container_name());
-        command.args(TEST_COMMAND);
-        command.args(args);
-
-        command.check_run()
+        command
+            .arg(self.container_name())
+            .args(TEST_COMMAND)
+            .args(args)
+            .check_run()
     }
 }
 
@@ -288,7 +288,7 @@ impl IntegrationTestRunner {
 
     pub(super) fn ensure_network(&self) -> Result<()> {
         if let Some(network_name) = &self.network {
-            let mut command = docker_command(["network", "ls", "--format", "{{.Name}}"]);
+            let command = docker_command(["network", "ls", "--format", "{{.Name}}"]);
 
             if command
                 .check_output()?
@@ -370,21 +370,19 @@ impl TestRunner for LocalTestRunner {
         args: &[String],
         _directory: &str,
     ) -> Result<()> {
-        let mut command = Command::new(TEST_COMMAND[0]);
-        command.args(&TEST_COMMAND[1..]);
-        command.args(args);
-
-        for (key, value) in outer_env {
-            if let Some(value) = value {
-                command.env(key, value);
-            }
-        }
-        for (key, value) in inner_env {
-            if let Some(value) = value {
-                command.env(key, value);
-            }
-        }
-
-        command.check_run()
+        VDevCommand::new(TEST_COMMAND[0])
+            .args(&TEST_COMMAND[1..])
+            .args(args)
+            .envs(
+                outer_env
+                    .iter()
+                    .filter_map(|(key, value)| value.as_ref().map(|v| (key, v))),
+            )
+            .envs(
+                inner_env
+                    .iter()
+                    .filter_map(|(key, value)| value.as_ref().map(|v| (key, v))),
+            )
+            .check_run()
     }
 }

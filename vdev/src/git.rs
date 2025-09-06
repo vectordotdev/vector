@@ -1,7 +1,7 @@
-use crate::app::CommandExt as _;
+use crate::app::VDevCommand;
 use anyhow::{Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
-use std::{collections::HashSet, process::Command};
+use std::collections::HashSet;
 
 pub fn current_branch() -> Result<String> {
     let output = run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
@@ -95,46 +95,46 @@ pub fn get_modified_files() -> Result<Vec<String>> {
 }
 
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {
-    Command::new("git")
+    VDevCommand::new("git")
         .args(["config", key, value])
-        .stdout(std::process::Stdio::null())
         .check_output()
 }
 
 /// Checks if the current directory's repo is clean
 pub fn check_git_repository_clean() -> Result<bool> {
-    Ok(Command::new("git")
+    VDevCommand::new("git")
         .args(["diff-index", "--quiet", "HEAD"])
-        .stdout(std::process::Stdio::null())
-        .status()
-        .map(|status| status.success())?)
+        .run()
+        .map(|status| status.success())
 }
 
 pub fn add_files_in_current_dir() -> Result<String> {
-    Command::new("git").args(["add", "."]).check_output()
+    VDevCommand::new("git").args(["add", "."]).check_output()
 }
 
 /// Commits changes from the current repo
 pub fn commit(commit_message: &str) -> Result<String> {
-    Command::new("git")
+    VDevCommand::new("git")
         .args(["commit", "--all", "--message", commit_message])
         .check_output()
 }
 
 /// Pushes changes from the current repo
 pub fn push() -> Result<String> {
-    Command::new("git").args(["push"]).check_output()
+    VDevCommand::new("git").args(["push"]).check_output()
 }
 
 pub fn push_and_set_upstream(branch_name: &str) -> Result<String> {
-    Command::new("git")
+    VDevCommand::new("git")
         .args(["push", "-u", "origin", branch_name])
         .check_output()
 }
 
 pub fn clone(repo_url: &str) -> Result<String> {
     // We cannot use capture_output since this will need to run in the CWD
-    Command::new("git").args(["clone", repo_url]).check_output()
+    VDevCommand::new("git")
+        .args(["clone", repo_url])
+        .check_output()
 }
 
 /// Walks up from the current working directory until it finds a `.git`
@@ -189,7 +189,7 @@ pub fn create_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn run_and_check_output(args: &[&str]) -> Result<String> {
-    Command::new("git").in_repo().args(args).check_output()
+    VDevCommand::new("git").in_repo().args(args).check_output()
 }
 
 fn is_warning_line(line: &str) -> bool {

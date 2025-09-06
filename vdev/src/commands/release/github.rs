@@ -1,8 +1,7 @@
-use crate::app::CommandExt as _;
+use crate::app::VDevCommand;
 use crate::util;
-use anyhow::{anyhow, Ok, Result};
+use anyhow::{Result, anyhow};
 use glob::glob;
-use std::process::Command;
 
 /// Uploads target/artifacts to GitHub releases
 #[derive(clap::Args, Debug)]
@@ -21,25 +20,24 @@ impl Cli {
             .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
 
         let version = util::get_version()?;
-        let mut command = Command::new("gh");
-        command.in_repo();
-        command.args(
-            [
-                "release",
-                "--repo",
-                "vectordotdev/vector",
-                "create",
-                &format!("v{version}"),
-                "--title",
-                &format!("v{version}"),
-                "--notes",
-                &format!("[View release notes](https://vector.dev/releases/{version})"),
-            ]
-            .map(String::from)
-            .into_iter()
-            .chain(artifacts),
-        );
-        command.check_run()?;
-        Ok(())
+        VDevCommand::new("gh")
+            .in_repo()
+            .args(
+                [
+                    "release",
+                    "--repo",
+                    "vectordotdev/vector",
+                    "create",
+                    &format!("v{version}"),
+                    "--title",
+                    &format!("v{version}"),
+                    "--notes",
+                    &format!("[View release notes](https://vector.dev/releases/{version})"),
+                ]
+                .map(String::from)
+                .into_iter()
+                .chain(artifacts),
+            )
+            .check_run()
     }
 }
