@@ -462,6 +462,11 @@ check-all: check-scripts check-deny check-component-docs check-licenses
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check component-features
 
+.PHONY: check-changelog-fragments
+check-changelog-fragments: ## Check that all component features are setup properly
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check changelog-fragments
+
+
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
