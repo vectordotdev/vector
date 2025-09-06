@@ -1,9 +1,9 @@
 use std::{error, fmt, mem};
 
 use bytes::{Buf, BufMut};
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers},
 };
 
 use crate::{

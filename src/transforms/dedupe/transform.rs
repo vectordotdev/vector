@@ -6,13 +6,12 @@ use lru::LruCache;
 use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 use vrl::path::OwnedTargetPath;
 
+use super::common::FieldMatchConfig;
 use crate::{
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
     transforms::TaskTransform,
 };
-
-use super::common::FieldMatchConfig;
 
 #[derive(Clone)]
 pub struct Dedupe {

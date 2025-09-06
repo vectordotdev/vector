@@ -1,9 +1,12 @@
 #![allow(clippy::print_stdout)]
-use crate::config::{SourceConfig, SourceContext};
+use async_nats::jetstream::stream::StorageType;
+use bytes::Bytes;
+use vector_lib::config::log_schema;
+
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
-    config::LogNamespace,
+    config::{LogNamespace, SourceConfig, SourceContext},
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
@@ -20,9 +23,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsEnableableConfig},
 };
-use async_nats::jetstream::stream::StorageType;
-use bytes::Bytes;
-use vector_lib::config::log_schema;
 
 fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
     NatsSourceConfig {

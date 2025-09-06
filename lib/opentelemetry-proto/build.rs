@@ -1,7 +1,10 @@
+use std::{
+    fs::{read_to_string, write},
+    io::Result,
+    path::{Path, PathBuf},
+};
+
 use glob::glob;
-use std::fs::{read_to_string, write};
-use std::path::Path;
-use std::{io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_root = PathBuf::from("src/proto/opentelemetry-proto");

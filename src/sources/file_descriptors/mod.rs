@@ -5,19 +5,17 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt, channel::mpsc, executor};
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::configurable::NamedComponent;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::NamedComponent,
     event::Event,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 

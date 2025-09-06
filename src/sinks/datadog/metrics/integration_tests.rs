@@ -9,13 +9,17 @@ use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
 use rand::{Rng, rng};
-
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
     metric_tags,
 };
 
+use super::{
+    DatadogMetricsConfig,
+    config::{SERIES_V1_PATH, SERIES_V2_PATH},
+    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
+};
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
@@ -26,12 +30,6 @@ use crate::{
         },
         map_event_batch_stream, next_addr,
     },
-};
-
-use super::{
-    DatadogMetricsConfig,
-    config::{SERIES_V1_PATH, SERIES_V2_PATH},
-    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
 };
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]

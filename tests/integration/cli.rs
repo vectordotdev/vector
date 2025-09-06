@@ -1,6 +1,5 @@
 #![allow(clippy::print_stdout)]
-use std::collections::HashSet;
-use std::{fs::read_dir, process::Command};
+use std::{collections::HashSet, fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
 

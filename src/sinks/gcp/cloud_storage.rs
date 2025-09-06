@@ -2,20 +2,22 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::Uri;
-use http::header::{HeaderName, HeaderValue};
+use http::{
+    Uri,
+    header::{HeaderName, HeaderValue},
+};
 use indoc::indoc;
-use snafu::ResultExt;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::{TimeZone, request_metadata::RequestMetadata};
+use vector_lib::{
+    TimeZone,
+    codecs::encoding::Framer,
+    configurable::configurable_component,
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -35,8 +37,9 @@ use crate::{
         },
         util::{
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, timezone_to_offset,
+            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
+            partitioner::KeyPartitioner, request_builder::EncodeResult,
+            service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
     template::{Template, TemplateParseError},
@@ -446,21 +449,24 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 #[cfg(test)]
 mod tests {
     use futures_util::{future::ready, stream};
-    use vector_lib::EstimatedJsonEncodedSizeOf;
-    use vector_lib::codecs::encoding::FramingConfig;
-    use vector_lib::codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    };
-    use vector_lib::partition::Partitioner;
-    use vector_lib::request_metadata::GroupedCountByteSize;
-
-    use crate::event::LogEvent;
-    use crate::test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
-        http::{always_200_response, spawn_blackhole_http_server},
+    use vector_lib::{
+        EstimatedJsonEncodedSizeOf,
+        codecs::{
+            JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+            encoding::FramingConfig,
+        },
+        partition::Partitioner,
+        request_metadata::GroupedCountByteSize,
     };
 
     use super::*;
+    use crate::{
+        event::LogEvent,
+        test_util::{
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {

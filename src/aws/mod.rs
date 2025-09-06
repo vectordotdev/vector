@@ -3,6 +3,17 @@ pub mod auth;
 pub mod region;
 pub mod timeout;
 
+use std::{
+    error::Error,
+    pin::Pin,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime},
+};
+
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{
     Region, SdkConfig, meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig,
@@ -33,22 +44,14 @@ use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::{
-    error::Error,
-    pin::Pin,
-    sync::{
-        Arc, OnceLock,
-        atomic::{AtomicUsize, Ordering},
-    },
-    task::{Context, Poll},
-    time::{Duration, SystemTime},
-};
 pub use timeout::AwsTimeout;
 
-use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector, status};
-use crate::internal_events::AwsBytesSent;
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::{
+    config::ProxyConfig,
+    http::{build_proxy_connector, build_tls_connector, status},
+    internal_events::AwsBytesSent,
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 

@@ -1,4 +1,3 @@
-use crate::serde::default_decoding;
 use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
 use bytes::Bytes;
@@ -13,6 +12,8 @@ use vector_lib::{
     lookup::lookup_v2::ConfigValuePath,
 };
 use vrl::prelude::VrlValueConvert;
+
+use crate::serde::default_decoding;
 
 /// Configuration for message buffering which enables message replay for clients that connect later.
 #[configurable_component]

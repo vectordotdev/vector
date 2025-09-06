@@ -3,14 +3,19 @@ use std::iter;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{
-    CountByteSize, EventsReceived, InternalEventHandle as _, Registered,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
+    config::LogNamespace,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _, Registered},
+    lookup::{PathPrefix, metadata_path, path},
 };
-use vector_lib::lookup::{PathPrefix, metadata_path, path};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
 
-use crate::{codecs::Decoder, config::log_schema, event::BatchNotifier, event::Event};
+use crate::{
+    codecs::Decoder,
+    config::log_schema,
+    event::{BatchNotifier, Event},
+};
 
 pub fn decode_message<'a>(
     mut decoder: Decoder,

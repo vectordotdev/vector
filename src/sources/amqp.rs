@@ -1,5 +1,27 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
+use std::{io::Cursor, pin::Pin};
+
+use async_stream::stream;
+use bytes::Bytes;
+use chrono::{TimeZone, Utc};
+use futures::{FutureExt, StreamExt};
+use futures_util::Stream;
+use lapin::{Channel, acker::Acker, message::Delivery};
+use snafu::Snafu;
+use tokio_util::codec::FramedRead;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
+    configurable::configurable_component,
+    event::{Event, LogEvent},
+    finalizer::UnorderedFinalizer,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+    lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
+};
+use vrl::value::Kind;
+
 use crate::{
     SourceSender,
     amqp::AmqpConfig,
@@ -13,28 +35,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
 };
-use async_stream::stream;
-use bytes::Bytes;
-use chrono::{TimeZone, Utc};
-use futures::{FutureExt, StreamExt};
-use futures_util::Stream;
-use lapin::{Channel, acker::Acker, message::Delivery};
-use snafu::Snafu;
-use std::{io::Cursor, pin::Pin};
-use tokio_util::codec::FramedRead;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
-    event::{Event, LogEvent},
-};
-use vector_lib::{
-    finalizer::UnorderedFinalizer,
-    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
-};
-use vrl::value::Kind;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -490,9 +490,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
-    use vector_lib::tls::TlsConfig;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition, tls::TlsConfig};
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -605,8 +603,12 @@ pub mod test {
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
+    use chrono::Utc;
+    use lapin::{BasicProperties, options::*};
+    use tokio::time::Duration;
+    use vector_lib::config::log_schema;
+
+    use super::{test::*, *};
     use crate::{
         SourceSender,
         amqp::await_connection,
@@ -616,11 +618,6 @@ mod integration_test {
             random_string,
         },
     };
-    use chrono::Utc;
-    use lapin::BasicProperties;
-    use lapin::options::*;
-    use tokio::time::Duration;
-    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {

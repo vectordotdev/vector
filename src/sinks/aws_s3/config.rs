@@ -1,10 +1,14 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
-use vector_lib::codecs::{
-    TextSerializerConfig,
-    encoding::{Framer, FramingConfig},
+use vector_lib::{
+    TimeZone,
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
+    sink::VectorSink,
 };
-use vector_lib::{TimeZone, configurable::configurable_component, sink::VectorSink};
 
 use super::sink::S3RequestOptions;
 use crate::{

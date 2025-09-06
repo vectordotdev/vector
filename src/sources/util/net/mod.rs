@@ -8,8 +8,6 @@ use std::{fmt, net::SocketAddr};
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
-use crate::config::{Protocol, Resource};
-
 #[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{
     MAX_IN_FLIGHT_EVENTS_TARGET, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker,
@@ -17,6 +15,7 @@ pub use self::tcp::{
 };
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
+use crate::config::{Protocol, Resource};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum SocketListenAddrParseError {

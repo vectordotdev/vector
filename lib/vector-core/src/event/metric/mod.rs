@@ -1,9 +1,5 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
-
-#[cfg(feature = "vrl")]
-use vrl::compiler::value::VrlValueConvert;
-
 use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
@@ -19,6 +15,8 @@ use vector_common::{
     request_metadata::GetEventCountTags,
 };
 use vector_config::configurable_component;
+#[cfg(feature = "vrl")]
+use vrl::compiler::value::VrlValueConvert;
 
 use super::{
     BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,

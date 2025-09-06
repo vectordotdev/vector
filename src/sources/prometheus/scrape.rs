@@ -1,28 +1,26 @@
-use std::collections::HashMap;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{config::LogNamespace, event::Event};
+use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
 
 use super::parser;
-use crate::http::QueryParameters;
-use crate::sources::util::http::HttpMethod;
-use crate::sources::util::http_client::{default_timeout, warn_if_interval_too_low};
 use crate::{
     Result,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    http::Auth,
+    http::{Auth, QueryParameters},
     internal_events::PrometheusParseError,
     sources::{
         self,
-        util::http_client::{
-            GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-            default_interval,
+        util::{
+            http::HttpMethod,
+            http_client::{
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
+                default_interval, default_timeout, warn_if_interval_too_low,
+            },
         },
     },
     tls::{TlsConfig, TlsSettings},

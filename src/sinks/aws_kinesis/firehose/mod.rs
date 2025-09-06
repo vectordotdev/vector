@@ -9,6 +9,7 @@ use aws_sdk_firehose::{
     Client, operation::put_record_batch::PutRecordBatchError, types::Record as FRecord,
 };
 
+pub use self::config::KinesisFirehoseSinkConfig;
 pub use super::{
     config::{KinesisSinkBaseConfig, build_sink},
     record::{Record, SendRecord},
@@ -16,8 +17,6 @@ pub use super::{
     service::{KinesisResponse, KinesisService},
     sink,
 };
-
-pub use self::config::KinesisFirehoseSinkConfig;
 
 pub type KinesisError = PutRecordBatchError;
 pub type KinesisRecord = FRecord;

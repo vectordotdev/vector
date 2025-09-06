@@ -23,8 +23,7 @@ use crate::{
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
     },
-    sinks::util::StreamSink,
-    sinks::websocket::config::WebSocketSinkConfig,
+    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 
 pub struct WebSocketSink {

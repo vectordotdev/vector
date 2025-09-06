@@ -1,9 +1,10 @@
-use chrono::Utc;
-use futures::StreamExt;
 use std::{
     num::NonZeroU64,
     time::{Duration, Instant},
 };
+
+use chrono::Utc;
+use futures::StreamExt;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
@@ -17,9 +18,8 @@ use vector_lib::{
     shutdown::ShutdownSignal,
 };
 
-use crate::{SourceSender, internal_events::StreamClosedError};
-
 use super::{Memory, MemoryConfig};
+use crate::{SourceSender, internal_events::StreamClosedError};
 
 /// Configuration for memory enrichment table source functionality.
 #[configurable_component]

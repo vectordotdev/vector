@@ -442,10 +442,11 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde::Serialize;
+
+    use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
     struct ValidString(String);

@@ -1,7 +1,12 @@
-use std::ffi::{OsStr, OsString};
 use std::{
-    borrow::Cow, env, io::Read, path::PathBuf, process::Command, process::ExitStatus,
-    process::Stdio, sync::LazyLock, sync::OnceLock, time::Duration,
+    borrow::Cow,
+    env,
+    ffi::{OsStr, OsString},
+    io::Read,
+    path::PathBuf,
+    process::{Command, ExitStatus, Stdio},
+    sync::{LazyLock, OnceLock},
+    time::Duration,
 };
 
 use anyhow::{Context as _, Result, bail};

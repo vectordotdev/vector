@@ -5,7 +5,6 @@ use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 
-use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
     common::mqtt::{
@@ -14,6 +13,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
+    template::Template,
     tls::MaybeTlsSettings,
 };
 

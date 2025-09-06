@@ -18,10 +18,11 @@ mod platform;
 mod testing;
 mod util;
 
+use std::env;
+
 use anyhow::Result;
 use clap::Parser;
 use commands::Cli;
-use std::env;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

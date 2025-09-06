@@ -4,9 +4,12 @@ use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
 use prost::Message;
 use tower::Service;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce};
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::telemetry};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::telemetry,
+    request_metadata::GroupedCountByteSize,
+    stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
+};
 
 use super::service::VectorRequest;
 use crate::{

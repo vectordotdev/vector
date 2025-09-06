@@ -270,15 +270,21 @@ mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
-    use vector_lib::codecs::JsonSerializerConfig;
-    use vector_lib::event::{BatchNotifier, BatchStatus};
+    use vector_lib::{
+        codecs::JsonSerializerConfig,
+        event::{BatchNotifier, BatchStatus},
+    };
 
     use super::*;
-    use crate::gcp;
-    use crate::test_util::components::{COMPONENT_ERROR_TAGS, run_and_assert_sink_error};
-    use crate::test_util::{
-        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
-        random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
+    use crate::{
+        gcp,
+        test_util::{
+            components::{
+                COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, run_and_assert_sink_compliance,
+                run_and_assert_sink_error,
+            },
+            random_events_with_stream, random_metrics_with_stream, random_string, trace_init,
+        },
     };
 
     const PROJECT: &str = "testproject";

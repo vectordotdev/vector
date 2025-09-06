@@ -1,18 +1,24 @@
-use std::num::NonZeroUsize;
-use std::task::{Context, Poll};
+use std::{
+    num::NonZeroUsize,
+    task::{Context, Poll},
+};
 
-use crate::internal_events::EndpointBytesSent;
-use crate::sinks::prelude::{RequestMetadataBuilder, RetryLogic};
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
-use sqlx::types::Json;
-use sqlx::{Pool, Postgres};
+use sqlx::{Pool, Postgres, types::Json};
 use tower::Service;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::event::{Event, EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::JsonSerializerConfig,
+    event::{Event, EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
+
+use crate::{
+    internal_events::EndpointBytesSent,
+    sinks::prelude::{RequestMetadataBuilder, RetryLogic},
+};
 
 const POSTGRES_PROTOCOL: &str = "postgres";
 

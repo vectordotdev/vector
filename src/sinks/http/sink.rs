@@ -1,9 +1,9 @@
 //! Implementation of the `http` sink.
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
 use std::collections::BTreeMap;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct HttpSink<S> {
     service: S,

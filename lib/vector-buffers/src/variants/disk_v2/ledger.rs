@@ -1,8 +1,10 @@
 use std::{
     fmt, io, mem,
     path::PathBuf,
-    sync::Arc,
-    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    },
     time::Instant,
 };
 

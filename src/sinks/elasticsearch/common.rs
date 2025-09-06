@@ -3,8 +3,7 @@ use http::{Response, StatusCode, Uri};
 use hyper::{Body, body};
 use serde::Deserialize;
 use snafu::ResultExt;
-use vector_lib::config::LogNamespace;
-use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
 
 use super::{
     ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request, VersionType,

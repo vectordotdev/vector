@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use tower::ServiceBuilder;
 use vector_lib::{
     config::AcknowledgementsConfig,
@@ -10,8 +11,6 @@ use super::{
     service::{PostgresRetryLogic, PostgresService},
     sink::PostgresSink,
 };
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
-
 use crate::{
     config::{Input, SinkConfig, SinkContext},
     sinks::{

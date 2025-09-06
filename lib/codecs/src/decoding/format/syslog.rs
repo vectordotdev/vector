@@ -1,14 +1,14 @@
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
 use derivative::Derivative;
 use lookup::{OwnedTargetPath, OwnedValuePath, event_path, owned_value_path};
 use smallvec::{SmallVec, smallvec};
-use std::borrow::Cow;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol, Variant};
 use vector_config::configurable_component;
-use vector_core::config::{LegacyKey, LogNamespace};
 use vector_core::{
-    config::{DataType, log_schema},
+    config::{DataType, LegacyKey, LogNamespace, log_schema},
     event::{Event, LogEvent, ObjectMap, Value},
     schema,
 };
@@ -480,8 +480,9 @@ fn insert_fields_from_syslog(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::{LogSchema, init_log_schema, log_schema};
+
+    use super::*;
 
     #[test]
     fn deserialize_syslog_legacy_namespace() {

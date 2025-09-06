@@ -1,20 +1,18 @@
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
-use mlua::ExternalError;
-use mlua::FromLua;
+use mlua::{ExternalError, FromLua};
 use ordered_float::NotNan;
 use snafu::{ResultExt, Snafu};
 use vector_lib::configurable::configurable_component;
 use vrl::path::parse_target_path;
 
-use crate::config::OutputId;
-use crate::schema::Definition;
 use crate::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, OutputId, TransformOutput},
     event::{Event, Value},
     internal_events::{LuaGcTriggered, LuaScriptError},
     schema,
+    schema::Definition,
     transforms::{TaskTransform, Transform},
 };
 
@@ -325,8 +323,11 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::event::{Event, LogEvent, Value};
-    use crate::{config::ComponentKey, test_util};
+    use crate::{
+        config::ComponentKey,
+        event::{Event, LogEvent, Value},
+        test_util,
+    };
 
     #[test]
     fn lua_add_field() {

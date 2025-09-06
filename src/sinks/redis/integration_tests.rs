@@ -1,20 +1,17 @@
 use futures::stream;
 use rand::Rng;
 use redis::AsyncCommands;
-use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::{
+    codecs::JsonSerializerConfig,
     config::{Tags, Telemetry, init_telemetry},
     event::LogEvent,
-};
-
-use crate::event::{
-    BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent,
 };
 
 use super::config::{
     DataTypeConfig, ListMethod, ListOption, RedisSinkConfig, SortedSetMethod, SortedSetOption,
 };
 use crate::{
+    event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
     serde::OneOrMany,
     sinks::prelude::*,
     test_util::{

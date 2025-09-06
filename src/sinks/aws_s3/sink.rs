@@ -3,9 +3,7 @@ use std::io;
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::event::Finalizable;
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{codecs::encoding::Framer, event::Finalizable, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},

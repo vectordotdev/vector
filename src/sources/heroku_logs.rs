@@ -9,22 +9,18 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use vector_lib::{
     codecs::{
         StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
-    config::DataType,
+    config::{DataType, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::parse_value_path, owned_value_path, path},
+    schema::Definition,
 };
 use vrl::value::{Kind, kind::Collection};
 use warp::http::{HeaderMap, StatusCode};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
-};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -434,18 +430,18 @@ mod tests {
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
     use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
+        lookup::{OwnedTargetPath, owned_value_path},
         schema::Definition,
     };
     use vrl::value::{Kind, kind::Collection};
 
     use super::LogplexConfig;
-    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
         SourceSender,
+        common::http::server_auth::HttpServerAuthConfig,
         config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{

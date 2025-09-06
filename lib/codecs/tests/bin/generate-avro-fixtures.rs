@@ -1,8 +1,7 @@
+use std::{fs::File, io::Write, path::PathBuf};
+
 use apache_avro::{Decimal, Schema, types::Value};
 use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
 
 const FIXTURES_PATH: &str = "lib/codecs/tests/data/avro/generated";
 

@@ -1,3 +1,5 @@
+use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
+
 use axum::{
     Router,
     body::Body,
@@ -10,9 +12,10 @@ use flate2::read::GzDecoder;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
-use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
-use tokio::sync::mpsc::{self, Receiver, Sender};
-use tokio::time::{Duration, sleep};
+use tokio::{
+    sync::mpsc::{self, Receiver, Sender},
+    time::{Duration, sleep},
+};
 
 use crate::{
     config::ConfigBuilder,

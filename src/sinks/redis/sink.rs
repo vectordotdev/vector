@@ -1,4 +1,3 @@
-use snafu::prelude::*;
 use std::{future, sync::Arc, time::Duration};
 
 use redis::{
@@ -6,13 +5,12 @@ use redis::{
     aio::ConnectionManager,
     sentinel::{Sentinel, SentinelNodeConnectionInfo},
 };
+use snafu::prelude::*;
 use tokio::{
     sync::watch::{self, Receiver, Sender},
     task::JoinHandle,
     time::sleep,
 };
-
-use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 use super::{
     RedisEvent, RedisRequest, RepairChannelSnafu,
@@ -20,6 +18,7 @@ use super::{
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
 };
+use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 pub(super) type GenerationCount = u64;
 

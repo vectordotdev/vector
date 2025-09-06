@@ -2,11 +2,11 @@ use std::convert::Infallible;
 
 use bytes::BytesMut;
 use tokio_util::codec::Encoder;
-use vector_lib::request_metadata::RequestMetadata;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::telemetry,
     event::{EventFinalizers, Finalizable, Metric},
+    request_metadata::RequestMetadata,
 };
 
 use super::{encoder::StatsdEncoder, service::StatsdRequest};

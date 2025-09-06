@@ -1,26 +1,25 @@
-use std::net::SocketAddr;
-use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
     io::{self, Read},
+    net::SocketAddr,
+    time::Duration,
 };
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
 use smallvec::{SmallVec, smallvec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{OwnedValuePath, event_path, metadata_path, owned_value_path, path};
 use vector_lib::{
+    codecs::{BytesDeserializerConfig, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, event_path, metadata_path, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::kind::Collection;
-use vrl::value::{KeyString, Kind};
+use vrl::value::{KeyString, Kind, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{

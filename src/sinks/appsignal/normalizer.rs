@@ -24,10 +24,11 @@ impl MetricNormalize for AppsignalMetricsNormalizer {
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::event::{Metric, MetricKind, MetricValue};
-
     use super::AppsignalMetricsNormalizer;
-    use crate::test_util::metrics::{assert_normalize, tests};
+    use crate::{
+        event::{Metric, MetricKind, MetricValue},
+        test_util::metrics::{assert_normalize, tests},
+    };
 
     #[test]
     fn absolute_counter() {

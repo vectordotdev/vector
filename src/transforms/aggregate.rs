@@ -6,10 +6,13 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_lib::{config::LogNamespace, event::MetricValue};
 use vector_lib::{
+    config::LogNamespace,
     configurable::configurable_component,
-    event::metric::{Metric, MetricData, MetricKind, MetricSeries},
+    event::{
+        MetricValue,
+        metric::{Metric, MetricData, MetricKind, MetricSeries},
+    },
 };
 
 use crate::{
@@ -366,12 +369,12 @@ mod tests {
     use vrl::value::Kind;
 
     use super::*;
-    use crate::schema::Definition;
     use crate::{
         event::{
             Event, Metric,
             metric::{MetricKind, MetricValue},
         },
+        schema::Definition,
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };

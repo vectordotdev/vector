@@ -1,7 +1,7 @@
-use futures::FutureExt;
-use futures_util::{TryFutureExt, future::join};
 use std::net::SocketAddr;
 
+use futures::FutureExt;
+use futures_util::{TryFutureExt, future::join};
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 use vector_lib::{
     codecs::decoding::ProtobufDeserializer,
@@ -23,7 +23,10 @@ use vector_lib::{
     schema::Definition,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-use vrl::protobuf::parse::Options;
+use vrl::{
+    protobuf::parse::Options,
+    value::{Kind, kind::Collection},
+};
 
 use crate::{
     config::{
@@ -42,8 +45,6 @@ use crate::{
         util::grpc::run_grpc_server_with_routes,
     },
 };
-
-use vrl::value::{Kind, kind::Collection};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";

@@ -1,23 +1,18 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
-use futures::future::ready;
-use futures::stream;
+use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::{APIClient as DatabendAPIClient, Page};
+use futures::{future::ready, stream};
 use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
-use crate::sinks::util::test::load_sink;
+use super::config::DatabendConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::UriSerde,
+    sinks::util::{UriSerde, test::load_sink},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };
-
-use super::config::DatabendConfig;
 
 fn databend_endpoint() -> String {
     std::env::var("DATABEND_ENDPOINT")

@@ -1,7 +1,8 @@
 #![allow(missing_docs)]
 
-use snafu::Snafu;
 use std::collections::HashSet;
+
+use snafu::Snafu;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 

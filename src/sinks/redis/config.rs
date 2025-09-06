@@ -4,14 +4,13 @@ use redis::{
 };
 use snafu::prelude::*;
 
-use crate::{
-    serde::OneOrMany,
-    sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
-};
-
 use super::{
     RedisCreateFailedSnafu,
     sink::{RedisConnection, RedisSink},
+};
+use crate::{
+    serde::OneOrMany,
+    sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
 
 #[derive(Clone, Copy, Debug)]

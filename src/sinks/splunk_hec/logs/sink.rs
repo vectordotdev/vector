@@ -1,9 +1,15 @@
 use std::{fmt, sync::Arc};
 
+use vector_lib::{
+    config::{LogNamespace, log_schema},
+    lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
+    schema::meaning,
+};
+use vrl::path::OwnedTargetPath;
+
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
-    internal_events::SplunkEventTimestampInvalidType,
-    internal_events::SplunkEventTimestampMissing,
+    internal_events::{SplunkEventTimestampInvalidType, SplunkEventTimestampMissing},
     sinks::{
         prelude::*,
         splunk_hec::common::{
@@ -13,12 +19,6 @@ use crate::{
         util::processed_event::ProcessedEvent,
     },
 };
-use vector_lib::{
-    config::{LogNamespace, log_schema},
-    lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
-    schema::meaning,
-};
-use vrl::path::OwnedTargetPath;
 
 // NOTE: The `OptionalTargetPath`s are wrapped in an `Option` in order to distinguish between a true
 //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an

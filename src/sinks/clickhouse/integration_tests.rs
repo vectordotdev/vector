@@ -15,8 +15,10 @@ use http::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::{Duration, timeout};
-use vector_lib::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
-use vector_lib::lookup::PathPrefix;
+use vector_lib::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+    lookup::PathPrefix,
+};
 use warp::Filter;
 
 use crate::{

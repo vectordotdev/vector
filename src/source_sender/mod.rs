@@ -5,32 +5,34 @@ use chrono::Utc;
 use futures::{Stream, StreamExt};
 use metrics::{Histogram, histogram};
 use tracing::Span;
-use vector_lib::buffers::EventCount;
-use vector_lib::buffers::{
-    config::MemoryBufferSize,
-    topology::channel::{self, LimitedReceiver, LimitedSender},
-};
-use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(any(test, feature = "test-utils"))]
 use vector_lib::event::{EventStatus, into_event_stream};
-use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
-use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
-use vector_lib::json_size::JsonSize;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
-    config::{SourceOutput, log_schema},
-    event::{Event, EventArray, EventContainer, EventRef, array},
-    internal_event::{
-        self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered,
+    buffers::{
+        EventCount,
+        config::MemoryBufferSize,
+        topology::channel::{self, LimitedReceiver, LimitedSender},
     },
+    config::{SourceOutput, log_schema},
+    event::{Event, EventArray, EventContainer, EventRef, array, array::EventArrayIntoIter},
+    finalization::{AddBatchNotifier, BatchNotifier},
+    internal_event::{
+        self, ComponentEventsDropped, CountByteSize, DEFAULT_OUTPUT, EventsSent,
+        InternalEventHandle as _, Registered, UNINTENTIONAL,
+    },
+    json_size::JsonSize,
 };
 use vrl::value::Value;
 
 mod errors;
 
-use crate::config::{ComponentKey, OutputId};
-use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
+
+use crate::{
+    config::{ComponentKey, OutputId},
+    schema::Definition,
+};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 

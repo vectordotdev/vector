@@ -2,9 +2,9 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
 use prost::Message;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::prometheus::parser::proto;
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, prometheus::parser::proto,
+};
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -348,6 +348,7 @@ mod test {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use std::net::{SocketAddr, ToSocketAddrs as _};
+
     use tokio::time::Duration;
 
     use super::*;

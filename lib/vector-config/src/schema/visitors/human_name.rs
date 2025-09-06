@@ -106,9 +106,8 @@ mod tests {
     use serde_json::json;
     use vector_config_common::schema::visit::Visitor;
 
-    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
-
     use super::GenerateHumanFriendlyNameVisitor;
+    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
 
     #[test]
     fn logical_name() {

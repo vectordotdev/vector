@@ -3,10 +3,13 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
+use super::{
+    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
+    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
+};
 use crate::{
     http::HttpClient,
     sinks::{
@@ -16,11 +19,6 @@ use crate::{
             http::{HttpService, http_response_retry_logic},
         },
     },
-};
-
-use super::{
-    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";

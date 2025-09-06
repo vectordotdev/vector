@@ -1,10 +1,9 @@
-use crate::encoding::BuildError;
+use std::{collections::HashMap, fmt::Write, num::ParseIntError};
+
 use bytes::BytesMut;
 use chrono::SecondsFormat;
 use lookup::lookup_v2::ConfigTargetPath;
 use snafu::Snafu;
-use std::num::ParseIntError;
-use std::{collections::HashMap, fmt::Write};
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -12,6 +11,8 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
+
+use crate::encoding::BuildError;
 
 const DEFAULT_DEVICE_VENDOR: &str = "Datadog";
 const DEFAULT_DEVICE_PRODUCT: &str = "Vector";

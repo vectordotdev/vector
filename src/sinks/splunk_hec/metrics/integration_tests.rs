@@ -2,10 +2,10 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, MetricValue},
+    lookup::lookup_v2::OptionalValuePath,
     metric_tags,
 };
 

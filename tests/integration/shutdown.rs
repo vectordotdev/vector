@@ -1,6 +1,5 @@
 use std::{
-    fs::create_dir,
-    fs::read_dir,
+    fs::{create_dir, read_dir},
     io::Write,
     net::SocketAddr,
     path::PathBuf,

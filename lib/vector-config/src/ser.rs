@@ -1,7 +1,7 @@
-use serde_json::Value;
 use std::{cell::RefCell, marker::PhantomData};
 
 use serde::{Serialize, Serializer};
+use serde_json::Value;
 
 use crate::{
     Configurable, GenerateError, Metadata, ToValue,

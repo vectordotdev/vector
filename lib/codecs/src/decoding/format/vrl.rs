@@ -1,16 +1,20 @@
-use crate::BytesDeserializerConfig;
-use crate::decoding::format::Deserializer;
 use bytes::Bytes;
 use derivative::Derivative;
 use smallvec::{SmallVec, smallvec};
 use vector_config_macros::configurable_component;
-use vector_core::config::{DataType, LogNamespace};
-use vector_core::event::{Event, TargetEvents, VrlTarget};
-use vector_core::{compile_vrl, schema};
-use vrl::compiler::state::ExternalEnv;
-use vrl::compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime};
-use vrl::diagnostic::Formatter;
-use vrl::value::Kind;
+use vector_core::{
+    compile_vrl,
+    config::{DataType, LogNamespace},
+    event::{Event, TargetEvents, VrlTarget},
+    schema,
+};
+use vrl::{
+    compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime, state::ExternalEnv},
+    diagnostic::Formatter,
+    value::Kind,
+};
+
+use crate::{BytesDeserializerConfig, decoding::format::Deserializer};
 
 /// Config used to build a `VrlDeserializer`.
 #[configurable_component]
@@ -135,12 +139,11 @@ impl VrlDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
     use indoc::indoc;
-    use vrl::btreemap;
-    use vrl::path::OwnedTargetPath;
-    use vrl::value::Value;
+    use vrl::{btreemap, path::OwnedTargetPath, value::Value};
+
+    use super::*;
 
     fn make_decoder(source: &str) -> VrlDeserializer {
         VrlDeserializerConfig {

@@ -12,7 +12,6 @@ use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 use vrl::event_path;
 
 use super::{DatadogTracesConfig, apm_stats::StatsPayload, dd_proto, ddsketch_full};
-
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},

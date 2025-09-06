@@ -120,8 +120,10 @@ impl Encoder<Event> for JsonSerializer {
 mod tests {
     use bytes::{Bytes, BytesMut};
     use chrono::{TimeZone, Timelike, Utc};
-    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
-    use vector_core::metric_tags;
+    use vector_core::{
+        event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+        metric_tags,
+    };
     use vrl::btreemap;
 
     use super::*;
@@ -274,12 +276,15 @@ mod tests {
     }
 
     mod pretty_json {
-        use super::*;
         use bytes::{Bytes, BytesMut};
         use chrono::{TimeZone, Timelike, Utc};
-        use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
-        use vector_core::metric_tags;
+        use vector_core::{
+            event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+            metric_tags,
+        };
         use vrl::btreemap;
+
+        use super::*;
 
         fn get_pretty_json_config() -> JsonSerializerConfig {
             JsonSerializerConfig {

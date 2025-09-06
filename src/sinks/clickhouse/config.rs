@@ -1,5 +1,11 @@
 //! Configuration for the `Clickhouse` sink.
 
+use std::fmt;
+
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
+use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
+
 use super::{
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
@@ -12,10 +18,6 @@ use crate::{
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
 };
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use std::fmt;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
 
 /// Data format.
 ///

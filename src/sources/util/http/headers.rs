@@ -1,13 +1,12 @@
 use bytes::Bytes;
-use vector_lib::lookup::path;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
+    lookup::path,
 };
 use warp::http::{HeaderMap, HeaderValue};
 
-use crate::event::Value;
-use crate::sources::http_server::HttpConfigParamKind;
+use crate::{event::Value, sources::http_server::HttpConfigParamKind};
 
 pub fn add_headers(
     events: &mut [Event],
@@ -65,12 +64,14 @@ pub fn add_headers(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::LogEvent;
-    use crate::sources::{http_server::HttpConfigParamKind, util::add_headers};
-
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
     use warp::http::HeaderMap;
+
+    use crate::{
+        event::LogEvent,
+        sources::{http_server::HttpConfigParamKind, util::add_headers},
+    };
 
     #[test]
     fn multiple_headers() {

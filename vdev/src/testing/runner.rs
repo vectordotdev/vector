@@ -1,15 +1,17 @@
-use std::collections::HashSet;
-use std::process::Command;
-use std::{env, path::PathBuf};
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use anyhow::Result;
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::app::{self, CommandExt as _};
-use crate::environment::{Environment, append_environment_variables};
-use crate::testing::build::prepare_build_command;
-use crate::testing::docker::{DOCKER_SOCKET, docker_command};
-use crate::util::{ChainArgs as _, IS_A_TTY};
+use crate::{
+    app::{self, CommandExt as _},
+    environment::{Environment, append_environment_variables},
+    testing::{
+        build::prepare_build_command,
+        docker::{DOCKER_SOCKET, docker_command},
+    },
+    util::{ChainArgs as _, IS_A_TTY},
+};
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";

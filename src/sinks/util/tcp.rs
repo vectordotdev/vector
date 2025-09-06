@@ -16,9 +16,10 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    json_size::JsonSize,
+};
 
 use crate::{
     codecs::Transformer,

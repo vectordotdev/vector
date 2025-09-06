@@ -19,9 +19,9 @@ pub use length_delimited::{LengthDelimitedEncoder, LengthDelimitedEncoderConfig}
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
 use tokio_util::codec::LinesCodecError;
 
-pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
-pub use self::varint_length_delimited::{
-    VarintLengthDelimitedEncoder, VarintLengthDelimitedEncoderConfig,
+pub use self::{
+    bytes::{BytesEncoder, BytesEncoderConfig},
+    varint_length_delimited::{VarintLengthDelimitedEncoder, VarintLengthDelimitedEncoderConfig},
 };
 
 /// An error that occurred while framing bytes.

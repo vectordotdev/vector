@@ -15,7 +15,10 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use self::{
+    label_filter::VectorLabelFilter,
+    recorder::{Registry, VectorRecorder},
+};
 use crate::{
     config::metrics_expiration::PerMetricSetExpiration,
     event::{Metric, MetricValue},
@@ -244,7 +247,6 @@ macro_rules! update_counter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::{
         config::metrics_expiration::{
             MetricLabelMatcher, MetricLabelMatcherConfig, MetricNameMatcherConfig,

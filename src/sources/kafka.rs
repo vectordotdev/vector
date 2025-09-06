@@ -37,17 +37,16 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    finalizer::OrderedFinalizer,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, ObjectMap, kind::Collection};
 
@@ -1386,8 +1385,7 @@ impl ConsumerContext for KafkaSourceContext {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
 

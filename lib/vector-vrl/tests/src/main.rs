@@ -4,14 +4,15 @@
 mod docs;
 mod test_enrichment;
 
-use std::env;
-use std::path::PathBuf;
-use vrl::test::{Test, TestConfig, get_tests_from_functions, run_tests};
+use std::{env, path::PathBuf};
 
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
-use vrl::compiler::{CompileConfig, TimeZone, VrlRuntime};
+use vrl::{
+    compiler::{CompileConfig, TimeZone, VrlRuntime},
+    test::{Test, TestConfig, get_tests_from_functions, run_tests},
+};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]

@@ -4,12 +4,14 @@ use std::{
     task::{Context, Poll, ready},
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
 use pin_project::pin_project;
-use tokio::time::interval;
+use tokio::{
+    sync::mpsc::{Receiver, Sender, channel},
+    time::interval,
+};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal};
 

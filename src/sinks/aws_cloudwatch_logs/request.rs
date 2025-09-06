@@ -1,3 +1,10 @@
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll, ready},
+};
+
 use aws_sdk_cloudwatchlogs::{
     Client as CloudwatchLogsClient,
     operation::{
@@ -13,16 +20,9 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{FutureExt, future::BoxFuture};
 use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll, ready},
-};
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::config::Retention;
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
 
 pub struct CloudwatchFuture {
     client: Client,

@@ -1,17 +1,22 @@
-use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
-
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_sqs::Client as SqsClient;
-use aws_sdk_sqs::operation::delete_message_batch::{
-    DeleteMessageBatchError, DeleteMessageBatchOutput,
+use std::{
+    collections::HashMap,
+    future::ready,
+    num::NonZeroUsize,
+    panic,
+    sync::{Arc, LazyLock},
 };
-use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
-use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
-use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry};
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+
+use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
+use aws_sdk_sqs::{
+    Client as SqsClient,
+    operation::{
+        delete_message_batch::{DeleteMessageBatchError, DeleteMessageBatchOutput},
+        receive_message::ReceiveMessageError,
+        send_message_batch::{SendMessageBatchError, SendMessageBatchOutput},
+    },
+    types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry},
+};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -23,26 +28,28 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_lib::codecs::decoding::FramingError;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    codecs::decoding::FramingError,
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    event::MaybeAsLogMut,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::{PathPrefix, metadata_path, path},
 };
 
-use crate::codecs::Decoder;
-use crate::event::{Event, LogEvent};
-use crate::internal_events::{
-    SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
-};
 use crate::{
     SourceSender,
     aws::AwsTimeout,
+    codecs::Decoder,
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
+        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
     },
     line_agg::{self, LineAgg},
@@ -50,9 +57,6 @@ use crate::{
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
 };
-use vector_lib::config::{LegacyKey, LogNamespace, log_schema};
-use vector_lib::event::MaybeAsLogMut;
-use vector_lib::lookup::{PathPrefix, metadata_path, path};
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());

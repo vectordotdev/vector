@@ -6,11 +6,10 @@ use vector_config_common::schema::{
     *,
 };
 
-use crate::schema::visitors::merge::Mergeable;
-
 use super::scoped_visit::{
     SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
 };
+use crate::schema::visitors::merge::Mergeable;
 
 /// A visitor that marks schemas as closed by disallowing unknown properties via
 /// `unevaluatedProperties`.
@@ -535,9 +534,8 @@ mod tests {
     use serde_json::json;
     use vector_config_common::schema::visit::Visitor;
 
-    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
-
     use super::DisallowUnevaluatedPropertiesVisitor;
+    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
 
     #[test]
     fn basic_object_schema() {

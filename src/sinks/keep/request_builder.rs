@@ -1,11 +1,11 @@
 //! `RequestBuilder` implementation for the `keep` sink.
 
-use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use bytes::Bytes;
 
 use super::encoder::KeepEncoder;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct KeepRequestBuilder {
     pub(super) encoder: KeepEncoder,

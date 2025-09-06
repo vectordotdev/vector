@@ -7,12 +7,12 @@ use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    lookup::lookup_v2::OptionalValuePath,
-    lookup::owned_value_path,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path},
     tls::MaybeTlsSettings,
 };
 use vrl::value::Kind;
 
+use super::source::MqttSource;
 use crate::{
     codecs::DecodingConfig,
     common::mqtt::{
@@ -22,8 +22,6 @@ use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
     serde::{default_decoding, default_framing_message_based},
 };
-
-use super::source::MqttSource;
 
 /// Configuration for the `mqtt` source.
 #[configurable_component(source("mqtt", "Collect logs from MQTT."))]

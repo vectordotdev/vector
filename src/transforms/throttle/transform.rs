@@ -1,9 +1,9 @@
+use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
+
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{Quota, clock};
 use snafu::Snafu;
-use std::hash::Hash;
-use std::{num::NonZeroU32, pin::Pin, time::Duration};
 
 use super::{
     config::{ThrottleConfig, ThrottleInternalMetricsConfig},
@@ -147,15 +147,15 @@ mod tests {
     use std::task::Poll;
 
     use futures::SinkExt;
-
-    use super::*;
-    use crate::transforms::Transform;
-    use crate::{
-        event::LogEvent, test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
-    };
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+
+    use super::*;
+    use crate::{
+        event::LogEvent,
+        test_util::components::assert_transform_compliance,
+        transforms::{Transform, test::create_topology},
+    };
 
     #[tokio::test]
     async fn throttle_events() {

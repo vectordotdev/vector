@@ -4,14 +4,18 @@
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{ObjectRef, store::Store};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vector_lib::lookup::{OwnedTargetPath, lookup_v2::ValuePath, owned_value_path, path};
-
-use crate::event::{Event, LogEvent};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, ValuePath},
+        owned_value_path, path,
+    },
+};
 
 use super::Config;
+use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are enriched with Namespace metadata.
 #[configurable_component]

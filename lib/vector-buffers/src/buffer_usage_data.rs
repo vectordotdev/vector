@@ -372,8 +372,9 @@ impl BufferUsage {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::thread;
+
+    use super::*;
 
     #[test]
     fn test_multithreaded_updates_are_correct() {

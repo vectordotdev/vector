@@ -5,9 +5,8 @@ use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
-use crate::sinks::prelude::*;
-
 use super::{config::NatsHeaderConfig, sink::NatsEvent};
+use crate::sinks::prelude::*;
 
 pub(super) struct NatsEncoder {
     pub(super) transformer: Transformer,

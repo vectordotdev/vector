@@ -1,17 +1,17 @@
-use crate::config::{ComponentConfig, ComponentType};
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
-    time::Duration,
-};
-use std::{
     sync::mpsc::{Receiver, channel},
     thread,
+    time::Duration,
 };
 
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 
-use crate::Error;
+use crate::{
+    Error,
+    config::{ComponentConfig, ComponentType},
+};
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
 /// so to avoid receiving repetitions of previous events on macOS.
@@ -200,14 +200,16 @@ fn create_watcher(
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
 mod tests {
+    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
+
+    use tokio::sync::broadcast;
+
     use super::*;
     use crate::{
         config::ComponentKey,
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
-    use tokio::sync::broadcast;
 
     async fn test_signal(
         file: &mut File,

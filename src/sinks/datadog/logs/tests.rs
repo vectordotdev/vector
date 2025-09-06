@@ -15,15 +15,18 @@ use vector_lib::{
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
-use crate::sinks::datadog::test_utils::{ApiStatus, test_server};
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
     http::HttpError,
     sinks::{
-        util::retries::RetryLogic,
-        util::test::{load_sink, load_sink_with_context},
+        datadog::test_utils::{ApiStatus, test_server},
+        util::{
+            retries::RetryLogic,
+            test::{load_sink, load_sink_with_context},
+        },
     },
     test_util::{
         components::{
@@ -35,8 +38,6 @@ use crate::{
     },
     tls::TlsError,
 };
-
-use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));

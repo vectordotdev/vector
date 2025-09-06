@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
 
-use crate::vrl_util::is_case_sensitive;
 use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
-    vrl_util::{self, add_index, evaluate_condition},
+    vrl_util::{self, add_index, evaluate_condition, is_case_sensitive},
 };
 
 fn get_enrichment_table_record(
@@ -187,11 +187,11 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use vrl::compiler::TargetValue;
-    use vrl::compiler::prelude::TimeZone;
-    use vrl::compiler::state::RuntimeState;
-    use vrl::value;
-    use vrl::value::Secrets;
+    use vrl::{
+        compiler::{TargetValue, prelude::TimeZone, state::RuntimeState},
+        value,
+        value::Secrets,
+    };
 
     use super::*;
     use crate::test_util::get_table_registry;

@@ -2,9 +2,9 @@ use std::{error, fmt, io, mem};
 
 use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable},
 };
 
 use crate::{EventCount, encoding::FixedEncodable};

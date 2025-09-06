@@ -4,9 +4,8 @@ use aws_smithy_types::Blob;
 use bytes::Bytes;
 use tracing::Instrument;
 
-use crate::sinks::prelude::*;
-
 use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
+use crate::sinks::prelude::*;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseRecord {

@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
 
 use clap::Parser;
 use itertools::Itertools;

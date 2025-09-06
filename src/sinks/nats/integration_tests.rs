@@ -1,3 +1,15 @@
+use std::time::Duration;
+
+use async_nats::jetstream::stream::StorageType;
+use futures_util::StreamExt;
+use serde::Deserialize;
+use snafu::ResultExt;
+use vector_lib::{
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
+    event::{EventArray, LogEvent},
+};
+use vrl::value;
+
 use super::{
     ConfigSnafu, NatsError,
     config::{NatsHeaderConfig, NatsSinkConfig},
@@ -7,22 +19,13 @@ use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
-    sinks::nats::config::JetStreamConfig,
-    sinks::prelude::*,
+    sinks::{nats::config::JetStreamConfig, prelude::*},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
     },
     tls::TlsEnableableConfig,
 };
-use async_nats::jetstream::stream::StorageType;
-use futures_util::StreamExt;
-use serde::Deserialize;
-use snafu::ResultExt;
-use std::time::Duration;
-use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::event::{EventArray, LogEvent};
-use vrl::value;
 
 fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
     NatsSinkConfig {

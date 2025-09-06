@@ -1,11 +1,13 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-
-use std::borrow::Cow;
-use std::collections::{BTreeMap, hash_map::DefaultHasher};
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
-use std::{cmp::Ordering, mem};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{BTreeMap, hash_map::DefaultHasher},
+    fmt::Display,
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};

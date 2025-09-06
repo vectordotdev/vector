@@ -5,7 +5,6 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use vector_config_macros::configurable_component;
 
 use snafu::{ResultExt, Snafu};
 use tokio::{net::TcpStream, time};
@@ -19,6 +18,7 @@ use tokio_tungstenite::{
         stream::Mode as UriMode,
     },
 };
+use vector_config_macros::configurable_component;
 
 use crate::{
     common::backoff::ExponentialBackoff,

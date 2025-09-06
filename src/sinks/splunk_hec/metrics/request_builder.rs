@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{

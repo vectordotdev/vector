@@ -2,12 +2,10 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
-
-use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
+use vector_lib::{configurable::configurable_component, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
 /// Options for the filesystem metrics collector.
 #[configurable_component]

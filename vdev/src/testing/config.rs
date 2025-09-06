@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
@@ -8,8 +10,7 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::environment::Environment;
-use crate::{app, util};
+use crate::{app, environment::Environment, util};
 
 const FILE_NAME: &str = "test.yaml";
 

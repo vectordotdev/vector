@@ -1,4 +1,8 @@
 #![allow(missing_docs)]
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
 use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
@@ -9,15 +13,18 @@ use std::{
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-use tokio::runtime::{self, Runtime};
-use tokio::sync::{MutexGuard, broadcast::error::RecvError};
+use tokio::{
+    runtime::{self, Handle, Runtime},
+    sync::{MutexGuard, broadcast::error::RecvError},
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, Config, ConfigPath},
+    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    extra_context::ExtraContext,
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -27,13 +34,6 @@ use crate::{
     },
     trace,
 };
-use crate::{config::ComponentType, extra_context::ExtraContext};
-
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
-#[cfg(windows)]
-use std::os::windows::process::ExitStatusExt;
-use tokio::runtime::Handle;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 

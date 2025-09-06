@@ -8,8 +8,10 @@ use std::{
 use futures::StreamExt;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
-use vector_lib::config::ComponentKey;
+use vector_lib::{
+    buffers::{BufferConfig, BufferType, WhenFull},
+    config::ComponentKey,
+};
 
 use crate::{
     config::Config,

@@ -13,8 +13,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::event::EventStatus;
-use vector_lib::request_metadata::MetaDescriptive;
+use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
 
 use super::{
     EndpointTarget,
@@ -282,10 +281,10 @@ mod tests {
     use bytes::Bytes;
     use futures_util::{StreamExt, poll, stream::FuturesUnordered};
     use tower::{Service, ServiceExt, util::BoxService};
-    use vector_lib::internal_event::CountByteSize;
     use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
+        internal_event::CountByteSize,
     };
     use wiremock::{
         Mock, MockServer, Request, Respond, ResponseTemplate,

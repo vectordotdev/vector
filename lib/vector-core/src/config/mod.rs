@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{collections::HashMap, fmt, num::NonZeroUsize};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
@@ -12,7 +11,6 @@ pub mod output_id;
 pub mod proxy;
 mod telemetry;
 
-use crate::event::LogEvent;
 pub use global_options::{GlobalOptions, WildcardMatching};
 pub use log_schema::{LogSchema, init_log_schema, log_schema};
 use lookup::{PathPrefix, lookup_v2::ValuePath, path};
@@ -23,7 +21,7 @@ pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vrl::value::Value;
 
-use crate::schema;
+use crate::{event::LogEvent, schema};
 
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
@@ -570,12 +568,13 @@ impl LogNamespace {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::LogEvent;
     use chrono::Utc;
     use lookup::{OwnedTargetPath, event_path, owned_value_path};
     use vector_common::btreemap;
     use vrl::value::Kind;
+
+    use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {

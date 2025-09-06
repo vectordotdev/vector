@@ -1,3 +1,22 @@
+use std::{path::Path, time::Duration};
+
+use futures_util::{FutureExt, TryFutureExt};
+use pulsar::{
+    Authentication, ConnectionRetryOptions, Error as PulsarError, OperationRetryOptions,
+    ProducerOptions, Pulsar, TokioExecutor,
+    authentication::oauth2::{OAuth2Authentication, OAuth2Params},
+    compression,
+    error::AuthenticationError,
+    message::proto,
+};
+use vector_lib::{
+    codecs::{TextSerializerConfig, encoding::SerializerConfig},
+    config::DataType,
+    lookup::lookup_v2::OptionalTargetPath,
+    sensitive_string::SensitiveString,
+};
+use vrl::value::Kind;
+
 use crate::{
     schema,
     sinks::{
@@ -5,22 +24,6 @@ use crate::{
         pulsar::sink::{PulsarSink, healthcheck},
     },
 };
-use futures_util::{FutureExt, TryFutureExt};
-use pulsar::{
-    Authentication, ConnectionRetryOptions, Error as PulsarError, ProducerOptions, Pulsar,
-    TokioExecutor,
-    authentication::oauth2::{OAuth2Authentication, OAuth2Params},
-    compression,
-    message::proto,
-};
-use pulsar::{OperationRetryOptions, error::AuthenticationError};
-use std::path::Path;
-use std::time::Duration;
-use vector_lib::codecs::{TextSerializerConfig, encoding::SerializerConfig};
-use vector_lib::config::DataType;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vector_lib::sensitive_string::SensitiveString;
-use vrl::value::Kind;
 
 /// Configuration for the `pulsar` sink.
 #[configurable_component(sink("pulsar", "Publish observability events to Apache Pulsar topics."))]

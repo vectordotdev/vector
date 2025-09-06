@@ -1,51 +1,43 @@
-use crate::internal_events::{
-    DecoderDeserializeError, HttpClientEventsReceived, HttpClientHttpError,
-    HttpClientHttpResponseError,
-};
-use crate::{
-    codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext},
-    http::HttpError,
-    sources,
-    sources::util::http_client::{default_interval, default_timeout, warn_if_interval_too_low},
-    tls::TlsSettings,
-};
+use std::{sync::Arc, time::Duration};
+
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::StreamExt as _;
 use futures_util::{FutureExt, Stream, stream};
 use http::Uri;
-
+use hyper::{Body, Request};
 use percent_encoding::utf8_percent_encode;
 use serde_with::serde_as;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::JsonDeserializerConfig;
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::config::proxy::ProxyConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::tls::TlsConfig;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::{LogNamespace, SourceOutput},
+    codecs::{
+        JsonDeserializerConfig, StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LogNamespace, SourceOutput, proxy::ProxyConfig},
+    configurable::configurable_component,
     event::Event,
+    json_size::JsonSize,
+    shutdown::ShutdownSignal,
+    tls::TlsConfig,
 };
 
 use crate::{
     SourceSender,
-    http::HttpClient,
-    internal_events::{EndpointBytesReceived, StreamClosedError},
+    codecs::{Decoder, DecodingConfig},
+    config::{SourceConfig, SourceContext},
+    http::{HttpClient, HttpError},
+    internal_events::{
+        DecoderDeserializeError, EndpointBytesReceived, HttpClientEventsReceived,
+        HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
+    },
+    sources,
+    sources::util::http_client::{default_interval, default_timeout, warn_if_interval_too_low},
+    tls::TlsSettings,
 };
-
-use hyper::{Body, Request};
 
 /// Configuration for the `okta` source.
 #[serde_as]

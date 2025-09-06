@@ -4,9 +4,12 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use futures::{StreamExt, future, stream::BoxStream};
 use tower::Service;
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_lib::stream::{BatcherSettings, DriverResponse};
-use vector_lib::{partition::Partitioner, sink::StreamSink};
+use vector_lib::{
+    partition::Partitioner,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+};
 
 use crate::{
     event::{Event, EventFinalizers, Finalizable},

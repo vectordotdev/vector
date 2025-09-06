@@ -356,9 +356,8 @@ pub trait MetaDescriptive {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{config::ComponentKey, internal_event::OptionalTag};
-
     use super::*;
+    use crate::{config::ComponentKey, internal_event::OptionalTag};
 
     struct DummyEvent {
         source: OptionalTag<Arc<ComponentKey>>,

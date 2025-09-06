@@ -5,7 +5,8 @@ mod error;
 pub mod format;
 pub mod framing;
 
-use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
+use std::fmt::Debug;
+
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
@@ -27,7 +28,6 @@ pub use framing::{
     OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
-use std::fmt::Debug;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
@@ -36,6 +36,7 @@ use vector_core::{
 };
 
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.

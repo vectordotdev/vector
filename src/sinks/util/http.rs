@@ -37,9 +37,6 @@ impl PartialOrd for OrderedHeaderName {
         Some(self.cmp(other))
     }
 }
-use hyper::{Body, body};
-use pin_project::pin_project;
-use snafu::{ResultExt, Snafu};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -51,6 +48,10 @@ use std::{
     task::{Context, Poll, ready},
     time::Duration,
 };
+
+use hyper::{Body, body};
+use pin_project::pin_project;
+use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_lib::{
@@ -65,10 +66,8 @@ use super::{
     sink::{self, Response as _},
     uri,
 };
-
 #[cfg(feature = "aws-core")]
 use crate::aws::sign_request;
-
 use crate::{
     event::Event,
     http::{HttpClient, HttpError},

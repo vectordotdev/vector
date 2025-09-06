@@ -1,14 +1,20 @@
-use std::sync::{Arc, LazyLock};
-use std::{collections::HashMap, convert::TryFrom, future::ready, pin::Pin, time::Duration};
-
-use bollard::query_parameters::{
-    EventsOptionsBuilder, ListContainersOptionsBuilder, LogsOptionsBuilder,
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    future::ready,
+    pin::Pin,
+    sync::{Arc, LazyLock},
+    time::Duration,
 };
+
 use bollard::{
     Docker,
     container::LogOutput,
     errors::Error as DockerError,
-    query_parameters::InspectContainerOptions,
+    query_parameters::{
+        EventsOptionsBuilder, InspectContainerOptions, ListContainersOptionsBuilder,
+        LogsOptionsBuilder,
+    },
     service::{ContainerInspectResponse, EventMessage},
 };
 use bytes::{Buf, Bytes};
@@ -17,17 +23,20 @@ use futures::{Stream, StreamExt};
 use serde_with::serde_as;
 use tokio::sync::mpsc;
 use tracing_futures::Instrument;
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered},
+    lookup::{
+        OwnedValuePath, PathPrefix, lookup_v2::OptionalValuePath, metadata_path, owned_value_path,
+        path,
+    },
 };
-use vector_lib::lookup::{
-    OwnedValuePath, PathPrefix, lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path,
+use vrl::{
+    event_path,
+    value::{Kind, kind::Collection},
 };
-use vrl::event_path;
-use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
 use crate::{

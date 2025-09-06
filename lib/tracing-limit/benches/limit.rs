@@ -3,12 +3,13 @@ extern crate criterion;
 #[macro_use]
 extern crate tracing;
 
-use criterion::{BenchmarkId, Criterion};
-use std::hint::black_box;
 use std::{
     fmt,
+    hint::black_box,
     sync::{Mutex, MutexGuard},
 };
+
+use criterion::{BenchmarkId, Criterion};
 use tracing::{Event, Metadata, Subscriber, field, span, subscriber::Interest};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};

@@ -1,8 +1,7 @@
 //! Client timeout configuration for AWS operations.
 //use std::time::Duration;
-use vector_lib::configurable::configurable_component;
-
 use serde_with::serde_as;
+use vector_lib::configurable::configurable_component;
 
 /// Client timeout configuration for AWS operations.
 #[serde_as]

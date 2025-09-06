@@ -10,8 +10,10 @@ mod vrl_util;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use vrl::compiler::Function;
-use vrl::value::{ObjectMap, Value};
+use vrl::{
+    compiler::Function,
+    value::{ObjectMap, Value},
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);

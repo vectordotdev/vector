@@ -286,10 +286,10 @@ impl HttpServerAuthMatcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::{next_addr, random_string};
     use indoc::indoc;
 
     use super::*;
+    use crate::test_util::{next_addr, random_string};
 
     impl HttpServerAuthMatcher {
         fn auth_header(self) -> (HeaderValue, &'static str) {

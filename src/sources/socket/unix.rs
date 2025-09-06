@@ -2,12 +2,15 @@ use std::path::PathBuf;
 
 use bytes::Bytes;
 use chrono::Utc;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, path};
-use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::OptionalValuePath, path},
+    shutdown::ShutdownSignal,
+};
 
+use super::{SocketConfig, default_host_key};
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -18,8 +21,6 @@ use crate::{
         util::{build_unix_datagram_source, build_unix_stream_source},
     },
 };
-
-use super::{SocketConfig, default_host_key};
 
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]

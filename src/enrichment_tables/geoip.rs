@@ -11,8 +11,10 @@ use maxminddb::{
     geoip2::{AnonymousIp, City, ConnectionType, Isp},
 };
 use ordered_float::NotNan;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};

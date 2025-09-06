@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::TimeZone;
 use ordered_float::NotNan;

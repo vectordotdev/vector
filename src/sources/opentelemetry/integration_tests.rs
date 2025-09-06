@@ -1,8 +1,20 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use itertools::Itertools;
+use prost::Message;
 use serde_json::json;
+use vector_lib::opentelemetry::proto::{
+    collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
+    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
+    metrics::v1::{
+        Gauge, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
+        number_data_point::Value,
+    },
+    resource::v1::Resource,
+    trace::v1::{ResourceSpans, ScopeSpans, Span},
+};
 
+use super::tests::new_source;
 use crate::{
     config::{SourceConfig, SourceContext, log_schema},
     event::EventStatus,
@@ -14,19 +26,6 @@ use crate::{
         components::{SOURCE_TAGS, assert_source_compliance},
         retry_until, wait_for_tcp,
     },
-};
-use prost::Message;
-
-use super::tests::new_source;
-use vector_lib::opentelemetry::proto::{
-    collector::{metrics::v1::ExportMetricsServiceRequest, trace::v1::ExportTraceServiceRequest},
-    common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
-    metrics::v1::{
-        Gauge, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
-        number_data_point::Value,
-    },
-    resource::v1::Resource,
-    trace::v1::{ResourceSpans, ScopeSpans, Span},
 };
 
 fn otel_health_url() -> String {

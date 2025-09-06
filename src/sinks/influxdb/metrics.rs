@@ -3,9 +3,9 @@ use std::{collections::HashMap, future::ready, task::Poll};
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, future::BoxFuture, stream};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    configurable::configurable_component,
     event::metric::{MetricSketch, MetricTags, Quantile},
 };
 

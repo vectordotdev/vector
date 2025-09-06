@@ -10,7 +10,6 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
-use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     common::expansion::pair_expansion,
     http::{HttpClient, get_http_scheme_from_uri},
@@ -18,7 +17,7 @@ use crate::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
-    sinks::prelude::*,
+    sinks::{loki::event::LokiBatchEncoding, prelude::*},
 };
 
 #[derive(Clone)]
@@ -566,9 +565,11 @@ mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
     use futures::stream::StreamExt;
-    use vector_lib::codecs::JsonSerializerConfig;
-    use vector_lib::event::{Event, LogEvent, ObjectMap, Value};
-    use vector_lib::lookup::PathPrefix;
+    use vector_lib::{
+        codecs::JsonSerializerConfig,
+        event::{Event, LogEvent, ObjectMap, Value},
+        lookup::PathPrefix,
+    };
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{

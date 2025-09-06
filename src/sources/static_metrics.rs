@@ -1,17 +1,16 @@
-use std::collections::BTreeMap;
-use std::num::NonZeroU32;
-use std::time::Duration;
+use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
 
 use chrono::Utc;
 use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
 };
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::LogNamespace};
 
 use crate::{
     SourceSender,

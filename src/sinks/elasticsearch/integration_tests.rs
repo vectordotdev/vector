@@ -3,8 +3,7 @@ use std::{fs::File, io::Read};
 use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
-use futures::StreamExt;
-use futures::{future::ready, stream};
+use futures::{StreamExt, future::ready, stream};
 use http::{Request, StatusCode};
 use serde_json::{Value, json};
 use vector_lib::{

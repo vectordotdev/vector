@@ -154,9 +154,6 @@ mod windows;
 
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 mod expansion;
-#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
-pub use self::expansion::*;
-
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
@@ -204,6 +201,8 @@ pub(crate) use self::docker_logs::*;
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
 pub(crate) use self::exec::*;
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+pub use self::expansion::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes_logs",
@@ -292,7 +291,6 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
-
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,

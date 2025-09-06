@@ -1,3 +1,9 @@
+use chrono::{TimeZone, Utc};
+use vector_core::event::{
+    Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+    metric::{Bucket, Quantile, TagValue},
+};
+
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
     metrics::v1::{
@@ -6,11 +12,6 @@ use super::proto::{
         SummaryDataPoint, metric::Data, number_data_point::Value as NumberDataPointValue,
     },
     resource::v1::Resource,
-};
-use chrono::{TimeZone, Utc};
-use vector_core::event::{
-    Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-    metric::{Bucket, Quantile, TagValue},
 };
 
 impl ResourceMetrics {

@@ -1,9 +1,10 @@
 use std::net::Ipv4Addr;
 
 use metrics::{counter, histogram};
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 

@@ -1,12 +1,20 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::APIClient as DatabendAPIClient;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_lib::codecs::encoding::{Framer, FramingConfig};
-use vector_lib::configurable::{component::GenerateConfig, configurable_component};
+use vector_lib::{
+    codecs::encoding::{Framer, FramingConfig},
+    configurable::{component::GenerateConfig, configurable_component},
+};
 
+use super::{
+    compression::DatabendCompression,
+    encoding::{DatabendEncodingConfig, DatabendMissingFieldAS, DatabendSerializerConfig},
+    request_builder::DatabendRequestBuilder,
+    service::{DatabendRetryLogic, DatabendService},
+    sink::DatabendSink,
+};
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -20,14 +28,6 @@ use crate::{
     },
     tls::TlsConfig,
     vector_version,
-};
-
-use super::{
-    compression::DatabendCompression,
-    encoding::{DatabendEncodingConfig, DatabendMissingFieldAS, DatabendSerializerConfig},
-    request_builder::DatabendRequestBuilder,
-    service::{DatabendRetryLogic, DatabendService},
-    sink::DatabendSink,
 };
 
 /// Configuration for the `databend` sink.

@@ -1,18 +1,24 @@
-use std::borrow::Cow;
-use std::num::{NonZero, TryFromIntError};
-use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    convert::TryFrom,
+    marker::PhantomData,
+    num::{NonZero, TryFromIntError},
+};
 
-use lookup::lookup_v2::OwnedSegment;
-use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, lookup_v2::OwnedSegment};
 use snafu::Snafu;
-use vrl::compiler::value::VrlValueConvert;
-use vrl::compiler::{ProgramInfo, SecretTarget, Target};
-use vrl::prelude::Collection;
-use vrl::value::{Kind, ObjectMap, Value};
+use vrl::{
+    compiler::{ProgramInfo, SecretTarget, Target, value::VrlValueConvert},
+    prelude::Collection,
+    value::{Kind, ObjectMap, Value},
+};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, metric::TagValue};
-use crate::config::{LogNamespace, log_schema};
-use crate::schema::Definition;
+use crate::{
+    config::{LogNamespace, log_schema},
+    schema::Definition,
+};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
 
@@ -681,11 +687,9 @@ mod test {
     use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::btreemap;
-    use vrl::value::kind::Index;
+    use vrl::{btreemap, value::kind::Index};
 
-    use super::super::MetricValue;
-    use super::*;
+    use super::{super::MetricValue, *};
     use crate::metric_tags;
 
     #[test]

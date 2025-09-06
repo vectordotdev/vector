@@ -8,18 +8,16 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::lookup::{PathPrefix, metadata_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-};
-use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
+    lookup::{PathPrefix, metadata_path, path},
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
@@ -257,8 +255,9 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use flate2::{Compression, write::GzEncoder};
     use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
 
     use super::*;
 

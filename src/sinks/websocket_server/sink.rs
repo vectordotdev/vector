@@ -33,6 +33,11 @@ use vector_lib::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
+use super::{
+    WebSocketListenerSinkConfig,
+    buffering::MessageBufferingConfig,
+    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+};
 use crate::{
     codecs::{Encoder, Transformer},
     common::http::server_auth::HttpServerAuthMatcher,
@@ -45,12 +50,6 @@ use crate::{
         prelude::*,
         websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
     },
-};
-
-use super::{
-    WebSocketListenerSinkConfig,
-    buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
 };
 
 pub struct WebSocketListenerSink {
@@ -445,12 +444,12 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
 #[cfg(test)]
 mod tests {
+    use std::{future::ready, num::NonZeroUsize};
+
     use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
     use futures_util::stream;
-    use std::{future::ready, num::NonZeroUsize};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-
     use tokio::{task::JoinHandle, time};
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     use vector_lib::{
         codecs::{
             JsonDeserializerConfig,
@@ -462,7 +461,6 @@ mod tests {
     };
 
     use super::*;
-
     use crate::{
         event::{Event, LogEvent},
         sinks::websocket_server::{

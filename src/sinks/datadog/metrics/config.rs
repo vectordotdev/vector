@@ -3,8 +3,7 @@ use std::sync::OnceLock;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_lib::config::proxy::ProxyConfig;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component};
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,

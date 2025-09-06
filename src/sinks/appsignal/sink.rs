@@ -1,12 +1,11 @@
 use futures_util::future::ready;
 
-use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer};
-
 use super::{
     encoder::AppsignalEncoder,
     normalizer::AppsignalMetricsNormalizer,
     request_builder::{AppsignalRequest, AppsignalRequestBuilder},
 };
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricNormalizer};
 
 pub(super) struct AppsignalSink<S> {
     pub(super) service: S,

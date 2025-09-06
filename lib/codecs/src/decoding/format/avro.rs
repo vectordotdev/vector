@@ -1,7 +1,4 @@
-use super::Deserializer;
-use crate::encoding::AvroSerializerOptions;
-use bytes::Buf;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
@@ -13,6 +10,9 @@ use vector_core::{
     schema,
 };
 use vrl::value::KeyString;
+
+use super::Deserializer;
+use crate::encoding::AvroSerializerOptions;
 
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;

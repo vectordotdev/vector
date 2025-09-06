@@ -407,10 +407,11 @@ impl<C> Aggregate<C> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use bytes::Bytes;
     use futures::SinkExt;
     use similar_asserts::assert_eq;
-    use std::fmt::Write as _;
 
     use super::*;
 

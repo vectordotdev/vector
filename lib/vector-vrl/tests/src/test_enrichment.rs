@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use vrl::value::{ObjectMap, Value};
 
 #[derive(Debug, Clone)]

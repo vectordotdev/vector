@@ -1,10 +1,11 @@
 use bytes::Bytes;
-use vector_lib::configurable::component::GenerateConfig;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+use vector_lib::{configurable::component::GenerateConfig, lookup::lookup_v2::OptionalTargetPath};
 use vrl::value::{ObjectMap, Value};
 
-use crate::event::{Event, LogEvent};
-use crate::sinks::pulsar::config::PulsarSinkConfig;
+use crate::{
+    event::{Event, LogEvent},
+    sinks::pulsar::config::PulsarSinkConfig,
+};
 
 #[test]
 fn generate_config() {

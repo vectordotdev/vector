@@ -2,11 +2,12 @@ mod renderer;
 
 use std::collections::HashMap;
 
-use crate::renderer::SchemaRenderer;
 use anyhow::{Context, Result};
 use tracing::debug;
 use vector_config::schema::parser::{component::ComponentSchema, query::SchemaQuerier};
 use vector_config_common::constants::{self, ComponentType};
+
+use crate::renderer::SchemaRenderer;
 
 fn main() -> Result<()> {
     let querier = SchemaQuerier::from_schema("/tmp/vector-config-schema.json")

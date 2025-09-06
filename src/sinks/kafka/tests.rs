@@ -12,11 +12,11 @@ mod integration_test {
         consumer::{BaseConsumer, Consumer},
         message::Headers,
     };
-    use vector_lib::codecs::TextSerializerConfig;
-    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
     use vector_lib::{
+        codecs::TextSerializerConfig,
         config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
+        lookup::lookup_v2::ConfigTargetPath,
     };
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};

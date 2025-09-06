@@ -1,21 +1,26 @@
 use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
-use vector_common::internal_event::{
-    self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered, register,
+use vector_common::{
+    EventDataEq,
+    byte_size_of::ByteSizeOf,
+    internal_event::{
+        self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered,
+        register,
+    },
+    json_size::JsonSize,
 };
-use vector_common::{EventDataEq, byte_size_of::ByteSizeOf, json_size::JsonSize};
 
-use crate::config::{ComponentKey, OutputId};
-use crate::event::EventMutRef;
-use crate::schema::Definition;
 use crate::{
     config,
+    config::{ComponentKey, OutputId},
     event::{
-        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef, into_event_stream,
+        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventMutRef, EventRef,
+        into_event_stream,
     },
     fanout::{self, Fanout},
     schema,
+    schema::Definition,
 };
 
 #[cfg(feature = "lua")]

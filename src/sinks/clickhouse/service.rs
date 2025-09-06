@@ -1,7 +1,13 @@
 //! Service implementation for the `Clickhouse` sink.
 
-use super::config::QuerySettingsConfig;
-use super::sink::PartitionKey;
+use bytes::Bytes;
+use http::{
+    Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+};
+use snafu::ResultExt;
+
+use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
     http::{Auth, HttpError},
     sinks::{
@@ -14,12 +20,6 @@ use crate::{
         },
     },
 };
-use bytes::Bytes;
-use http::{
-    Request, StatusCode, Uri,
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-};
-use snafu::ResultExt;
 
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {

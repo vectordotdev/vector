@@ -1,4 +1,20 @@
-use crate::vector_lib::codecs::StreamDecodingError;
+use std::pin::Pin;
+
+use chrono::Utc;
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
+use snafu::Snafu;
+use tokio::time;
+use tokio_tungstenite::tungstenite::{
+    Message, error::Error as TungsteniteError, protocol::CloseFrame,
+};
+use tokio_util::codec::FramedRead;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    event::{Event, LogEvent},
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
+
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -11,20 +27,7 @@ use crate::{
         WebSocketReceiveError, WebSocketSendError,
     },
     sources::websocket::config::WebSocketConfig,
-};
-use chrono::Utc;
-use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
-use snafu::Snafu;
-use std::pin::Pin;
-use tokio::time;
-use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::{Message, error::Error as TungsteniteError};
-use tokio_util::codec::FramedRead;
-use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    config::LogNamespace,
-    event::{Event, LogEvent},
+    vector_lib::codecs::StreamDecodingError,
 };
 
 macro_rules! fail_with_event {
@@ -454,26 +457,30 @@ impl PingManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::components::run_and_assert_source_error;
+    use std::{borrow::Cow, num::NonZeroU64};
+
+    use futures::{StreamExt, sink::SinkExt};
+    use tokio::{net::TcpListener, time::Duration};
+    use tokio_tungstenite::{
+        accept_async,
+        tungstenite::{
+            Message,
+            protocol::frame::{CloseFrame, coding::CloseCode},
+        },
+    };
+    use url::Url;
+    use vector_lib::codecs::decoding::DeserializerConfig;
+
     use crate::{
         common::websocket::WebSocketCommonConfig,
-        sources::websocket::config::PongMessage,
-        sources::websocket::config::WebSocketConfig,
+        sources::websocket::config::{PongMessage, WebSocketConfig},
         test_util::{
-            components::{SOURCE_TAGS, run_and_assert_source_compliance},
+            components::{
+                SOURCE_TAGS, run_and_assert_source_compliance, run_and_assert_source_error,
+            },
             next_addr,
         },
     };
-    use futures::{StreamExt, sink::SinkExt};
-    use std::borrow::Cow;
-    use std::num::NonZeroU64;
-    use tokio::{net::TcpListener, time::Duration};
-    use tokio_tungstenite::tungstenite::{
-        protocol::frame::CloseFrame, protocol::frame::coding::CloseCode,
-    };
-    use tokio_tungstenite::{accept_async, tungstenite::Message};
-    use url::Url;
-    use vector_lib::codecs::decoding::DeserializerConfig;
 
     fn make_config(uri: &str) -> WebSocketConfig {
         WebSocketConfig {

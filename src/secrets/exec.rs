@@ -220,17 +220,19 @@ async fn query_backend(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        config::SecretBackend,
-        secrets::exec::{ExecBackend, ExecVersion},
-    };
-    use rstest::rstest;
     use std::{
         collections::{HashMap, HashSet},
         path::PathBuf,
     };
+
+    use rstest::rstest;
     use tokio::sync::broadcast;
     use vrl::value;
+
+    use crate::{
+        config::SecretBackend,
+        secrets::exec::{ExecBackend, ExecVersion},
+    };
 
     fn make_test_backend(protocol: ExecVersion) -> ExecBackend {
         let command_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

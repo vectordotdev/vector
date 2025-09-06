@@ -1,4 +1,3 @@
-use crate::encoding::BuildError;
 use bytes::BytesMut;
 use chrono::SecondsFormat;
 use csv_core::{WriteResult, Writer, WriterBuilder};
@@ -10,6 +9,8 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
+
+use crate::encoding::BuildError;
 
 /// The user configuration to choose the metric tag strategy.
 #[configurable_component]

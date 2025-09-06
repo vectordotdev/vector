@@ -5,19 +5,20 @@ use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
-
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::{DatadogMetricOriginMetadata, EventMetadata},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     metrics::AgentDDSketch,
 };
+use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use crate::common::http::ErrorMessage;
 use crate::{
     SourceSender,
-    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
+    common::{
+        datadog::{DatadogMetricType, DatadogSeriesMetric},
+        http::ErrorMessage,
+    },
     config::log_schema,
     event::{
         Event, MetricKind, MetricTags,

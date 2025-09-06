@@ -9,6 +9,7 @@ use vector_lib::{
     metric_tags,
 };
 
+use super::StatsdSinkConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{statsd::config::Mode, util::service::net::UdpConnectorConfig},
@@ -18,8 +19,6 @@ use crate::{
         next_addr, trace_init,
     },
 };
-
-use super::StatsdSinkConfig;
 
 fn tags() -> MetricTags {
     metric_tags!(

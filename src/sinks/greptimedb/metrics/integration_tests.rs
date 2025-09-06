@@ -1,3 +1,10 @@
+use chrono::{DateTime, Duration, Utc};
+use futures::stream;
+use vector_lib::{
+    event::{Event, Metric, MetricKind, MetricValue},
+    metric_tags,
+};
+
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{greptimedb::metrics::config::GreptimeDBMetricsConfig, util::test::load_sink},
@@ -5,12 +12,6 @@ use crate::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         trace_init,
     },
-};
-use chrono::{DateTime, Duration, Utc};
-use futures::stream;
-use vector_lib::{
-    event::{Event, Metric, MetricKind, MetricValue},
-    metric_tags,
 };
 
 #[tokio::test]

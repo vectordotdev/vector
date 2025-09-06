@@ -1,5 +1,3 @@
-use crate::gelf::GELF_TARGET_PATHS;
-use crate::{VALID_FIELD_REGEX, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -11,6 +9,8 @@ use vector_core::{
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };
+
+use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -243,13 +243,15 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encoding::SerializerConfig;
-
-    use super::*;
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
-    use vrl::btreemap;
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        btreemap,
+        value::{ObjectMap, Value},
+    };
+
+    use super::*;
+    use crate::encoding::SerializerConfig;
 
     fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
         let config = GelfSerializerConfig::new();

@@ -1,8 +1,11 @@
 use futures::{future::ready, stream};
 use serde::Deserialize;
-use vector_lib::configurable::component::GenerateConfig;
-use vector_lib::event::{Event, LogEvent};
+use vector_lib::{
+    configurable::component::GenerateConfig,
+    event::{Event, LogEvent},
+};
 
+use super::config::AppsignalConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     test_util::{
@@ -10,8 +13,6 @@ use crate::{
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
-
-use super::config::AppsignalConfig;
 
 #[tokio::test]
 async fn component_spec_compliance() {

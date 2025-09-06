@@ -2,12 +2,13 @@
 //! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
 //!
 //! [maxmind]: https://maxmind.com
-use std::path::PathBuf;
-use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 
 use maxminddb::Reader;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -173,8 +174,9 @@ impl std::fmt::Debug for Mmdb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vrl::value::Value;
+
+    use super::*;
 
     #[test]
     fn city_partial_lookup() {

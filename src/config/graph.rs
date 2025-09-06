@@ -1,10 +1,14 @@
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    fmt,
+};
+
+use indexmap::{IndexMap, set::IndexSet};
+
 use super::{
     ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
     TransformOutput, WildcardMatching, schema,
 };
-use indexmap::{IndexMap, set::IndexSet};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Node {

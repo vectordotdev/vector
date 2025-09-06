@@ -13,9 +13,11 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
 };
 
 use crate::{

@@ -1,37 +1,46 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
-use crate::SourceSender;
-use crate::enrichment_tables::memory::MemoryConfig;
-use crate::enrichment_tables::memory::internal_events::{
-    MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
-    MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
+use std::{
+    sync::{Arc, Mutex, MutexGuard},
+    time::{Duration, Instant},
 };
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
-
-use evmap::shallow_copy::CopyValue;
-use evmap::{self};
-use evmap_derive::ShallowCopy;
-use futures::StreamExt;
-use thread_local::ThreadLocal;
-use tokio::time::interval;
-use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream::BoxStream;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::event::{Event, EventStatus, Finalizable};
-use vector_lib::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+use evmap::{
+    shallow_copy::CopyValue,
+    {self},
 };
-use vector_lib::sink::StreamSink;
+use evmap_derive::ShallowCopy;
+use futures::{StreamExt, stream::BoxStream};
+use thread_local::ThreadLocal;
+use tokio::time::interval;
+use tokio_stream::wrappers::IntervalStream;
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    enrichment::{Case, Condition, IndexHandle, Table},
+    event::{Event, EventStatus, Finalizable},
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+    },
+    shutdown::ShutdownSignal,
+    sink::StreamSink,
+};
 use vrl::value::{KeyString, ObjectMap, Value};
 
 use super::source::MemorySource;
+use crate::{
+    SourceSender,
+    enrichment_tables::memory::{
+        MemoryConfig,
+        internal_events::{
+            MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed,
+            MemoryEnrichmentTableInserted, MemoryEnrichmentTableRead,
+            MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
+        },
+    },
+};
 
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
@@ -372,12 +381,11 @@ impl StreamSink<Event> for Memory {
 
 #[cfg(test)]
 mod tests {
+    use std::{num::NonZeroU64, slice::from_ref, time::Duration};
+
     use futures::{StreamExt, future::ready};
     use futures_util::stream;
-    use std::slice::from_ref;
-    use std::{num::NonZeroU64, time::Duration};
     use tokio::time;
-
     use vector_lib::{
         event::{EventContainer, MetricValue},
         metrics::Controller,

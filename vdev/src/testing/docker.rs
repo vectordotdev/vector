@@ -1,8 +1,10 @@
-use std::env;
-use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::sync::LazyLock;
+use std::{
+    env,
+    ffi::{OsStr, OsString},
+    path::PathBuf,
+    process::{Command, Stdio},
+    sync::LazyLock,
+};
 
 pub static CONTAINER_TOOL: LazyLock<OsString> =
     LazyLock::new(|| env::var_os("CONTAINER_TOOL").unwrap_or_else(detect_container_tool));

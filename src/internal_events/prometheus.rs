@@ -4,8 +4,9 @@
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL, error_stage, error_type};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 #[cfg(feature = "sources-prometheus-scrape")]
 use vector_lib::prometheus::parser::ParserError;
 

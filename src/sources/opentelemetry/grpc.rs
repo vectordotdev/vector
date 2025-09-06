@@ -1,31 +1,31 @@
-use crate::sources::opentelemetry::config::METRICS;
-use crate::{
-    SourceSender,
-    internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::config::{LOGS, TRACES},
-};
 use futures::TryFutureExt;
 use prost::Message;
 use tonic::{Request, Response, Status};
-use vector_lib::codecs::decoding::ProtobufDeserializer;
-use vector_lib::codecs::decoding::format::Deserializer;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::opentelemetry::proto::collector::{
-    logs::v1::{
-        ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
-    },
-    metrics::v1::{
-        ExportMetricsServiceRequest, ExportMetricsServiceResponse,
-        metrics_service_server::MetricsService,
-    },
-    trace::v1::{
-        ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
-    },
-};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    opentelemetry::proto::collector::{
+        logs::v1::{
+            ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
+        },
+        metrics::v1::{
+            ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+            metrics_service_server::MetricsService,
+        },
+        trace::v1::{
+            ExportTraceServiceRequest, ExportTraceServiceResponse,
+            trace_service_server::TraceService,
+        },
+    },
+};
+
+use crate::{
+    SourceSender,
+    internal_events::{EventsReceived, StreamClosedError},
+    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
 };
 
 #[derive(Clone)]

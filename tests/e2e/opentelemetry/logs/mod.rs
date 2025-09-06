@@ -1,6 +1,6 @@
+use std::{collections::BTreeMap, path::PathBuf};
+
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 const EXPECTED_LOG_COUNT: usize = 100;
 

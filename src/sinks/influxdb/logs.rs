@@ -4,15 +4,13 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use vrl::event_path;
-use vrl::path::OwnedValuePath;
-use vrl::value::Kind;
-
-use vector_lib::config::log_schema;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::PathPrefix;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::schema;
+use vector_lib::{
+    config::log_schema,
+    configurable::configurable_component,
+    lookup::{PathPrefix, lookup_v2::OptionalValuePath},
+    schema,
+};
+use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
     Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp, healthcheck,
@@ -395,10 +393,12 @@ mod tests {
     use futures::{StreamExt, channel::mpsc, stream};
     use http::{StatusCode, request::Parts};
     use indoc::indoc;
+    use vector_lib::{
+        event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        lookup::owned_value_path,
+    };
 
-    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vector_lib::lookup::owned_value_path;
-
+    use super::*;
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
@@ -412,8 +412,6 @@ mod tests {
             next_addr,
         },
     };
-
-    use super::*;
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -872,13 +870,15 @@ mod integration_tests {
 
     use chrono::Utc;
     use futures::stream;
+    use vector_lib::{
+        codecs::BytesDeserializerConfig,
+        config::{LegacyKey, LogNamespace},
+        event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        lookup::{owned_value_path, path},
+    };
     use vrl::value;
 
-    use vector_lib::codecs::BytesDeserializerConfig;
-    use vector_lib::config::{LegacyKey, LogNamespace};
-    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vector_lib::lookup::{owned_value_path, path};
-
+    use super::*;
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
@@ -888,8 +888,6 @@ mod integration_tests {
         },
         test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {

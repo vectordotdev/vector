@@ -16,11 +16,6 @@ use tokio::{
     time::timeout,
 };
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
-use vector_lib::internal_event::{
-    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
-};
-use vector_lib::transform::update_runtime_schema_definition;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     buffers::{
@@ -30,7 +25,10 @@ use vector_lib::{
             channel::{BufferReceiver, BufferSender},
         },
     },
+    config::LogNamespace,
+    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     schema::Definition,
+    transform::update_runtime_schema_definition,
 };
 
 use super::{

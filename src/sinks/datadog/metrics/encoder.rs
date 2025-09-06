@@ -8,12 +8,12 @@ use std::{
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use snafu::{ResultExt, Snafu};
-use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
     event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
     metrics::AgentDDSketch,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
