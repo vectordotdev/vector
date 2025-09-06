@@ -44,7 +44,6 @@ mod tests {
     };
 
     use super::DatadogMetricsNormalizer;
-
     use crate::test_util::metrics::{
         assert_normalize, generate_f64s, get_aggregated_histogram, get_distribution, tests,
     };

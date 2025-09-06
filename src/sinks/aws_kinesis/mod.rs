@@ -10,5 +10,4 @@ pub mod request_builder;
 pub mod service;
 pub mod sink;
 
-pub use service::KinesisResponse;
-pub use service::KinesisService;
+pub use service::{KinesisResponse, KinesisService};

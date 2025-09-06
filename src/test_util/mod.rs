@@ -35,12 +35,12 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_lib::event::{
-    BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent, MetricTags, MetricValue,
-};
 use vector_lib::{
     buffers::topology::channel::LimitedReceiver,
-    event::{Metric, MetricKind},
+    event::{
+        BatchNotifier, BatchStatusReceiver, Event, EventArray, LogEvent, Metric, MetricKind,
+        MetricTags, MetricValue,
+    },
 };
 #[cfg(test)]
 use zstd::Decoder as ZstdDecoder;

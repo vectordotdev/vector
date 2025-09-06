@@ -1,3 +1,10 @@
+use std::cell::RefCell;
+
+use chrono_tz::Tz;
+use serde_json::Value;
+use vector_config_common::{attributes::CustomAttribute, constants};
+use vrl::compiler::TimeZone;
+
 use crate::{
     Configurable, GenerateError, Metadata, ToValue,
     schema::{
@@ -5,11 +12,6 @@ use crate::{
         generate_one_of_schema, get_or_generate_schema,
     },
 };
-use chrono_tz::Tz;
-use serde_json::Value;
-use std::cell::RefCell;
-use vector_config_common::{attributes::CustomAttribute, constants};
-use vrl::compiler::TimeZone;
 
 // TODO: Consider an approach for generating schema of "fixed string value, or remainder" structure
 // used by this type.

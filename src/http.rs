@@ -1,4 +1,12 @@
 #![allow(missing_docs)]
+use std::{
+    collections::HashMap,
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -15,13 +23,6 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -29,12 +30,10 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
-
 use crate::{
     config::ProxyConfig,
     internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
@@ -686,9 +685,8 @@ mod tests {
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {

@@ -1,9 +1,11 @@
 //! Encoding for the `AMQP` sink.
-use crate::sinks::prelude::*;
-use bytes::BytesMut;
 use std::io;
+
+use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
+
+use crate::sinks::prelude::*;
 
 #[derive(Clone, Debug)]
 pub(super) struct AmqpEncoder {
