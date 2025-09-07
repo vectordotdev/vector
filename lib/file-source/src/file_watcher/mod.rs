@@ -1,8 +1,6 @@
 use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
 use std::{
     io::{self, SeekFrom},
     path::PathBuf,
