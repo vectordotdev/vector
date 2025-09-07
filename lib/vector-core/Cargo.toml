@@ -41,7 +41,7 @@ proptest = { version = "1.7", optional = true }
 prost-types.workspace = true
 prost.workspace = true
 quanta = { version = "0.12.6", default-features = false }
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
