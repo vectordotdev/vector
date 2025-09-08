@@ -13,10 +13,6 @@ generator:
         maximum_prebuild_cache_size_bytes: 250MiB
         mount_point: /smp-shared
 
-blackhole:
-  - tcp:
-      binding_addr: "127.0.0.1:15400"
-
 target_metrics:
   - prometheus: # internal telemetry
       uri: "http://127.0.0.1:9090/metrics"

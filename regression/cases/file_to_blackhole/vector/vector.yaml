@@ -19,14 +19,10 @@ sources:
 
 sinks:
   prometheus:
-    type:    "prometheus_exporter"
-    inputs: [ "internal_metrics" ]
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
     address: "0.0.0.0:9090"
 
-  socket_sink:
-    type:    "socket"
-    inputs: [ "file" ]
-    mode:    "tcp"
-    address: "127.0.0.1:15400"
-    encoding:
-      codec: "json"
+  blackhole:
+    type: "blackhole"
+    inputs: ["file"]
