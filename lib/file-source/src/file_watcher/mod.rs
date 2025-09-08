@@ -18,9 +18,6 @@ use file_source_common::{
     AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
-use flate2::bufread::MultiGzDecoder;
-use tracing::debug;
-use vector_common::constants::GZIP_MAGIC;
 
 #[cfg(test)]
 mod tests;
