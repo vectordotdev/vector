@@ -283,12 +283,12 @@ where
                         Ok((path, Err(err))) => {
                             self.emitter.emit_file_delete_error(&path, err);
                         }
-                        Err(err) => {
+                        Err(join_err) => {
                             self.emitter.emit_file_delete_error(
                                 remove_file_tasks
-                                    .get(&err.id())
-                                    .expect("panicked task id not in task id pool"),
-                                std::io::Error::from_raw_os_error(1), // FIXME actually use `err`
+                                    .get(&join_err.id())
+                                    .expect("panicked/cancelled task id not in task id pool"),
+                                std::io::Error::other(join_err),
                             );
                         }
                     }
