@@ -140,7 +140,7 @@ where
     R: Record + Clone,
 {
     pub events: Vec<KinesisRequest<R>>,
-    metadata: RequestMetadata,
+    pub metadata: RequestMetadata,
 }
 
 impl<R> Clone for BatchKinesisRequest<R>

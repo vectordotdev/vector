@@ -11,6 +11,7 @@ use crate::{
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         Healthcheck, VectorSink,
+        prelude::*,
         util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
     },
 };
@@ -192,9 +193,23 @@ impl RetryLogic for KinesisRetryLogic {
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        if response.failure_count > 0 && self.retry_partial {
-            let msg = format!("partial error count {}", response.failure_count);
-            RetryAction::Retry(msg.into())
+        if response.failure_count > 0 && self.retry_partial && !response.failed_records.is_empty() {
+            let failed_records = response.failed_records.clone();
+            RetryAction::RetryPartial(Box::new(move |original_request| {
+                let failed_events: Vec<_> = failed_records
+                    .iter()
+                    .filter_map(|r| original_request.events.get(r.index).cloned())
+                    .collect();
+
+                let metadata = RequestMetadata::from_batch(
+                    failed_events.iter().map(|req| req.get_metadata().clone()),
+                );
+
+                BatchKinesisRequest {
+                    events: failed_events,
+                    metadata,
+                }
+            }))
         } else {
             RetryAction::Successful
         }
