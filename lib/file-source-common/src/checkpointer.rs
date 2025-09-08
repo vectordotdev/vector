@@ -322,11 +322,11 @@ impl Checkpointer {
             // stable file will still be in its current valid state and we'll be
             // able to recover.
             let tmp_file_path = self.tmp_file_path.clone();
-            let current_ = current.clone(); // FIXME cloning here is **bad**
-            tokio::task::spawn_blocking(move || -> Result<(), io::Error> {
+            let current = tokio::task::spawn_blocking(move || -> Result<State, io::Error> {
                 let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
-                serde_json::to_writer(&mut f, &current_)?;
-                f.into_inner()?.sync_all()
+                serde_json::to_writer(&mut f, &current)?;
+                f.into_inner()?.sync_all()?;
+                Ok(current)
             })
             .await
             .map_err(io::Error::other)??;
