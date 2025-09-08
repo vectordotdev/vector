@@ -3,8 +3,7 @@
 
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::tls::TlsEnableableConfig;
 

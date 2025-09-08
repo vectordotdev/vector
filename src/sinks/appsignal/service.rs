@@ -8,19 +8,18 @@ use futures::{
 use http::{Request, StatusCode, Uri, header::AUTHORIZATION};
 use hyper::body::Body;
 use tower::{Service, ServiceExt};
-
-use vector_lib::stream::DriverResponse;
 use vector_lib::{
-    finalization::EventStatus, request_metadata::GroupedCountByteSize,
-    request_metadata::MetaDescriptive, sensitive_string::SensitiveString,
+    finalization::EventStatus,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    sensitive_string::SensitiveString,
+    stream::DriverResponse,
 };
 
+use super::request_builder::AppsignalRequest;
 use crate::{
     http::HttpClient,
     sinks::util::{Compression, http::HttpBatchService, sink::Response},
 };
-
-use super::request_builder::AppsignalRequest;
 
 #[derive(Clone)]
 pub(super) struct AppsignalService {

@@ -8,20 +8,20 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::{
-    file_server::{FileServer, Line, calculate_ignore_before},
-    paths_provider::{Glob, MatchOptions},
-};
-use vector_lib::file_source_common::{
-    Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
-};
-use vector_lib::finalizer::OrderedFinalizer;
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    file_source::{
+        file_server::{FileServer, Line, calculate_ignore_before},
+        paths_provider::{Glob, MatchOptions},
+    },
+    file_source_common::{
+        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+    },
+    finalizer::OrderedFinalizer,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
@@ -859,7 +859,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::time::{Duration, sleep, timeout};
     use vector_lib::schema::Definition;
-    use vrl::value::kind::Collection;
+    use vrl::{value, value::kind::Collection};
 
     use super::*;
     use crate::{
@@ -869,7 +869,6 @@ mod tests {
         sources::file,
         test_util::components::{FILE_SOURCE_TAGS, assert_source_compliance},
     };
-    use vrl::value;
 
     #[test]
     fn generate_config() {

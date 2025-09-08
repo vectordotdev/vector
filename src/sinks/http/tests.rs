@@ -6,20 +6,26 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use http_body_util::Empty;
 use hyper::body::Body;
 use hyper::{Method, Response, StatusCode};
 use serde::{Deserialize, de};
-use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::{Framer, FramingConfig},
+use vector_lib::{
+    codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    finalization::AddBatchNotifier,
 };
-use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-use vector_lib::finalization::AddBatchNotifier;
 
+use super::{
+    config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
+    encoder::HttpEncoder,
+};
 use crate::{
     assert_downcast_matches,
     codecs::{EncodingConfigWithFraming, SinkType},
@@ -42,12 +48,6 @@ use crate::{
         },
         create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },
-};
-
-use super::{
-    config::HttpSinkConfig,
-    config::{validate_headers, validate_payload_wrapper},
-    encoder::HttpEncoder,
 };
 
 #[test]

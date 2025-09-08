@@ -6,15 +6,18 @@ use derivative::Derivative;
 use prost_reflect::{DynamicMessage, MessageDescriptor};
 use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
-use vector_core::event::{LogEvent, TraceEvent};
 use vector_core::{
     config::{DataType, LogNamespace, log_schema},
-    event::Event,
+    event::{Event, LogEvent, TraceEvent},
     schema,
 };
-use vrl::protobuf::descriptor::{get_message_descriptor, get_message_descriptor_from_bytes};
-use vrl::protobuf::parse::{Options, proto_to_value};
-use vrl::value::{Kind, Value};
+use vrl::{
+    protobuf::{
+        descriptor::{get_message_descriptor, get_message_descriptor_from_bytes},
+        parse::{Options, proto_to_value},
+    },
+    value::{Kind, Value},
+};
 
 use super::Deserializer;
 
@@ -171,8 +174,8 @@ impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
 mod tests {
     // TODO: add test for bad file path & invalid message_type
 
-    use std::path::PathBuf;
-    use std::{env, fs};
+    use std::{env, fs, path::PathBuf};
+
     use vector_core::config::log_schema;
 
     use super::*;

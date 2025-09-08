@@ -10,8 +10,7 @@ use hyper::body::Body;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{EstimatedJsonEncodedSizeOf, metric_tags};
+use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
     SourceSender,

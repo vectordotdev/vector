@@ -2,12 +2,11 @@ use bytes::Bytes;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
-use vector_core::config::LogNamespace;
-use vector_core::schema::meaning;
 use vector_core::{
-    config::{DataType, log_schema},
+    config::{DataType, LogNamespace, log_schema},
     event::{Event, LogEvent},
     schema,
+    schema::meaning,
 };
 use vrl::value::Kind;
 
@@ -89,8 +88,9 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vrl::value::Value;
+
+    use super::*;
 
     #[test]
     fn deserialize_bytes_legacy_namespace() {

@@ -10,8 +10,7 @@ use tonic::{
     transport::{Channel, Endpoint},
 };
 use tower::Service;
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{event::Event, tls::MaybeTlsSettings};
+use vector_lib::{event::Event, shutdown::ShutdownSignal, tls::MaybeTlsSettings};
 
 use crate::{
     components::validation::{

@@ -4,13 +4,17 @@ use http::{Request, Uri, header::AUTHORIZATION};
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Body;
 use tower::ServiceBuilder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
+use super::{
+    service::{AppsignalResponse, AppsignalService},
+    sink::AppsignalSink,
+};
 use crate::{
     codecs::Transformer,
     http::HttpClient,
@@ -22,11 +26,6 @@ use crate::{
             http::HttpStatusRetryLogic,
         },
     },
-};
-
-use super::{
-    service::{AppsignalResponse, AppsignalService},
-    sink::AppsignalSink,
 };
 
 /// Configuration for the `appsignal` sink.

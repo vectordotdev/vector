@@ -6,11 +6,11 @@ use hyper::Request;
 use serde_with::serde_as;
 use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
 };
 
 use self::types::Stats;

@@ -8,8 +8,7 @@ use std::{
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::EventStatus;
+use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{

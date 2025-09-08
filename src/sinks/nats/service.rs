@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use futures_util::TryFutureExt;
 
-use crate::sinks::prelude::*;
-
 use super::{NatsError, config::NatsPublisher, request_builder::NatsRequest};
+use crate::sinks::prelude::*;
 
 #[derive(Clone)]
 pub(super) struct NatsService {

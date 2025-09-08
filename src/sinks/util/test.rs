@@ -1,3 +1,8 @@
+use std::{
+    io::{BufRead, BufReader},
+    net::SocketAddr,
+};
+
 use bytes::{Buf, Bytes};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
@@ -8,10 +13,6 @@ use http_body_util::Empty;
 use hyper::body::Body;
 use hyper::{Request, Response, Server, StatusCode, service::service_fn};
 use serde::Deserialize;
-use std::{
-    io::{BufRead, BufReader},
-    net::SocketAddr,
-};
 use stream_cancel::{Trigger, Tripwire};
 
 use crate::{

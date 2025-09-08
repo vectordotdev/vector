@@ -7,9 +7,10 @@ use http_body_util::Empty;
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 
 use super::Region;
 use crate::{

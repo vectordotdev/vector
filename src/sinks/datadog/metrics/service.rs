@@ -1,5 +1,7 @@
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use futures::future::BoxFuture;
@@ -10,14 +12,15 @@ use http::{
 use hyper::body::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
-    sinks::datadog::DatadogApiError,
-    sinks::util::retries::RetryLogic,
+    sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.

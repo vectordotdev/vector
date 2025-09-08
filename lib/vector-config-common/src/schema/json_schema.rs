@@ -1,6 +1,7 @@
+use std::{iter, ops::Deref};
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{iter, ops::Deref};
 
 use super::{DEFINITIONS_PREFIX, Map, Set};
 

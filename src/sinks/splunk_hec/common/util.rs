@@ -6,8 +6,11 @@ use http::{Request, StatusCode, Uri};
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Body;
 use snafu::{ResultExt, Snafu};
-use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
-use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
+use vector_lib::{
+    config::proxy::ProxyConfig,
+    event::EventRef,
+    lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath},
+};
 
 use super::{
     EndpointTarget,

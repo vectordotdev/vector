@@ -13,8 +13,10 @@ use hyper::body::Body;
 use tracing::Instrument;
 
 use super::{NewRelicCredentials, NewRelicSinkError};
-use crate::sinks::prelude::*;
-use crate::{http::HttpClient, sinks::util::Compression};
+use crate::{
+    http::HttpClient,
+    sinks::{prelude::*, util::Compression},
+};
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {

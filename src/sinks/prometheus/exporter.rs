@@ -24,9 +24,9 @@ use stream_cancel::{Trigger, Tripwire};
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    configurable::configurable_component,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
         Registered,
@@ -601,12 +601,13 @@ impl StreamSink<Event> for PrometheusExporter {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read;
+
     use chrono::{Duration, Utc};
     use flate2::read::GzDecoder;
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use std::io::Read;
     use tokio::{sync::oneshot::error::TryRecvError, time};
     use vector_lib::{
         event::{MetricTags, StatisticKind},

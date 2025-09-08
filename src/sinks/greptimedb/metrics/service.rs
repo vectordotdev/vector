@@ -1,14 +1,19 @@
-use crate::sinks::{
-    greptimedb::metrics::config::GreptimeDBMetricsConfig,
-    greptimedb::metrics::request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
-    prelude::*,
-};
+use std::{sync::Arc, task::Poll};
+
 use greptimedb_ingester::{
     Client, ClientBuilder, Compression, Database, Error as GreptimeError,
-    api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*,
+    api::v1::{auth_header::AuthScheme, *},
+    channel_manager::*,
 };
-use std::{sync::Arc, task::Poll};
 use vector_lib::sensitive_string::SensitiveString;
+
+use crate::sinks::{
+    greptimedb::metrics::{
+        config::GreptimeDBMetricsConfig,
+        request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    },
+    prelude::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct GreptimeDBGrpcService {

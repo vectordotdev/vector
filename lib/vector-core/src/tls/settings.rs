@@ -1,3 +1,10 @@
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
+
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
@@ -8,12 +15,6 @@ use openssl::{
     x509::{X509, store::X509StoreBuilder},
 };
 use snafu::ResultExt;
-use std::{
-    fmt,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-};
 use vector_config::configurable_component;
 
 use super::{

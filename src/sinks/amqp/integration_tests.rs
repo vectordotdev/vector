@@ -1,3 +1,9 @@
+use std::{collections::HashSet, time::Duration};
+
+use config::AmqpPropertiesConfig;
+use futures::StreamExt;
+use vector_lib::{config::LogNamespace, event::LogEvent};
+
 use super::*;
 use crate::{
     SourceSender,
@@ -11,10 +17,6 @@ use crate::{
         random_lines_with_stream, random_string,
     },
 };
-use config::AmqpPropertiesConfig;
-use futures::StreamExt;
-use std::{collections::HashSet, time::Duration};
-use vector_lib::{config::LogNamespace, event::LogEvent};
 
 pub fn make_config() -> AmqpSinkConfig {
     let mut config = AmqpSinkConfig {

@@ -1,27 +1,27 @@
-use std::time::Duration;
-use std::{convert::Infallible, fmt, net::SocketAddr};
+use std::{convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use futures::FutureExt;
 use hyper::{Server, service::service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::owned_value_path;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::tls::MaybeTlsIncomingStream;
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::owned_value_path,
+    sensitive_string::SensitiveString,
+    tls::MaybeTlsIncomingStream,
+};
 use vrl::value::Kind;
 
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::DecodingConfig,
     config::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
-    http::build_http_trace_layer,
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -282,8 +282,7 @@ mod tests {
     use futures::Stream;
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::lookup::path;
+    use vector_lib::{assert_event_data_eq, lookup::path};
     use vrl::value;
 
     use super::*;

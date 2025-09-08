@@ -1,9 +1,10 @@
+use async_graphql::Object;
+use cfg_if::cfg_if;
+
 use crate::{
     event::{Metric, MetricValue},
     sources::host_metrics,
 };
-use async_graphql::Object;
-use cfg_if::cfg_if;
 
 pub struct MemoryMetrics(Vec<Metric>);
 

@@ -8,8 +8,10 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use super::VectorSinkError;
 use crate::{

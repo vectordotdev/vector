@@ -1,11 +1,9 @@
 use snafu::ResultExt;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
 
-use crate::common::websocket::WebSocketCommonConfig;
 use crate::{
     codecs::EncodingConfig,
-    common::websocket::{ConnectSnafu, WebSocketConnector, WebSocketError},
+    common::websocket::{ConnectSnafu, WebSocketCommonConfig, WebSocketConnector, WebSocketError},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, websocket::sink::WebSocketSink},
     tls::MaybeTlsSettings,

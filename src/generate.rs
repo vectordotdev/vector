@@ -10,10 +10,12 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use toml::{Value, map::Map};
-use vector_lib::configurable::component::{
-    SinkDescription, SourceDescription, TransformDescription,
+use vector_lib::{
+    buffers::BufferConfig,
+    config::GlobalOptions,
+    configurable::component::{SinkDescription, SourceDescription, TransformDescription},
+    default_data_dir,
 };
-use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
 use crate::config::{Format, SinkHealthcheckOptions, format};
 
@@ -379,9 +381,10 @@ fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::config::ConfigBuilder;
-    use rstest::rstest;
 
     fn generate_and_deserialize(expression: String, format: Format) {
         let opts = Opts {
