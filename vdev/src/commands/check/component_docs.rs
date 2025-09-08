@@ -12,6 +12,7 @@ impl Cli {
         let dirty_component_files: Vec<String> = files
             .into_iter()
             .filter(|file| file.starts_with("website/cue/reference"))
+            .filter(|file| file.contains("generated/"))
             .collect();
 
         // If it is not empty, there are out-of-sync component Cue files in the current branch.
