@@ -13,6 +13,7 @@ ALL_MODULES=(
   markdownlint
   datadog-ci
   release-flags
+  vdev
 )
 
 # By default, install everything
