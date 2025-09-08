@@ -1,23 +1,29 @@
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::pin::Pin;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
-use crate::internal_events::ReduceAddEventError;
-use crate::transforms::reduce::merge_strategy::{
-    MergeStrategy, ReduceValueMerger, get_value_merger,
-};
-use crate::{
-    conditions::Condition,
-    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
-    internal_events::ReduceStaleEventFlushed,
-    transforms::{TaskTransform, reduce::config::ReduceConfig},
-};
 use futures::Stream;
 use indexmap::IndexMap;
 use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
-use vrl::path::{OwnedTargetPath, parse_target_path};
-use vrl::prelude::KeyString;
+use vrl::{
+    path::{OwnedTargetPath, parse_target_path},
+    prelude::KeyString,
+};
+
+use crate::{
+    conditions::Condition,
+    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
+    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    transforms::{
+        TaskTransform,
+        reduce::{
+            config::ReduceConfig,
+            merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
+        },
+    },
+};
 
 #[derive(Clone, Debug)]
 struct ReduceState {
@@ -218,10 +224,10 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if let Some(period) = self.end_every_period {
-                if (now - t.creation) >= period {
-                    flush_discriminants.push(k.clone());
-                }
+            if let Some(period) = self.end_every_period
+                && (now - t.creation) >= period
+            {
+                flush_discriminants.push(k.clone());
             }
 
             if (now - t.stale_since) >= self.expire_after {
@@ -347,23 +353,22 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use indoc::indoc;
     use serde_json::json;
-    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
     use vrl::value::Kind;
 
-    use vector_lib::enrichment::TableRegistry;
-    use vector_lib::lookup::owned_value_path;
-
-    use crate::config::schema::Definition;
-    use crate::config::{LogNamespace, OutputId, TransformConfig, schema};
-    use crate::event::{LogEvent, Value};
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
-
     use super::*;
+    use crate::{
+        config::{LogNamespace, OutputId, TransformConfig, schema, schema::Definition},
+        event::{LogEvent, Value},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[tokio::test]
     async fn reduce_from_condition() {

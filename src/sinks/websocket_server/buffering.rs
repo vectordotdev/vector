@@ -1,4 +1,3 @@
-use crate::serde::default_decoding;
 use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
 use bytes::Bytes;
@@ -13,6 +12,8 @@ use vector_lib::{
     lookup::lookup_v2::ConfigValuePath,
 };
 use vrl::prelude::VrlValueConvert;
+
+use crate::serde::default_decoding;
 
 /// Configuration for message buffering which enables message replay for clients that connect later.
 #[configurable_component]
@@ -236,13 +237,12 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             message_id_path: Some(message_id_path),
             ..
         }) = self
+            && let Some(log) = event.maybe_as_log_mut()
         {
-            if let Some(log) = event.maybe_as_log_mut() {
-                let mut buffer = [0; 36];
-                let uuid = message_id.hyphenated().encode_lower(&mut buffer);
-                log.value_mut()
-                    .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
-            }
+            let mut buffer = [0; 36];
+            let uuid = message_id.hyphenated().encode_lower(&mut buffer);
+            log.value_mut()
+                .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
         }
         message_id
     }

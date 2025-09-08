@@ -1,37 +1,46 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
-use crate::SourceSender;
-use crate::enrichment_tables::memory::MemoryConfig;
-use crate::enrichment_tables::memory::internal_events::{
-    MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed, MemoryEnrichmentTableInserted,
-    MemoryEnrichmentTableRead, MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
+use std::{
+    sync::{Arc, Mutex, MutexGuard},
+    time::{Duration, Instant},
 };
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
-
-use evmap::shallow_copy::CopyValue;
-use evmap::{self};
-use evmap_derive::ShallowCopy;
-use futures::StreamExt;
-use thread_local::ThreadLocal;
-use tokio::time::interval;
-use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream::BoxStream;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::event::{Event, EventStatus, Finalizable};
-use vector_lib::internal_event::{
-    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+use evmap::{
+    shallow_copy::CopyValue,
+    {self},
 };
-use vector_lib::sink::StreamSink;
+use evmap_derive::ShallowCopy;
+use futures::{StreamExt, stream::BoxStream};
+use thread_local::ThreadLocal;
+use tokio::time::interval;
+use tokio_stream::wrappers::IntervalStream;
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    enrichment::{Case, Condition, IndexHandle, Table},
+    event::{Event, EventStatus, Finalizable},
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
+    },
+    shutdown::ShutdownSignal,
+    sink::StreamSink,
+};
 use vrl::value::{KeyString, ObjectMap, Value};
 
 use super::source::MemorySource;
+use crate::{
+    SourceSender,
+    enrichment_tables::memory::{
+        MemoryConfig,
+        internal_events::{
+            MemoryEnrichmentTableFlushed, MemoryEnrichmentTableInsertFailed,
+            MemoryEnrichmentTableInserted, MemoryEnrichmentTableRead,
+            MemoryEnrichmentTableReadFailed, MemoryEnrichmentTableTtlExpired,
+        },
+    },
+};
 
 /// Single memory entry containing the value and TTL
 #[derive(Clone, Eq, PartialEq, Hash, ShallowCopy)]
@@ -133,20 +142,19 @@ impl Memory {
                 update_time: now.into(),
             };
             let new_entry_size = new_entry_key.size_of() + new_entry.size_of();
-            if let Some(max_byte_size) = self.config.max_byte_size {
-                if writer
+            if let Some(max_byte_size) = self.config.max_byte_size
+                && writer
                     .metadata
                     .byte_size
                     .saturating_add(new_entry_size as u64)
                     > max_byte_size
-                {
-                    // Reject new entries
-                    emit!(MemoryEnrichmentTableInsertFailed {
-                        key: &new_entry_key,
-                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                    });
-                    continue;
-                }
+            {
+                // Reject new entries
+                emit!(MemoryEnrichmentTableInsertFailed {
+                    key: &new_entry_key,
+                    include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                });
+                continue;
             }
             writer.metadata.byte_size = writer
                 .metadata
@@ -173,17 +181,17 @@ impl Memory {
         // Refresh will happen only after we manually invoke it after iteration
         if let Some(reader) = self.get_read_handle().read() {
             for (k, v) in reader.iter() {
-                if let Some(entry) = v.get_one() {
-                    if entry.expired(now, self.config.ttl) {
-                        // Byte size is not reduced at this point, because the actual deletion
-                        // will only happen at refresh time
-                        writer.write_handle.empty(k.clone());
-                        emit!(MemoryEnrichmentTableTtlExpired {
-                            key: k,
-                            include_key_metric_tag: self.config.internal_metrics.include_key_tag
-                        });
-                        needs_flush = true;
-                    }
+                if let Some(entry) = v.get_one()
+                    && entry.expired(now, self.config.ttl)
+                {
+                    // Byte size is not reduced at this point, because the actual deletion
+                    // will only happen at refresh time
+                    writer.write_handle.empty(k.clone());
+                    emit!(MemoryEnrichmentTableTtlExpired {
+                        key: k,
+                        include_key_metric_tag: self.config.internal_metrics.include_key_tag
+                    });
+                    needs_flush = true;
                 }
             }
         };
@@ -373,11 +381,11 @@ impl StreamSink<Event> for Memory {
 
 #[cfg(test)]
 mod tests {
+    use std::{num::NonZeroU64, slice::from_ref, time::Duration};
+
     use futures::{StreamExt, future::ready};
     use futures_util::stream;
-    use std::{num::NonZeroU64, time::Duration};
     use tokio::time;
-
     use vector_lib::{
         event::{EventContainer, MetricValue},
         metrics::Controller,
@@ -483,7 +491,7 @@ mod tests {
                 ("ttl".into(), Value::from(0)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         // Force scan
@@ -549,7 +557,7 @@ mod tests {
                 ("ttl".into(), Value::from(ttl / 2)),
                 ("value".into(), Value::from(5)),
             ])),
-            memory.find_table_row(Case::Sensitive, &[condition.clone()], None, None, None)
+            memory.find_table_row(Case::Sensitive, from_ref(&condition), None, None, None)
         );
 
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));

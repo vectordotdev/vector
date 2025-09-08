@@ -23,8 +23,7 @@ use crate::{
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
     },
-    sinks::util::StreamSink,
-    sinks::websocket::config::WebSocketSinkConfig,
+    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 
 pub struct WebSocketSink {
@@ -64,13 +63,13 @@ impl WebSocketSink {
     }
 
     fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
-        if let Some(ping_timeout) = self.ping_timeout {
-            if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-                return Err(TungsteniteError::Io(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Pong not received in time",
-                )));
-            }
+        if let Some(ping_timeout) = self.ping_timeout
+            && last_pong.elapsed() > Duration::from_secs(ping_timeout.into())
+        {
+            return Err(TungsteniteError::Io(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "Pong not received in time",
+            )));
         }
 
         Ok(())

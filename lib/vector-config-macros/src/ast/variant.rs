@@ -1,11 +1,11 @@
-use darling::{error::Accumulator, util::Flag, FromAttributes};
+use darling::{FromAttributes, error::Accumulator, util::Flag};
 use proc_macro2::{Ident, TokenStream};
 use quote::ToTokens;
 use serde_derive_internals::ast as serde_ast;
 
 use super::{
-    util::{has_flag_attribute, try_extract_doc_title_description, DarlingResultIterator},
     Field, LazyCustomAttribute, Metadata, Style, Tagging,
+    util::{DarlingResultIterator, has_flag_attribute, try_extract_doc_title_description},
 };
 
 /// A variant in an enum.

@@ -1,8 +1,5 @@
 use vector_lib::config::{LogNamespace, log_schema};
-use vrl::owned_value_path;
-use vrl::path::OwnedTargetPath;
-
-pub mod optional;
+use vrl::{owned_value_path, path::OwnedTargetPath};
 
 pub(crate) fn get_message_path(log_namespace: LogNamespace) -> OwnedTargetPath {
     match log_namespace {

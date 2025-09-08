@@ -9,8 +9,10 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{BytesSent, Protocol, Registered};
+use vector_lib::{
+    configurable::configurable_component,
+    internal_event::{BytesSent, Protocol, Registered},
+};
 
 use super::{
     SinkBuildError,
@@ -128,10 +130,10 @@ impl UdpConnector {
 
         let socket = UdpSocket::bind(bind_address).await.context(BindSnafu)?;
 
-        if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-            if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_bytes) {
-                warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
-            }
+        if let Some(send_buffer_bytes) = self.send_buffer_bytes
+            && let Err(error) = net::set_send_buffer_size(&socket, send_buffer_bytes)
+        {
+            warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
         }
 
         socket.connect(addr).await.context(ConnectSnafu)?;

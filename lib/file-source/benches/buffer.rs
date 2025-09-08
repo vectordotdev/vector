@@ -1,7 +1,7 @@
 use std::{fmt, io::Cursor};
 
 use bytes::BytesMut;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use file_source_common::buffer::read_until_with_max_size;
 
 struct Parameters {

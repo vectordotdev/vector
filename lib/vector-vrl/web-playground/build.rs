@@ -1,10 +1,13 @@
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::{env, fs, io};
+use std::{
+    env, fs,
+    fs::File,
+    io,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
-use cargo_lock::{package::SourceKind, Lockfile};
+use cargo_lock::{Lockfile, package::SourceKind};
 
 fn get_vector_lock_path() -> PathBuf {
     let path = fs::canonicalize(env::var("CARGO_MANIFEST_DIR").unwrap()).unwrap();

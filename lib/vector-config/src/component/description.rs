@@ -5,8 +5,10 @@ use toml::Value;
 use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};
-use crate::schema::{SchemaGenerator, SchemaObject};
-use crate::{schema, Configurable, ConfigurableRef, GenerateError, Metadata};
+use crate::{
+    Configurable, ConfigurableRef, GenerateError, Metadata, schema,
+    schema::{SchemaGenerator, SchemaObject},
+};
 
 #[derive(Debug, Snafu, Clone, PartialEq, Eq)]
 pub enum ExampleError {
@@ -83,12 +85,14 @@ where
     }
 
     /// Generate a schema object covering all the descriptions of this type.
-    pub fn generate_schemas(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    pub fn generate_schemas(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         let mut descriptions: Vec<_> = inventory::iter::<Self>.into_iter().collect();
         descriptions.sort_unstable_by_key(|desc| desc.component_name);
         let subschemas: Vec<SchemaObject> = descriptions
             .into_iter()
-            .map(|description| description.generate_schema(gen))
+            .map(|description| description.generate_schema(generator))
             .collect::<Result<_, _>>()?;
         Ok(schema::generate_one_of_schema(&subschemas))
     }
@@ -96,7 +100,7 @@ where
     /// Generate a schema object for this description.
     fn generate_schema(
         &self,
-        gen: &RefCell<SchemaGenerator>,
+        generator: &RefCell<SchemaGenerator>,
     ) -> Result<SchemaObject, GenerateError> {
         let mut tag_subschema =
             schema::generate_const_string_schema(self.component_name.to_string());
@@ -110,7 +114,7 @@ where
         let mut field_metadata = Metadata::default();
         field_metadata.set_transparent();
         let mut subschema =
-            schema::get_or_generate_schema(&self.config, gen, Some(field_metadata))?;
+            schema::get_or_generate_schema(&self.config, generator, Some(field_metadata))?;
 
         schema::convert_to_flattened_schema(&mut subschema, flattened_subschemas);
 

@@ -5,11 +5,10 @@ use std::os::windows::fs::MetadataExt;
 use std::{fs, io::Write};
 
 use bytes::Bytes;
+use file_source_common::ReadFrom;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::file_watcher::{tests::*, FileWatcher, RawLineResult};
-
-use file_source_common::ReadFrom;
+use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 
 // Interpret all FWActions, including truncation
 //

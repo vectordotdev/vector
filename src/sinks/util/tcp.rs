@@ -16,9 +16,10 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    json_size::JsonSize,
+};
 
 use crate::{
     codecs::Transformer,
@@ -177,16 +178,16 @@ impl TcpConnector {
             .await
             .context(ConnectSnafu)
             .map(|mut maybe_tls| {
-                if let Some(keepalive) = self.keepalive {
-                    if let Err(error) = maybe_tls.set_keepalive(keepalive) {
-                        warn!(message = "Failed configuring TCP keepalive.", %error);
-                    }
+                if let Some(keepalive) = self.keepalive
+                    && let Err(error) = maybe_tls.set_keepalive(keepalive)
+                {
+                    warn!(message = "Failed configuring TCP keepalive.", %error);
                 }
 
-                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
-                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
-                    }
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes
+                    && let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes)
+                {
+                    warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
                 }
 
                 maybe_tls

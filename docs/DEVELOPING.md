@@ -125,7 +125,7 @@ Loosely, you'll need the following:
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
-- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
 - **To run `make generate-component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.

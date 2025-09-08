@@ -37,17 +37,16 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    finalizer::OrderedFinalizer,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::{Kind, ObjectMap, kind::Collection};
 
@@ -622,11 +621,10 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered {
-                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                            if status == BatchStatus::Delivered
+                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
                                     emit!(KafkaOffsetUpdateError { error });
                                 }
-                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -1387,8 +1385,7 @@ impl ConsumerContext for KafkaSourceContext {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
 
@@ -1861,10 +1858,10 @@ mod integration_test {
             .expect("create_topics failed");
 
         for result in topic_results {
-            if let Err((topic, err)) = result {
-                if err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
-                    panic!("Creating a topic failed: {:?}", (topic, err))
-                }
+            if let Err((topic, err)) = result
+                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                panic!("Creating a topic failed: {:?}", (topic, err))
             }
         }
     }

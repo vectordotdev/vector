@@ -304,6 +304,40 @@ generated: configuration: configuration: {
 				required:      true
 				relevant_when: "type = \"exec\""
 			}
+			protocol: {
+				type: object: options: {
+					backend_config: {
+						type: "*": {}
+						description: """
+														The configuration to pass to the secrets executable. This is the `config` field in the
+														backend request. Refer to the documentation of your `backend_type `to see which options
+														are required to be set.
+														"""
+						required:      false
+						relevant_when: "version = \"v1_1\""
+					}
+					backend_type: {
+						type: string: {}
+						description:   "The name of the backend. This is `type` field in the backend request."
+						required:      true
+						relevant_when: "version = \"v1_1\""
+					}
+					version: {
+						required: false
+						type: string: {
+							enum: {
+								v1:   "Expect the command to fetch the configuration options itself."
+								v1_1: "Configuration options to the command are to be curried upon each request."
+							}
+							default: "v1"
+						}
+						description: "The protocol version."
+					}
+				}
+				description:   "Settings for the protocol between Vector and the secrets executable."
+				required:      false
+				relevant_when: "type = \"exec\""
+			}
 			timeout: {
 				type: uint: default: 5
 				description:   "The timeout, in seconds, to wait for the command to complete."

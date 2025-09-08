@@ -8,18 +8,16 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::lookup::{PathPrefix, metadata_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-};
-use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
+    lookup::{PathPrefix, metadata_path, path},
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
@@ -134,13 +132,12 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            if context.store_access_key {
-                                if let Some(access_key) = &request.access_key {
-                                    log.metadata_mut().secrets_mut().insert_secret(
-                                        "aws_kinesis_firehose_access_key",
-                                        access_key,
-                                    );
-                                }
+                            if context.store_access_key
+                                && let Some(access_key) = &request.access_key
+                            {
+                                log.metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("aws_kinesis_firehose_access_key", access_key);
                             }
                         }
                     }
@@ -258,8 +255,9 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use flate2::{Compression, write::GzEncoder};
     use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
 
     use super::*;
 

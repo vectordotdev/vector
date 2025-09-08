@@ -4,8 +4,8 @@ use serde_json::Value;
 use vector_config_common::validation::{Format, Validation};
 
 use crate::{
-    schema::{generate_string_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject, generate_string_schema},
 };
 
 impl Configurable for url::Url {

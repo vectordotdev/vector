@@ -1,7 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{net::SocketAddr, time::Duration};
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,13 +8,16 @@ use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_lib::codecs::{
-    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
-    decoding::{Deserializer, Framer},
+use vector_lib::{
+    codecs::{
+        BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
+        decoding::{Deserializer, Framer},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path};
 use vrl::event_path;
 
 #[cfg(unix)]
@@ -27,8 +29,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, log_schema,
     },
     event::Event,
-    internal_events::StreamClosedError,
-    internal_events::{SocketBindError, SocketMode, SocketReceiveError},
+    internal_events::{SocketBindError, SocketMode, SocketReceiveError, StreamClosedError},
     net,
     shutdown::ShutdownSignal,
     sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
@@ -328,10 +329,10 @@ pub fn udp(
             })
         })?;
 
-        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes
+            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+        {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
         info!(
@@ -449,17 +450,19 @@ fn enrich_syslog_event(
 #[cfg(test)]
 mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
-    use vector_lib::lookup::{OwnedTargetPath, event_path, owned_value_path};
 
     use chrono::prelude::*;
     use rand::{Rng, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::codecs::decoding::format::Deserializer;
-    use vector_lib::lookup::PathPrefix;
-    use vector_lib::{config::ComponentKey, schema::Definition};
+    use vector_lib::{
+        assert_event_data_eq,
+        codecs::decoding::format::Deserializer,
+        config::ComponentKey,
+        lookup::{OwnedTargetPath, PathPrefix, event_path, owned_value_path},
+        schema::Definition,
+    };
     use vrl::value::{Kind, ObjectMap, Value, kind::Collection};
 
     use super::*;
@@ -1184,12 +1187,13 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
-        use futures_util::{SinkExt, stream};
         use std::os::unix::net::UnixStream as StdUnixStream;
-        use tokio::io::AsyncWriteExt;
-        use tokio::net::UnixStream;
+
+        use futures_util::{SinkExt, stream};
+        use tokio::{io::AsyncWriteExt, net::UnixStream};
         use tokio_util::codec::{FramedWrite, LinesCodec};
+
+        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
 
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
