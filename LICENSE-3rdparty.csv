@@ -185,6 +185,7 @@ data-url,https://github.com/servo/rust-url,MIT OR Apache-2.0,Simon Sapin <simon.
 databend-client,https://github.com/databendlabs/bendsql,Apache-2.0,Databend Authors <opensource@databend.com>
 dbl,https://github.com/RustCrypto/utils,MIT OR Apache-2.0,RustCrypto Developers
 deadpool,https://github.com/bikeshedder/deadpool,MIT OR Apache-2.0,Michael P. Jung <michael.jung@terreon.de>
+debugid,https://github.com/getsentry/rust-debugid,Apache-2.0,Sentry <hello@sentry.io>
 der,https://github.com/RustCrypto/formats/tree/master/der,Apache-2.0 OR MIT,RustCrypto Developers
 deranged,https://github.com/jhpratt/deranged,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 derivative,https://github.com/mcarton/rust-derivative,MIT OR Apache-2.0,mcarton <cartonmartin+git@gmail.com>
@@ -587,6 +588,11 @@ security-framework,https://github.com/kornelski/rust-security-framework,MIT OR A
 semver,https://github.com/dtolnay/semver,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 semver,https://github.com/steveklabnik/semver,MIT OR Apache-2.0,"Steve Klabnik <steve@steveklabnik.com>, The Rust Project Developers"
 semver-parser,https://github.com/steveklabnik/semver-parser,MIT OR Apache-2.0,Steve Klabnik <steve@steveklabnik.com>
+sentry,https://github.com/getsentry/sentry-rust,MIT,Sentry <hello@sentry.io>
+sentry-core,https://github.com/getsentry/sentry-rust,MIT,Sentry <hello@sentry.io>
+sentry-log,https://github.com/getsentry/sentry-rust,MIT,Sentry <hello@sentry.io>
+sentry-tracing,https://github.com/getsentry/sentry-rust,MIT,Sentry <hello@sentry.io>
+sentry-types,https://github.com/getsentry/sentry-rust,MIT,Sentry <hello@sentry.io>
 serde,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
 serde-toml-merge,https://github.com/jdrouet/serde-toml-merge,MIT,Jeremie Drouet <jeremie.drouet@gmail.com>
 serde-value,https://github.com/arcnmx/serde-value,MIT,arcnmx
@@ -716,6 +722,8 @@ unreachable,https://github.com/reem/rust-unreachable,MIT  OR  Apache-2.0,Jonatha
 unsafe-libyaml,https://github.com/dtolnay/unsafe-libyaml,MIT,David Tolnay <dtolnay@gmail.com>
 untrusted,https://github.com/briansmith/untrusted,ISC,Brian Smith <brian@briansmith.org>
 uom,https://github.com/iliekturtles/uom,Apache-2.0 OR MIT,Mike Boutin <mike.boutin@gmail.com>
+ureq,https://github.com/algesten/ureq,MIT OR Apache-2.0,"Martin Algesten <martin@algesten.se>, Jacob Hoffman-Andrews <ureq@hoffman-andrews.com>"
+ureq-proto,https://github.com/algesten/ureq-proto,MIT OR Apache-2.0,Martin Algesten <martin@algesten.se>
 url,https://github.com/servo/rust-url,MIT OR Apache-2.0,The rust-url developers
 urlencoding,https://github.com/kornelski/rust_urlencoding,MIT,"Kornel <kornel@geekhood.net>, Bertram Truong <b@bertramtruong.com>"
 utf-8,https://github.com/SimonSapin/rust-utf8,MIT OR Apache-2.0,Simon Sapin <simon.sapin@exyr.org>
@@ -748,6 +756,7 @@ wasm-timer,https://github.com/tomaka/wasm-timer,MIT,Pierre Krieger <pierre.krieg
 web-sys,https://github.com/rustwasm/wasm-bindgen/tree/master/crates/web-sys,MIT OR Apache-2.0,The wasm-bindgen Developers
 web-time,https://github.com/daxpedda/web-time,MIT OR Apache-2.0,The web-time Authors
 webbrowser,https://github.com/amodm/webbrowser-rs,MIT OR Apache-2.0,Amod Malviya @amodm
+webpki-root-certs,https://github.com/rustls/webpki-roots,CDLA-Permissive-2.0,The webpki-root-certs Authors
 webpki-roots,https://github.com/rustls/webpki-roots,MPL-2.0,The webpki-roots Authors
 whoami,https://github.com/ardaku/whoami,Apache-2.0 OR BSL-1.0 OR MIT,The whoami Authors
 widestring,https://github.com/starkat99/widestring-rs,MIT OR Apache-2.0,Kathryn Long <squeeself@gmail.com>

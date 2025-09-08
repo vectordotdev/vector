@@ -112,6 +112,8 @@ on:
         value: ${{ jobs.int_tests.outputs.pulsar }}
       redis:
         value: ${{ jobs.int_tests.outputs.redis }}
+      sentry:
+        value: ${{ jobs.int_tests.outputs.sentry }}
       splunk:
         value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
@@ -260,7 +262,7 @@ jobs:
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -338,5 +340,5 @@ jobs:
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml

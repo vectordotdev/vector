@@ -100,6 +100,8 @@ pub mod redis;
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
+#[cfg(feature = "sinks-sentry")]
+pub mod sentry;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]

@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/[0-9]+/envelope/",
+    "headers": {
+      "Content-Type": {
+        "equalTo": "application/x-sentry-envelope"
+      },
+      "X-Sentry-Auth": {
+        "matches": "Sentry sentry_version=7, sentry_key=.*"
+      },
+      "User-Agent": {
+        "equalTo": "sentry.vector/0.1.0"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"id\": \"{{randomValue type='UUID'}}\"}",
+    "transformers": ["response-template"]
+  },
+  "postServeActions": [
+    {
+      "name": "webhook",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8081/envelope-received",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{{jsonPath request.body '$'}}"
+      }
+    }
+  ]
+}
