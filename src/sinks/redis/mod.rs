@@ -18,14 +18,12 @@ use redis::RedisError;
 use snafu::Snafu;
 use tokio::sync::watch::error::RecvError;
 
-use crate::sinks::prelude::*;
-
 use self::{
     config::{ListMethod, SortedSetMethod},
     sink::GenerationCount,
 };
-
 use super::util::EncodedLength;
+use crate::sinks::prelude::*;
 
 #[derive(Debug, Snafu)]
 pub(super) enum RedisSinkError {

@@ -1,10 +1,11 @@
-use vector_lib::codecs::MetricTagValues;
-use vector_lib::codecs::encoding::FramingConfig;
-use vector_lib::codecs::encoding::JsonSerializerConfig;
-use vector_lib::codecs::encoding::JsonSerializerOptions;
-use vector_lib::codecs::encoding::SerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::{
+        MetricTagValues,
+        encoding::{FramingConfig, JsonSerializerConfig, JsonSerializerOptions, SerializerConfig},
+    },
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
@@ -186,10 +187,11 @@ mod test {
 #[cfg(feature = "axiom-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::env;
+
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use serde::{Deserialize, Serialize};
-    use std::env;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;

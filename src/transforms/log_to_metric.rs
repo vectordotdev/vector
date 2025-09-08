@@ -1,28 +1,25 @@
-use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError};
+use std::{collections::HashMap, num::ParseFloatError, sync::Arc};
 
 use chrono::Utc;
 use indexmap::IndexMap;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::LogEvent;
 use vector_lib::{
     config::LogNamespace,
-    event::DatadogMetricOriginMetadata,
+    configurable::configurable_component,
     event::{
-        metric::Sample,
-        metric::{Bucket, Quantile},
+        DatadogMetricOriginMetadata, LogEvent,
+        metric::{Bucket, Quantile, Sample},
     },
 };
-use vrl::path::{PathParseError, parse_target_path};
-use vrl::{event_path, path};
+use vrl::{
+    event_path, path,
+    path::{PathParseError, parse_target_path},
+};
 
-use crate::config::schema::Definition;
-use crate::transforms::log_to_metric::TransformError::PathNotFound;
 use crate::{
     common::expansion::pair_expansion,
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
-        TransformOutput,
+        TransformOutput, schema::Definition,
     },
     event::{
         Event, Value,
@@ -35,7 +32,9 @@ use crate::{
     },
     schema,
     template::{Template, TemplateRenderingError},
-    transforms::{FunctionTransform, OutputBuffer, Transform},
+    transforms::{
+        FunctionTransform, OutputBuffer, Transform, log_to_metric::TransformError::PathNotFound,
+    },
 };
 
 const ORIGIN_SERVICE_VALUE: u32 = 3;
@@ -959,24 +958,27 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::Arc, time::Duration};
+
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::{
+        config::ComponentKey,
+        event::{EventMetadata, ObjectMap},
+        metric_tags,
+    };
+
     use super::*;
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
     use crate::{
         config::log_schema,
         event::{
             Event, LogEvent,
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
         },
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
     };
-    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::event::{EventMetadata, ObjectMap};
-    use vector_lib::metric_tags;
 
     #[test]
     fn generate_config() {

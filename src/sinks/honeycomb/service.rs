@@ -2,16 +2,17 @@
 
 use bytes::Bytes;
 use http::{Request, Uri};
+use snafu::ResultExt;
 use vector_lib::sensitive_string::SensitiveString;
 
+use super::config::HTTP_HEADER_HONEYCOMB;
 use crate::sinks::{
     HTTPRequestBuilderSnafu,
-    util::buffer::compression::Compression,
-    util::http::{HttpRequest, HttpServiceRequestBuilder},
+    util::{
+        buffer::compression::Compression,
+        http::{HttpRequest, HttpServiceRequestBuilder},
+    },
 };
-use snafu::ResultExt;
-
-use super::config::HTTP_HEADER_HONEYCOMB;
 
 #[derive(Debug, Clone)]
 pub(super) struct HoneycombSvcRequestBuilder {

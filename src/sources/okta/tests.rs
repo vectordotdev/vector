@@ -1,19 +1,20 @@
-use crate::components::validation::prelude::*;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+
 use tokio::time::Duration;
-use vector_lib::config::LogNamespace;
+use vector_lib::{config::LogNamespace, event::Event};
 use warp::Filter;
 
-use vector_lib::event::Event;
-
-use crate::config::log_schema;
-use crate::sources::okta::OktaConfig;
-use crate::test_util::{
-    components::HTTP_PULL_SOURCE_TAGS, components::run_and_assert_source_compliance, next_addr,
-    test_generate_config, wait_for_tcp,
+use crate::{
+    components::validation::prelude::*,
+    config::log_schema,
+    sources::okta::OktaConfig,
+    test_util::{
+        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        next_addr, test_generate_config, wait_for_tcp,
+    },
 };
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(10);

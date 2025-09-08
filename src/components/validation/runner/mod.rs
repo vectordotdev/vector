@@ -16,11 +16,16 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_util::codec::Encoder as _;
-
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, codecs::encoding, config::LogNamespace, event::Event,
 };
 
+pub use self::config::TopologyBuilder;
+use super::{
+    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
+    encode_test_event,
+    sync::{Configuring, TaskCoordinator},
+};
 use crate::{
     codecs::Encoder,
     components::validation::{RunnerMetrics, TestCase},
@@ -28,14 +33,6 @@ use crate::{
     extra_context::ExtraContext,
     topology::RunningTopology,
 };
-
-use super::{
-    ComponentType, TestCaseExpectation, TestEvent, ValidationConfiguration, Validator,
-    encode_test_event,
-    sync::{Configuring, TaskCoordinator},
-};
-
-pub use self::config::TopologyBuilder;
 
 /// Runner input mechanism.
 ///

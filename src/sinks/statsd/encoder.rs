@@ -153,15 +153,14 @@ fn encode_and_write_single_event<V: Display>(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "sources-statsd")]
+    use vector_lib::event::{Metric, MetricKind, MetricValue, StatisticKind};
     use vector_lib::{
         event::{MetricTags, metric::TagValue},
         metric_tags,
     };
 
     use super::encode_tags;
-
-    #[cfg(feature = "sources-statsd")]
-    use vector_lib::event::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[cfg(feature = "sources-statsd")]
     fn encode_metric(metric: &Metric) -> bytes::BytesMut {

@@ -3,18 +3,18 @@ use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
-};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
@@ -309,6 +309,7 @@ mod test {
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
     use redis::AsyncCommands;
+    use vrl::value;
 
     use super::*;
     use crate::{
@@ -320,7 +321,6 @@ mod integration_test {
             random_string,
         },
     };
-    use vrl::value;
 
     const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
 

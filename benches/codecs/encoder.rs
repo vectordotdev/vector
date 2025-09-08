@@ -7,8 +7,11 @@ use criterion::{
 };
 use tokio_util::codec::Encoder;
 use vector::event::{Event, LogEvent};
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoder, encoding::Framer};
-use vector_lib::{btreemap, byte_size_of::ByteSizeOf};
+use vector_lib::{
+    btreemap,
+    byte_size_of::ByteSizeOf,
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoder, encoding::Framer},
+};
 
 #[derive(Debug, Clone)]
 pub struct JsonLogSerializer;

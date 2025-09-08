@@ -4,13 +4,13 @@ use std::net::SocketAddr;
 use chrono::Utc;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_lib::codecs::NativeDeserializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::NativeDeserializerConfig,
     config::LogNamespace,
+    configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::{CountByteSize, InternalEventHandle as _},
 };
 
 use crate::{
@@ -217,13 +217,11 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::owned_value_path;
-    use vector_lib::{config::LogNamespace, schema::Definition};
+    use vector_lib::{config::LogNamespace, lookup::owned_value_path, schema::Definition};
     use vrl::value::{Kind, kind::Collection};
 
-    use crate::config::SourceConfig;
-
     use super::VectorConfig;
+    use crate::config::SourceConfig;
 
     #[test]
     fn generate_config() {
@@ -278,6 +276,8 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
+    use vector_lib::{assert_event_data_eq, config::log_schema};
+
     use super::*;
     use crate::{
         SourceSender,
@@ -285,8 +285,6 @@ mod tests {
         sinks::vector::VectorConfig as SinkConfig,
         test_util,
     };
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
         let config = format!(r#"address = "{addr}""#);

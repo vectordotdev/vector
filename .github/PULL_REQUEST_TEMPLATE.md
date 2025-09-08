@@ -37,7 +37,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 - Some CI checks run only after we manually approve them.
   - We recommend adding a `pre-push` hook, please see [this template](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#Pre-push).
   - Alternatively, we recommend running the following locally before pushing to the remote branch:
-    - `cargo fmt --all`
+    - `cargo vdev fmt`
     - `cargo clippy --workspace --all-targets -- -D warnings`
     - `cargo nextest run --workspace` (alternatively, you can run `cargo test --all`)
 - After a review is requested, please avoid force pushes to help us review incrementally.

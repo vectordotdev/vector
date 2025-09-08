@@ -10,6 +10,7 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::exec("scripts/check-style.sh", ["--fix"], true)?;
-        app::exec("cargo", ["+nightly", "fmt"], true)
+        // We are using nightly features in `.rustfmt.toml
+        app::exec("cargo", ["+nightly", "fmt", "--all"], true)
     }
 }
