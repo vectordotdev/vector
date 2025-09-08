@@ -256,9 +256,9 @@ components: sources: opentelemetry: {
 				This setup allows shipping OTLP formatted logs to an OTEL collector without the use of a `remap` transform.
 				The same can be done for metrics and traces.
 
-				However, the OTLP formatted metrics cannot be converted Vector metrics format. As a workaround, the OTLP metrics
-				map to Vector log events. This prohibits the use of metric transforms like `aggregate` but it enables easy
-				shipping to OTEL collectors.
+				However, the OTLP formatted metrics cannot be converted to theVector metrics format. As a workaround, the OTLP
+				metrics are converted to Vector log events while preserving the OTLP foramt. This prohibits the use of metric
+				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
 
 				```yaml
 						sources:
