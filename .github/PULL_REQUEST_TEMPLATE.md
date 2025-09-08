@@ -38,7 +38,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
   - We recommend adding a `pre-push` hook, please see [this template](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#Pre-push).
   - Alternatively, we recommend running the following locally before pushing to the remote branch:
     - `make fmt`
-    - `make check-clippy` (if there are failure, maybe some of them can be fixed with `make lippy-fix`)
+    - `make check-clippy` (if there are failures it's possible some of them can be fixed with `make clippy-fix`)
     - `make test`
 - After a review is requested, please avoid force pushes to help us review incrementally.
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
