@@ -2,9 +2,7 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
+use std::{fmt, path::Path, str::FromStr};
 
 use serde::{Deserialize, Serialize, de};
 use vector_config_macros::Configurable;

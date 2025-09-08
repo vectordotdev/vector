@@ -2,9 +2,8 @@ use bytes::Bytes;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::DataType,
+    config::{DataType, LogNamespace},
     event::{Event, EventArray, EventContainer, proto},
     schema,
 };

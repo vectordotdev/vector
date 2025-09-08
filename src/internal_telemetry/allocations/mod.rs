@@ -15,7 +15,6 @@ use metrics::{counter, gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
-
 pub(crate) use self::allocator::{
     AllocationGroupId, AllocationLayer, GroupedTraceableAllocator, without_allocation_tracing,
 };

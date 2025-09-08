@@ -670,10 +670,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 clean: environment-clean ## Clean everything
 	cargo clean
 
-.PHONY: fmt
-fmt: ## Format code
-	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
 	cargo vdev build manifests
@@ -709,3 +705,11 @@ ci-generate-publish-metadata: ## Generates the necessary metadata required for b
 .PHONY: clippy-fix
 clippy-fix:
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --fix
+
+.PHONY: fmt
+fmt:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev fmt
+
+.PHONY: build-licenses
+build-licenses:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev build licenses

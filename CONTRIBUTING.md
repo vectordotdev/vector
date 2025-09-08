@@ -130,6 +130,11 @@ You can use the following as a starting point:
 ```shell
 #!/bin/sh
 set -e
+
+echo "Format code"
+
+make fmt
+
 echo "Running pre-push checks..."
 
 # We recommend always running all the following checks.
@@ -298,8 +303,8 @@ cd rust-doc && make docs
 
 ```sh
 cargo install dd-rust-license-tool --locked
-dd-rust-license-tool write
-git commit -am "dd-rust-license-tool write"
+make build-licenses
+git commit -am "updated LICENSE-3rdparty.csv"
 git push
 ```
 
@@ -312,7 +317,7 @@ When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.
 When adding, modifying, or removing a dependency in Vector you may find that you need to update the
 inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This file is generated using
 [dd-rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
-`cargo vdev build licenses`.
+`make build-licenses`.
 
 ## Next steps
 

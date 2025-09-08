@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lookup::lookup_v2::TargetPath;
-use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, owned_value_path};
+use lookup::{
+    OwnedTargetPath, OwnedValuePath, PathPrefix, lookup_v2::TargetPath, owned_value_path,
+};
 use vrl::value::{Kind, kind::Collection};
 
 use crate::config::{LegacyKey, LogNamespace, log_schema};
@@ -613,13 +614,13 @@ mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::{Event, EventMetadata, LogEvent};
-    use lookup::lookup_v2::parse_target_path;
-    use lookup::owned_value_path;
     use std::collections::{BTreeMap, HashMap};
+
+    use lookup::{lookup_v2::parse_target_path, owned_value_path};
     use vrl::value::Value;
 
     use super::*;
+    use crate::event::{Event, EventMetadata, LogEvent};
 
     #[test]
     fn test_definition_validity() {

@@ -1,9 +1,13 @@
-use crate::config::{ConfigBuilder, Format, format};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use clap::Parser;
 use colored::*;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+
+use crate::config::{ConfigBuilder, Format, format};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -207,12 +211,18 @@ fn walk_dir_and_convert(
     feature = "sinks-console"
 ))]
 mod tests {
-    use crate::config::{ConfigBuilder, Format, format};
-    use crate::convert_config::{Opts, check_paths, walk_dir_and_convert};
-    use std::path::{Path, PathBuf};
-    use std::str::FromStr;
-    use std::{env, fs};
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        str::FromStr,
+    };
+
     use tempfile::tempdir;
+
+    use crate::{
+        config::{ConfigBuilder, Format, format},
+        convert_config::{Opts, check_paths, walk_dir_and_convert},
+    };
 
     fn test_data_dir() -> PathBuf {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/cmd/config")

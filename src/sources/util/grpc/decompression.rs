@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    future::Future,
     io::Write,
     mem,
     pin::Pin,
@@ -14,7 +15,6 @@ use hyper::{
     Body,
     body::{HttpBody, Sender},
 };
-use std::future::Future;
 use tokio::{pin, select};
 use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};

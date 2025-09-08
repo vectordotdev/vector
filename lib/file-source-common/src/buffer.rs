@@ -113,9 +113,8 @@ mod test {
     use quickcheck::{QuickCheck, TestResult};
     use tokio::io::BufReader;
 
-    use crate::buffer::ReadResult;
-
     use super::read_until_with_max_size;
+    use crate::buffer::ReadResult;
 
     async fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
         // The `global_data` is the view of `chunks` as a single contiguous
