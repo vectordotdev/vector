@@ -27,7 +27,6 @@ vector-config = { path = "../vector-config", default-features = false }
 tokio = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-criterion = "0.7"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"
