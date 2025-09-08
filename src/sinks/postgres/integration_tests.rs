@@ -1,4 +1,16 @@
-use crate::test_util::integration::postgres::pg_url;
+use std::future::ready;
+
+use chrono::{DateTime, Utc};
+use futures::stream;
+use ordered_float::NotNan;
+use serde::{Deserialize, Serialize};
+use sqlx::{Connection, FromRow, PgConnection};
+use vector_lib::event::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
+    MetricValue,
+};
+use vrl::event_path;
+
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{ObjectMap, TraceEvent, Value},
@@ -7,20 +19,10 @@ use crate::{
         components::{
             COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance, run_and_assert_sink_error,
         },
+        integration::postgres::pg_url,
         next_addr, random_table_name, trace_init,
     },
 };
-use chrono::{DateTime, Utc};
-use futures::stream;
-use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
-use sqlx::{Connection, FromRow, PgConnection};
-use std::future::ready;
-use vector_lib::event::{
-    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
-    MetricValue,
-};
-use vrl::event_path;
 
 const POSTGRES_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 

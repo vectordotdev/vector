@@ -1,5 +1,7 @@
-use std::convert::TryFrom;
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryFrom,
+    time::{Duration, Instant},
+};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
@@ -14,13 +16,13 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::{
-    TextSerializerConfig,
-    encoding::{Framer, FramingConfig},
-};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
 };
 

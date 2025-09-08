@@ -2,6 +2,8 @@
 //! Accepts log events streamed from [`Apache Pulsar`][pulsar].
 //!
 //! [pulsar]: https://pulsar.apache.org/
+use std::path::Path;
+
 use chrono::TimeZone;
 use futures_util::StreamExt;
 use pulsar::{
@@ -10,9 +12,7 @@ use pulsar::{
     consumer::Message,
     message::proto::MessageIdData,
 };
-use std::path::Path;
 use tokio_util::codec::FramedRead;
-
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -551,10 +551,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::log_schema;
-    use crate::test_util::components::{SOURCE_TAGS, assert_source_compliance};
-    use crate::test_util::{collect_n, random_string, trace_init};
-    use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
+    use crate::{
+        config::log_schema,
+        test_util::{
+            collect_n,
+            components::{SOURCE_TAGS, assert_source_compliance},
+            random_string, trace_init,
+        },
+        tls::TEST_PEM_INTERMEDIATE_CA_PATH,
+    };
 
     fn pulsar_host() -> String {
         std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())

@@ -1,4 +1,3 @@
-use ipnet::IpNet;
 #[cfg(unix)]
 use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
 use std::{
@@ -22,6 +21,7 @@ use futures::{
     stream::{self, StreamExt, TryStreamExt},
 };
 use futures_util::{Future, FutureExt, future::BoxFuture};
+use ipnet::IpNet;
 use listenfd::ListenFd;
 use tokio::{
     self,
@@ -39,6 +39,7 @@ use vector_lib::{
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
 };
 
+use super::net::{RequestLimiter, SocketListenAddr};
 use crate::{
     SourceSender,
     event::Event,
@@ -56,8 +57,6 @@ use crate::{
         },
     },
 };
-
-use super::net::{RequestLimiter, SocketListenAddr};
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
@@ -937,7 +936,6 @@ async fn wait_for_task_quota(active_task_nums: &Arc<AtomicUsize>, max_tasks: usi
 
 #[cfg(test)]
 mod test {
-    use futures_util::Stream;
     use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
@@ -948,7 +946,6 @@ mod test {
         },
         thread,
     };
-    use tokio::net::TcpStream;
 
     use bytes::{Bytes, BytesMut, buf::Buf};
     use futures::{
@@ -956,22 +953,20 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
+    use futures_util::Stream;
     use ipnet::IpNet;
     use tokio::{
         self,
-        net::UnixStream,
+        net::{TcpStream, UnixStream},
         task::JoinHandle,
         time::{Duration, Instant},
     };
     use tokio_util::codec::{Framed, length_delimited};
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
-        tcp::TcpKeepaliveConfig,
-        tls::{CertificateMetadata, MaybeTls},
-    };
-    use vector_lib::{
         lookup::{OwnedValuePath, owned_value_path, path},
-        tls::MaybeTlsSettings,
+        tcp::TcpKeepaliveConfig,
+        tls::{CertificateMetadata, MaybeTls, MaybeTlsSettings},
     };
 
     use super::{

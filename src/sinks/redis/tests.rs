@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue};
-use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
+    event::{LogEvent, Metric, MetricKind, MetricValue},
+    request_metadata::GroupedCountByteSize,
+};
 
 use super::{config::RedisSinkConfig, request_builder::encode_event};
 use crate::{

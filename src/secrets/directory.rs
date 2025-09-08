@@ -1,5 +1,7 @@
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 

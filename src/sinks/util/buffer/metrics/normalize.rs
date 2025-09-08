@@ -1,16 +1,19 @@
-use lru::LruCache;
-use std::marker::PhantomData;
-use std::time::{Duration, Instant};
-
-use vector_lib::event::{
-    EventMetadata, Metric, MetricKind,
-    metric::{MetricData, MetricSeries},
+use std::{
+    marker::PhantomData,
+    time::{Duration, Instant},
 };
 
+use lru::LruCache;
 use serde_with::serde_as;
 use snafu::Snafu;
 use vector_config_macros::configurable_component;
-use vector_lib::ByteSizeOf;
+use vector_lib::{
+    ByteSizeOf,
+    event::{
+        EventMetadata, Metric, MetricKind,
+        metric::{MetricData, MetricSeries},
+    },
+};
 
 #[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum NormalizerError {
