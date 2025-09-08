@@ -130,6 +130,11 @@ You can use the following as a starting point:
 ```shell
 #!/bin/sh
 set -e
+
+echo "Format code"
+
+make fmt
+
 echo "Running pre-push checks..."
 
 # We recommend always running all the following checks.
