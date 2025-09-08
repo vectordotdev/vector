@@ -279,6 +279,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
+                &None,
                 &bytes_sent,
             )
             .await;
