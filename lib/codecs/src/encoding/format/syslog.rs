@@ -1,8 +1,11 @@
 use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, SecondsFormat, SubsecRound, Utc};
+use regex::Regex;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
@@ -11,10 +14,8 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
-use vrl::value::ObjectMap;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use vrl::path::parse_target_path;
+use vrl::value::ObjectMap;
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -107,7 +108,6 @@ fn default_severity() -> DynamicOrStatic<Severity> {
     DynamicOrStatic::Static(Severity::Informational)
 }
 
-
 // Generic helper.
 fn deserialize_syslog_code<'de, D, T>(
     deserializer: D,
@@ -134,10 +134,7 @@ where
     }
 }
 
-fn parse_syslog_code<T>(
-    s: &str,
-    from_repr_fn: fn(usize) -> Option<T>
-) -> Option<T>
+fn parse_syslog_code<T>(s: &str, from_repr_fn: fn(usize) -> Option<T>) -> Option<T>
 where
     T: FromStr,
 {
@@ -173,7 +170,6 @@ pub struct SyslogSerializer {
 impl SyslogSerializer {
     /// Creates a new `SyslogSerializer`.
     pub fn new(conf: &SyslogSerializerConfig) -> Self {
-        dbg!(conf);
         Self {
             config: conf.clone(),
         }
@@ -185,17 +181,22 @@ impl Encoder<Event> for SyslogSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         if let Event::Log(mut log_event) = event {
-            let syslog_message = ConfigDecanter::new(&mut log_event).decant_config(&self.config.syslog, &self.config.except_fields);
+            let syslog_message = ConfigDecanter::new(&mut log_event)
+                .decant_config(&self.config.syslog, &self.config.except_fields);
             let vec = syslog_message
                 .encode(&self.config.syslog.rfc)
                 .as_bytes()
                 .to_vec();
             buffer.put_slice(&vec);
         }
+
         Ok(())
     }
 }
 
+// Adapts a `LogEvent` into a `SyslogMessage` based on config from `SyslogSerializerOptions`:
+// - Splits off the responsibility of encoding logic to `SyslogMessage` (which is not dependent upon Vector types).
+// - Majority of methods are only needed to support the `decant_config()` operation.
 struct ConfigDecanter<'a> {
     log: &'a mut LogEvent,
 }
@@ -205,24 +206,38 @@ impl<'a> ConfigDecanter<'a> {
         Self { log }
     }
 
-    fn decant_config(&mut self, config: &SyslogSerializerOptions, except_fields: &Vec<String>) -> SyslogMessage {
+    fn decant_config(
+        &mut self,
+        config: &SyslogSerializerOptions,
+        except_fields: &Vec<String>,
+    ) -> SyslogMessage {
         SyslogMessage {
-            pri: Pri {
-                facility: self.get_facility(config),
-                severity: self.get_severity(config),
-            },
+            pri: self.build_pri(config),
             timestamp: self.get_timestamp(),
             // TODO: use self.log.get_host() -> unit test failed
-            hostname: self.get_value("hostname").map(|v| v.to_string_lossy().to_string()),
-            tag: Tag {
-                app_name: self
-                    .get_field_or_static(&config.app_name)
-                    .unwrap_or_else(|| "vector".to_owned()),
-                proc_id: self.get_field_or_static(&config.proc_id),
-                msg_id: self.get_field_or_static(&config.msg_id),
-            },
+            hostname: self
+                .get_value("hostname")
+                .map(|v| v.to_string_lossy().to_string()),
+            tag: self.build_tag(&config),
             structured_data: self.get_structured_data(),
             message: self.get_payload(config, except_fields),
+        }
+    }
+
+    fn build_pri(&mut self, config: &SyslogSerializerOptions) -> Pri {
+        Pri {
+            facility: self.get_facility(config),
+            severity: self.get_severity(config),
+        }
+    }
+
+    fn build_tag(&mut self, config: &&SyslogSerializerOptions) -> Tag {
+        Tag {
+            app_name: self
+                .get_field_or_static(&config.app_name)
+                .unwrap_or_else(|| "vector".to_owned()),
+            proc_id: self.get_field_or_static(&config.proc_id),
+            msg_id: self.get_field_or_static(&config.msg_id),
         }
     }
 
@@ -264,7 +279,8 @@ impl<'a> ConfigDecanter<'a> {
     fn get_field_or_static(&self, value: &Option<String>) -> Option<String> {
         value.as_ref().and_then(|path| {
             if path.starts_with("$.") {
-                self.get_value(path).map(|v| v.to_string_lossy().to_string())
+                self.get_value(path)
+                    .map(|v| v.to_string_lossy().to_string())
             } else {
                 Some(path.clone())
             }
@@ -286,7 +302,11 @@ impl<'a> ConfigDecanter<'a> {
         Utc::now()
     }
 
-    fn get_payload(&mut self, config: &SyslogSerializerOptions, except_fields: &Vec<String>) -> String {
+    fn get_payload(
+        &mut self,
+        config: &SyslogSerializerOptions,
+        except_fields: &Vec<String>,
+    ) -> String {
         for field in except_fields {
             let parsed_path = parse_target_path(field).unwrap();
             self.log.remove_prune(&parsed_path, false);
@@ -398,8 +418,7 @@ struct Tag {
 
 // This regex pattern checks for "something[digits]".
 // It's created lazily to be compiled only once.
-static RFC3164_TAG_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\S+\[\d+\]$").unwrap());
+static RFC3164_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\S+\[\d+]$").unwrap());
 
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
@@ -443,14 +462,14 @@ impl StructuredData {
         } else {
             self.elements
                 .iter()
-                .map(|(sd_id, sd_params)| {
-                    let params_encoded = sd_params
-                        .iter()
-                        .map(|(key, value)| format!(" {}=\"{}\"", key, value))
-                        .collect::<String>();
-                    format!("[{}{}]", sd_id, params_encoded)
+                .fold(String::new(), |mut acc, (sd_id, sd_params)| {
+                    let _ = write!(acc, "[{}", sd_id);
+                    for (key, value) in sd_params {
+                        let _ = write!(acc, " {}=\"{}\"", key, value);
+                    }
+                    let _ = write!(acc, "]");
+                    acc
                 })
-                .collect()
         }
     }
 }
@@ -479,6 +498,8 @@ struct Pri {
 }
 
 impl Pri {
+    // The last paragraph describes how to compose the enums into `PRIVAL`:
+    // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
     fn encode(&self) -> String {
         let pri_val = (self.facility as u8 * 8) + self.severity as u8;
         format!("<{}>", pri_val)
@@ -486,9 +507,7 @@ impl Pri {
 }
 
 /// Syslog facility
-#[derive(
-    Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq,
-)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[configurable_component]
 pub enum Facility {
@@ -544,9 +563,7 @@ pub enum Facility {
 }
 
 /// Syslog severity
-#[derive(
-    Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq,
-)]
+#[derive(Default, Debug, EnumString, FromRepr, VariantNames, Copy, Clone, PartialEq, Eq)]
 #[strum(serialize_all = "kebab-case")]
 #[configurable_component]
 pub enum Severity {
@@ -573,7 +590,7 @@ pub enum Severity {
 mod tests {
     use super::*;
     use bytes::BytesMut;
-    use chrono::{NaiveDate};
+    use chrono::NaiveDate;
     use vector_core::event::Event;
     use vrl::{event_path, value};
 
@@ -627,7 +644,7 @@ mod tests {
             payload_key = ".message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_simple_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<13>1 2025-08-28T18:30:00Z test-host.com static-app 987 static-msg-id - original message";
@@ -645,7 +662,7 @@ mod tests {
             payload_key = "message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_test_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<14>1 2025-08-28T18:30:00Z test-host.com my-app 12345 req-abc-789 [metrics retries=\"3\"] original message";
@@ -665,7 +682,7 @@ mod tests {
             payload_key = "message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_test_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<38>Aug 28 18:30:00 test-host.com my-app[12345]: [metrics retries=\"3\"] original message";
@@ -682,7 +699,7 @@ mod tests {
             payload_key = "message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_test_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<26>1 2025-08-28T18:30:00Z test-host.com vector - - [metrics retries=\"3\"] original message";
@@ -696,22 +713,28 @@ mod tests {
             [syslog]
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_simple_log();
         let log_as_json_value = serde_json::to_value(&log).unwrap();
         let message_content = serde_json::to_string(&log_as_json_value).unwrap();
         let output = run_encode(config, Event::Log(log));
-        let expected = format!("<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {}", message_content);
+        let expected = format!(
+            "<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {}",
+            message_content
+        );
         assert_eq!(output, expected);
     }
 
     #[test]
     fn test_config_tag_alias_for_app_name() {
-        let config = toml::from_str::<SyslogSerializerConfig>(r#"
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
         [syslog]
         # Use the "tag" alias in the config
         tag = "my-legacy-app"
-    "#).unwrap();
+    "#,
+        )
+        .unwrap();
 
         // Assert that the value of "tag" was correctly assigned to the "app_name" field.
         assert_eq!(config.syslog.app_name, Some("my-legacy-app".to_string()));
@@ -730,7 +753,7 @@ mod tests {
             payload_key = "message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_test_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<38>Aug 28 18:30:00 test-host.com my-app[12345]: [metrics retries=\"3\"] original message";
@@ -750,7 +773,7 @@ mod tests {
             payload_key = "message"
         "#,
         )
-            .unwrap();
+        .unwrap();
         let log = create_test_log();
         let output = run_encode(config, Event::Log(log));
         let expected = "<38>Aug 28 18:30:00 test-host.com my-app[12345]: [metrics retries=\"3\"] original message";
@@ -773,8 +796,14 @@ mod tests {
         severity = "$.sys.sev"
     "#;
         let config: TestConfig = toml::from_str(config_str).unwrap();
-        assert_eq!(config.facility, DynamicOrStatic::Dynamic("$.sys.fac".to_string()));
-        assert_eq!(config.severity, DynamicOrStatic::Dynamic("$.sys.sev".to_string()));
+        assert_eq!(
+            config.facility,
+            DynamicOrStatic::Dynamic("$.sys.fac".to_string())
+        );
+        assert_eq!(
+            config.severity,
+            DynamicOrStatic::Dynamic("$.sys.sev".to_string())
+        );
 
         // 2. Test static
         let config_str = r#"
@@ -816,18 +845,12 @@ mod tests {
         except_fields = ["_internal"]
     "#,
         )
-            .unwrap();
+        .unwrap();
 
         let mut log = create_simple_log();
-        log.insert(
-            event_path!("_internal"),
-            value!({"secret": "do not show"}),
-        );
+        log.insert(event_path!("_internal"), value!({"secret": "do not show"}));
 
-        log.insert(
-            event_path!("include"),
-            value!({"public": "show me"}),
-        );
+        log.insert(event_path!("include"), value!({"public": "show me"}));
 
         let output = run_encode(config, Event::Log(log));
 
@@ -838,6 +861,5 @@ mod tests {
         assert!(output.contains("original message"));
         assert!(output.contains("include"));
         assert!(output.contains("show me"));
-
     }
 }
