@@ -257,7 +257,7 @@ components: sources: opentelemetry: {
 				The same can be done for metrics and traces.
 
 				However, the OTLP formatted metrics cannot be converted to theVector metrics format. As a workaround, the OTLP
-				metrics are converted to Vector log events while preserving the OTLP foramt. This prohibits the use of metric
+				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
 				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
 
 				```yaml
