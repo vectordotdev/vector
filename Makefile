@@ -709,3 +709,7 @@ clippy-fix:
 .PHONY: fmt
 fmt:
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev fmt
+
+.PHONY: build-licenses
+build-licenses:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev build licenses
