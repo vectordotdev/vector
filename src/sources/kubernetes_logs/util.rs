@@ -5,9 +5,12 @@ use futures::{
     future::{Either, select},
     pin_mut,
 };
-use vector_lib::file_source::{
-    file_server::{FileServer, Line, Shutdown as FileServerShutdown},
-    paths_provider::PathsProvider,
+use vector_lib::{
+    file_source::{
+        file_server::{FileServer, Line, Shutdown as FileServerShutdown},
+        paths_provider::PathsProvider,
+    },
+    file_source_common::{Checkpointer, FileSourceInternalEvents},
 };
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
