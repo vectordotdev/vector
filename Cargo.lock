@@ -3794,17 +3794,16 @@ checksum = "a481586acf778f1b1455424c343f71124b048ffa5f4fc3f8f6ae9dc432dcb3c7"
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "async-compression",
  "bytes 1.10.1",
  "chrono",
- "criterion",
  "file-source-common",
- "flate2",
  "futures 0.3.31",
+ "futures-util",
  "glob",
  "indexmap 2.11.0",
  "libc",
  "quickcheck",
- "similar-asserts",
  "tempfile",
  "tokio",
  "tracing 0.1.41",
@@ -3816,13 +3815,12 @@ dependencies = [
 name = "file-source-common"
 version = "0.1.0"
 dependencies = [
+ "async-compression",
  "bstr 1.12.0",
  "bytes 1.10.1",
  "chrono",
  "crc",
- "criterion",
  "dashmap",
- "flate2",
  "glob",
  "libc",
  "quickcheck",
@@ -3831,6 +3829,7 @@ dependencies = [
  "serde_json",
  "similar-asserts",
  "tempfile",
+ "tokio",
  "tracing 0.1.41",
  "vector-common",
  "vector-config",

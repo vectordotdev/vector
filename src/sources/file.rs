@@ -6,7 +6,7 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::oneshot, task::spawn_blocking};
+use tokio::sync::oneshot;
 use tracing::{Instrument, Span};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -570,7 +570,6 @@ pub fn file_source(
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
-        handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
     };
 
@@ -705,14 +704,16 @@ pub fn file_source(
         });
 
         let span = info_span!("file_server");
-        spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer);
+            let rt = tokio::runtime::Handle::current();
+            let result =
+                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
-            result.unwrap();
+            result.expect("file server exited with an error");
         })
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await
@@ -1697,6 +1698,7 @@ mod tests {
         for i in 0..line_count {
             writeln!(&mut file, "Here's a line for you: {i}").unwrap();
         }
+        file.flush().unwrap();
         sleep_500_millis().await;
 
         // First time server runs it should pick up a bunch of lines
