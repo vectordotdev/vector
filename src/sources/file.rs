@@ -713,7 +713,7 @@ pub fn file_source(
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
-            result.unwrap();
+            result.expect("file server exited with an error");
         })
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await

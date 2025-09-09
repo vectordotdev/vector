@@ -31,15 +31,17 @@ where
     <<PP as PathsProvider>::IntoIter as IntoIterator>::IntoIter: Send,
 {
     let span = info_span!("file_server");
-    let join_handle = tokio::spawn(async move {
+
+    // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
+    let join_handle = tokio::task::spawn_blocking(move || {
         // These will need to be separated when this source is updated
         // to support end-to-end acknowledgements.
         let shutdown = shutdown.shared();
         let shutdown2 = shutdown.clone();
         let _enter = span.enter();
-        let result = file_server
-            .run(chans, shutdown, shutdown2, checkpointer)
-            .await;
+
+        let rt = tokio::runtime::Handle::current();
+        let result = rt.block_on(file_server.run(chans, shutdown, shutdown2, checkpointer));
         result.expect("file server exited with an error")
     });
     join_handle.await

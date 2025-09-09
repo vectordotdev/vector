@@ -322,6 +322,8 @@ impl Checkpointer {
             // stable file will still be in its current valid state and we'll be
             // able to recover.
             let tmp_file_path = self.tmp_file_path.clone();
+
+            // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
             let current = tokio::task::spawn_blocking(move || -> Result<State, io::Error> {
                 let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
                 serde_json::to_writer(&mut f, &current)?;
