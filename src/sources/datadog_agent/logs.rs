@@ -4,18 +4,20 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_lib::json_size::JsonSize;
-use vector_lib::lookup::path;
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
+    config::LegacyKey,
+    internal_event::{CountByteSize, InternalEventHandle as _},
+    json_size::JsonSize,
+    lookup::path,
+};
 use vrl::core::Value;
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use crate::common::datadog::DDTAGS;
-use crate::common::http::ErrorMessage;
 use crate::{
     SourceSender,
+    common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
     sources::datadog_agent::{
@@ -239,9 +241,10 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use similar_asserts::assert_eq;
     use vrl::value;
+
+    use super::*;
 
     #[test]
     fn ddtags_parse_empty() {

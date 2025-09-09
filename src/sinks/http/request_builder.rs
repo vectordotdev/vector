@@ -1,11 +1,11 @@
 //! `RequestBuilder` implementation for the `http` sink.
 
-use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{http::sink::PartitionKey, prelude::*, util::http::HttpRequest};
+use bytes::Bytes;
 
 use super::encoder::HttpEncoder;
+use crate::sinks::{http::sink::PartitionKey, prelude::*, util::http::HttpRequest};
 
 pub(super) struct HttpRequestBuilder {
     pub(super) encoder: HttpEncoder,

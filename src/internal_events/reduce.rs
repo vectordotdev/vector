@@ -1,7 +1,6 @@
 use metrics::counter;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
-use vrl::path::PathParseError;
-use vrl::value::KeyString;
+use vrl::{path::PathParseError, value::KeyString};
 
 #[derive(Debug)]
 pub struct ReduceStaleEventFlushed;

@@ -6,8 +6,7 @@ mod metrics;
 mod state;
 
 use clap::Parser;
-pub use cmd::cmd;
-pub use cmd::top;
+pub use cmd::{cmd, top};
 pub use dashboard::is_tty;
 use glob::Pattern;
 use url::Url;

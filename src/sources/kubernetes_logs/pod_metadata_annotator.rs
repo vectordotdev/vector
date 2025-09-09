@@ -7,12 +7,14 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{ObjectRef, store::Store};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{
-    OwnedTargetPath,
-    lookup_v2::{OptionalTargetPath, ValuePath},
-    owned_value_path, path,
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, ValuePath},
+        owned_value_path, path,
+    },
 };
 
 use super::{
@@ -485,9 +487,10 @@ fn annotate_from_container(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use k8s_openapi::api::core::v1::PodIP;
     use similar_asserts::assert_eq;
-    use std::path::PathBuf;
     use vector_lib::lookup::{event_path, metadata_path};
 
     use super::*;

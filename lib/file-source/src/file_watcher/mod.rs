@@ -8,14 +8,13 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use flate2::bufread::MultiGzDecoder;
-use tracing::debug;
-use vector_common::constants::GZIP_MAGIC;
-
 use file_source_common::{
     FilePosition, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
+use flate2::bufread::MultiGzDecoder;
+use tracing::debug;
+use vector_common::constants::GZIP_MAGIC;
 
 #[cfg(test)]
 mod tests;

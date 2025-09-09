@@ -6,11 +6,13 @@ use futures::{
     pin_mut,
 };
 use tokio::task::spawn_blocking;
-use vector_lib::file_source::{
-    file_server::{FileServer, Line, Shutdown as FileServerShutdown},
-    paths_provider::PathsProvider,
+use vector_lib::{
+    file_source::{
+        file_server::{FileServer, Line, Shutdown as FileServerShutdown},
+        paths_provider::PathsProvider,
+    },
+    file_source_common::{Checkpointer, FileSourceInternalEvents},
 };
-use vector_lib::file_source_common::{Checkpointer, FileSourceInternalEvents};
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
