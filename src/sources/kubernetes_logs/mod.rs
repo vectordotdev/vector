@@ -19,27 +19,26 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use std::sync::Arc;
-use std::{cmp::min, path::PathBuf, time::Duration};
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::file_server::{
-    FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
-};
-use vector_lib::file_source_common::{
-    Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
-};
-use vector_lib::lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey, config::LogNamespace};
+use std::{cmp::min, path::PathBuf, sync::Arc, time::Duration};
 use vector_lib::{
-    TimeZone,
+    EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    file_source::file_server::{
+        FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
+    },
+    file_source_common::{
+        Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+    },
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
 use vrl::value::{Kind, Value, kind::Collection};
 
-use crate::sources::kubernetes_logs::metadata_cache::K8sMetadataCache;
 use crate::{
     SourceSender,
+    built_info::{PKG_NAME, PKG_VERSION},
     config::{
         ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
         SourceOutput, log_schema,
@@ -54,11 +53,10 @@ use crate::{
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
+    sources::kubernetes_logs::{
+        metadata_cache::K8sMetadataCache, partial_events_merger::merge_partial_events,
+    },
     transforms::{FunctionTransform, OutputBuffer},
-};
-use crate::{
-    built_info::{PKG_NAME, PKG_VERSION},
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
 };
 
 mod k8s_paths_provider;
@@ -73,10 +71,11 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use self::node_metadata_annotator::NodeMetadataAnnotator;
-use self::parser::Parser;
-use self::pod_metadata_annotator::PodMetadataAnnotator;
+use self::{
+    namespace_metadata_annotator::NamespaceMetadataAnnotator,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    pod_metadata_annotator::PodMetadataAnnotator,
+};
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -1171,8 +1170,11 @@ fn prepare_label_selector(selector: &str) -> String {
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
-    use vector_lib::{config::LogNamespace, schema::Definition};
+    use vector_lib::{
+        config::LogNamespace,
+        lookup::{OwnedTargetPath, owned_value_path},
+        schema::Definition,
+    };
     use vrl::value::{Kind, kind::Collection};
 
     use crate::config::SourceConfig;
