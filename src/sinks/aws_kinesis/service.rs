@@ -38,7 +38,7 @@ where
 pub struct KinesisResponse {
     pub(crate) failure_count: usize,
     pub(crate) events_byte_size: GroupedCountByteSize,
-    // Track individual failed records for retry logic (Streams only)
+    /// Track individual failed records for retry logic (Streams only)
     pub(crate) failed_records: Vec<RecordResult>,
 }
 

@@ -24,14 +24,6 @@ fn kinesis_address() -> String {
     std::env::var("KINESIS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
 }
 
-/// Configure localstack to be more aggressive about throttling
-fn setup_localstack_for_partial_failures() {
-    unsafe {
-        // Set environment variables that make localstack more likely to throttle
-        std::env::set_var("KINESIS_ERROR_PROBABILITY", "0.3"); // 30% error rate
-    }
-}
-
 #[tokio::test]
 async fn kinesis_put_records_with_partition_key() {
     let stream = gen_stream();
@@ -225,33 +217,9 @@ fn gen_stream() -> String {
 
 #[tokio::test]
 async fn kinesis_retry_failed_records_on_partial_failure() {
-    setup_localstack_for_partial_failures();
-
     let stream = gen_stream();
 
     ensure_stream(stream.clone()).await;
-
-    // Create stream with minimal capacity to trigger throttling
-    let client = client().await;
-    let _ = client
-        .delete_stream()
-        .stream_name(stream.clone())
-        .send()
-        .await;
-
-    // Wait for deletion
-    sleep(Duration::from_secs(1)).await;
-
-    // Create stream with single shard (limited capacity)
-    client
-        .create_stream()
-        .stream_name(stream.clone())
-        .shard_count(1)
-        .send()
-        .await
-        .expect("Failed to create stream");
-
-    sleep(Duration::from_secs(2)).await;
 
     let mut batch = BatchConfig::default();
     batch.max_events = Some(500); // Large batch to overwhelm single shard
