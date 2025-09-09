@@ -3797,7 +3797,6 @@ dependencies = [
  "async-compression",
  "bytes 1.10.1",
  "chrono",
- "criterion",
  "file-source-common",
  "futures 0.3.31",
  "futures-util",

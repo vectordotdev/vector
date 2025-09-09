@@ -25,10 +25,5 @@ async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
-criterion = { version = "0.7", features = ["async", "async_tokio"] }
 quickcheck = "1"
 tempfile.workspace = true
-
-[[bench]]
-name = "buffer"
-harness = false
