@@ -1,23 +1,23 @@
 //! `RequestBuilder` implementation for the `http` sink.
 
-use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use bytes::Bytes;
 
 use super::encoder::HttpEncoder;
+use crate::sinks::{http::sink::PartitionKey, prelude::*, util::http::HttpRequest};
 
 pub(super) struct HttpRequestBuilder {
     pub(super) encoder: HttpEncoder,
     pub(super) compression: Compression,
 }
 
-impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
-    type Metadata = EventFinalizers;
+impl RequestBuilder<(PartitionKey, Vec<Event>)> for HttpRequestBuilder {
+    type Metadata = (PartitionKey, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = HttpEncoder;
     type Payload = Bytes;
-    type Request = HttpRequest<()>;
+    type Request = HttpRequest<PartitionKey>;
     type Error = io::Error;
 
     fn compression(&self) -> Compression {
@@ -30,11 +30,13 @@ impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
 
     fn split_input(
         &self,
-        mut events: Vec<Event>,
+        input: (PartitionKey, Vec<Event>),
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
+        let (partition_key, mut events) = input;
+
         let finalizers = events.take_finalizers();
         let builder = RequestMetadataBuilder::from_events(&events);
-        (finalizers, builder, events)
+        ((partition_key, finalizers), builder, events)
     }
 
     fn build_request(
@@ -43,6 +45,12 @@ impl RequestBuilder<Vec<Event>> for HttpRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        HttpRequest::new(payload.into_payload(), metadata, request_metadata, ())
+        let (partition_key, finalizers) = metadata;
+        HttpRequest::new(
+            payload.into_payload(),
+            finalizers,
+            request_metadata,
+            partition_key,
+        )
     }
 }

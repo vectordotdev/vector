@@ -1,7 +1,7 @@
-use crate::encoding::BuildError;
-use bytes::BytesMut;
-use prost_reflect::{prost::Message as _, MessageDescriptor};
 use std::path::PathBuf;
+
+use bytes::BytesMut;
+use prost_reflect::{MessageDescriptor, prost::Message as _};
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -9,6 +9,9 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
+use vrl::protobuf::{descriptor::get_message_descriptor, encode::encode_message};
+
+use crate::encoding::BuildError;
 
 /// Config used to build a `ProtobufSerializer`.
 #[configurable_component]
@@ -21,16 +24,14 @@ pub struct ProtobufSerializerConfig {
 impl ProtobufSerializerConfig {
     /// Build the `ProtobufSerializer` from this configuration.
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
-        let message_descriptor = vrl::protobuf::get_message_descriptor(
-            &self.protobuf.desc_file,
-            &self.protobuf.message_type,
-        )?;
+        let message_descriptor =
+            get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
         Ok(ProtobufSerializer { message_descriptor })
     }
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Log | DataType::Trace
     }
 
     /// The schema required by the serializer.
@@ -82,11 +83,9 @@ impl Encoder<Event> for ProtobufSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message = match event {
-            Event::Log(log) => {
-                vrl::protobuf::encode_message(&self.message_descriptor, log.into_parts().0)
-            }
+            Event::Log(log) => encode_message(&self.message_descriptor, log.into_parts().0),
             Event::Metric(_) => unimplemented!(),
-            Event::Trace(trace) => vrl::protobuf::encode_message(
+            Event::Trace(trace) => encode_message(
                 &self.message_descriptor,
                 Value::Object(trace.into_parts().0),
             ),

@@ -192,19 +192,20 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?:       #FeaturesAggregate
-			convert?:         #FeaturesConvert
-			enrich?:          #FeaturesEnrich
-			filter?:          #FeaturesFilter
-			parse?:           #FeaturesParse
-			program?:         #FeaturesProgram
-			proxy?:           #FeaturesProxy
-			reduce?:          #FeaturesReduce
-			route?:           #FeaturesRoute
-			exclusive_route?: #FeaturesExclusiveRoute
-			sanitize?:        #FeaturesSanitize
-			shape?:           #FeaturesShape
-			window?:          #FeaturesWindow
+			aggregate?:               #FeaturesAggregate
+			convert?:                 #FeaturesConvert
+			enrich?:                  #FeaturesEnrich
+			filter?:                  #FeaturesFilter
+			parse?:                   #FeaturesParse
+			program?:                 #FeaturesProgram
+			proxy?:                   #FeaturesProxy
+			reduce?:                  #FeaturesReduce
+			route?:                   #FeaturesRoute
+			exclusive_route?:         #FeaturesExclusiveRoute
+			sanitize?:                #FeaturesSanitize
+			shape?:                   #FeaturesShape
+			window?:                  #FeaturesWindow
+			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
 		}
 
 		if Args.kind == "sink" {
@@ -337,6 +338,8 @@ components: {
 	#FeaturesShape: {}
 
 	#FeaturesWindow: {}
+
+	#FeaturesIncrementalToAbsolute: {}
 
 	#FeaturesSend: {
 		_args: {
@@ -627,7 +630,7 @@ components: {
 					enabled: {
 						common: false
 						description: """
-							Whether or not to require TLS for incoming/outgoing connections.
+							Whether to require TLS for incoming/outgoing connections.
 
 							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 							more information.
@@ -742,7 +745,7 @@ components: {
 						enabled: {
 							common: true
 							description: """
-								Whether or not to require TLS for incoming/outgoing connections.
+								Whether to require TLS for incoming/outgoing connections.
 
 								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 								more information.

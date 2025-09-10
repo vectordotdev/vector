@@ -1,3 +1,11 @@
+[![Nightly](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml)
+[![E2E Test Suite](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml)
+[![Component Features](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml)
+
+<p align="center">
+  <img src="website/static/img/diagram.svg" alt="Vector">
+</p>
+
 <p align="center">
   <strong>
     <a href="https://vector.dev/docs/setup/quickstart/">Quickstart</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -8,9 +16,6 @@
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
   </strong>
-</p>
-<p align="center">
-  <img src="website/static/img/diagram.svg" alt="Vector">
 </p>
 
 ## What is Vector?
@@ -27,7 +32,7 @@ faster than every alternative in the space.
 To get started, follow our [**quickstart guide**][docs.quickstart] or [**install
 Vector**][docs.installation].
 
-Vector is maintained by the Datadog's [Community Open Source Engineering team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team).
+Vector is maintained by Datadog's [Community Open Source Engineering team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team).
 
 ### Principles
 

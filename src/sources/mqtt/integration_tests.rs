@@ -1,21 +1,22 @@
 #![cfg(feature = "mqtt-integration-tests")]
 #![cfg(test)]
 
-use crate::common::mqtt::MqttCommonConfig;
-use crate::test_util::trace_init;
-use crate::test_util::{components::SOURCE_TAGS, random_lines_with_stream, random_string};
-use rumqttc::{AsyncClient, MqttOptions, QoS};
 use std::{collections::HashSet, time::Duration};
 
 use futures::StreamExt;
+use rumqttc::{AsyncClient, MqttOptions, QoS};
 use tokio::time::timeout;
 
 use super::MqttSourceConfig;
 use crate::{
-    config::{log_schema, SourceConfig, SourceContext},
-    event::Event,
-    test_util::components::assert_source_compliance,
     SourceSender,
+    common::mqtt::MqttCommonConfig,
+    config::{SourceConfig, SourceContext, log_schema},
+    event::Event,
+    test_util::{
+        components::{SOURCE_TAGS, assert_source_compliance},
+        random_lines_with_stream, random_string, trace_init,
+    },
 };
 
 fn mqtt_broker_address() -> String {
@@ -108,7 +109,7 @@ async fn mqtt_happy() {
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             }
         }
         assert!(expected_messages.is_empty());

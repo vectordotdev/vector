@@ -1,26 +1,28 @@
-use crate::test_util::integration::postgres::pg_url;
+use std::future::ready;
+
+use chrono::{DateTime, Utc};
+use futures::stream;
+use ordered_float::NotNan;
+use serde::{Deserialize, Serialize};
+use sqlx::{Connection, FromRow, PgConnection};
+use vector_lib::event::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
+    MetricValue,
+};
+use vrl::event_path;
+
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{ObjectMap, TraceEvent, Value},
     sinks::{postgres::PostgresConfig, util::test::load_sink},
     test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
+            COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance, run_and_assert_sink_error,
         },
-        random_table_name, trace_init,
+        integration::postgres::pg_url,
+        next_addr, random_table_name, trace_init,
     },
 };
-use chrono::{DateTime, Utc};
-use futures::stream;
-use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
-use sqlx::{Connection, FromRow, PgConnection};
-use std::future::ready;
-use vector_lib::event::{
-    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
-    MetricValue,
-};
-use vrl::event_path;
 
 const POSTGRES_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
@@ -168,27 +170,54 @@ async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
 async fn healthcheck_passes() {
     trace_init();
     let (config, _table, _connection) = prepare_config().await;
-    let (_sink, healthcheck) = config.build(SinkContext::default()).await.unwrap();
-    healthcheck.await.unwrap();
+    let (_sink, healthcheck) = config
+        .build(SinkContext::default())
+        .await
+        .expect("sink should build successfully");
+    assert!(healthcheck.await.is_ok());
 }
 
-// This test does not actually fail in the healthcheck query, but in the connection pool creation at
-// `PostgresConfig::build`
 #[tokio::test]
-async fn healthcheck_fails() {
+async fn healthcheck_fails_unknown_host() {
     trace_init();
 
     let table = random_table_name();
-    let endpoint = "postgres://user:pass?host=/unknown_socket_path".to_string();
+    let endpoint = "postgres://unknown_host".to_string();
     let config_str = format!(
         r#"
             endpoint = "{endpoint}"
             table = "{table}"
         "#,
     );
-    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+    let (config, cx) = load_sink::<PostgresConfig>(&config_str).unwrap();
 
-    assert!(config.build(SinkContext::default()).await.is_err());
+    let (_sink, healthcheck) = config
+        .build(cx)
+        .await
+        .expect("sink should build successfully");
+    assert!(healthcheck.await.is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn healthcheck_fails_timed_out() {
+    trace_init();
+
+    let free_addr = next_addr();
+    let endpoint = format!("postgres://{free_addr}");
+    let table = random_table_name();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+        "#,
+    );
+    let (config, cx) = load_sink::<PostgresConfig>(&config_str).unwrap();
+
+    let (_sink, healthcheck) = config
+        .build(cx)
+        .await
+        .expect("sink should build successfully");
+    assert!(healthcheck.await.is_err());
 }
 
 #[tokio::test]
@@ -197,8 +226,9 @@ async fn insert_single_event() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    let create_table_sql =
-        format!("CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await
@@ -466,8 +496,9 @@ async fn insertion_fails_primary_key_violation() {
 
     let (config, table, mut connection) = prepare_config().await;
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
-    let create_table_sql =
-        format!("CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)");
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
         .await

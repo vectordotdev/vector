@@ -1,16 +1,18 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-
-use std::borrow::Cow;
-use std::collections::{hash_map::DefaultHasher, BTreeMap};
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
-use std::{cmp::Ordering, mem};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{BTreeMap, hash_map::DefaultHasher},
+    fmt::Display,
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use indexmap::IndexSet;
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_config::{configurable_component, Configurable};
+use vector_config::{Configurable, configurable_component};
 
 /// A single tag value, either a bare tag or a value.
 #[derive(Clone, Configurable, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]

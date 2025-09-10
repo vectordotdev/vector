@@ -3,24 +3,22 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
+use super::{
+    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
+    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
+};
 use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
+            http::{HttpService, http_response_retry_logic},
         },
     },
-};
-
-use super::{
-    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
@@ -190,10 +188,6 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     } else {
         let body = String::from_utf8_lossy(&body[..]);
 
-        Err(format!(
-            "Server returned unexpected error status: {} body: {}",
-            status, body
-        )
-        .into())
+        Err(format!("Server returned unexpected error status: {status} body: {body}").into())
     }
 }

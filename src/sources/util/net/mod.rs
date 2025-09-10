@@ -8,15 +8,14 @@ use std::{fmt, net::SocketAddr};
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
-use crate::config::{Protocol, Resource};
-
 #[cfg(feature = "sources-utils-net-tcp")]
 pub use self::tcp::{
-    request_limiter::RequestLimiter, try_bind_tcp_listener, TcpNullAcker, TcpSource, TcpSourceAck,
-    TcpSourceAcker, MAX_IN_FLIGHT_EVENTS_TARGET,
+    MAX_IN_FLIGHT_EVENTS_TARGET, TcpNullAcker, TcpSource, TcpSourceAck, TcpSourceAcker,
+    request_limiter::RequestLimiter, try_bind_tcp_listener,
 };
 #[cfg(feature = "sources-utils-net-udp")]
 pub use self::udp::try_bind_udp_socket;
+use crate::config::{Protocol, Resource};
 
 #[derive(Clone, Debug, Eq, PartialEq, Snafu)]
 pub enum SocketListenAddrParseError {
@@ -83,8 +82,8 @@ impl SocketListenAddr {
 impl fmt::Display for SocketListenAddr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::SocketAddr(ref addr) => addr.fmt(f),
-            Self::SystemdFd(offset) => write!(f, "systemd socket #{}", offset),
+            Self::SocketAddr(addr) => addr.fmt(f),
+            Self::SystemdFd(offset) => write!(f, "systemd socket #{offset}"),
         }
     }
 }
@@ -137,7 +136,7 @@ impl From<SocketListenAddr> for String {
                 if fd == 0 {
                     "systemd".to_owned()
                 } else {
-                    format!("systemd#{}", fd)
+                    format!("systemd#{fd}")
                 }
             }
         }

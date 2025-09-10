@@ -2,8 +2,10 @@ use std::{collections::BTreeMap, fmt::Write as _};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
-use vector_lib::event::metric::{samples_to_buckets, MetricSketch, MetricTags, Quantile};
-use vector_lib::prometheus::parser::{proto, METRIC_NAME_LABEL};
+use vector_lib::{
+    event::metric::{MetricSketch, MetricTags, Quantile, samples_to_buckets},
+    prometheus::parser::{METRIC_NAME_LABEL, proto},
+};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -256,8 +258,8 @@ impl MetricCollector for StringCollector {
         result.push_str(suffix);
         Self::encode_tags(result, tags, extra);
         _ = match timestamp_millis {
-            None => writeln!(result, " {}", value),
-            Some(timestamp) => writeln!(result, " {} {}", value, timestamp),
+            None => writeln!(result, " {value}"),
+            Some(timestamp) => writeln!(result, " {value} {timestamp}"),
         };
     }
 
@@ -290,10 +292,7 @@ impl StringCollector {
 
     fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
         let r#type = prometheus_metric_type(value).as_str();
-        format!(
-            "# HELP {} {}\n# TYPE {} {}\n",
-            fullname, name, fullname, r#type
-        )
+        format!("# HELP {fullname} {name}\n# TYPE {fullname} {type}\n")
     }
 
     fn format_tag(key: &str, mut value: &str) -> String {

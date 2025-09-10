@@ -1,10 +1,12 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
-use vector_lib::codecs::decoding::{
-    format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer,
-    NewlineDelimitedDecoder,
+use vector_lib::{
+    codecs::decoding::{
+        BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer, NewlineDelimitedDecoder,
+        format::Deserializer as _,
+    },
+    config::LogNamespace,
 };
-use vector_lib::config::LogNamespace;
 
 use crate::{
     event::Event,
@@ -101,15 +103,16 @@ impl tokio_util::codec::Decoder for Decoder {
 
 #[cfg(test)]
 mod tests {
-    use super::Decoder;
     use bytes::Bytes;
-    use futures::{stream, StreamExt};
+    use futures::{StreamExt, stream};
     use tokio_util::{codec::FramedRead, io::StreamReader};
     use vector_lib::codecs::{
-        decoding::{Deserializer, Framer},
         JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+        decoding::{Deserializer, Framer},
     };
     use vrl::value::Value;
+
+    use super::Decoder;
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {

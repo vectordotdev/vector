@@ -17,51 +17,51 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
-use std::convert::Infallible;
-use std::time::Duration;
-use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, fmt::Debug, io::Read, net::SocketAddr, sync::Arc, time::Duration};
 
 use bytes::{Buf, Bytes};
-use chrono::{serde::ts_milliseconds, DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::service::make_service_fn;
-use hyper::Server;
+use hyper::{Server, service::make_service_fn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{BatchNotifier, BatchStatus};
-use vector_lib::internal_event::{EventsReceived, Registered};
-use vector_lib::lookup::owned_value_path;
-use vector_lib::schema::meaning;
-use vector_lib::tls::MaybeTlsIncomingStream;
-use vrl::path::OwnedTargetPath;
-use vrl::value::kind::Collection;
-use vrl::value::Kind;
-use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    event::{BatchNotifier, BatchStatus},
+    internal_event::{EventsReceived, Registered},
+    lookup::owned_value_path,
+    schema::meaning,
+    tls::MaybeTlsIncomingStream,
+};
+use vrl::{
+    path::OwnedTargetPath,
+    value::{Kind, kind::Collection},
+};
+use warp::{Filter, Reply, filters::BoxedFilter, reject::Rejection, reply::Response};
 
-use crate::common::http::ErrorMessage;
-use crate::http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
+    common::http::ErrorMessage,
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput, log_schema,
     },
     event::Event,
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{self},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 pub const LOGS: &str = "logs";
@@ -481,8 +481,8 @@ impl DatadogAgentSource {
                     encoding => {
                         return Err(ErrorMessage::new(
                             StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                            format!("Unsupported encoding {}", encoding),
-                        ))
+                            format!("Unsupported encoding {encoding}"),
+                        ));
                     }
                 }
             }
@@ -542,7 +542,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     });
     ErrorMessage::new(
         StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {} decoder.", encoding),
+        format!("Failed decompressing payload with {encoding} decoder."),
     )
 }
 

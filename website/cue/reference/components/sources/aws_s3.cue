@@ -45,7 +45,7 @@ components: sources: aws_s3: components._aws & {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_s3.configuration & {
+	configuration: generated.components.sources.aws_s3.configuration & {
 		_aws_include: false
 	}
 

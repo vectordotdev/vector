@@ -1,8 +1,7 @@
 use darling::util::path_to_string;
 use proc_macro::TokenStream;
-
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Attribute, DeriveInput, Error, LitStr};
+use syn::{Attribute, DeriveInput, Error, LitStr, parse_macro_input, spanned::Spanned};
 
 use crate::attrs::{self, path_matches};
 
@@ -134,8 +133,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
         return Err(Error::new(
             attr.span(),
             format!(
-                "{}s must have a name specified (e.g. `{}(\"my_component\")`)",
-                component_type, component_type_attr
+                "{component_type}s must have a name specified (e.g. `{component_type_attr}(\"my_component\")`)"
             ),
         ));
     }
@@ -147,8 +145,7 @@ fn attr_to_component_name(attr: &Attribute) -> Result<Option<String>, Error> {
             Error::new(
                 attr.span(),
                 format!(
-                    "expected a string literal for the {} name (i.e. `{}(\"...\")`)",
-                    component_type, component_type_attr
+                    "expected a string literal for the {component_type} name (i.e. `{component_type_attr}(\"...\")`)"
                 ),
             )
         })
@@ -185,6 +182,8 @@ fn check_component_name_validity(component_name: &str) -> Result<(), String> {
     if component_name == component_name_converted {
         Ok(())
     } else {
-        Err(format!("component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{}\")", component_name_converted))
+        Err(format!(
+            "component names must be lowercase, and contain only letters, numbers, and underscores (e.g. \"{component_name_converted}\")"
+        ))
     }
 }

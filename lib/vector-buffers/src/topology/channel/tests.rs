@@ -6,11 +6,11 @@ use std::{
 use tokio::{pin, sync::Barrier, time::sleep};
 
 use crate::{
+    Bufferable, WhenFull,
     topology::{
         channel::{BufferReceiver, BufferSender},
         test_util::{assert_current_send_capacity, build_buffer},
     },
-    Bufferable, WhenFull,
 };
 
 async fn assert_send_ok_with_capacities<T>(

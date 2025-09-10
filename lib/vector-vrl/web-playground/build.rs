@@ -1,10 +1,13 @@
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::{env, fs, io};
+use std::{
+    env, fs,
+    fs::File,
+    io,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
-use cargo_lock::{package::SourceKind, Lockfile};
+use cargo_lock::{Lockfile, package::SourceKind};
 
 fn get_vector_lock_path() -> PathBuf {
     let path = fs::canonicalize(env::var("CARGO_MANIFEST_DIR").unwrap()).unwrap();
@@ -55,40 +58,39 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
         .find(|&package| package.name.as_str() == "vrl")
         .expect("missing VRL dependency");
 
-    let vrl_source = vrl_dep.source.clone().expect("missing VRL source id");
-
-    let (version, link) = match vrl_source.kind() {
-        SourceKind::Git(_) => {
-            let precise = vrl_source
-                .precise()
-                .expect("git reference should have precise")
-                .to_string();
-            (
-                precise.clone(),
-                format!("{}/tree/{precise}", vrl_source.url()),
-            )
+    let (version, link) = if let Some(vrl_source) = vrl_dep.source.clone() {
+        match vrl_source.kind() {
+            SourceKind::Git(_) => {
+                let precise = vrl_source
+                    .precise()
+                    .expect("git reference should have precise")
+                    .to_string();
+                (
+                    precise.clone(),
+                    Some(format!("{}/tree/{precise}", vrl_source.url())),
+                )
+            }
+            SourceKind::Registry if vrl_source.is_default_registry() => {
+                let version = vrl_dep.version.to_string();
+                (
+                    version.clone(),
+                    Some(format!("https://crates.io/crates/vrl/{version}")),
+                )
+            }
+            SourceKind::Path => (vrl_dep.version.to_string(), None),
+            kind => unimplemented!("unhandled source kind: {:?}", kind),
         }
-        SourceKind::Registry if vrl_source.is_default_registry() => {
-            let version = vrl_dep.version.to_string();
-            (
-                version.to_string(),
-                format!("https://crates.io/crates/vrl/{version}"),
-            )
-        }
-        SourceKind::Path
-        | SourceKind::Registry
-        | SourceKind::SparseRegistry
-        | SourceKind::LocalRegistry
-        | SourceKind::Directory => unimplemented!("unhandled source kind: {:?}", vrl_source.kind()),
-        _ => unimplemented!("unknown source kind: {:?}", vrl_source.kind()),
+    } else {
+        (vrl_dep.version.to_string(), None)
     };
 
     output_file
         .write_all(create_const_statement("VRL_VERSION", &version).as_bytes())
         .expect("Failed to write VRL version constant");
 
+    let link_str = link.as_deref().unwrap_or("");
     output_file
-        .write_all(create_const_statement("VRL_LINK", &link).as_bytes())
+        .write_all(create_const_statement("VRL_LINK", link_str).as_bytes())
         .expect("Failed to write VRL_LINK constant");
 }
 

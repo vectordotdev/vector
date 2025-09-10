@@ -1,13 +1,14 @@
-use std::convert::TryFrom;
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryFrom,
+    time::{Duration, Instant},
+};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{
-    future,
+    FutureExt, future,
     stream::{BoxStream, StreamExt},
-    FutureExt,
 };
 use serde_with::serde_as;
 use tokio::{
@@ -15,14 +16,14 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
-};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
 };
 
 use crate::{
@@ -33,7 +34,7 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::{timezone_to_offset, StreamSink},
+    sinks::util::{StreamSink, timezone_to_offset},
     template::Template,
 };
 
@@ -444,7 +445,7 @@ mod tests {
     use std::convert::TryInto;
 
     use chrono::{SubsecRound, Utc};
-    use futures::{stream, SinkExt};
+    use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::JsonSerializerConfig,
@@ -456,7 +457,7 @@ mod tests {
     use crate::{
         config::log_schema,
         test_util::{
-            components::{assert_sink_compliance, FILE_SINK_TAGS},
+            components::{FILE_SINK_TAGS, assert_sink_compliance},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
             random_lines_with_stream, random_metrics_with_stream,
             random_metrics_with_stream_timestamp, temp_dir, temp_file, trace_init,
@@ -722,7 +723,7 @@ mod tests {
 
         let format = "%Y-%m-%d-%H-%M-%S";
         let mut template = directory.to_string_lossy().to_string();
-        template.push_str(&format!("/{}.log", format));
+        template.push_str(&format!("/{format}.log"));
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),

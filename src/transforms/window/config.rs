@@ -1,6 +1,9 @@
-use vector_lib::config::{clone_input_definitions, LogNamespace};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    config::{LogNamespace, clone_input_definitions},
+    configurable::configurable_component,
+};
 
+use super::transform::Window;
 use crate::{
     conditions::AnyCondition,
     config::{
@@ -10,8 +13,6 @@ use crate::{
     schema,
     transforms::Transform,
 };
-
-use super::transform::Window;
 
 /// Configuration for the `window` transform.
 #[configurable_component(transform(

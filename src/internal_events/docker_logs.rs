@@ -1,9 +1,8 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -170,7 +169,7 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

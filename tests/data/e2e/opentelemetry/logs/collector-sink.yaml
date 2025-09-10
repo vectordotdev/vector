@@ -1,0 +1,26 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:5318"
+
+processors:
+  batch: { }
+
+exporters:
+  debug: { }
+  file:
+    path: /output/collector-file-exporter.log
+    rotation:
+      max_megabytes: 10
+      max_days: 1
+
+service:
+  pipelines:
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ debug, file ]
+  telemetry:
+    logs:
+      level: "debug"

@@ -1,7 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
 use std::{net::SocketAddr, time::Duration};
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,31 +8,33 @@ use futures::StreamExt;
 use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
-use vector_lib::codecs::{
-    decoding::{Deserializer, Framer},
-    BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
+use vector_lib::{
+    codecs::{
+        BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
+        decoding::{Deserializer, Framer},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, path, OwnedValuePath};
 use vrl::event_path;
 
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
+    SourceSender,
     codecs::Decoder,
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, log_schema,
     },
     event::Event,
-    internal_events::StreamClosedError,
-    internal_events::{SocketBindError, SocketMode, SocketReceiveError},
+    internal_events::{SocketBindError, SocketMode, SocketReceiveError, StreamClosedError},
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{try_bind_udp_socket, SocketListenAddr, TcpNullAcker, TcpSource},
+    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
-    SourceSender,
 };
 
 /// Configuration for the `syslog` source.
@@ -328,10 +329,10 @@ pub fn udp(
             })
         })?;
 
-        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes
+            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+        {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
         info!(
@@ -449,27 +450,29 @@ fn enrich_syslog_event(
 #[cfg(test)]
 mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
-    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath};
 
     use chrono::prelude::*;
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
     use serde::Deserialize;
-    use tokio::time::{sleep, Duration, Instant};
+    use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::codecs::decoding::format::Deserializer;
-    use vector_lib::lookup::PathPrefix;
-    use vector_lib::{config::ComponentKey, schema::Definition};
-    use vrl::value::{kind::Collection, Kind, ObjectMap, Value};
+    use vector_lib::{
+        assert_event_data_eq,
+        codecs::decoding::format::Deserializer,
+        config::ComponentKey,
+        lookup::{OwnedTargetPath, PathPrefix, event_path, owned_value_path},
+        schema::Definition,
+    };
+    use vrl::value::{Kind, ObjectMap, Value, kind::Collection};
 
     use super::*;
     use crate::{
         config::log_schema,
         event::{Event, LogEvent},
         test_util::{
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
-            next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
             CountReceiver,
+            components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
+            next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
         },
     };
 
@@ -984,7 +987,7 @@ mod test {
     #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
-        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
+        let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {msg}"#);
         let event = event_from_bytes(
             "host",
             Some(Bytes::from("192.168.0.254")),
@@ -1032,8 +1035,7 @@ mod test {
     fn rsyslog_omfwd_tcp_default() {
         let msg = "start";
         let raw = format!(
-            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
-            msg
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {msg}"#
         );
         let event = event_from_bytes(
             "host",
@@ -1081,8 +1083,7 @@ mod test {
     fn rsyslog_omfwd_tcp_forward_format() {
         let msg = "start";
         let raw = format!(
-            r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] {}"#,
-            msg
+            r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] {msg}"#
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -1186,12 +1187,13 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_unix_stream_syslog() {
-        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
-        use futures_util::{stream, SinkExt};
         use std::os::unix::net::UnixStream as StdUnixStream;
-        use tokio::io::AsyncWriteExt;
-        use tokio::net::UnixStream;
+
+        use futures_util::{SinkExt, stream};
+        use tokio::{io::AsyncWriteExt, net::UnixStream};
         use tokio_util::codec::{FramedWrite, LinesCodec};
+
+        use crate::test_util::components::SOCKET_PUSH_SOURCE_TAGS;
 
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 1;
@@ -1369,7 +1371,7 @@ mod test {
             //"secfrac" can contain up to 6 digits, but TCP sinks uses `AutoSi`
 
             Self {
-                msgid: format!("test{}", id),
+                msgid: format!("test{id}"),
                 severity: Severity::LOG_INFO,
                 facility: Facility::LOG_USER,
                 version: 1,
@@ -1492,7 +1494,7 @@ mod test {
                 x => {
                     #[allow(clippy::print_stdout)]
                     {
-                        println!("converting severity str, got {}", x);
+                        println!("converting severity str, got {x}");
                     }
                     None
                 }
@@ -1544,7 +1546,7 @@ mod test {
             .filter(|m| !m.is_empty()) //syslog_rfc5424 ignores empty maps, tested separately
             .take(amount)
             .enumerate()
-            .map(|(i, map)| (format!("id{}", i), map))
+            .map(|(i, map)| (format!("id{i}"), map))
             .collect()
     }
 

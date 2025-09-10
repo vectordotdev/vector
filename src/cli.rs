@@ -10,8 +10,10 @@ use crate::service;
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
-use crate::{generate_schema, signal};
+use crate::{
+    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
+    validate,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -178,7 +180,6 @@ pub struct RootOpts {
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
     /// Set the internal log rate limit
-    /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(
         short,
         long,

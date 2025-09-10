@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    num::{NonZeroU64, NonZeroU8},
+    num::{NonZeroU8, NonZeroU64},
     sync::Arc,
     time::Duration,
 };
@@ -8,8 +8,7 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::EventStatus;
+use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -147,8 +146,7 @@ impl HecAckClient {
                         }
                         _ => {
                             emit!(SplunkIndexerAcknowledgementAPIError {
-                                message:
-                                    "Unable to send acknowledgement query request. Will retry.",
+                                message: "Unable to send acknowledgement query request. Will retry.",
                                 error,
                             });
                             self.expire_ack_ids_with_status(EventStatus::Errored);
@@ -286,7 +284,7 @@ pub async fn run_acknowledgements(
 mod tests {
     use std::sync::Arc;
 
-    use futures_util::{stream::FuturesUnordered, StreamExt};
+    use futures_util::{StreamExt, stream::FuturesUnordered};
     use tokio::sync::oneshot::{self, Receiver};
     use vector_lib::{config::proxy::ProxyConfig, event::EventStatus};
 
@@ -295,7 +293,7 @@ mod tests {
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
-                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder, EndpointTarget,
+                EndpointTarget, acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
             },
             util::Compression,
         },

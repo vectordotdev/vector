@@ -4,16 +4,17 @@ use std::net::SocketAddr;
 use chrono::Utc;
 use futures::TryFutureExt;
 use tonic::{Request, Response, Status};
-use vector_lib::codecs::NativeDeserializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
 use vector_lib::{
-    config::LogNamespace,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     EstimatedJsonEncodedSizeOf,
+    codecs::NativeDeserializerConfig,
+    config::LogNamespace,
+    configurable::configurable_component,
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::{CountByteSize, InternalEventHandle as _},
 };
 
 use crate::{
+    SourceSender,
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
@@ -21,9 +22,8 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{util::grpc::run_grpc_server, Source},
+    sources::{Source, util::grpc::run_grpc_server},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 /// Marker type for version two of the configuration for the `vector` source.
@@ -57,7 +57,7 @@ impl proto::Service for Service {
 
         let now = Utc::now();
         for event in &mut events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     VectorConfig::NAME,
@@ -217,13 +217,11 @@ impl SourceConfig for VectorConfig {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::owned_value_path;
-    use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{kind::Collection, Kind};
-
-    use crate::config::SourceConfig;
+    use vector_lib::{config::LogNamespace, lookup::owned_value_path, schema::Definition};
+    use vrl::value::{Kind, kind::Collection};
 
     use super::VectorConfig;
+    use crate::config::SourceConfig;
 
     #[test]
     fn generate_config() {
@@ -278,17 +276,18 @@ mod test {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod tests {
+    use vector_lib::{assert_event_data_eq, config::log_schema};
+
     use super::*;
     use crate::{
+        SourceSender,
         config::{SinkConfig as _, SinkContext},
         sinks::vector::VectorConfig as SinkConfig,
-        test_util, SourceSender,
+        test_util,
     };
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::config::log_schema;
 
     async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         let source: VectorConfig = toml::from_str(&config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
@@ -324,7 +323,7 @@ mod tests {
     async fn receive_message() {
         let addr = test_util::next_addr();
 
-        let config = format!(r#"address = "{}""#, addr);
+        let config = format!(r#"address = "{addr}""#);
         run_test(&config, addr).await;
     }
 
@@ -333,9 +332,8 @@ mod tests {
         let addr = test_util::next_addr();
 
         let config = format!(
-            r#"address = "{}"
-            compression=true"#,
-            addr
+            r#"address = "{addr}"
+            compression=true"#
         );
         run_test(&config, addr).await;
     }

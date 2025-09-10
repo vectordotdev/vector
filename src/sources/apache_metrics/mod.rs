@@ -1,16 +1,16 @@
 use std::{future::ready, time::Duration};
 
 use chrono::Utc;
-use futures::{stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::uri::Scheme;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
+    SourceSender,
     config::{GenerateConfig, ProxyConfig, SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
@@ -19,7 +19,6 @@ use crate::{
         HttpClientHttpError, HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 mod parser;
@@ -229,28 +228,32 @@ fn apache_metrics(
                                     code: header.status,
                                     url: sanitized_url.to_owned(),
                                 });
-                                Some(stream::iter(vec![Metric::new(
-                                    "up",
-                                    MetricKind::Absolute,
-                                    MetricValue::Gauge { value: 1.0 },
-                                )
-                                .with_namespace(namespace.clone())
-                                .with_tags(Some(tags.clone()))
-                                .with_timestamp(Some(Utc::now()))]))
+                                Some(stream::iter(vec![
+                                    Metric::new(
+                                        "up",
+                                        MetricKind::Absolute,
+                                        MetricValue::Gauge { value: 1.0 },
+                                    )
+                                    .with_namespace(namespace.clone())
+                                    .with_tags(Some(tags.clone()))
+                                    .with_timestamp(Some(Utc::now())),
+                                ]))
                             }
                             Err(error) => {
                                 emit!(HttpClientHttpError {
                                     error,
                                     url: sanitized_url.to_owned(),
                                 });
-                                Some(stream::iter(vec![Metric::new(
-                                    "up",
-                                    MetricKind::Absolute,
-                                    MetricValue::Gauge { value: 0.0 },
-                                )
-                                .with_namespace(namespace.clone())
-                                .with_tags(Some(tags.clone()))
-                                .with_timestamp(Some(Utc::now()))]))
+                                Some(stream::iter(vec![
+                                    Metric::new(
+                                        "up",
+                                        MetricKind::Absolute,
+                                        MetricValue::Gauge { value: 0.0 },
+                                    )
+                                    .with_namespace(namespace.clone())
+                                    .with_tags(Some(tags.clone()))
+                                    .with_timestamp(Some(Utc::now())),
+                                ]))
                             }
                         })
                     })
@@ -276,21 +279,21 @@ fn apache_metrics(
 #[cfg(test)]
 mod test {
     use hyper::{
-        service::{make_service_fn, service_fn},
         Body, Response, Server,
+        service::{make_service_fn, service_fn},
     };
     use similar_asserts::assert_eq;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     use super::*;
     use crate::{
+        Error,
         config::SourceConfig,
         test_util::{
             collect_ready,
-            components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+            components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr, wait_for_tcp,
         },
-        Error,
     };
 
     #[test]
@@ -380,7 +383,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     Some(tags) => {
                         assert_eq!(
                             tags.get("endpoint"),
-                            Some(&format!("http://{}/metrics", in_addr)[..])
+                            Some(&format!("http://{in_addr}/metrics")[..])
                         );
                         assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
                     }

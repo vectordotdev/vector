@@ -51,3 +51,6 @@ pub mod resource {
         tonic::include_proto!("opentelemetry.proto.resource.v1");
     }
 }
+
+/// The raw descriptor bytes for all the above.
+include!(concat!(env!("OUT_DIR"), "/opentelemetry-proto.rs"));

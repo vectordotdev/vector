@@ -2,14 +2,14 @@ use core::fmt;
 use std::{num::NonZeroUsize, time::Duration};
 
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use indexmap::IndexMap;
-use vector::transforms::reduce::{Reduce, ReduceConfig};
+use vector::transforms::reduce::{config::ReduceConfig, transform::Reduce};
 use vector_lib::transform::Transform;
 
-use crate::common::{consume, FixedLogStream};
+use crate::common::{FixedLogStream, consume};
 
 #[derive(Debug)]
 struct Param {
@@ -33,17 +33,13 @@ fn reduce(c: &mut Criterion) {
         NonZeroUsize::new(128).unwrap(),
         NonZeroUsize::new(2).unwrap(),
     );
-    for param in &[
-        // The `Reduce` transform has a high configuration surface. For now we
-        // only benchmark the "proof of concept" configuration, demonstrating
-        // that the benchmark does minimally work. Once we have soak tests with
-        // reduces in them we should extend this array to include those
-        // configurations.
-        Param {
+    {
+        let param = &Param {
             slug: "proof_of_concept",
             input: fixed_stream.clone(),
             reduce_config: ReduceConfig {
                 expire_after_ms: Duration::from_secs(30),
+                end_every_period_ms: None,
                 flush_period_ms: Duration::from_secs(1),
                 group_by: vec![String::from("message")],
                 merge_strategies: IndexMap::default(),
@@ -51,8 +47,7 @@ fn reduce(c: &mut Criterion) {
                 starts_when: None,
                 max_events: None,
             },
-        },
-    ] {
+        };
         group.throughput(Throughput::Elements(param.input.len() as u64));
         group.bench_with_input(BenchmarkId::new("transform", param), &param, |b, param| {
             b.to_async(tokio::runtime::Runtime::new().unwrap())

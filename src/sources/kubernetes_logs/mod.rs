@@ -14,35 +14,35 @@ use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
+    Client, Config as ClientConfig,
     api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{reflector, watcher, WatchStreamExt},
-    Client, Config as ClientConfig,
+    runtime::{WatchStreamExt, reflector, watcher},
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
-use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
-use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    file_source::file_server::{
+        FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
+    },
+    file_source_common::{
+        Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+    },
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
-    TimeZone,
+    lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use crate::{
+    SourceSender,
     built_info::{PKG_NAME, PKG_VERSION},
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
-};
-use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
-        SourceContext, SourceOutput,
+        ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
+        SourceOutput, log_schema,
     },
     event::Event,
     internal_events::{
@@ -54,8 +54,8 @@ use crate::{
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
+    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
     transforms::{FunctionTransform, OutputBuffer},
-    SourceSender,
 };
 
 mod k8s_paths_provider;
@@ -69,10 +69,11 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use self::node_metadata_annotator::NodeMetadataAnnotator;
-use self::parser::Parser;
-use self::pod_metadata_annotator::PodMetadataAnnotator;
+use self::{
+    namespace_metadata_annotator::NamespaceMetadataAnnotator,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    pod_metadata_annotator::PodMetadataAnnotator,
+};
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -585,8 +586,7 @@ impl Source {
         {
             std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
                 format!(
-                    "self_node_name config value or {} env var is not set",
-                    SELF_NODE_NAME_ENV_KEY
+                    "self_node_name config value or {SELF_NODE_NAME_ENV_KEY} env var is not set"
                 )
             })?
         } else {
@@ -612,7 +612,7 @@ impl Source {
             }
             None => ClientConfig::infer().await?,
         };
-        if let Ok(user_agent) = HeaderValue::from_str(&format!("{}/{}", PKG_NAME, PKG_VERSION)) {
+        if let Ok(user_agent) = HeaderValue::from_str(&format!("{PKG_NAME}/{PKG_VERSION}")) {
             client_config
                 .headers
                 .push((HeaderName::from_static("user-agent"), user_agent));
@@ -854,7 +854,6 @@ impl Source {
                 include_file_metric_tag,
             },
             // A handle to the current tokio runtime
-            handle: tokio::runtime::Handle::current(),
             rotate_wait,
         };
 
@@ -1120,7 +1119,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
         ?self_node_name
     );
 
-    let field_selector = format!("spec.nodeName={}", self_node_name);
+    let field_selector = format!("spec.nodeName={self_node_name}");
 
     if config.extra_field_selector.is_empty() {
         return Ok(field_selector);
@@ -1134,7 +1133,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
 
 // This function constructs the selector for a node to annotate entries with a node metadata.
 fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
-    Ok(format!("metadata.name={}", self_node_name))
+    Ok(format!("metadata.name={self_node_name}"))
 }
 
 // This function constructs the effective label selector to use, based on
@@ -1146,19 +1145,21 @@ fn prepare_label_selector(selector: &str) -> String {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, selector)
+    format!("{BUILT_IN},{selector}")
 }
 
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-    use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{kind::Collection, Kind};
-
-    use crate::config::SourceConfig;
+    use vector_lib::{
+        config::LogNamespace,
+        lookup::{OwnedTargetPath, owned_value_path},
+        schema::Definition,
+    };
+    use vrl::value::{Kind, kind::Collection};
 
     use super::Config;
+    use crate::config::SourceConfig;
 
     #[test]
     fn generate_config() {
