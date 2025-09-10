@@ -763,7 +763,7 @@ impl Source {
 
             reflectors.push(tokio::spawn(custom_reflector(
                 ns_store_w,
-                ns_cacher: MetaCache::new(),
+                MetaCache::new(),
                 ns_watcher,
                 delay_deletion,
             )));
@@ -906,7 +906,6 @@ impl Source {
 
                 if insert_namespace_fields {
                     if let Some(name) = namespace {
-
                         if ns_annotator.annotate(&mut event, name).is_none() {
                             emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                         }
