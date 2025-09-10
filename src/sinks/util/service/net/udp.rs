@@ -2,12 +2,10 @@ use std::net::SocketAddr;
 
 use snafu::ResultExt;
 use tokio::net::UdpSocket;
-
 use vector_lib::configurable::configurable_component;
 
-use crate::{dns, net};
-
 use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
+use crate::{dns, net};
 
 /// UDP configuration.
 #[configurable_component]

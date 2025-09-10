@@ -5,14 +5,23 @@ edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
 readme = "README.md"
-publish = false
+repository = "https://github.com/vectordotdev/vector"
+homepage = "https://vector.dev"
+description = "CLI utilities for Vector (vector.dev) development and CI workflows"
+keywords = ["cli", "developer-tools", "vector", "vdev"]
+categories = ["command-line-utilities"]
+include = [
+  "Cargo.toml",
+  "README.md",
+  "src/**",
+]
 
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
-clap-verbosity-flag = "3.0.3"
-clap_complete = "4.5.55"
+clap-verbosity-flag = "3.0.4"
+clap_complete = "4.5.57"
 confy = "1.0.0"
 directories = "6.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
@@ -38,3 +47,6 @@ semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
 cfg-if.workspace = true
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"

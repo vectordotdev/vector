@@ -1,6 +1,9 @@
 use std::{fmt, iter::IntoIterator, pin::Pin};
 
-use futures::{Sink, SinkExt, Stream, StreamExt, stream, task::Context, task::Poll};
+use futures::{
+    Sink, SinkExt, Stream, StreamExt, stream,
+    task::{Context, Poll},
+};
 
 use crate::event::{Event, EventArray, EventContainer, into_event_stream};
 

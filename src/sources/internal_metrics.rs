@@ -4,12 +4,13 @@ use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::lookup_v2::OptionalValuePath,
 };
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::LogNamespace};
 
 use crate::{
     SourceSender,

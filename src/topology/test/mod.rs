@@ -7,9 +7,21 @@ use std::{
     },
 };
 
+use futures::{StreamExt, future, stream};
+use tokio::{
+    task::yield_now,
+    time::{Duration, sleep},
+};
+use vector_lib::{
+    buffers::{BufferConfig, BufferType, WhenFull},
+    config::{ComponentKey, OutputId},
+};
+
 use crate::{
     config::{Config, ConfigDiff, SinkOuter},
     event::{Event, EventArray, EventContainer, LogEvent, into_event_stream},
+    schema::Definition,
+    source_sender::SourceSenderItem,
     test_util::{
         mock::{
             basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
@@ -20,15 +32,6 @@ use crate::{
     },
     topology::{RunningTopology, TopologyPieces},
 };
-use crate::{schema::Definition, source_sender::SourceSenderItem};
-use futures::{StreamExt, future, stream};
-use tokio::{
-    task::yield_now,
-    time::{Duration, sleep},
-};
-use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
-use vector_lib::config::ComponentKey;
-use vector_lib::config::OutputId;
 
 mod backpressure;
 mod compliance;

@@ -130,8 +130,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_lib::{Error, Result, shutdown};
-pub use vector_lib::{event, metrics, schema, tcp, tls};
+pub use vector_lib::{Error, Result, event, metrics, schema, shutdown, tcp, tls};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 

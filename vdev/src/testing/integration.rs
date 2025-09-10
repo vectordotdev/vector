@@ -1,17 +1,28 @@
-use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context, Result, bail};
 use tempfile::{Builder, NamedTempFile};
 
-use super::config::{
-    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+use super::{
+    config::{
+        ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+    },
+    runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
+    state::EnvsDir,
 };
-use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
-use super::state::EnvsDir;
-use crate::app::CommandExt as _;
-use crate::environment::{Environment, extract_present, rename_environment_keys};
-use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
-use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
+use crate::{
+    app::CommandExt as _,
+    environment::{Environment, extract_present, rename_environment_keys},
+    testing::{
+        build::ALL_INTEGRATIONS_FEATURE_FLAG,
+        docker::{CONTAINER_TOOL, DOCKER_SOCKET},
+    },
+};
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
@@ -341,14 +352,19 @@ impl Compose {
 
 #[cfg(unix)]
 mod unix {
-    use std::fs::{self, Metadata, Permissions};
-    use std::os::unix::fs::PermissionsExt as _;
-    use std::path::{Path, PathBuf};
+    use std::{
+        fs::{self, Metadata, Permissions},
+        os::unix::fs::PermissionsExt as _,
+        path::{Path, PathBuf},
+    };
+
+    use anyhow::{Context, Result};
 
     use super::super::config::ComposeConfig;
-    use crate::environment::{Environment, resolve_placeholders};
-    use crate::testing::config::VolumeMount;
-    use anyhow::{Context, Result};
+    use crate::{
+        environment::{Environment, resolve_placeholders},
+        testing::config::VolumeMount,
+    };
 
     /// Unix permissions mask to allow everybody to read a file
     const ALL_READ: u32 = 0o444;
