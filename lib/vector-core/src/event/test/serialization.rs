@@ -39,7 +39,7 @@ fn serde_eventarray_no_size_loss() {
 // Ser/De the EventArray type through EncodeBytes -> DecodeBytes
 #[test]
 #[allow(clippy::neg_cmp_op_on_partial_ord)] // satisfying clippy leads to less
-                                            // clear expression
+// clear expression
 fn back_and_forth_through_bytes() {
     fn inner(events: EventArray) -> TestResult {
         let expected = events.clone();

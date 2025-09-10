@@ -1,17 +1,18 @@
 use futures::{future::ready, stream};
 use serde::Deserialize;
-use vector_lib::configurable::component::GenerateConfig;
-use vector_lib::event::{Event, LogEvent};
-
-use crate::{
-    config::{SinkConfig, SinkContext},
-    test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
-        http::{always_200_response, spawn_blackhole_http_server},
-    },
+use vector_lib::{
+    configurable::component::GenerateConfig,
+    event::{Event, LogEvent},
 };
 
 use super::config::AppsignalConfig;
+use crate::{
+    config::{SinkConfig, SinkContext},
+    test_util::{
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
+        http::{always_200_response, spawn_blackhole_http_server},
+    },
+};
 
 #[tokio::test]
 async fn component_spec_compliance() {

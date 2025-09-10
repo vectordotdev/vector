@@ -1,8 +1,10 @@
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
+use vector_lib::{
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
 
 #[cfg(not(windows))]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -208,21 +210,20 @@ mod test {
         net::{SocketAddr, UdpSocket},
     };
 
+    #[cfg(target_os = "windows")]
+    use cfg_if::cfg_if;
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
     use tokio::{
         net::TcpListener,
-        time::{sleep, timeout, Duration},
+        time::{Duration, sleep, timeout},
     };
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
-
-    #[cfg(target_os = "windows")]
-    use cfg_if::cfg_if;
     cfg_if! { if #[cfg(unix)] {
         use vector_lib::codecs::NativeJsonSerializerConfig;
         use crate::test_util::random_metrics_with_stream;
@@ -235,8 +236,9 @@ mod test {
         config::SinkContext,
         event::{Event, LogEvent},
         test_util::{
-            components::{assert_sink_compliance, run_and_assert_sink_compliance, SINK_TAGS},
-            next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
+            CountReceiver,
+            components::{SINK_TAGS, assert_sink_compliance, run_and_assert_sink_compliance},
+            next_addr, next_addr_v6, random_lines_with_stream, trace_init,
         },
     };
 
@@ -425,24 +427,24 @@ mod test {
         use std::{
             pin::Pin,
             sync::{
-                atomic::{AtomicUsize, Ordering},
                 Arc,
+                atomic::{AtomicUsize, Ordering},
             },
             task::Poll,
         };
 
-        use futures::{channel::mpsc, FutureExt, SinkExt, StreamExt};
+        use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc};
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
             task::yield_now,
-            time::{interval, Duration},
+            time::{Duration, interval},
         };
         use tokio_stream::wrappers::IntervalStream;
 
-        use crate::event::EventArray;
-        use crate::tls::{
-            self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig,
+        use crate::{
+            event::EventArray,
+            tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
         };
 
         trace_init();
@@ -504,9 +506,11 @@ mod test {
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
 
-                    std::future::poll_fn(move |cx| loop {
-                        if let Some(fut) = close_rx.as_mut() {
-                            if let Poll::Ready(()) = fut.poll_unpin(cx) {
+                    std::future::poll_fn(move |cx| {
+                        loop {
+                            if let Some(fut) = close_rx.as_mut()
+                                && let Poll::Ready(()) = fut.poll_unpin(cx)
+                            {
                                 stream
                                     .get_mut()
                                     .unwrap()
@@ -516,22 +520,22 @@ mod test {
                                     .unwrap();
                                 close_rx = None;
                             }
-                        }
 
-                        let mut buf = [0u8; 11];
-                        let mut buf = ReadBuf::new(&mut buf);
-                        return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
-                            Poll::Ready(Ok(())) => {
-                                if buf.filled().is_empty() {
-                                    Poll::Ready(())
-                                } else {
-                                    msg_counter1.fetch_add(1, Ordering::SeqCst);
-                                    continue;
+                            let mut buf = [0u8; 11];
+                            let mut buf = ReadBuf::new(&mut buf);
+                            return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
+                                Poll::Ready(Ok(())) => {
+                                    if buf.filled().is_empty() {
+                                        Poll::Ready(())
+                                    } else {
+                                        msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                        continue;
+                                    }
                                 }
-                            }
-                            Poll::Ready(Err(error)) => panic!("{}", error),
-                            Poll::Pending => Poll::Pending,
-                        };
+                                Poll::Ready(Err(error)) => panic!("{error}"),
+                                Poll::Pending => Poll::Pending,
+                            };
+                        }
                     })
                 })
                 .await;
@@ -622,12 +626,14 @@ mod test {
 
         // Second listener
         // If this doesn't succeed then the sink hanged.
-        assert!(timeout(
-            Duration::from_secs(5),
-            CountReceiver::receive_lines(addr).connected()
-        )
-        .await
-        .is_ok());
+        assert!(
+            timeout(
+                Duration::from_secs(5),
+                CountReceiver::receive_lines(addr).connected()
+            )
+            .await
+            .is_ok()
+        );
 
         sink_handle.await.unwrap();
     }

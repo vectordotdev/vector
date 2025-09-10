@@ -1,20 +1,23 @@
-use std::collections::BTreeMap;
-use std::io::Cursor;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    collections::BTreeMap,
+    io::Cursor,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use chrono::Utc;
-use databend_client::APIClient as DatabendAPIClient;
-use databend_client::Error as DatabendError;
+use databend_client::{APIClient as DatabendAPIClient, Error as DatabendError};
 use futures::future::BoxFuture;
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
-use vector_lib::finalization::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    finalization::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{internal_events::EndpointBytesSent, sinks::util::retries::RetryLogic};
 

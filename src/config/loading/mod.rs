@@ -20,7 +20,7 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
+    Config, ConfigPath, Format, FormatHint, builder::ConfigBuilder, format, validation, vars,
 };
 use crate::{config::ProviderConfig, signal};
 
@@ -283,10 +283,10 @@ pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<Strin
         })
         .collect();
 
-    if !vars.contains_key("HOSTNAME") {
-        if let Ok(hostname) = crate::get_hostname() {
-            vars.insert("HOSTNAME".into(), hostname);
-        }
+    if !vars.contains_key("HOSTNAME")
+        && let Ok(hostname) = crate::get_hostname()
+    {
+        vars.insert("HOSTNAME".into(), hostname);
     }
     vars::interpolate(&source_string, &vars)
 }
@@ -342,15 +342,21 @@ mod tests {
             .join("success");
         let configs = vec![ConfigPath::Dir(path)];
         let builder = load_builder_from_paths(&configs).unwrap();
-        assert!(builder
-            .transforms
-            .contains_key(&ComponentKey::from("apache_parser")));
-        assert!(builder
-            .sources
-            .contains_key(&ComponentKey::from("apache_logs")));
-        assert!(builder
-            .sinks
-            .contains_key(&ComponentKey::from("es_cluster")));
+        assert!(
+            builder
+                .transforms
+                .contains_key(&ComponentKey::from("apache_parser"))
+        );
+        assert!(
+            builder
+                .sources
+                .contains_key(&ComponentKey::from("apache_logs"))
+        );
+        assert!(
+            builder
+                .sinks
+                .contains_key(&ComponentKey::from("es_cluster"))
+        );
         assert_eq!(builder.tests.len(), 2);
     }
 

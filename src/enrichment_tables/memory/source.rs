@@ -1,12 +1,14 @@
-use chrono::Utc;
-use futures::StreamExt;
 use std::{
     num::NonZeroU64,
     time::{Duration, Instant},
 };
+
+use chrono::Utc;
+use futures::StreamExt;
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     configurable::configurable_component,
     event::{Event, EventMetadata, LogEvent},
@@ -14,12 +16,10 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle, Protocol,
     },
     shutdown::ShutdownSignal,
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
 };
 
-use crate::{internal_events::StreamClosedError, SourceSender};
-
 use super::{Memory, MemoryConfig};
+use crate::{SourceSender, internal_events::StreamClosedError};
 
 /// Configuration for memory enrichment table source functionality.
 #[configurable_component]

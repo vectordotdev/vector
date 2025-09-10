@@ -1,21 +1,20 @@
 use vector_lib::config::LogNamespace;
 
+use super::{
+    io::{ControlledEdges, InputEdge, OutputEdge},
+    telemetry::{Telemetry, TelemetryCollector},
+};
 use crate::{
     components::validation::{
+        ComponentConfiguration, ComponentType, ValidationConfiguration,
         component_names::*,
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
-        ComponentConfiguration, ComponentType, ValidationConfiguration,
     },
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
     test_util::next_addr,
-};
-
-use super::{
-    io::{ControlledEdges, InputEdge, OutputEdge},
-    telemetry::{Telemetry, TelemetryCollector},
 };
 
 pub struct TopologyBuilder {

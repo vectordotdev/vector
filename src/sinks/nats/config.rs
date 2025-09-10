@@ -1,16 +1,14 @@
-use async_nats::header;
+use async_nats::{HeaderMap, header};
 use bytes::Bytes;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::tls::TlsEnableableConfig;
+use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
-use super::{sink::NatsSink, ConfigSnafu, ConnectSnafu, NatsError};
+use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
-    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
-use async_nats::HeaderMap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NatsTowerRequestConfigDefaults;
@@ -38,10 +36,10 @@ impl NatsHeaderConfig {
     pub fn build_headers(&self, event: &Event) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
-        if let Some(template) = &self.message_id {
-            if let Ok(value) = template.render_string(event) {
-                headers.insert(header::NATS_MESSAGE_ID, value.as_str());
-            }
+        if let Some(template) = &self.message_id
+            && let Ok(value) = template.render_string(event)
+        {
+            headers.insert(header::NATS_MESSAGE_ID, value.as_str());
         }
 
         headers

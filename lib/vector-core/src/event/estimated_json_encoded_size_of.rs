@@ -114,11 +114,7 @@ impl EstimatedJsonEncodedSizeOf for Bytes {
 
 impl EstimatedJsonEncodedSizeOf for bool {
     fn estimated_json_encoded_size_of(&self) -> JsonSize {
-        if *self {
-            TRUE_SIZE
-        } else {
-            FALSE_SIZE
-        }
+        if *self { TRUE_SIZE } else { FALSE_SIZE }
     }
 }
 
@@ -446,10 +442,11 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde::Serialize;
+
+    use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
     struct ValidString(String);

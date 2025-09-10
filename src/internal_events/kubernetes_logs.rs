@@ -1,7 +1,8 @@
 use metrics::counter;
-use vector_lib::internal_event::{InternalEvent, INTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 use vrl::core::Value;
@@ -71,7 +72,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -96,7 +97,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -122,7 +123,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -162,7 +163,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -191,7 +192,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

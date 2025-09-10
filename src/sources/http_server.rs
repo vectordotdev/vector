@@ -1,4 +1,3 @@
-use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
 use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
@@ -6,23 +5,23 @@ use chrono::Utc;
 use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
-use vrl::value::{kind::Collection, Kind};
-use warp::http::HeaderMap;
-
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
-    NewlineDelimitedDecoderConfig,
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
+    codecs::{
+        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
+        NewlineDelimitedDecoderConfig,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{DataType, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
+use vrl::value::{Kind, kind::Collection};
+use warp::http::HeaderMap;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
@@ -31,8 +30,8 @@ use crate::{
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        http::{add_headers, add_query_parameters, HttpMethod},
         Encoding, HttpSource,
+        http::{HttpMethod, add_headers, add_query_parameters},
     },
     tls::TlsEnableableConfig,
 };
@@ -525,44 +524,43 @@ impl HttpSource for SimpleHttpSource {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use std::{io::Write, net::SocketAddr};
+    use std::{io::Write, net::SocketAddr, str::FromStr};
 
     use flate2::{
-        write::{GzEncoder, ZlibEncoder},
         Compression,
+        write::{GzEncoder, ZlibEncoder},
     };
     use futures::Stream;
-    use headers::authorization::Credentials;
-    use headers::Authorization;
-    use http::header::AUTHORIZATION;
-    use http::{HeaderMap, Method, StatusCode, Uri};
+    use headers::{Authorization, authorization::Credentials};
+    use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
     use similar_asserts::assert_eq;
-    use vector_lib::codecs::{
-        decoding::{DeserializerConfig, FramingConfig},
-        BytesDecoderConfig, JsonDeserializerConfig,
+    use vector_lib::{
+        codecs::{
+            BytesDecoderConfig, JsonDeserializerConfig,
+            decoding::{DeserializerConfig, FramingConfig},
+        },
+        config::LogNamespace,
+        event::LogEvent,
+        lookup::{
+            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath, owned_value_path,
+        },
+        schema::Definition,
     };
-    use vector_lib::config::LogNamespace;
-    use vector_lib::event::LogEvent;
-    use vector_lib::lookup::lookup_v2::OptionalValuePath;
-    use vector_lib::lookup::{event_path, owned_value_path, OwnedTargetPath, PathPrefix};
-    use vector_lib::schema::Definition;
-    use vrl::value::{kind::Collection, Kind, ObjectMap};
+    use vrl::value::{Kind, ObjectMap, kind::Collection};
 
-    use crate::common::http::server_auth::HttpServerAuthConfig;
-    use crate::sources::http_server::HttpMethod;
+    use super::{SimpleHttpConfig, remove_duplicates};
     use crate::{
+        SourceSender,
+        common::http::server_auth::HttpServerAuthConfig,
         components::validation::prelude::*,
-        config::{log_schema, SourceConfig, SourceContext},
+        config::{SourceConfig, SourceContext, log_schema},
         event::{Event, EventStatus, Value},
+        sources::http_server::HttpMethod,
         test_util::{
-            components::{self, assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{self, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
             next_addr, spawn_collect_n, wait_for_tcp,
         },
-        SourceSender,
     };
-
-    use super::{remove_duplicates, SimpleHttpConfig};
 
     #[test]
     fn generate_config() {

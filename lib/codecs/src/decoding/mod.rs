@@ -5,7 +5,8 @@ mod error;
 pub mod format;
 pub mod framing;
 
-use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
+use std::fmt::Debug;
+
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
@@ -24,10 +25,9 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions,
+    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
-use std::fmt::Debug;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
@@ -36,6 +36,7 @@ use vector_core::{
 };
 
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -105,6 +106,10 @@ pub enum FramingConfig {
     ///
     /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
     ChunkedGelf(ChunkedGelfDecoderConfig),
+
+    /// Byte frames which are prefixed by a varint indicating the length.
+    /// This is compatible with protobuf's length-delimited encoding.
+    VarintLengthDelimited(VarintLengthDelimitedDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -143,6 +148,12 @@ impl From<ChunkedGelfDecoderConfig> for FramingConfig {
     }
 }
 
+impl From<VarintLengthDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: VarintLengthDelimitedDecoderConfig) -> Self {
+        Self::VarintLengthDelimited(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
@@ -153,6 +164,9 @@ impl FramingConfig {
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
             FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
+            }
         }
     }
 }
@@ -174,6 +188,8 @@ pub enum Framer {
     Boxed(BoxedFramer),
     /// Uses a `ChunkedGelfDecoder` for framing.
     ChunkedGelf(ChunkedGelfDecoder),
+    /// Uses a `VarintLengthDelimitedDecoder` for framing.
+    VarintLengthDelimited(VarintLengthDelimitedDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -189,6 +205,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
             Framer::ChunkedGelf(framer) => framer.decode(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode(src),
         }
     }
 
@@ -201,6 +218,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
             Framer::ChunkedGelf(framer) => framer.decode_eof(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode_eof(src),
         }
     }
 }

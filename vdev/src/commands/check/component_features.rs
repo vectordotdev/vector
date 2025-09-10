@@ -50,7 +50,9 @@ impl Cli {
         )?;
 
         // The feature builds already run in parallel below, so don't overload the parallelism
-        env::set_var("CARGO_BUILD_JOBS", "1");
+        unsafe {
+            env::set_var("CARGO_BUILD_JOBS", "1");
+        }
 
         app::exec(
             "parallel",

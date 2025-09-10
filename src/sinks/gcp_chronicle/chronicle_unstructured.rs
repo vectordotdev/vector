@@ -1,32 +1,32 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
-use bytes::{Bytes, BytesMut};
+use std::{collections::HashMap, io};
 
+use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::header::{self, HeaderName, HeaderValue};
-use http::{Request, StatusCode, Uri};
+use http::{
+    Request, StatusCode, Uri,
+    header::{self, HeaderName, HeaderValue},
+};
 use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use std::collections::HashMap;
-use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_lib::configurable::configurable_component;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
-    config::{telemetry, AcknowledgementsConfig, Input},
-    event::{Event, EventFinalizers, Finalizable},
-    sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
+    config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
+    event::{Event, EventFinalizers, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    sink::VectorSink,
 };
 use vrl::value::Kind;
 
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -34,22 +34,23 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
+        Healthcheck,
         gcp_chronicle::{
             compression::ChronicleCompression,
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
         },
         gcs_common::{
-            config::{healthcheck_response, GcsRetryLogic},
+            config::{GcsRetryLogic, healthcheck_response},
             service::GcsResponse,
         },
         util::{
-            encoding::{as_tracked_write, Encoder},
+            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            service::TowerRequestConfigDefaults,
         },
-        Healthcheck,
     },
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
@@ -678,8 +679,8 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            SINK_TAGS,
+            COMPONENT_ERROR_TAGS, SINK_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_sink_error,
         },
         random_events_with_stream, random_string, trace_init,
     };

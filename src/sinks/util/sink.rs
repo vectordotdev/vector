@@ -37,14 +37,14 @@ use std::{
     hash::Hash,
     marker::PhantomData,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
-use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt};
+use futures::{FutureExt, Sink, Stream, TryFutureExt, future::BoxFuture, stream::FuturesUnordered};
 use pin_project::pin_project;
 use tokio::{
     sync::oneshot,
-    time::{sleep, Duration, Sleep},
+    time::{Duration, Sleep, sleep},
 };
 use tower::{Service, ServiceBuilder};
 use tracing::Instrument;
@@ -55,10 +55,10 @@ use vector_lib::internal_event::{
 pub use vector_lib::sink::StreamSink;
 
 use super::{
+    EncodedEvent,
     batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
-    EncodedEvent,
 };
 use crate::event::EventStatus;
 
@@ -339,15 +339,15 @@ where
             }
 
             // Cleanup of in flight futures
-            if let Some(in_flight) = this.in_flight.as_mut() {
-                if in_flight.len() > this.partitions.len() {
-                    // There is at least one in flight future without a partition to check it
-                    // so we will do it here.
-                    let partitions = this.partitions;
-                    in_flight.retain(|partition, req| {
-                        partitions.contains_key(partition) || req.poll_unpin(cx).is_pending()
-                    });
-                }
+            if let Some(in_flight) = this.in_flight.as_mut()
+                && in_flight.len() > this.partitions.len()
+            {
+                // There is at least one in flight future without a partition to check it
+                // so we will do it here.
+                let partitions = this.partitions;
+                in_flight.retain(|partition, req| {
+                    partitions.contains_key(partition) || req.poll_unpin(cx).is_pending()
+                });
             }
 
             // Try move item from buffer to batch.
@@ -570,11 +570,14 @@ impl Response for &str {}
 mod tests {
     use std::{
         convert::Infallible,
-        sync::{atomic::AtomicUsize, atomic::Ordering::Relaxed, Arc, Mutex},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering::Relaxed},
+        },
     };
 
     use bytes::Bytes;
-    use futures::{future, stream, task::noop_waker_ref, SinkExt, StreamExt};
+    use futures::{SinkExt, StreamExt, future, stream, task::noop_waker_ref};
     use tokio::{task::yield_now, time::Instant};
     use vector_lib::{
         finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventFinalizers},

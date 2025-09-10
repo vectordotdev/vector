@@ -1,19 +1,17 @@
 use std::{cell::RefCell, fmt};
 
-use serde::Serializer;
-use serde_json::Value;
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_const_string_schema, generate_number_schema,
-        generate_one_of_schema, SchemaGenerator, SchemaObject,
-    },
-    Configurable, GenerateError, Metadata, ToValue,
-};
-
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{self, Unexpected, Visitor},
-    Deserialize, Deserializer, Serialize,
+};
+use serde_json::Value;
+use vector_lib::configurable::{
+    Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
+    schema::{
+        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        generate_number_schema, generate_one_of_schema,
+    },
 };
 
 /// Configuration for outbound request concurrency.

@@ -1,14 +1,17 @@
-use metrics::{counter, gauge};
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
+
+use metrics::{counter, gauge};
 use vector_lib::{
     configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-
-use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -83,6 +86,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -107,15 +111,14 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::file_source::FileSourceInternalEvents;
-    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
-
-    use super::{FileOpen, InternalEvent};
-    use vector_lib::emit;
     use vector_lib::{
-        internal_event::{error_stage, error_type},
+        emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{ComponentEventsDropped, INTENTIONAL, error_stage, error_type},
         json_size::JsonSize,
     };
+
+    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -223,7 +226,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
-
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -263,6 +266,7 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -355,7 +359,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
-
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -457,7 +461,7 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
-
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -484,6 +488,7 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
+                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",

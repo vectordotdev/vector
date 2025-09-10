@@ -1,28 +1,27 @@
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use vector_lib::encode_logfmt;
-use vector_lib::lookup::{owned_value_path, PathPrefix};
 use vector_lib::{
-    config::{init_telemetry, LogNamespace, Tags, Telemetry},
+    config::{LogNamespace, Tags, Telemetry, init_telemetry},
+    encode_logfmt,
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    lookup::{PathPrefix, owned_value_path},
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::config::{LokiConfig, OutOfOrderAction};
 use crate::{
-    config::{log_schema, SinkConfig},
+    config::{SinkConfig, log_schema},
     event::Value,
     schema,
-    sinks::{util::test::load_sink, VectorSink},
+    sinks::{VectorSink, util::test::load_sink},
     template::Template,
     test_util::{
         components::{
-            run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-            DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
+            run_and_assert_sink_compliance,
         },
         generate_events_with_stream, generate_lines_with_stream, random_lines,
     },

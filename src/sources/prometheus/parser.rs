@@ -6,8 +6,8 @@ use vector_lib::prometheus::parser::proto;
 use vector_lib::prometheus::parser::{GroupKind, MetricGroup, ParserError};
 
 use crate::event::{
-    metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
     Event,
+    metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
 };
 
 fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc> {
@@ -182,8 +182,7 @@ mod test {
 
     use chrono::{TimeZone, Timelike, Utc};
     use similar_asserts::assert_eq;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::metric_tags;
+    use vector_lib::{assert_event_data_eq, metric_tags};
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -224,12 +223,14 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "uptime",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 123.0 },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "uptime",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 123.0 },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -356,12 +357,14 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "latency",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 123.0 },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "latency",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 123.0 },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -373,12 +376,14 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "metric_without_timestamp_and_labels",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 12.47 },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "metric_without_timestamp_and_labels",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 12.47 },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -390,12 +395,14 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "no_labels",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 3.0 },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "no_labels",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 3.0 },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -407,18 +414,20 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "msdos_file_access_time_seconds",
-                MetricKind::Absolute,
-                MetricValue::Gauge {
-                    value: 1458255915.0
-                },
-            )
-            .with_tags(Some(metric_tags!(
-                "path" => "C:\\DIR\\FILE.TXT",
-                "error" => "Cannot find file:\n\"FILE.TXT\"",
-            )))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "msdos_file_access_time_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge {
+                        value: 1458255915.0
+                    },
+                )
+                .with_tags(Some(metric_tags!(
+                    "path" => "C:\\DIR\\FILE.TXT",
+                    "error" => "Cannot find file:\n\"FILE.TXT\"",
+                )))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -431,13 +440,15 @@ mod test {
             "#;
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "name",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 0.0 },
-            )
-            .with_tags(Some(metric_tags! { "tag" => "}" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(metric_tags! { "tag" => "}" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -450,13 +461,15 @@ mod test {
             "#;
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "name",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 0.0 },
-            )
-            .with_tags(Some(metric_tags! { "tag" => "a,b" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(metric_tags! { "tag" => "a,b" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -469,13 +482,15 @@ mod test {
             "#;
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "name",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 0.0 },
-            )
-            .with_tags(Some(metric_tags! { "tag" => "\\n" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(metric_tags! { "tag" => "\\n" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -488,13 +503,15 @@ mod test {
             "#;
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "name",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 0.0 },
-            )
-            .with_tags(Some(metric_tags! { "tag" => " * " }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(metric_tags! { "tag" => " * " }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -506,14 +523,16 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "telemetry_scrape_size_bytes_count",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 1890.0 },
-            )
-            .with_tags(Some(metric_tags!( "registry" => "default",
+            Ok(vec![
+                Metric::new(
+                    "telemetry_scrape_size_bytes_count",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1890.0 },
+                )
+                .with_tags(Some(metric_tags!( "registry" => "default",
                     "content_type" => "text/plain; version=0.0.4" )))
-            .with_timestamp(Some(*TIMESTAMP))]),
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -543,17 +562,17 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "something_weird",
-                MetricKind::Absolute,
-                MetricValue::Gauge {
-                    value: f64::INFINITY
-                },
-            )
-            .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
-            .with_tags(Some(
-                metric_tags!("problem" => "division by zero")
-            ))]),
+            Ok(vec![
+                Metric::new(
+                    "something_weird",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge {
+                        value: f64::INFINITY
+                    },
+                )
+                .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
+                .with_tags(Some(metric_tags!("problem" => "division by zero")))
+            ]),
         );
     }
 
@@ -701,18 +720,20 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "http_request_duration_seconds",
-                MetricKind::Absolute,
-                MetricValue::AggregatedHistogram {
-                    buckets: vector_lib::buckets![
-                        0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
-                    ],
-                    count: 144320,
-                    sum: 53423.0,
-                },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "http_request_duration_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![
+                            0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
+                        ],
+                        count: 144320,
+                        sum: 53423.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -729,16 +750,18 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "duration",
-                MetricKind::Absolute,
-                MetricValue::AggregatedHistogram {
-                    buckets: vector_lib::buckets![1.0 => 133988],
-                    count: 144320,
-                    sum: 53423.0,
-                },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "duration",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![1.0 => 133988],
+                        count: 144320,
+                        sum: 53423.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -756,16 +779,18 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text(exp)),
-            Ok(vec![Metric::new(
-                "duration",
-                MetricKind::Absolute,
-                MetricValue::AggregatedHistogram {
-                    buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
-                    count: 2000,
-                    sum: 2000.0,
-                },
-            )
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "duration",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
+                        count: 2000,
+                        sum: 2000.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -1077,13 +1102,15 @@ mod test {
 
         assert_event_data_eq!(
             events_to_metrics(parse_text_with_overrides(exp, vec![], false)),
-            Ok(vec![Metric::new(
-                "jobs_total",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 1.0 },
-            )
-            .with_tags(Some(metric_tags! { "type" => "a" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "a" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -1101,13 +1128,15 @@ mod test {
                 vec![("type".to_owned(), "b".to_owned())],
                 false
             )),
-            Ok(vec![Metric::new(
-                "jobs_total",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 1.0 },
-            )
-            .with_tags(Some(metric_tags! { "type" => "b" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "b" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 
@@ -1130,13 +1159,15 @@ mod test {
                 ],
                 false
             )),
-            Ok(vec![Metric::new(
-                "jobs_total",
-                MetricKind::Absolute,
-                MetricValue::Counter { value: 1.0 },
-            )
-            .with_tags(Some(metric_tags! { "type" => "c" }))
-            .with_timestamp(Some(*TIMESTAMP))]),
+            Ok(vec![
+                Metric::new(
+                    "jobs_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some(metric_tags! { "type" => "c" }))
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
         );
     }
 

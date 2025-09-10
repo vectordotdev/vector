@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde_toml_merge::merge_into_table;
 use toml::value::{Table, Value};
 
-use super::{component_name, open_file, read_dir, Format};
+use super::{Format, component_name, open_file, read_dir};
 use crate::config::format;
 
 /// Provides a hint to the loading system of the type of components that should be found
@@ -135,15 +135,15 @@ pub(super) mod process {
             // Only descend into folders if `recurse: true`.
             if recurse {
                 for entry in folders {
-                    if let Ok(name) = component_name(&entry) {
-                        if !result.contains_key(&name) {
-                            match self.load_dir(&entry, true) {
-                                Ok(table) => {
-                                    result.insert(name, Value::Table(table));
-                                }
-                                Err(errs) => {
-                                    errors.extend(errs);
-                                }
+                    if let Ok(name) = component_name(&entry)
+                        && !result.contains_key(&name)
+                    {
+                        match self.load_dir(&entry, true) {
+                            Ok(table) => {
+                                result.insert(name, Value::Table(table));
+                            }
+                            Err(errs) => {
+                                errors.extend(errs);
                             }
                         }
                     }
@@ -177,10 +177,11 @@ pub(super) mod process {
             format: Format,
         ) -> Result<Option<(String, Table)>, Vec<String>> {
             if let Some((name, mut table)) = self.load_file(path, format)? {
-                if let Some(subdir) = path.parent().map(|p| p.join(&name)) {
-                    if subdir.is_dir() && subdir.exists() {
-                        self.load_dir_into(&subdir, &mut table, true)?;
-                    }
+                if let Some(subdir) = path.parent().map(|p| p.join(&name))
+                    && subdir.is_dir()
+                    && subdir.exists()
+                {
+                    self.load_dir_into(&subdir, &mut table, true)?;
                 }
                 Ok(Some((name, table)))
             } else {

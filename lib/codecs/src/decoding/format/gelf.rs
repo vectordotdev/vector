@@ -1,25 +1,22 @@
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::{event_path, owned_value_path};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, TimestampSecondsWithFrac};
-use smallvec::{smallvec, SmallVec};
-use std::collections::HashMap;
+use serde_with::{TimestampSecondsWithFrac, serde_as};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
 use vector_core::{
-    config::{log_schema, DataType},
-    event::Event,
-    event::LogEvent,
+    config::{DataType, LogNamespace, log_schema},
+    event::{Event, LogEvent},
     schema,
 };
-use vrl::value::kind::Collection;
-use vrl::value::{Kind, Value};
+use vrl::value::{Kind, Value, kind::Collection};
 
-use super::{default_lossy, Deserializer};
-use crate::gelf::GELF_TARGET_PATHS;
-use crate::{gelf_fields::*, VALID_FIELD_REGEX};
+use super::{Deserializer, default_lossy};
+use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
 
 // On GELF decoding behavior:
 //   Graylog has a relaxed decoding. They are much more lenient than the spec would
@@ -171,8 +168,11 @@ impl GelfDeserializer {
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
                 if !VALID_FIELD_REGEX.is_match(key) {
-                    return Err(format!("'{key}' field contains invalid characters. Field names may \
-                                       contain only letters, numbers, underscores, dashes and dots.").into());
+                    return Err(format!(
+                        "'{key}' field contains invalid characters. Field names may \
+                                       contain only letters, numbers, underscores, dashes and dots."
+                    )
+                    .into());
                 }
 
                 // per GELF spec, Additional field values must be either strings or numbers
@@ -232,7 +232,6 @@ impl Deserializer for GelfDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
     use lookup::event_path;
     use serde_json::json;
@@ -240,6 +239,8 @@ mod tests {
     use smallvec::SmallVec;
     use vector_core::{config::log_schema, event::Event};
     use vrl::value::Value;
+
+    use super::*;
 
     fn deserialize_gelf_input(
         input: &serde_json::Value,

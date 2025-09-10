@@ -1,13 +1,15 @@
 use bytes::Bytes;
 use derivative::Derivative;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
-use vector_core::{config::DataType, event::Event, schema};
-use vrl::value::kind::Collection;
-use vrl::value::Kind;
+use vector_core::{
+    config::{DataType, LogNamespace},
+    event::Event,
+    schema,
+};
+use vrl::value::{Kind, kind::Collection};
 
-use super::{default_lossy, Deserializer};
-use vector_core::config::LogNamespace;
+use super::{Deserializer, default_lossy};
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[configurable_component]

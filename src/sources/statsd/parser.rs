@@ -9,8 +9,7 @@ use regex::Regex;
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
-    sources::statsd::ConversionUnit,
-    sources::util::extract_tag_key_and_value,
+    sources::{statsd::ConversionUnit, util::extract_tag_key_and_value},
 };
 
 static WHITESPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
@@ -191,11 +190,7 @@ fn sanitize_key(key: &str, sanitize: bool) -> String {
 }
 
 fn sanitize_sampling(sampling: f64) -> f64 {
-    if sampling == 0.0 {
-        1.0
-    } else {
-        sampling
-    }
+    if sampling == 0.0 { 1.0 } else { sampling }
 }
 
 fn convert_to_statistic(unit: &str) -> StatisticKind {
@@ -238,12 +233,13 @@ impl From<ParseFloatError> for ParseError {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::{event::metric::TagValue, metric_tags};
+    use vector_lib::{assert_event_data_eq, event::metric::TagValue, metric_tags};
 
-    use super::{sanitize_key, sanitize_sampling, ParseError, Parser};
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sources::statsd::ConversionUnit;
+    use super::{ParseError, Parser, sanitize_key, sanitize_sampling};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sources::statsd::ConversionUnit,
+    };
 
     const SANITIZING_PARSER: Parser = Parser::new(true, ConversionUnit::Seconds);
     fn parse(packet: &str) -> Result<Metric, ParseError> {

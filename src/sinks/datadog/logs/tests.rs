@@ -5,37 +5,39 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{
-    channel::mpsc::{Receiver, TryRecvError},
     StreamExt,
+    channel::mpsc::{Receiver, TryRecvError},
 };
 use http::request::Parts;
 use indoc::indoc;
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
-use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
     http::HttpError,
     sinks::{
-        util::retries::RetryLogic,
-        util::test::{load_sink, load_sink_with_context},
+        datadog::test_utils::{ApiStatus, test_server},
+        util::{
+            retries::RetryLogic,
+            test::{load_sink, load_sink_with_context},
+        },
     },
     test_util::{
         components::{
+            COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-            run_and_assert_sink_error, COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+            run_and_assert_sink_error,
         },
         next_addr, random_lines_with_stream,
     },
     tls::TlsError,
 };
-
-use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));
@@ -520,9 +522,10 @@ async fn global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "global-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "global-key")
+    );
 }
 
 #[tokio::test]
@@ -566,7 +569,8 @@ async fn override_global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "local-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "local-key")
+    );
 }

@@ -6,14 +6,13 @@ mod ddmetric_proto {
 }
 
 use ddmetric_proto::{
-    metric_payload::{MetricSeries, MetricType},
     MetricPayload,
+    metric_payload::{MetricSeries, MetricType},
 };
 use tracing::info;
 use vector::common::datadog::DatadogSeriesMetric;
 
 use self::ddmetric_proto::metric_payload::{MetricPoint, Resource};
-
 use super::*;
 
 const SERIES_ENDPOINT_V1: &str = "/api/v1/series";
