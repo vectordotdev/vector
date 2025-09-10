@@ -67,12 +67,12 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
                     .to_string();
 
                 let mut url = vrl_source.url().to_string();
-                url = url.trim_end_matches(".git").trim_end_matches('/').to_string();
+                url = url
+                    .trim_end_matches(".git")
+                    .trim_end_matches('/')
+                    .to_string();
 
-                (
-                    precise.clone(),
-                    Some(format!("{url}/tree/{precise}")),
-                )
+                (precise.clone(), Some(format!("{url}/tree/{precise}")))
             }
             SourceKind::Registry if vrl_source.is_default_registry() => {
                 let version = vrl_dep.version.to_string();
