@@ -820,6 +820,7 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
     .await;
 }
 
+#[allow(clippy::too_many_lines)]
 #[tokio::test]
 async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() {
     let assertion_registry = install_tracing_helpers();
