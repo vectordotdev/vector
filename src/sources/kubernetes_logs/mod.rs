@@ -109,13 +109,11 @@ pub struct Config {
 
     /// Specifies whether or not to enrich logs with namespace fields.
     ///
-    /// Setting to `false` prevents Vector from puling in namespaces, which helps reduce load on 
-    /// the kube-apiserver and lowers daemonset memory usage in clusters with many of namespaces.
-    /// Note: If set to `false`, fields based on namespace labels will not
-    /// be available.
+    /// Setting to `false` prevents Vector from puling in namespaces and thus namespace label fields will not be available. This helps reduce load on 
+    /// the `kube-apiserver` and lowers daemonset memory usage in clusters with many of namespaces.
     ///
     #[serde(default = "default_add_namespace_fields")]
-    add_namespace_fields: bool,
+    insert_namespace_fields: bool,
 
     /// The name of the Kubernetes [Node][node] that is running.
     ///
@@ -761,7 +759,6 @@ impl Source {
                 },
             )
             .backoff(watcher::DefaultBackoff::default());
-            let ns_cacher = MetaCache::new();
 
             reflectors.push(tokio::spawn(custom_reflector(
                 ns_store_w,
@@ -908,9 +905,8 @@ impl Source {
 
                 if add_namespace_fields {
                     if let Some(name) = namespace {
-                        let ns_info = ns_annotator.annotate(&mut event, name);
 
-                        if ns_info.is_none() {
+                        if ns_annotator.annotate(&mut event, name).is_none() {
                             emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                         }
                     }
@@ -1065,7 +1061,7 @@ const fn default_oldest_first() -> bool {
     true
 }
 
-// We'd like to add these in all but clusters with very many namespaces
+// It might make sense to disable this for clusters with a very large number of namespaces.
 const fn default_add_namespace_fields() -> bool {
     true
 }
