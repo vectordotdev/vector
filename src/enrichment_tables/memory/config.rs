@@ -1,25 +1,28 @@
-use std::num::NonZeroU64;
-use std::sync::Arc;
+use std::{num::NonZeroU64, sync::Arc};
 
-use crate::sinks::Healthcheck;
-use crate::sources::Source;
-use crate::{config::SinkContext, enrichment_tables::memory::Memory};
 use async_trait::async_trait;
 use futures::{FutureExt, future};
 use tokio::sync::Mutex;
-use vector_lib::config::{AcknowledgementsConfig, DataType, Input, LogNamespace};
-use vector_lib::enrichment::Table;
-use vector_lib::id::ComponentKey;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::schema::{self};
-use vector_lib::{configurable::configurable_component, sink::VectorSink};
-use vrl::path::OwnedTargetPath;
-use vrl::value::Kind;
+use vector_lib::{
+    config::{AcknowledgementsConfig, DataType, Input, LogNamespace},
+    configurable::configurable_component,
+    enrichment::Table,
+    id::ComponentKey,
+    lookup::lookup_v2::OptionalValuePath,
+    schema::{self},
+    sink::VectorSink,
+};
+use vrl::{path::OwnedTargetPath, value::Kind};
 
-use crate::config::{EnrichmentTableConfig, SinkConfig, SourceConfig, SourceContext, SourceOutput};
-
-use super::internal_events::InternalMetricsConfig;
-use super::source::MemorySourceConfig;
+use super::{internal_events::InternalMetricsConfig, source::MemorySourceConfig};
+use crate::{
+    config::{
+        EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+    },
+    enrichment_tables::memory::Memory,
+    sinks::Healthcheck,
+    sources::Source,
+};
 
 /// Configuration for the `memory` enrichment table.
 #[configurable_component(enrichment_table("memory"))]

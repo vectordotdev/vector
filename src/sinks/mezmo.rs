@@ -4,10 +4,11 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde_json::json;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vrl::event_path;
-use vrl::value::{Kind, Value};
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vrl::{
+    event_path,
+    value::{Kind, Value},
+};
 
 use crate::{
     codecs::Transformer,

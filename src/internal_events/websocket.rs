@@ -1,14 +1,17 @@
-use std::error::Error;
-use std::fmt::{Debug, Display, Formatter, Result};
+#![allow(dead_code)] // TODO requires optional feature compilation
+
+use std::{
+    error::Error,
+    fmt::{Debug, Display, Formatter, Result},
+};
 
 use metrics::{counter, histogram};
 use tokio_tungstenite::tungstenite::error::Error as TungsteniteError;
-use vector_lib::internal_event::InternalEvent;
-
 use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+use vector_lib::internal_event::InternalEvent;
 
 pub const PROTOCOL: &str = "websocket";
 

@@ -6,10 +6,12 @@ use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
     measurement::WallTime,
 };
-use vector::config::TransformContext;
-use vector::transforms::{
-    TransformOutputsBuf,
-    route::{Route, RouteConfig},
+use vector::{
+    config::TransformContext,
+    transforms::{
+        TransformOutputsBuf,
+        route::{Route, RouteConfig},
+    },
 };
 use vector_lib::{
     config::{DataType, TransformOutput},

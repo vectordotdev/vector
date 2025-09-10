@@ -6,6 +6,20 @@ use std::{
     },
 };
 
+use futures::{Future, FutureExt, future};
+use stream_cancel::Trigger;
+use tokio::{
+    sync::{mpsc, watch},
+    time::{Duration, Instant, interval, sleep_until},
+};
+use tracing::Instrument;
+use vector_lib::{
+    buffers::topology::channel::BufferSender,
+    shutdown::ShutdownSignal,
+    tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
+    trigger::DisabledTrigger,
+};
+
 use super::{
     BuiltBuffer, TaskHandle,
     builder::{self, TopologyPieces, reload_enrichment_tables},
@@ -21,16 +35,6 @@ use crate::{
     signal::ShutdownError,
     spawn_named,
 };
-use futures::{Future, FutureExt, future};
-use stream_cancel::Trigger;
-use tokio::{
-    sync::{mpsc, watch},
-    time::{Duration, Instant, interval, sleep_until},
-};
-use tracing::Instrument;
-use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
-use vector_lib::trigger::DisabledTrigger;
-use vector_lib::{buffers::topology::channel::BufferSender, shutdown::ShutdownSignal};
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
 
@@ -263,6 +267,20 @@ impl RunningTopology {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
+            match self.config.global.diff(&new_config.global) {
+                Ok(changed) => {
+                    error!(
+                        message = "Global options changed; reload aborted.",
+                        changed_fields = ?changed
+                    );
+                }
+                Err(err) => {
+                    error!(
+                        message = "Failed to compute config diff; reload aborted.",
+                        %err
+                    );
+                }
+            }
             error!(
                 message = "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
             );

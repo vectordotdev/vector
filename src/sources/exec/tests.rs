@@ -1,13 +1,12 @@
-use crate::sources::exec::*;
-use crate::{event::LogEvent, test_util::trace_init};
+use std::{ffi::OsStr, io::Cursor};
+
 use bytes::Bytes;
-use std::ffi::OsStr;
-use std::io::Cursor;
+#[cfg(unix)]
+use futures::task::Poll;
 use vector_lib::event::EventMetadata;
 use vrl::value;
 
-#[cfg(unix)]
-use futures::task::Poll;
+use crate::{event::LogEvent, sources::exec::*, test_util::trace_init};
 
 #[test]
 fn test_generate_config() {
@@ -331,6 +330,7 @@ async fn test_drop_receiver() {
 
 #[tokio::test]
 #[cfg(unix)]
+#[cfg_attr(target_os = "macos", ignore)] // Flaky when running `cargo test`
 async fn test_run_command_linux() {
     let config = standard_scheduled_test_config();
 

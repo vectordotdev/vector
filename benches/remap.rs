@@ -10,8 +10,7 @@ use vector::{
         remap::{Remap, RemapConfig},
     },
 };
-use vrl::event_path;
-use vrl::prelude::*;
+use vrl::{event_path, prelude::*};
 
 criterion_group!(
     name = benches;

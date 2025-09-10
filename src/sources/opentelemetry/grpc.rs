@@ -1,22 +1,25 @@
 use futures::TryFutureExt;
+use prost::Message;
 use tonic::{Request, Response, Status};
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::opentelemetry::proto::collector::{
-    logs::v1::{
-        ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
-    },
-    metrics::v1::{
-        ExportMetricsServiceRequest, ExportMetricsServiceResponse,
-        metrics_service_server::MetricsService,
-    },
-    trace::v1::{
-        ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
-    },
-};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    opentelemetry::proto::collector::{
+        logs::v1::{
+            ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
+        },
+        metrics::v1::{
+            ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+            metrics_service_server::MetricsService,
+        },
+        trace::v1::{
+            ExportTraceServiceRequest, ExportTraceServiceResponse,
+            trace_service_server::TraceService,
+        },
+    },
 };
 
 use crate::{
@@ -31,6 +34,7 @@ pub(super) struct Service {
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
     pub log_namespace: LogNamespace,
+    pub deserializer: Option<ProtobufDeserializer>,
 }
 
 #[tonic::async_trait]
@@ -39,12 +43,21 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let events: Vec<Event> = request
-            .into_inner()
-            .resource_spans
-            .into_iter()
-            .flat_map(|v| v.into_event_iter())
-            .collect();
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            let bytes = bytes::Bytes::from(raw_bytes);
+            deserializer
+                .parse_traces(bytes)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
+        } else {
+            request
+                .into_inner()
+                .resource_spans
+                .into_iter()
+                .flat_map(|v| v.into_event_iter())
+                .collect()
+        };
         self.handle_events(events, TRACES).await?;
 
         Ok(Response::new(ExportTraceServiceResponse {
@@ -59,12 +72,21 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let events: Vec<Event> = request
-            .into_inner()
-            .resource_logs
-            .into_iter()
-            .flat_map(|v| v.into_event_iter(self.log_namespace))
-            .collect();
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            let bytes = bytes::Bytes::from(raw_bytes);
+            deserializer
+                .parse(bytes, self.log_namespace)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
+        } else {
+            request
+                .into_inner()
+                .resource_logs
+                .into_iter()
+                .flat_map(|v| v.into_event_iter(self.log_namespace))
+                .collect()
+        };
         self.handle_events(events, LOGS).await?;
 
         Ok(Response::new(ExportLogsServiceResponse {
@@ -79,12 +101,23 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        let events: Vec<Event> = request
-            .into_inner()
-            .resource_metrics
-            .into_iter()
-            .flat_map(|v| v.into_event_iter())
-            .collect();
+        let events = if let Some(deserializer) = self.deserializer.as_ref() {
+            let raw_bytes = request.get_ref().encode_to_vec();
+            // Major caveat here, the output event will be logs.
+            let bytes = bytes::Bytes::from(raw_bytes);
+            deserializer
+                .parse(bytes, self.log_namespace)
+                .map_err(|e| Status::invalid_argument(e.to_string()))
+                .map(|buf| buf.into_vec())?
+        } else {
+            request
+                .into_inner()
+                .resource_metrics
+                .into_iter()
+                .flat_map(|v| v.into_event_iter())
+                .collect()
+        };
+
         self.handle_events(events, METRICS).await?;
 
         Ok(Response::new(ExportMetricsServiceResponse {

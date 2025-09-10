@@ -136,8 +136,7 @@ mod tests {
         watcher,
     };
 
-    use super::MetaCache;
-    use super::custom_reflector;
+    use super::{MetaCache, custom_reflector};
 
     #[tokio::test]
     async fn applied_should_add_object() {

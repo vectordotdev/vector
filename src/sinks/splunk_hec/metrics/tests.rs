@@ -11,11 +11,13 @@ use vector_lib::{
 use vrl::owned_value_path;
 
 use super::sink::{HecProcessedEvent, process_metric};
-use crate::sinks::splunk_hec::common::config_host_key;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
+        splunk_hec::{
+            common::config_host_key,
+            metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
+        },
         util::{Compression, test::build_test_server},
     },
     template::Template,

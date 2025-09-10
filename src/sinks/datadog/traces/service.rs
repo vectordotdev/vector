@@ -9,9 +9,11 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
