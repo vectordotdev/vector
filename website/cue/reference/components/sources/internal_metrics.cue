@@ -892,7 +892,7 @@ components: sources: internal_metrics: {
 		// config metrics
 		config_reload_rejected: {
 			description:       "Number of configuration reload attempts that were rejected."
-			type:        	   "counter"
+			type:              "counter"
 			default_namespace: "vector"
 			tags: _internal_metrics_tags & {
 					reason: _reason
