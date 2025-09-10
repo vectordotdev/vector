@@ -16,12 +16,12 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::finalization::AddBatchNotifier;
-use vector_lib::lookup::{OwnedValuePath, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    finalization::AddBatchNotifier,
+    lookup::{OwnedValuePath, path},
 };
 use vrl::value::ObjectMap;
 

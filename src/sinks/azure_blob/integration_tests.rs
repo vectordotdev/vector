@@ -1,17 +1,20 @@
+use std::{
+    io::{BufRead, BufReader},
+    num::NonZeroU32,
+};
+
 use azure_core::http::StatusCode;
 use azure_core_for_storage::prelude::Range;
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
 use futures::{Stream, StreamExt, stream};
-use std::{
-    io::{BufRead, BufReader},
-    num::NonZeroU32,
-};
-use vector_lib::ByteSizeOf;
-use vector_lib::codecs::{
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    encoding::FramingConfig,
+use vector_lib::{
+    ByteSizeOf,
+    codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        encoding::FramingConfig,
+    },
 };
 
 use super::config::AzureBlobSinkConfig;

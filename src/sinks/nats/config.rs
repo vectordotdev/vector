@@ -1,16 +1,14 @@
-use async_nats::header;
+use async_nats::{HeaderMap, header};
 use bytes::Bytes;
 use futures_util::TryFutureExt;
 use snafu::ResultExt;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::tls::TlsEnableableConfig;
+use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
 };
-use async_nats::HeaderMap;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NatsTowerRequestConfigDefaults;

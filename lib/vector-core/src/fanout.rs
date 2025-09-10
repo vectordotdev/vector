@@ -460,8 +460,7 @@ impl Sender {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use std::num::NonZeroUsize;
+    use std::{mem, num::NonZeroUsize};
 
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
@@ -477,9 +476,11 @@ mod tests {
     use vrl::value::Value;
 
     use super::{ControlMessage, Fanout};
-    use crate::event::{Event, EventArray, LogEvent};
-    use crate::test_util::{collect_ready, collect_ready_events};
-    use crate::{config::ComponentKey, event::EventContainer};
+    use crate::{
+        config::ComponentKey,
+        event::{Event, EventArray, EventContainer, LogEvent},
+        test_util::{collect_ready, collect_ready_events},
+    };
 
     async fn build_sender_pair(
         capacity: usize,

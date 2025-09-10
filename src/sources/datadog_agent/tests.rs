@@ -16,25 +16,23 @@ use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use vector_lib::{
     codecs::{
-        BytesDecoder, BytesDeserializer,
-        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
+        BytesDecoder, BytesDeserializer, CharacterDelimitedDecoderConfig,
+        decoding::{
+            BytesDeserializerConfig, CharacterDelimitedDecoderOptions, Deserializer,
+            DeserializerConfig, Framer,
+        },
     },
-    config::DataType,
-};
-use vector_lib::{
-    codecs::{CharacterDelimitedDecoderConfig, decoding::CharacterDelimitedDecoderOptions},
-    lookup::{OwnedTargetPath, owned_value_path},
-};
-use vector_lib::{
-    config::LogNamespace,
+    config::{DataType, LogNamespace},
     event::{MetricTags, metric::TagValue},
+    lookup::{OwnedTargetPath, owned_value_path},
     metric_tags,
 };
-use vrl::compiler::value::Collection;
-use vrl::value;
-use vrl::value::{Kind, ObjectMap};
+use vrl::{
+    compiler::value::Collection,
+    value,
+    value::{Kind, ObjectMap},
+};
 
-use crate::schema::Definition;
 use crate::{
     SourceSender,
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -45,6 +43,7 @@ use crate::{
         metric::{MetricKind, MetricSketch, MetricValue},
     },
     schema,
+    schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,

@@ -1,6 +1,6 @@
+use std::{collections::BTreeMap, process::Command};
+
 use cfg_if::cfg_if;
-use std::collections::BTreeMap;
-use std::process::Command;
 
 cfg_if! {
     if #[cfg(unix)] {
