@@ -1,3 +1,3 @@
-Add metric vector_config_reload_rejected{reason="global_options_changed"} for rejected config reloads
+Vector nows emits `config_reload_rejected` and `config_reloaded` counters.
 
 authors: suikammd
