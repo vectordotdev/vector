@@ -260,6 +260,18 @@ Vector reviews this policy and all user access levels on a quarterly basis.
 
 We deeply appreciate any effort to discover and disclose security vulnerabilities responsibly.
 
+## Vector CI
+
+If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
+please e-mail security@datadoghq.com.
+
+We take all disclosures very seriously and will do our best to rapidly respond
+and verify the vulnerability before taking the necessary steps to fix it. After
+our initial reply to your disclosure, which should be directly after receiving
+it, we will periodically update you with the status of the fix.
+
+## Other reports
+
 Due to the nature of a open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
 potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
 via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
@@ -271,13 +283,6 @@ following when reporting:
 - Any tools, including versions used
 - Any relevant output
 
-If you would like to report a Vector CI vulnerability or have any security concerns with other Datadog products,
-please e-mail security@datadoghq.com.
-
-We take all disclosures very seriously and will do our best to rapidly respond
-and verify the vulnerability before taking the necessary steps to fix it. After
-our initial reply to your disclosure, which should be directly after receiving
-it, we will periodically update you with the status of the fix.
 
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
 [urls.cargo_deny_configuration]: https://github.com/vectordotdev/vector/blob/master/deny.toml
