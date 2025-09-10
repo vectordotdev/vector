@@ -5,7 +5,6 @@ use bytes::Bytes;
 use tracing::Instrument;
 
 use crate::sinks::prelude::*;
-
 use super::super::service::RecordResult;
 use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
 

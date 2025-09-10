@@ -12,7 +12,10 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         prelude::*,
-        util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
+        util::{
+            BatchConfig, SinkBatchSettings,
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
 
