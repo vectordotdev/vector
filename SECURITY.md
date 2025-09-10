@@ -280,33 +280,18 @@ our initial reply to your disclosure, which should be directly after receiving
 it, we will periodically update you with the status of the fix.
 
 [urls.cargo_deny]: https://github.com/EmbarkStudios/cargo-deny
-
 [urls.cargo_deny_configuration]: https://github.com/vectordotdev/vector/blob/master/deny.toml
-
 [urls.cargo_deny_schedule]: https://github.com/vectordotdev/vector/blob/master/.github/workflows/test.yml#L267
-
 [urls.dependabot]: https://github.com/marketplace/dependabot-preview
-
 [urls.dependabot_alerts]: https://github.com/vectordotdev/vector/network/alerts
-
 [urls.git]: https://git-scm.com/
-
 [urls.github_protected_branches]: https://help.github.com/en/github/administering-a-repository/about-protected-branches
-
 [urls.least_privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
-
 [urls.new_security_report]: https://github.com/vectordotdev/vector/issues/new?labels=domain%3A+security
-
 [urls.rust]: https://www.rust-lang.org/
-
 [urls.rust_sec]: https://rustsec.org/
-
 [urls.vector_chat]: https://chat.vector.dev
-
 [urls.vector_issues]: https://github.com/vectordotdev/vector/issues
-
 [urls.vector_pull_requests]: https://github.com/vectordotdev/vector/pulls
-
 [urls.vector_repo]: https://github.com/vectordotdev/vector
-
 [urls.vector_roadmap]: https://github.com/vectordotdev/vector/milestones?direction=asc&sort=due_date&state=open
