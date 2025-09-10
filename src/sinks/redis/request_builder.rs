@@ -2,9 +2,8 @@ use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
-use crate::sinks::{prelude::*, util::EncodedLength};
-
 use super::{RedisEvent, RedisKvEntry, RedisRequest};
+use crate::sinks::{prelude::*, util::EncodedLength};
 
 pub(super) fn encode_event(
     mut event: Event,

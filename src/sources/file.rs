@@ -6,22 +6,22 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::oneshot, task::spawn_blocking};
+use tokio::sync::oneshot;
 use tracing::{Instrument, Span};
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::{
-    file_server::{FileServer, Line, calculate_ignore_before},
-    paths_provider::{Glob, MatchOptions},
-};
-use vector_lib::file_source_common::{
-    Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
-};
-use vector_lib::finalizer::OrderedFinalizer;
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    file_source::{
+        file_server::{FileServer, Line, calculate_ignore_before},
+        paths_provider::{Glob, MatchOptions},
+    },
+    file_source_common::{
+        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+    },
+    finalizer::OrderedFinalizer,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
@@ -570,7 +570,6 @@ pub fn file_source(
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
-        handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
     };
 
@@ -705,14 +704,16 @@ pub fn file_source(
         });
 
         let span = info_span!("file_server");
-        spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer);
+            let rt = tokio::runtime::Handle::current();
+            let result =
+                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
-            result.unwrap();
+            result.expect("file server exited with an error");
         })
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await
@@ -859,7 +860,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::time::{Duration, sleep, timeout};
     use vector_lib::schema::Definition;
-    use vrl::value::kind::Collection;
+    use vrl::{value, value::kind::Collection};
 
     use super::*;
     use crate::{
@@ -869,7 +870,6 @@ mod tests {
         sources::file,
         test_util::components::{FILE_SOURCE_TAGS, assert_source_compliance},
     };
-    use vrl::value;
 
     #[test]
     fn generate_config() {
@@ -1698,6 +1698,7 @@ mod tests {
         for i in 0..line_count {
             writeln!(&mut file, "Here's a line for you: {i}").unwrap();
         }
+        file.flush().unwrap();
         sleep_500_millis().await;
 
         // First time server runs it should pick up a bunch of lines

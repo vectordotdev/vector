@@ -7,17 +7,20 @@ use futures_util::{
 };
 use tokio::sync::oneshot::{Sender, channel};
 use tower::Service;
-use vector_lib::stream::{BatcherSettings, DriverResponse};
-use vector_lib::{config::log_schema, event::Event, partition::Partitioner, sink::StreamSink};
-use vrl::event_path;
-use vrl::path::PathPrefix;
+use vector_lib::{
+    config::log_schema,
+    event::Event,
+    partition::Partitioner,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+};
+use vrl::{event_path, path::PathPrefix};
 
+use super::service::TraceApiRequest;
 use crate::{
     internal_events::DatadogTracesEncodingError,
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
-
-use super::service::TraceApiRequest;
 
 #[derive(Default)]
 struct EventPartitioner;

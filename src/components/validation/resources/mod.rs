@@ -13,20 +13,20 @@ use vector_lib::{
             TextSerializerConfig,
         },
     },
-    config::LogNamespace,
+    config::{DataType, LogNamespace},
+    event::Event,
 };
-use vector_lib::{config::DataType, event::Event};
 
-use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
-
-pub use self::event::{TestEvent, encode_test_event};
-pub use self::http::HttpResourceConfig;
 use self::http::HttpResourceOutputContext;
-
+pub use self::{
+    event::{TestEvent, encode_test_event},
+    http::HttpResourceConfig,
+};
 use super::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
+use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 /// The codec used by the external resource.
 ///

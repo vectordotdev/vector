@@ -1,11 +1,11 @@
+use std::io::Read;
+
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
 use flate2::read::ZlibDecoder;
-use std::io::Read;
 use tokio::io::{AsyncReadExt, BufReader};
-use vector::test_util::compression::is_zstd;
-use vector::test_util::trace_init;
+use vector::test_util::{compression::is_zstd, trace_init};
 
 mod series;
 mod sketches;

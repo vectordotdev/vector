@@ -27,11 +27,9 @@ use serde::Deserialize;
 use snafu::Snafu;
 use tokio::time::{self, Duration, Instant, sleep};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
-use super::AdaptiveConcurrencySettings;
-use super::controller::ControllerStatistics;
+use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{Event, metric::MetricValue},

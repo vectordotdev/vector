@@ -11,7 +11,7 @@ use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 // This interpretation is the happy case. When there are no truncations our
 // model and SUT should agree exactly. To that end, we confirm that every
 // read from SUT exactly matches the reads from the model.
-fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
+async fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
     let dir = tempfile::TempDir::new().expect("could not create tempdir");
     let path = dir.path().join("a_file.log");
     let mut fp = fs::File::create(&path).expect("could not create");
@@ -23,6 +23,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
         100_000,
         Bytes::from("\n"),
     )
+    .await
     .expect("must be able to create");
 
     let mut fwfiles: Vec<FileWatcherFile> = vec![FileWatcherFile::new()];
@@ -57,7 +58,7 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
             FileWatcherAction::Read => {
                 let mut attempts = 10;
                 while attempts > 0 {
-                    match fw.read_line() {
+                    match fw.read_line().await {
                         Err(_) => {
                             unreachable!();
                         }
@@ -90,14 +91,20 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
     }
 }
 
-#[test]
-fn file_watcher_no_truncation() {
+#[tokio::test]
+async fn file_watcher_no_truncation() {
     fn inner(actions: Vec<FileWatcherAction>) -> TestResult {
-        experiment_no_truncations(actions);
+        let handle = tokio::runtime::Handle::current();
+        handle.block_on(experiment_no_truncations(actions));
         TestResult::passed()
     }
-    QuickCheck::new()
-        .tests(5000)
-        .max_tests(50000)
-        .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
+
+    tokio::task::spawn_blocking(|| {
+        QuickCheck::new()
+            .tests(5000)
+            .max_tests(50000)
+            .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
+    })
+    .await
+    .unwrap();
 }
