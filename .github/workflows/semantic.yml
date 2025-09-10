@@ -260,5 +260,7 @@ jobs:
             template website
             website
             website deps
-
+            
+            vrl playground
+            
             opentelemetry lib
