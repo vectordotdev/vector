@@ -1,18 +1,6 @@
 package metadata
 
 generated: components: sources: kubernetes_logs: configuration: {
-	add_namespace_fields: {
-		description: """
-			Specifies whether or not to enrich logs with namespace fields.
-
-			Setting this to `false` prevents Vector from pulling in namespaces, which helps reduce load on
-			the kube-apiserver and lowers daemonset memory usage in clusters with  lots of namespaces.
-			**Note**: If set to `false`, fields based on namespace labels will not
-			be available.
-			"""
-		required: false
-		type: bool: default: true
-	}
 	auto_partial_merge: {
 		description: """
 			Whether or not to automatically merge partial events.
@@ -165,6 +153,17 @@ generated: components: sources: kubernetes_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
+	}
+	insert_namespace_fields: {
+		description: """
+			Specifies whether or not to enrich logs with namespace fields.
+
+			Setting to `false` prevents Vector from pulling in namespaces and thus namespace label fields will not
+			be available. This helps reduce load on the `kube-apiserver` and lowers daemonset memory usage in clusters
+			with many namespaces.
+			"""
+		required: false
+		type: bool: default: true
 	}
 	internal_metrics: {
 		description: "Configuration of internal metrics for file-based components."
