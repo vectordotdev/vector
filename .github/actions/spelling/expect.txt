@@ -159,6 +159,7 @@ dnsmsg
 dogstatsd
 downcasted
 dsl
+dsn
 dstaddr
 dstat
 dstport
