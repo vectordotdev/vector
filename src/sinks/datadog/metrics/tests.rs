@@ -2,19 +2,20 @@ use futures::StreamExt;
 use indoc::indoc;
 use vector_lib::finalization::{BatchNotifier, BatchStatus};
 
-use crate::sinks::datadog::test_utils::{ApiStatus, test_server};
+use super::config::DatadogMetricsConfig;
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
-    sinks::util::test::load_sink_with_context,
+    sinks::{
+        datadog::test_utils::{ApiStatus, test_server},
+        util::test::load_sink_with_context,
+    },
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         next_addr, random_metrics_with_stream,
     },
 };
-
-use super::config::DatadogMetricsConfig;
 
 #[tokio::test]
 async fn global_options() {

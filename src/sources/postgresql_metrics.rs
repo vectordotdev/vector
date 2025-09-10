@@ -25,12 +25,13 @@ use tokio_postgres::{
     types::FromSql,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, metric_tags};
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     json_size::JsonSize,
+    metric_tags,
 };
 
 use crate::{

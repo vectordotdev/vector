@@ -1,5 +1,4 @@
 use snafu::Snafu;
-
 use vector_lib::configurable::configurable_component;
 
 mod config;
@@ -50,8 +49,7 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::config::with_default_scheme;
-    use super::*;
+    use super::{config::with_default_scheme, *};
     use crate::{
         config::{SinkConfig as _, SinkContext},
         event::Event,

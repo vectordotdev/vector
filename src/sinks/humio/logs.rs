@@ -1,10 +1,11 @@
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
+    sensitive_string::SensitiveString,
+};
 
 use super::config_host_key_target_path;
-use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -14,6 +15,7 @@ use crate::{
             common::{
                 EndpointTarget, SplunkHecDefaultBatchSettings,
                 acknowledgements::HecClientAcknowledgementsConfig,
+                config_timestamp_key_target_path,
             },
             logs::config::HecLogsSinkConfig,
         },
@@ -226,12 +228,13 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
     use serde_json::{Value as JsonValue, json};
-    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;
