@@ -18,7 +18,7 @@ impl InternalEvent for ConfigReloadRejected {
                 );
 
                 counter!(
-                    "vector_config_reload_rejected",
+                    "config_reload_rejected",
                     "reason" => self.reason.as_str(),
                 )
                 .increment(1);
@@ -31,7 +31,7 @@ impl InternalEvent for ConfigReloadRejected {
                 );
 
                 counter!(
-                    "vector_config_reload_rejected",
+                    "config_reload_rejected",
                     "reason" => self.reason.as_str(),
                 )
                 .increment(1);
@@ -83,7 +83,7 @@ impl InternalEvent for ConfigReloaded {
             internal_log_rate_limit = true,
         );
 
-        counter!("vector_config_reloaded",).increment(1);
+        counter!("config_reloaded",).increment(1);
     }
 
     fn name(&self) -> Option<&'static str> {
