@@ -988,7 +988,7 @@ mod test {
         // read them back
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
     }
@@ -1018,7 +1018,7 @@ mod test {
         // read them back and assert we get the tmp file
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position + 1));
         }
     }

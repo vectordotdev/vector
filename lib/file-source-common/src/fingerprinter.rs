@@ -422,19 +422,13 @@ async fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::HashMap,
-        fs,
-        io::{Error, Read, Write},
-        path::Path,
-        time::Duration,
-    };
+    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
 
     use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
     use tempfile::{TempDir, tempdir};
 
-    use crate::internal_events::FileSourceInternalEvents;
+    use crate::{FingerprintStrategy, Fingerprinter, internal_events::FileSourceInternalEvents};
 
     use tokio::io::AsyncReadExt;
 

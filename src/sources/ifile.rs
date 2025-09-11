@@ -3,6 +3,7 @@ use std::{convert::TryInto, future, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
+use itertools::Itertools;
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -524,6 +525,39 @@ pub fn ifile_source(
         .exclude
         .iter()
         .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
+        .map(|original_path| {
+            let mut components = original_path
+                .components()
+                .map(|c| c.as_os_str().to_os_string())
+                .collect_vec();
+            let mut popped = vec![];
+
+            while components.len() > 0 {
+                let path: PathBuf = components.iter().collect();
+
+                match path.canonicalize() {
+                    Ok(mut canonical) => {
+                        if canonical == path {
+                            // Not a symlink, we should be good to keep original_path
+                            return original_path.clone();
+                        }
+                        // TODO log
+                        dbg!("symlink found");
+                        while let Some(popped) = popped.pop() {
+                            canonical.push(popped);
+                        }
+                        return canonical;
+                    }
+                    Err(_) => {
+                        popped.push(components.pop().expect("components.len() > 0"));
+                    }
+                }
+            }
+
+            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
+            // TODO check for * in components[0], if that's the case symlink resolution will not work
+            original_path.clone()
+        })
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let checkpoint_interval = config.checkpoint_interval;
@@ -537,14 +571,54 @@ pub fn ifile_source(
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
+    // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
+    // canonicalized paths only
+    let include = config
+        .include
+        .iter()
+        .map(|original_path| {
+            let mut components = original_path
+                .components()
+                .map(|c| c.as_os_str().to_os_string())
+                .collect_vec();
+            let mut popped = vec![];
+
+            while components.len() > 0 {
+                let path: PathBuf = components.iter().collect();
+
+                match path.canonicalize() {
+                    Ok(mut canonical) => {
+                        if canonical == path {
+                            // Not a symlink, we should be good to keep original_path
+                            return original_path.clone();
+                        }
+                        // TODO log
+                        dbg!("symlink found");
+                        while let Some(popped) = popped.pop() {
+                            canonical.push(popped);
+                        }
+                        return canonical;
+                    }
+                    Err(_) => {
+                        popped.push(components.pop().expect("components.len() > 0"));
+                    }
+                }
+            }
+
+            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
+            // TODO check for * in components[0], if that's the case symlink resolution will not work
+            original_path.clone()
+        })
+        .collect_vec();
+
     // Use notify-based paths provider by default
     debug!(
         message = "Using notify-based file discovery.",
-        include_patterns = ?config.include,
+        include_patterns = ?include,
         exclude_patterns = ?exclude_patterns,
     );
     let paths_provider = BoxedPathsProvider::new(NotifyPathsProvider::new(
-        &config.include,
+        &include,
         &exclude_patterns,
         MatchOptions::default(),
         emitter.clone(),
@@ -592,8 +666,7 @@ pub fn ifile_source(
         offset_key: config.offset_key.clone().and_then(|k| k.path),
     };
 
-    let include = config.include.clone();
-    let exclude = config.exclude.clone();
+    let exclude = exclude_patterns.clone();
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
@@ -905,7 +978,11 @@ mod tests {
     }
 
     async fn sleep_500_millis() {
-        sleep(Duration::from_millis(500)).await;
+        sleep_millis(500).await;
+    }
+
+    async fn sleep_millis(millis: u64) {
+        sleep(Duration::from_millis(millis)).await;
     }
 
     #[test]
@@ -1192,7 +1269,7 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
@@ -1218,20 +1295,7 @@ mod tests {
             file1.flush().unwrap();
             file2.flush().unwrap();
 
-            // Wait for the file source to process the written content
-            // We'll retry until we've seen all the expected events or timeout
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for file processing");
+            sleep_millis(1000).await;
         })
         .await;
 
@@ -1245,14 +1309,14 @@ mod tests {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
-                    path1.to_str().unwrap()
+                    path1.canonicalize().unwrap().to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
                 assert_eq!(line, format!("goodbye {}", goodbye_i));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
-                    path2.to_str().unwrap()
+                    path2.canonicalize().unwrap().to_str().unwrap()
                 );
                 goodbye_i += 1;
             }
@@ -1298,18 +1362,7 @@ mod tests {
             file.flush().unwrap();
 
             // Wait for the file source to process the written content
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for file processing");
+            sleep_millis(1000).await;
         })
         .await;
 
@@ -1330,16 +1383,7 @@ mod tests {
             let mut file = File::create(&path).unwrap();
 
             // Wait for the file to be observed at its original length before writing to it
-            retry_until(
-                || {
-                    // Check if the file exists and is being watched
-                    path.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("File should be discovered");
+            sleep_millis(1000).await;
 
             for i in 0..n {
                 writeln!(&mut file, "pretrunc {}", i).unwrap();
@@ -1347,54 +1391,20 @@ mod tests {
             file.flush().unwrap();
 
             // Wait for the writes to be observed before truncating
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for pre-truncate processing");
+            sleep_millis(1000).await;
 
             file.set_len(0).unwrap();
             file.seek(std::io::SeekFrom::Start(0)).unwrap();
 
             // Wait for the truncate to be observed before writing again
-            count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for truncate processing");
+            sleep_millis(1000).await;
 
             for i in 0..n {
                 writeln!(&mut file, "posttrunc {}", i).unwrap();
             }
             file.flush().unwrap();
 
-            // Wait for the final writes to be observed
-            count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for post-truncate processing");
+            sleep_millis(1000).await;
         })
         .await;
 
@@ -1404,7 +1414,7 @@ mod tests {
         for event in received {
             assert_eq!(
                 event.as_log()["file"].to_string_lossy(),
-                path.to_str().unwrap()
+                path.canonicalize().unwrap().to_str().unwrap()
             );
 
             let line =
@@ -1548,11 +1558,15 @@ mod tests {
         // Check that all events have a file path that is either the original path or the archive path
         for event in &received {
             let file_path = event.as_log()["file"].to_string_lossy();
+            let path = path.canonicalize().unwrap();
+            let path = path.to_str().unwrap();
+            let archive_path = archive_path.canonicalize().unwrap();
+            let archive_path = archive_path.to_str().unwrap();
             assert!(
-                file_path == path.to_str().unwrap() || file_path == archive_path.to_str().unwrap(),
+                file_path == path || file_path == archive_path,
                 "File path should be either {} or {}, but was {}",
-                path.to_str().unwrap(),
-                archive_path.to_str().unwrap(),
+                path,
+                archive_path,
                 file_path
             );
         }
@@ -1605,18 +1619,7 @@ mod tests {
             file4.flush().unwrap();
 
             // Wait for the file source to process the written content
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for file processing");
+            sleep_millis(1000).await;
         })
         .await;
 
@@ -1625,7 +1628,7 @@ mod tests {
         for event in received {
             let line =
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
-            let mut split = line.split(' ');
+            let mut split = line.split(' ').collect_vec().into_iter();
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
             let i = split.next().unwrap().parse::<usize>().unwrap();
@@ -1735,7 +1738,7 @@ mod tests {
             assert_eq!(received.len(), 1);
             assert_eq!(
                 received[0].as_log()["file"].to_string_lossy(),
-                path.to_str().unwrap()
+                path.canonicalize().unwrap().to_str().unwrap()
             );
         }
 
@@ -1763,7 +1766,7 @@ mod tests {
             assert_eq!(received.len(), 1);
             assert_eq!(
                 received[0].as_log()["source"].to_string_lossy(),
-                path.to_str().unwrap()
+                path.canonicalize().unwrap().to_str().unwrap()
             );
         }
 
@@ -2047,68 +2050,57 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let before_path = dir.path().join("before");
-            let mut before_file = File::create(&before_path).unwrap();
-            let after_path = dir.path().join("after");
-            let mut after_file = File::create(&after_path).unwrap();
+        let older_path = dir.path().join("older");
+        let mut older_file = File::create(&older_path).unwrap();
+        let newer_path = dir.path().join("newer");
+        let mut newer_file = File::create(&newer_path).unwrap();
 
-            writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
-            writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
+        writeln!(&mut older_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
+        writeln!(&mut newer_file, "_first line").unwrap(); // and therefore need to be non-identical
 
-            {
-                // Set the modified times
-                let before = SystemTime::now() - Duration::from_secs(8);
-                let after = SystemTime::now() - Duration::from_secs(2);
+        {
+            // Set the modified times
+            let older = SystemTime::now() - Duration::from_secs(8);
 
-                let before_time = libc::timeval {
-                    tv_sec: before
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as _,
-                    tv_usec: 0,
-                };
-                let before_times = [before_time, before_time];
+            let older_time = libc::timeval {
+                tv_sec: older
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs() as _,
+                tv_usec: 0,
+            };
 
-                let after_time = libc::timeval {
-                    tv_sec: after
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as _,
-                    tv_usec: 0,
-                };
-                let after_times = [after_time, after_time];
+            let ret =
+                unsafe { libc::futimes(older_file.as_raw_fd(), [older_time, older_time].as_ptr()) };
+            assert_eq!(ret, 0);
+        }
 
-                unsafe {
-                    libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
-                    libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
-                }
-            }
-
+        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, async {
+            // Need to sleep so that the file is checkpointed before we write to it, which
+            // updates the modified time
             sleep_500_millis().await;
-            writeln!(&mut before_file, "second line").unwrap();
-            writeln!(&mut after_file, "_second line").unwrap();
-
+            writeln!(&mut older_file, "second line").unwrap();
+            writeln!(&mut newer_file, "_second line").unwrap();
             sleep_500_millis().await;
         })
         .await;
 
-        let before_lines = received
+        let older_lines = received
             .iter()
-            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("older"))
             .map(|event| {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy()
             })
             .collect::<Vec<_>>();
-        let after_lines = received
+        let newer_lines = received
             .iter()
-            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("after"))
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("newer"))
             .map(|event| {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy()
             })
             .collect::<Vec<_>>();
-        assert_eq!(before_lines, vec!["second line"]);
-        assert_eq!(after_lines, vec!["_first line", "_second line"]);
+        assert_eq!(older_lines, vec!["second line"]);
+        assert_eq!(newer_lines, vec!["_first line", "_second line"]);
     }
 
     #[tokio::test]
