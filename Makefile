@@ -262,8 +262,9 @@ CARGO_HANDLES_FRESHNESS:
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
 	$(CONTAINER_TOOL) build \
+		-build-arg TARGET=${TRIPLE} \
+		--file scripts/cross/Dockerfile \
 		--tag vector-cross-env:${TRIPLE} \
-		--file scripts/cross/${TRIPLE}.dockerfile \
 		.
 
 # This is basically a shorthand for folks.
