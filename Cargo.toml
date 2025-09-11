@@ -448,7 +448,7 @@ netlink-packet-core = "0.7.0"
 netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
 
 [build-dependencies]
-bindgen = { version = "0.71.1" }
+bindgen = { version = "0.72.1" }
 prost-build = { workspace = true, optional = true }
 tonic-build = { workspace = true, optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes

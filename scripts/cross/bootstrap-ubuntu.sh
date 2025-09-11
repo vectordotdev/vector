@@ -53,6 +53,5 @@ tar -C /usr/local -xzf ${GO_TAR_FILE}
 rm ${GO_TAR_FILE}
 ln -s /usr/local/go/bin/go /usr/local/bin/go
 
-scripts/environment/prepare.sh --modules=rustup,bindgen
+../environment/prepare.sh --modules=rustup,bindgen
 ln -s "$(dirname "$(which cargo)")/"* /usr/local/bin/
-./pre
