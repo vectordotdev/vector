@@ -138,6 +138,7 @@ members = [
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
+aws-lc-sys = { version = "0.31.0", features = ["bindgen"] } # Required for FIPS enabled cross compilation
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 base64 = { version = "0.22.1", default-features = false }
 cfg-if = { version = "1.0.3", default-features = false }
@@ -386,7 +387,7 @@ lru = { version = "0.16.0", default-features = false }
 maxminddb = { version = "0.26.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runtime"], optional = true }
-async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring"] }
+async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["fips"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -447,6 +448,7 @@ netlink-packet-core = "0.7.0"
 netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
 
 [build-dependencies]
+bindgen = { version = "0.71.1" }
 prost-build = { workspace = true, optional = true }
 tonic-build = { workspace = true, optional = true }
 # update 'openssl_version' in website/config.toml whenever <major.minor> version changes
