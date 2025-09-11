@@ -1,4 +1,4 @@
-use metrics::{counter, gauge};
+use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -74,7 +74,7 @@ impl ReloadRejectReason {
 }
 
 #[derive(Debug)]
-pub struct ConfigReloaded {}
+pub struct ConfigReloaded;
 
 impl InternalEvent for ConfigReloaded {
     fn emit(self) {
