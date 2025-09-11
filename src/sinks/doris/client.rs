@@ -1,14 +1,19 @@
-use crate::http::Auth;
-use crate::{http::HttpClient, internal_events::EndpointBytesSent, sinks::util::Compression};
+use crate::{
+    http::{Auth, HttpClient},
+    internal_events::EndpointBytesSent,
+    sinks::util::Compression,
+};
 use bytes::Bytes;
-use http::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use http::{Method, Response, StatusCode, Uri};
+use http::{
+    Method, Response, StatusCode, Uri,
+    header::{CONTENT_LENGTH, CONTENT_TYPE},
+};
 use hyper::{Body, Request};
 use serde_json::Value;
-use std::time::SystemTime;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+    time::SystemTime,
 };
 use tracing::debug;
 use uuid::Uuid;

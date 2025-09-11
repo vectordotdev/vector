@@ -1,24 +1,21 @@
 //! Configuration for the `Doris` sink.
 
-use super::progress::ProgressReporter;
-use super::sink::DorisSink;
+use super::{progress::ProgressReporter, sink::DorisSink};
 
-use crate::sinks::doris::client::DorisSinkClient;
-use crate::sinks::doris::common::DorisCommon;
-use crate::sinks::doris::retry::DorisRetryLogic;
-use crate::sinks::doris::service::DorisService;
 use crate::{
     http::{Auth, HttpClient},
     sinks::{
-        doris::health::DorisHealthLogic,
+        doris::{
+            client::DorisSinkClient, common::DorisCommon, health::DorisHealthLogic,
+            retry::DorisRetryLogic, service::DorisService,
+        },
         prelude::*,
-        util::{service::HealthConfig, RealtimeSizeBasedDefaultBatchSettings},
+        util::{RealtimeSizeBasedDefaultBatchSettings, service::HealthConfig},
     },
 };
 use futures;
 use futures_util::TryFutureExt;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use vector_lib::codecs::JsonSerializerConfig;
 
 /// Configuration for the `doris` sink.
@@ -89,8 +86,8 @@ pub struct DorisConfig {
 
     /// Controls the buffer size for requests sent to Doris endpoints.
     ///
-    /// This sets the maximum number of stream load requests that can be queued for sending to 
-    /// Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent 
+    /// This sets the maximum number of stream load requests that can be queued for sending to
+    /// Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent
     /// sequentially to the endpoint.
     #[configurable(metadata(docs::examples = 1))]
     #[configurable(metadata(docs::human_name = "Request Buffer Size"))]

@@ -1,8 +1,12 @@
 //! Progress reporting implementation for Doris sink.
 
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicI64, Ordering},
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time;
 use tracing::info;
 use vector_lib::shutdown::ShutdownSignal;
@@ -145,7 +149,7 @@ impl Clone for ProgressReporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     #[test]
     fn test_new_reporter() {

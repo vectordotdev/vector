@@ -1,8 +1,7 @@
 //! `RequestBuilder` implementation for the `Doris` sink.
 
 use super::sink::DorisPartitionKey;
-use crate::sinks::prelude::*;
-use crate::sinks::util::http::HttpRequest;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
 

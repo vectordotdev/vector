@@ -1,10 +1,9 @@
 use serde::Deserialize;
 use tracing::{debug, error};
 
-use crate::sinks::doris::service::DorisResponse;
 use crate::{
     http::HttpError,
-    sinks::{prelude::*, util::retries::RetryAction},
+    sinks::{doris::service::DorisResponse, prelude::*, util::retries::RetryAction},
 };
 
 /// Internal struct for parsing Doris Stream Load API responses

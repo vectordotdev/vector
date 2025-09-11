@@ -110,10 +110,10 @@ base: components: sinks: doris: configuration: {
 		description: """
 			Controls the buffer size for requests sent to Doris endpoints.
 			
-			This sets the maximum number of stream load requests that can be queued for sending to 
-			Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent 
-			sequentially to the endpoint. Higher values allow more requests to be buffered, enabling 
-			better throughput but requiring careful consideration of your Doris endpoint's capacity 
+			This sets the maximum number of stream load requests that can be queued for sending to
+			Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent
+			sequentially to the endpoint. Higher values allow more requests to be buffered, enabling
+			better throughput but requiring careful consideration of your Doris endpoint's capacity
 			and processing capabilities.
 			"""
 		required: false

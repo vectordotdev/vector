@@ -1,5 +1,7 @@
-use crate::sinks::doris::service::DorisResponse;
-use crate::{http::HttpError, sinks::util::service::HealthLogic};
+use crate::{
+    http::HttpError,
+    sinks::{doris::service::DorisResponse, util::service::HealthLogic},
+};
 use tracing::{debug, error};
 
 #[derive(Clone)]

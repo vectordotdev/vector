@@ -1,8 +1,8 @@
-use crate::sinks::doris::common::DorisCommon;
-use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use crate::sinks::doris::DorisConfig;
-use crate::sinks::prelude::*;
-use crate::sinks::util::http::HttpRequest;
+use crate::sinks::{
+    doris::{DorisConfig, common::DorisCommon, request_builder::DorisRequestBuilder},
+    prelude::*,
+    util::http::HttpRequest,
+};
 
 pub struct DorisSink<S> {
     batch_settings: BatcherSettings,

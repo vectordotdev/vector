@@ -1,14 +1,18 @@
-use crate::codecs::Encoder;
-use crate::http::{Auth, MaybeAuth};
-use crate::sinks::doris::client::ThreadSafeDorisSinkClient;
-use crate::sinks::doris::request_builder::DorisRequestBuilder;
-use crate::sinks::doris::DorisConfig;
-use crate::sinks::prelude::Compression;
-use crate::sinks::util::UriSerde;
-use crate::tls::TlsSettings;
+use crate::{
+    codecs::Encoder,
+    http::{Auth, MaybeAuth},
+    sinks::{
+        doris::{
+            DorisConfig, client::ThreadSafeDorisSinkClient, request_builder::DorisRequestBuilder,
+        },
+        prelude::Compression,
+        util::UriSerde,
+    },
+    tls::TlsSettings,
+};
 use http::Uri;
 use snafu::prelude::*;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
+use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {

@@ -1,7 +1,7 @@
 use futures::{future::ready, stream};
 use http::Uri;
 use sqlx::{
-    mysql::MySqlConnectOptions, ConnectOptions, Connection, Executor as _, MySqlConnection, Row,
+    ConnectOptions, Connection, Executor as _, MySqlConnection, Row, mysql::MySqlConnectOptions,
 };
 use std::collections::HashMap;
 // use vector_common::finalization::BatchStatus;
@@ -13,7 +13,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::util::BatchConfig,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_string, trace_init,
     },
 };

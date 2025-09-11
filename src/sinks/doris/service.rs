@@ -1,18 +1,24 @@
-use crate::sinks::doris::client::{
-    DorisStreamLoadResponse, StreamLoadStatus, ThreadSafeDorisSinkClient,
+use crate::sinks::{
+    doris::{
+        client::{DorisStreamLoadResponse, StreamLoadStatus, ThreadSafeDorisSinkClient},
+        sink::DorisPartitionKey,
+    },
+    prelude::{BoxFuture, DriverResponse, Service},
+    util::http::HttpRequest,
 };
-use crate::sinks::doris::sink::DorisPartitionKey;
-use crate::sinks::prelude::{BoxFuture, DriverResponse, Service};
-use crate::sinks::util::http::HttpRequest;
 use bytes::Bytes;
 use http::Response;
 use serde_json;
 use snafu::Snafu;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tracing::info;
-use vector_common::finalization::EventStatus;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
+use vector_common::{
+    finalization::EventStatus,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+};
 
 #[derive(Clone)]
 pub struct DorisService {
