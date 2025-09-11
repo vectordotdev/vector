@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
