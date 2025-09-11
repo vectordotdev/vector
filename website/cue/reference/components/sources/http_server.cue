@@ -126,7 +126,12 @@ components: sources: http_server: {
 
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
-				encoding: "text"
+				decoding: {
+					codec: "text"
+				}
+				framing: {
+					method: "newline_delimited"
+				}
 				headers: ["User-Agent"]
 			}
 			input: """
@@ -159,7 +164,12 @@ components: sources: http_server: {
 
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
-				encoding: "json"
+				decoding: {
+					codec: "json"
+				}
+				framing: {
+					method: "bytes"
+				}
 				headers: ["User-Agent"]
 				_path:    _path
 				path_key: _path_key
