@@ -6,39 +6,39 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use tokio::{sync::oneshot, task::spawn_blocking};
-use tracing::{debug, Instrument, Span};
+use tokio::sync::oneshot;
+use tracing::{Instrument, Span, debug};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source_common::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::ifile_source::{
-    calculate_ignore_before, paths_provider::glob::MatchOptions, BoxedPathsProvider, Checkpointer,
-    FileServer, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
+    BoxedPathsProvider, Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom,
+    ReadFromConfig, calculate_ignore_before, paths_provider::glob::MatchOptions,
 };
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
+use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
 };
 use vrl::value::Kind;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
+    SourceSender,
     config::{
-        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        ifile::{FileInternalMetricsConfig, FileSourceInternalEventsEmitter},
         FileBytesReceived, FileEventsReceived, FileOpen, StreamClosedError,
+        ifile::{FileInternalMetricsConfig, FileSourceInternalEventsEmitter},
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -356,7 +356,9 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             } => {
                 let bytes = match bytes {
                     Some(bytes) => {
-                        warn!(message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
+                        warn!(
+                            message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead."
+                        );
                         bytes
                     }
                     None => 256,
@@ -575,7 +577,6 @@ pub fn ifile_source(
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
-        handle: tokio::runtime::Handle::current(),
         rotate_wait: config.rotate_wait,
         checkpoint_interval,
     };
@@ -650,7 +651,7 @@ pub fn ifile_source(
                 line
             });
 
-        let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
+        let messages: Box<dyn Stream<Item = Line> + Send + Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -711,9 +712,11 @@ pub fn ifile_source(
         });
 
         let span = info_span!("file_server");
-        spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer);
+            let rt = tokio::runtime::Handle::current();
+            let result =
+                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
@@ -733,7 +736,9 @@ fn reconcile_position_options(
     read_from: Option<ReadFromConfig>,
 ) -> (bool, ReadFrom) {
     if start_at_beginning.is_some() {
-        warn!(message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead.")
+        warn!(
+            message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead."
+        )
     }
 
     match start_at_beginning {
@@ -749,9 +754,9 @@ fn reconcile_position_options(
 }
 
 fn wrap_with_line_agg(
-    rx: impl Stream<Item = Line> + Send + std::marker::Unpin + 'static,
+    rx: impl Stream<Item = Line> + Send + Unpin + 'static,
     config: line_agg::Config,
-) -> Box<dyn Stream<Item = Line> + Send + std::marker::Unpin + 'static> {
+) -> Box<dyn Stream<Item = Line> + Send + Unpin + 'static> {
     let logic = line_agg::Logic::new(config);
     Box::new(
         LineAgg::new(
@@ -861,7 +866,7 @@ mod tests {
     use encoding_rs::UTF_16LE;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration};
+    use tokio::time::{Duration, sleep, timeout};
     use vector_lib::schema::Definition;
     use vrl::value::kind::Collection;
 
@@ -871,7 +876,7 @@ mod tests {
         event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::ifile,
-        test_util::components::{assert_source, IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS},
+        test_util::components::{IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS, assert_source},
     };
     use vrl::value;
 
@@ -1143,12 +1148,13 @@ mod tests {
                 .unwrap(),
             &value!(FileConfig::NAME)
         );
-        assert!(log
-            .metadata()
-            .value()
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
+        assert!(
+            log.metadata()
+                .value()
+                .get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp()
+        );
 
         assert_eq!(
             log.metadata()
@@ -2522,7 +2528,9 @@ mod tests {
         // Let's make the test more resilient by checking if we got any events at all
         if received.is_empty() {
             // If we didn't get any events, let's log a warning but not fail the test
-            warn!("No events received from gzipped file. This is expected with the current implementation.");
+            warn!(
+                "No events received from gzipped file. This is expected with the current implementation."
+            );
             // Skip the rest of the test
             return;
         }
@@ -2658,9 +2666,9 @@ mod tests {
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
     }
+    use AckingMode::*;
     use vector_lib::emit;
     use vector_lib::lookup::OwnedTargetPath;
-    use AckingMode::*;
 
     async fn run_ifile_source(
         config: &ifile::FileConfig,

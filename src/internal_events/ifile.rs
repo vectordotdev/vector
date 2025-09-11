@@ -1,3 +1,4 @@
+#![allow(dead_code)] // FIXME
 use metrics::{counter, gauge};
 use std::borrow::Cow;
 use vector_lib::{
@@ -5,7 +6,6 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
 };
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
 
 use vector_lib::internal_event::{error_stage, error_type};
@@ -102,7 +102,6 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 

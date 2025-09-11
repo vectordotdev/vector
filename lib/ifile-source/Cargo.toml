@@ -19,16 +19,16 @@ crc = "3.3.0"
 notify = "8.0.0"
 scan_fmt = "0.2.6"
 bstr = { version = "1.12", default-features = false }
-bytes = { version = "1.10.1", default-features = false }
-indexmap = { version = "2.10.0", default-features = false, features = ["serde"] }
+bytes.workspace = true
+indexmap.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 file-source-common = { path = "../file-source-common" }
-dashmap = { version = "6.1", default-features = false }
-flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+dashmap.workspace = true
 futures = { version = "0.3.31", default-features = false, features = ["executor"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.140", default-features = false }
+async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
 
 [dev-dependencies]
 criterion = "0.6"

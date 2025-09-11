@@ -10,7 +10,11 @@ use vector_lib::{
     },
 };
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-ifile",
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs"
+))]
 pub use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
@@ -105,7 +109,11 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-ifile",
+    feature = "sources-kubernetes_logs"
+))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
