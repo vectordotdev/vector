@@ -1,0 +1,17 @@
+ARG CROSS_VERSION=0.2.5
+ARG TARGET=x86_64-unknown-linux-musl
+
+FROM ghcr.io/cross-rs/${TARGET}:${CROSS_VERSION}
+
+# Common steps for all targets
+COPY scripts/cross/bootstrap-ubuntu.sh scripts/environment/install-protoc.sh /
+RUN /bootstrap-ubuntu.sh && bash /install-protoc.sh
+
+RUN if [ "$TARGET" = "arm-unknown-linux-musleabi" ]; then \
+      LIBSTDC=/usr/local/arm-linux-musleabi/lib/libstdc++.a; \
+    elif [ "$TARGET" = "armv7-unknown-linux-musleabihf" ]; then \
+      LIBSTDC=/usr/local/arm-linux-musleabihf/lib/libstdc++.a; \
+    fi && \
+    if [ -n "${LIBSTDC:-}" ]; then \
+      mkdir -p /lib/native-libs && cp "$LIBSTDC" /lib/native-libs/; \
+    fi
