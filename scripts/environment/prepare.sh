@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+
 ALL_MODULES=(
   rustup
   cargo-deb
@@ -106,13 +108,13 @@ fi
 
 install=(install)
 if contains_module rustup; then
-  . scripts/environment/release-flags.sh
+  . "${SCRIPT_DIR}"/release-flags.sh
 
   rustup show active-toolchain || rustup toolchain install stable
   rustup show
 
   if [ "${require_binstall}" = "true" ]; then
-    if cargo binstall -V &>/dev/null || ./scripts/environment/binstall.sh; then
+    if cargo binstall -V &>/dev/null || "${SCRIPT_DIR}"/binstall.sh; then
       install=(binstall -y)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
