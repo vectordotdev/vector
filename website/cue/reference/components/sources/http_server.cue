@@ -125,7 +125,7 @@ components: sources: http_server: {
 			title:       "text/plain"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
+				address: "0.0.0.0:\(_port)"
 				decoding: {
 					codec: "text"
 				}
@@ -163,7 +163,7 @@ components: sources: http_server: {
 			title:       "application/json"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
+				address: "0.0.0.0:\(_port)"
 				decoding: {
 					codec: "json"
 				}
