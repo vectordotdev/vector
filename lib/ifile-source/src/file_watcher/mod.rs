@@ -21,8 +21,6 @@ use file_source_common::{
     AsyncFileInfo,
 };
 mod notify_watcher;
-#[cfg(test)]
-mod tests;
 
 use notify_watcher::NotifyWatcher;
 
