@@ -6,7 +6,7 @@ FROM ghcr.io/cross-rs/${TARGET}:${CROSS_VERSION}
 # Common steps for all targets
 COPY scripts/cross/bootstrap-ubuntu.sh /
 COPY scripts/environment/ /scripts/environment/
-RUN /bootstrap-ubuntu.sh && bash /install-protoc.sh
+RUN /bootstrap-ubuntu.sh && bash /scripts/environment/install-protoc.sh
 
 # Relocate libstdc++ for musl targets that need it (TODO: investigate if still required)
 RUN if [ "$TARGET" = "arm-unknown-linux-musleabi" ]; then \
