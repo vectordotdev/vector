@@ -40,6 +40,7 @@ ALL_MODULES=(
   datadog-ci
   release-flags
   vdev
+  bindgen
 )
 
 # By default, install everything
@@ -77,6 +78,7 @@ Modules:
   markdownlint
   datadog-ci
   vdev
+  bindgen
 
 If a module requires rust then rustup will be automatically installed.
 By default, all modules are installed. To install only a subset:
@@ -201,5 +203,11 @@ fi
 if contains_module vdev; then
   if [[ "$(vdev --version 2>/dev/null)" != "vdev 0.1.0" ]]; then
     cargo "${install[@]}" vdev --version 0.1.0 --force --locked
+  fi
+fi
+
+if contains_module bindgen; then
+  if ! bindgen --version 2>/dev/null | grep -q '^bindgen 0.72.1'; then
+    cargo "${install[@]}" bindgen-cli --version 0.72.1 --force --locked
   fi
 fi
