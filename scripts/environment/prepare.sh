@@ -188,7 +188,7 @@ if contains_module vdev; then
 fi
 
 if contains_module bindgen; then
-  if ! bindgen --version 2>/dev/null | grep -q '^bindgen v0.72.1'; then
-    rustup run stable cargo "${install[@]}" bindgen-cli --version v0.72.1 --force --locked
+  if ! bindgen --version 2>/dev/null | grep -q '^bindgen 0.72.1'; then
+    rustup run stable cargo "${install[@]}" bindgen-cli --version 0.72.1 --force --locked
   fi
 fi
