@@ -12106,6 +12106,7 @@ dependencies = [
  "k8s-openapi 0.22.0",
  "kube",
  "lapin",
+ "libc",
  "listenfd",
  "loki-logproto",
  "lru 0.16.0",

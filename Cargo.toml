@@ -464,6 +464,7 @@ azure_storage = { version = "0.21", default-features = false, features = ["enabl
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
+libc.workspace = true
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
