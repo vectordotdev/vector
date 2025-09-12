@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use hyper::Body;
+use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::{configurable::configurable_component, event::EventStatus};

@@ -1,8 +1,11 @@
+use bytes::Bytes;
 use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
-use tonic::body::BoxBody;
+use http_body_util::combinators::BoxBody;
+use hyper_http_proxy::ProxyConnector;
+use hyper_openssl::client::legacy::HttpsConnector;
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
+use hyper_util::rt::TokioExecutor;
+use std::convert::Infallible;
 use tower::ServiceBuilder;
 use vector_lib::configurable::configurable_component;
 
@@ -209,10 +212,13 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
+) -> crate::Result<Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody<Bytes, Infallible>>>
+{
     let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
 
-    Ok(hyper::Client::builder().http2_only(true).build(proxy))
+    Ok(Client::builder(TokioExecutor::new())
+        .http2_only(true)
+        .build(proxy))
 }
 
 #[derive(Debug, Clone)]

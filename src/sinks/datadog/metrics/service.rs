@@ -9,7 +9,7 @@ use http::{
     Request, StatusCode, Uri,
     header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue},
 };
-use hyper::Body;
+use hyper::body::Body;
 use snafu::ResultExt;
 use tower::Service;
 use vector_lib::{

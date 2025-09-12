@@ -6,6 +6,10 @@ use std::{
     sync::Arc,
 };
 
+use crate::components::validation::{
+    RunnerMetrics,
+    sync::{Configuring, TaskCoordinator},
+};
 use axum::{
     Router,
     response::IntoResponse,
@@ -13,27 +17,22 @@ use axum::{
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
-use hyper::{Body, Client, Server};
+use hyper::body::Body;
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
+use hyper_util::rt::TokioExecutor;
+use tokio::net::TcpListener;
 use tokio::{
     select,
     sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    codecs::{
-        CharacterDelimitedEncoder,
-        encoding::{Framer, Serializer::Json},
-    },
-    config::LogNamespace,
-    event::Event,
+    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
+    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
 };
+use warp::hyper::body::to_bytes;
 
 use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
-use crate::components::validation::{
-    RunnerMetrics,
-    sync::{Configuring, TaskCoordinator},
-};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -218,7 +217,7 @@ fn spawn_input_http_client(
         started.mark_as_done();
         info!("HTTP client external input resource started.");
 
-        let client = Client::builder().build_http::<Body>();
+        let client = Client::builder(TokioExecutor::new()).build(HttpConnector::new());
         let request_uri = config.uri;
         let request_method = config.method.unwrap_or(Method::POST);
         let headers = config.headers.unwrap_or_default();
@@ -328,7 +327,7 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
-                    match hyper::body::to_bytes(request.into_body()).await {
+                    match to_bytes(request.into_body()).await {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let byte_size = body.len();

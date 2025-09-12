@@ -1,11 +1,8 @@
 #![allow(missing_docs)]
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
-    task::{Context, Poll},
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 
 use futures::{FutureExt, future::BoxFuture};
-use hyper::client::connect::dns::Name;
+use hyper_util::client::legacy::connect::dns::Name;
 use snafu::ResultExt;
 use tokio::task::spawn_blocking;
 use tower::Service;
@@ -61,10 +58,6 @@ impl Service<Name> for Resolver {
     type Response = LookupIp;
     type Error = DnsError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Ok(()).into()
-    }
 
     fn call(&mut self, name: Name) -> Self::Future {
         self.lookup_ip(name.as_str().to_owned()).boxed()

@@ -10,7 +10,8 @@ use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::{Body, body::to_bytes as body_to_bytes};
+use http_body_util::Empty;
+use hyper::{body::Body, body::to_bytes as body_to_bytes};
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
@@ -420,7 +421,7 @@ impl MetadataClient {
 
         let req = Request::put(uri)
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .body(Body::empty())?;
+            .body(Empty::<Bytes>::new())?;
 
         let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?
@@ -605,7 +606,7 @@ impl MetadataClient {
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
-            .body(Body::empty())?;
+            .body(Empty::<Bytes>::new())?;
 
         match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
             .await?

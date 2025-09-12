@@ -1,17 +1,5 @@
 //! Configuration for the `gcp_stackdriver_logs` sink.
 
-use std::collections::HashMap;
-
-use http::{Request, Uri};
-use hyper::Body;
-use snafu::Snafu;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vrl::value::Kind;
-
-use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
-};
 use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
@@ -25,6 +13,17 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
+};
+use http::{Request, Uri};
+use hyper::body::Body;
+use snafu::Snafu;
+use std::collections::HashMap;
+use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vrl::value::Kind;
+
+use super::{
+    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
+    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
 };
 
 #[derive(Debug, Snafu)]
