@@ -18,6 +18,7 @@ use crate::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
     },
+    sinks::util::Compression,
 };
 
 /// Splunk HEC acknowledgement configuration.
@@ -95,6 +96,12 @@ impl HecAckClient {
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
     ) -> Self {
+        // Reimplement with compression support, see https://github.com/vectordotdev/vector/issues/23748
+        let http_request_builder = Arc::new(HttpRequestBuilder {
+            compression: Compression::None,
+            ..(*http_request_builder).clone()
+        });
+
         Self {
             acks: HashMap::new(),
             retry_limit,
