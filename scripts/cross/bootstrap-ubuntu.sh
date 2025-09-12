@@ -46,9 +46,11 @@ make install
 
 # Go installation is required for building aws-lc-rs
 # https://github.com/aws/aws-lc/issues/2129
-GO_VERSION="1.24.0"
+GO_VERSION="1.24.7"
+SHA="da18191ddb7db8a9339816f3e2b54bdded8047cdc2a5d67059478f8d1595c43f"
 GO_TAR_FILE="go${GO_VERSION}.linux-amd64.tar.gz"
 wget https://go.dev/dl/${GO_TAR_FILE}
+echo "${SHA} ${GO_TAR_FILE}" | sha256sum -c -
 tar -C /usr/local -xzf ${GO_TAR_FILE}
 rm ${GO_TAR_FILE}
 ln -s /usr/local/go/bin/go /usr/local/bin/go

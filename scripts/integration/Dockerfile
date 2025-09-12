@@ -6,17 +6,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     curl \
     g++ \
+    git \
+    golang-go \
     libclang1 \
     libsasl2-dev \
     libssl-dev \
     llvm \
     pkg-config \
-    zlib1g-dev \
     unzip \
-    git \
+    zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
-RUN cargo install cargo-nextest --version 0.9.95 --locked
+COPY scripts/environment/ /scripts/environment/
+RUN bash /scripts/environment/prepare.sh --modules=cargo-nextest,bindgen
 
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
