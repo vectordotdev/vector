@@ -8,23 +8,20 @@ ensure_active_toolchain_is_installed() {
 
   # Ensure cargo/rustup are on PATH even if rustup was preinstalled in the image
   if [ -f "${HOME}/.cargo/env" ]; then
+    # shellcheck source=/dev/null
     source "${HOME}/.cargo/env"
   fi
 
-  # Determine desired toolchain and ensure it's installed (simple & readable).
+  # Determine desired toolchain and ensure it's installed.
   ACTIVE_TOOLCHAIN="$(rustup show active-toolchain 2>/dev/null || true)"
   ACTIVE_TOOLCHAIN="${ACTIVE_TOOLCHAIN%% *}"  # keep only the first token
-
   if [ -z "${ACTIVE_TOOLCHAIN}" ]; then
-    # No active toolchain yet: fall back to env override or stable, then make it default.
+    # No active toolchain yet: fall back to env override or ultimately to stable.
     ACTIVE_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
-    rustup toolchain install "${ACTIVE_TOOLCHAIN}"
     rustup default "${ACTIVE_TOOLCHAIN}"
-  else
-    # Ensure the active (possibly from rust-toolchain.toml) exists. Idempotent.
-    rustup toolchain install "${ACTIVE_TOOLCHAIN}" || rustup toolchain install "${ACTIVE_TOOLCHAIN%%-*}"
   fi
 
+  rustup toolchain install "${ACTIVE_TOOLCHAIN}"
   rustup show
 }
 
@@ -133,6 +130,7 @@ fi
 
 install=(install)
 if contains_module rustup; then
+  # shellcheck source=scripts/environment/release-flags.sh
   . "${SCRIPT_DIR}"/release-flags.sh
 
   ensure_active_toolchain_is_installed
