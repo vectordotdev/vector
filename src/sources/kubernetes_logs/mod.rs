@@ -904,11 +904,10 @@ impl Source {
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-                if insert_namespace_fields {
-                    if let Some(name) = namespace {
-                        if ns_annotator.annotate(&mut event, name).is_none() {
-                            emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
-                        }
+                if let Some(name) = namespace {
+                    if insert_namespace_fields && ns_annotator.annotate(&mut event, name).is_none()
+                    {
+                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
                 }
 
