@@ -1,6 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ensure_active_toolchain_is_installed() {
+  if ! command -v rustup >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+  fi
+
+  # Ensure cargo/rustup are on PATH even if rustup was preinstalled in the image
+  if [ -f "${HOME}/.cargo/env" ]; then
+    source "${HOME}/.cargo/env"
+  fi
+
+  # Determine desired toolchain and ensure it's installed (simple & readable).
+  ACTIVE_TOOLCHAIN="$(rustup show active-toolchain 2>/dev/null || true)"
+  ACTIVE_TOOLCHAIN="${ACTIVE_TOOLCHAIN%% *}"  # keep only the first token
+
+  if [ -z "${ACTIVE_TOOLCHAIN}" ]; then
+    # No active toolchain yet: fall back to env override or stable, then make it default.
+    ACTIVE_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+    rustup toolchain install "${ACTIVE_TOOLCHAIN}"
+    rustup default "${ACTIVE_TOOLCHAIN}"
+  else
+    # Ensure the active (possibly from rust-toolchain.toml) exists. Idempotent.
+    rustup toolchain install "${ACTIVE_TOOLCHAIN}" || rustup toolchain install "${ACTIVE_TOOLCHAIN%%-*}"
+  fi
+
+  rustup show
+}
+
+SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
+
 ALL_MODULES=(
   rustup
   cargo-deb
@@ -104,13 +133,12 @@ fi
 
 install=(install)
 if contains_module rustup; then
-  . scripts/environment/release-flags.sh
+  . "${SCRIPT_DIR}"/release-flags.sh
 
-  rustup show active-toolchain || rustup toolchain install stable
-  rustup show
+  ensure_active_toolchain_is_installed
 
   if [ "${require_binstall}" = "true" ]; then
-    if cargo binstall -V &>/dev/null || ./scripts/environment/binstall.sh; then
+    if cargo binstall -V &>/dev/null || "${SCRIPT_DIR}"/binstall.sh; then
       install=(binstall -y)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
@@ -120,43 +148,43 @@ fi
 set -e -o verbose
 if contains_module cargo-deb; then
   if [[ "$(cargo-deb --version 2>/dev/null)" != "2.9.3" ]]; then
-    rustup run stable cargo "${install[@]}" cargo-deb --version 2.9.3 --force --locked
+    cargo "${install[@]}" cargo-deb --version 2.9.3 --force --locked
   fi
 fi
 
 if contains_module cross; then
   if ! cross --version 2>/dev/null | grep -q '^cross 0.2.5'; then
-    rustup run stable cargo "${install[@]}" cross --version 0.2.5 --force --locked
+    cargo "${install[@]}" cross --version 0.2.5 --force --locked
   fi
 fi
 
 if contains_module cargo-nextest; then
   if ! cargo-nextest --version 2>/dev/null | grep -q '^cargo-nextest 0.9.95'; then
-    rustup run stable cargo "${install[@]}" cargo-nextest --version 0.9.95 --force --locked
+    cargo "${install[@]}" cargo-nextest --version 0.9.95 --force --locked
   fi
 fi
 
 if contains_module cargo-deny; then
   if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.16.2'; then
-    rustup run stable cargo "${install[@]}" cargo-deny --version 0.16.2 --force --locked
+    cargo "${install[@]}" cargo-deny --version 0.16.2 --force --locked
   fi
 fi
 
 if contains_module cargo-msrv; then
   if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
-    rustup run stable cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
+    cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
   fi
 fi
 
 if contains_module dd-rust-license-tool; then
   if ! dd-rust-license-tool --help &>/dev/null; then
-    rustup run stable cargo install dd-rust-license-tool --version 1.0.2 --force --locked
+    cargo install dd-rust-license-tool --version 1.0.2 --force --locked
   fi
 fi
 
 if contains_module wasm-pack; then
   if ! wasm-pack --version | grep -q '^wasm-pack 0.13.1'; then
-    rustup run stable cargo "${install[@]}" --locked --version 0.13.1 wasm-pack
+    cargo "${install[@]}" --locked --version 0.13.1 wasm-pack
   fi
 fi
 
@@ -174,6 +202,6 @@ fi
 
 if contains_module vdev; then
   if [[ "$(vdev --version 2>/dev/null)" != "vdev 0.1.0" ]]; then
-    rustup run stable cargo "${install[@]}" vdev --version 0.1.0 --force --locked
+    cargo "${install[@]}" vdev --version 0.1.0 --force --locked
   fi
 fi
