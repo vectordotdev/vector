@@ -183,7 +183,6 @@ pub struct TlsSettings {
 /// Identity store in PEM format
 #[derive(Clone)]
 pub(super) struct IdentityStore {
-    _name: String, // only set, never used. maybe we don't need this
     cert: X509,
     key: PKey<Private>,
     ca: Option<Vec<X509>>,
@@ -224,15 +223,6 @@ impl TlsSettings {
         })
     }
 
-    /// Returns the identity as a reference to a PEM encoded IdentityStore
-    ///
-    /// # Panics
-    ///
-    /// Panics if the identity is invalid.
-    fn identity(&self) -> &Option<IdentityStore> {
-        &self.identity
-    }
-
     /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
@@ -241,8 +231,8 @@ impl TlsSettings {
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.identity.as_ref().map(|identity| {
             // we have verified correct formatting at ingest time
-            let mut cert = identity.cert.to_pem().unwrap();
-            let key = identity.key.private_key_to_pem_pkcs8().unwrap();
+            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
+            let key = identity.key.private_key_to_pem_pkcs8().expect("Invalid stored identity");
             if let Some(chain) = identity.ca.as_ref() {
                 for authority in chain {
                     cert.extend(
@@ -283,7 +273,7 @@ impl TlsSettings {
         } else {
             SslVerifyMode::NONE
         });
-        if let Some(identity) = self.identity() {
+        if let Some(identity) = &self.identity {
             context
                 .set_certificate(&identity.cert)
                 .context(SetCertificateSnafu)?;
@@ -389,7 +379,7 @@ impl TlsConfig {
                 let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
-                    |der| self.parse_pkcs12_identity(der, &filename),
+                    |der| self.parse_pkcs12_identity(&der),
                     |pem| self.parse_pem_identity(&pem, &filename),
                 )
             }
@@ -418,7 +408,6 @@ impl TlsConfig {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
-                let name = crt_file.to_string_lossy().to_string();
                 let mut crt_stack = X509::stack_from_pem(pem.as_bytes())
                     .with_context(|_| X509ParseSnafu { filename: crt_file })?
                     .into_iter();
@@ -430,9 +419,8 @@ impl TlsConfig {
                 for intermediate in crt_stack {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
-                let ca: Vec<X509> = ca_stack.iter().map(|crt| crt.to_owned()).collect();
+                let ca: Vec<X509> = ca_stack.iter().map(std::borrow::ToOwned::to_owned).collect();
                 Ok(Some(IdentityStore {
-                    _name: name,
                     cert,
                     key,
                     ca: Some(ca),
@@ -444,11 +432,9 @@ impl TlsConfig {
     /// Parse identity from a DER encoded PKCS#12 archive
     fn parse_pkcs12_identity(
         &self,
-        der: Vec<u8>,
-        p12_file: &Path,
+        der: &[u8],
     ) -> Result<Option<IdentityStore>> {
-        let name = p12_file.to_string_lossy().to_string();
-        let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
+        let pkcs12 = Pkcs12::from_der(der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
         let parsed = pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
@@ -457,9 +443,8 @@ impl TlsConfig {
         let key = parsed.pkey.ok_or(TlsError::MissingKey)?;
         let ca: Option<Vec<X509>> = parsed
             .ca
-            .map(|stack| stack.iter().map(|crt| crt.to_owned()).collect());
+            .map(|stack| stack.iter().map(std::borrow::ToOwned::to_owned).collect());
         Ok(Some(IdentityStore {
-            _name: name,
             cert,
             key,
             ca,
