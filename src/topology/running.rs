@@ -272,7 +272,7 @@ impl RunningTopology {
                 Ok(changed) => {
                     emit!(ConfigReloadRejected::global_options_changed(changed));
                 }
-                Err(err) => {
+                Err(_err) => {
                     emit!(ConfigReloadRejected::failed_to_compute_global_diff());
                 }
             }

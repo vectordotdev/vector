@@ -895,7 +895,7 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags: _internal_metrics_tags & {
-					reason: _reason
+				reason: _reason
 			}
 		}
 		config_reloaded: {

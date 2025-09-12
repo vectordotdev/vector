@@ -65,7 +65,7 @@ enum ReloadRejectReason {
 }
 
 impl ReloadRejectReason {
-    fn as_str(&self) -> &'static str {
+    const fn as_str(&self) -> &'static str {
         match self {
             Self::GlobalOptionsChanged { fields: _ } => "global_options changed",
             Self::FailedToComputeGlobalDiff => "failed to compute global diff",
