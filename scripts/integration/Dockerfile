@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 COPY scripts/environment/ /scripts/environment/
-RUN bash /scripts/environment/prepare.sh --modules=cargo-nextest,bindgen
+RUN bash /scripts/environment/prepare.sh --modules=rustup,cargo-nextest,bindgen
 
 COPY scripts/environment/install-protoc.sh /
 COPY tests/data/ca/certs /certs
