@@ -2,14 +2,13 @@ use std::sync::Arc;
 
 use snafu::ResultExt;
 
-use crate::sinks::prelude::*;
-
 use super::{
-    config::{NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
-    request_builder::{NatsEncoder, NatsRequestBuilder},
-    service::{NatsResponse, NatsService},
     EncodingSnafu, NatsError,
+    config::{NatsHeaderConfig, NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
+    request_builder::{NatsEncoder, NatsRequest, NatsRequestBuilder},
+    service::{NatsResponse, NatsService},
 };
+use crate::sinks::prelude::*;
 
 pub(super) struct NatsEvent {
     pub(super) event: Event,
@@ -22,6 +21,7 @@ pub(super) struct NatsSink {
     encoder: Encoder<()>,
     publisher: Arc<NatsPublisher>,
     subject: Template,
+    headers: Option<NatsHeaderConfig>,
 }
 
 impl NatsSink {
@@ -48,6 +48,7 @@ impl NatsSink {
         let encoder = Encoder::<()>::new(serializer);
         let request = config.request;
         let subject = config.subject;
+        let headers = config.jetstream.headers;
 
         Ok(NatsSink {
             request,
@@ -55,6 +56,7 @@ impl NatsSink {
             encoder,
             publisher,
             subject,
+            headers,
         })
     }
 
@@ -66,6 +68,7 @@ impl NatsSink {
                 encoder: self.encoder.clone(),
                 transformer: self.transformer.clone(),
             },
+            headers: self.headers.clone(),
         };
 
         let service = ServiceBuilder::new()
@@ -105,6 +108,7 @@ pub(super) struct NatsRetryLogic;
 
 impl RetryLogic for NatsRetryLogic {
     type Error = NatsError;
+    type Request = NatsRequest;
     type Response = NatsResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {

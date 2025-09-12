@@ -28,7 +28,9 @@ remap: functions: to_unix_timestamp: {
 			default: "seconds"
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` cannot be represented in nanoseconds. Result is too large or too small for a 64 bit integer.",
+	]
 	return: types: ["integer"]
 
 	examples: [

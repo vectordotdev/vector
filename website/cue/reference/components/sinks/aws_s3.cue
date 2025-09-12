@@ -73,14 +73,21 @@ components: sinks: aws_s3: components._aws & {
 		warnings: []
 	}
 
-	configuration: base.components.sinks.aws_s3.configuration & {
+	configuration: generated.components.sinks.aws_s3.configuration & {
 		_aws_include: false
 	}
 
 	input: {
-		logs:    true
-		metrics: null
-		traces:  false
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: true
 	}
 
 	how_it_works: {
@@ -93,6 +100,17 @@ components: sinks: aws_s3: components._aws & {
 				[full tutorial](\(urls.aws_s3_cross_account_tutorial)) for this use case. If
 				don't know the bucket owner's canonical ID you can find it by following
 				[this tutorial](\(urls.aws_canonical_user_id)).
+				"""
+		}
+
+		log_on_put: {
+			title: "Emit a log when putting an object"
+			body: """
+				If you're using Vector to write objects to an s3-compatible storage, you can
+				set `VECTOR_LOG` to `vector::sinks::s3_common::service::put_object=trace` to
+				enable a trace log containing the bucket and key the object was put to. This
+				is best used when writing an object to an s3-compatible storage to kick off
+				post-put operations through another sink.
 				"""
 		}
 

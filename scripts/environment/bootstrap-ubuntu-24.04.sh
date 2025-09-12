@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 # Refer to https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md
 # for all runner information such as OS version and installed software.
 
@@ -58,18 +58,6 @@ tar \
     -xvf "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
-rm -rf "$TEMP"
-
-# Grease
-# Grease is used for the `make release-github` task.
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
-    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
-tar \
-    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 rm -rf "$TEMP"
 
 # Locales

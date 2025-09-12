@@ -1,23 +1,21 @@
 use chrono::Utc;
-use futures::{stream, StreamExt};
-use vector_lib::codecs::BytesDeserializerConfig;
-use vector_lib::config::log_schema;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::{owned_value_path, path, OwnedValuePath};
+use futures::{StreamExt, stream};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
+    codecs::BytesDeserializerConfig,
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
 use vrl::value::Kind;
 
 use crate::{
+    SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{EstimatedJsonEncodedSizeOf, Event},
     internal_events::{InternalLogsBytesReceived, InternalLogsEventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
-    SourceSender,
 };
 
 /// Configuration for the `internal_logs` source.
@@ -211,9 +209,8 @@ async fn run(
 #[cfg(test)]
 mod tests {
     use futures::Stream;
-    use tokio::time::{sleep, Duration};
-    use vector_lib::event::Value;
-    use vector_lib::lookup::OwnedTargetPath;
+    use tokio::time::{Duration, sleep};
+    use vector_lib::{event::Value, lookup::OwnedTargetPath};
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -221,7 +218,7 @@ mod tests {
         event::Event,
         test_util::{
             collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
         },
         trace,
     };

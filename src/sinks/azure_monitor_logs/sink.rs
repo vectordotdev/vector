@@ -1,12 +1,13 @@
 use std::{fmt::Debug, io};
 
 use bytes::Bytes;
-use vector_lib::codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializerConfig};
-use vector_lib::lookup::{OwnedValuePath, PathPrefix};
-
-use crate::sinks::prelude::*;
+use vector_lib::{
+    codecs::{CharacterDelimitedEncoder, JsonSerializerConfig, encoding::Framer},
+    lookup::{OwnedValuePath, PathPrefix},
+};
 
 use super::service::AzureMonitorLogsRequest;
+use crate::sinks::prelude::*;
 
 pub struct AzureMonitorLogsSink<S> {
     batch_settings: BatcherSettings,
@@ -112,10 +113,9 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
 
             // `.remove_timestamp()` will return the `timestamp` value regardless of location in Event or
             // Metadata, the following `insert()` ensures it's encoded in the request.
-            let timestamp = if let Some(Value::Timestamp(ts)) = log.remove_timestamp() {
-                ts
-            } else {
-                chrono::Utc::now()
+            let timestamp = match log.remove_timestamp() {
+                Some(Value::Timestamp(ts)) => ts,
+                _ => chrono::Utc::now(),
             };
 
             if let Some(timestamp_key) = &self.time_generated_key {

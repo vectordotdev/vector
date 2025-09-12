@@ -3,13 +3,15 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use criterion::{
-    black_box, criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
-use vector::config::TransformContext;
-use vector::transforms::{
-    route::{Route, RouteConfig},
-    TransformOutputsBuf,
+use vector::{
+    config::TransformContext,
+    transforms::{
+        TransformOutputsBuf,
+        route::{Route, RouteConfig},
+    },
 };
 use vector_lib::{
     config::{DataType, TransformOutput},
@@ -159,7 +161,8 @@ fn route(c: &mut Criterion) {
                     (route, param.input.clone(), param.output_buffer.clone())
                 },
                 |(mut route, input, mut output_buffer)| {
-                    black_box(route.transform(input, &mut output_buffer));
+                    route.transform(input, &mut output_buffer);
+                    std::hint::black_box(());
                 },
                 BatchSize::SmallInput,
             )

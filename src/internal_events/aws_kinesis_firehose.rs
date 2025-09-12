@@ -1,6 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;
@@ -48,6 +47,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
             error_type = error_type::REQUEST_FAILED,
             error_code = %self.error_code,
             request_id = %self.request_id.unwrap_or(""),
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -74,7 +74,7 @@ impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
             error_type = error_type::PARSER_FAILED,
             error_code = %io_error_code(&self.error),
             compression = %self.compression,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

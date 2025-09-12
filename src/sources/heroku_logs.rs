@@ -9,43 +9,45 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
-use vrl::value::{kind::Collection, Kind};
-use warp::http::{HeaderMap, StatusCode};
-
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{DataType, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::parse_value_path, owned_value_path, path},
     schema::Definition,
 };
+use vrl::value::{Kind, kind::Collection};
+use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
-        log_schema, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
+        SourceOutput, log_schema,
     },
     event::{Event, LogEvent},
     http::KeepaliveConfig,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
-        http_server::{build_param_matcher, remove_duplicates, HttpConfigParamKind},
+        http_server::{HttpConfigParamKind, build_param_matcher, remove_duplicates},
         util::{
-            http::{add_query_parameters, HttpMethod},
             HttpSource,
+            http::{HttpMethod, add_query_parameters},
         },
     },
     tls::TlsEnableableConfig,
 };
 
 /// Configuration for `heroku_logs` source.
-#[configurable_component(source("heroku_logs", "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."))]
+#[configurable_component(source(
+    "heroku_logs",
+    "Collect logs from Heroku's Logplex, the router responsible for receiving logs from your Heroku apps."
+))]
 #[derive(Clone, Debug)]
 pub struct LogplexConfig {
     /// The socket address to listen for connections on.
@@ -210,10 +212,7 @@ impl SourceConfig for LogplexConfig {
         // There is a global and per-source `log_namespace` config.
         // The source config overrides the global setting and is merged here.
         let schema_def = self.schema_definition(global_log_namespace.merge(self.log_namespace));
-        vec![SourceOutput::new_maybe_logs(
-            self.decoding.output_type(),
-            schema_def,
-        )]
+        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_def)]
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -326,7 +325,7 @@ fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, Erro
 fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     ErrorMessage::new(
         StatusCode::BAD_REQUEST,
-        format!("Invalid request header {:?}: {:?}", name, msg),
+        format!("Invalid request header {name:?}: {msg:?}"),
     )
 }
 
@@ -407,6 +406,7 @@ fn line_to_events(
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
+            internal_log_rate_limit = true
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -430,24 +430,24 @@ mod tests {
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
     use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
+        lookup::{OwnedTargetPath, owned_value_path},
         schema::Definition,
     };
-    use vrl::value::{kind::Collection, Kind};
+    use vrl::value::{Kind, kind::Collection};
 
     use super::LogplexConfig;
-    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
-        config::{log_schema, SourceConfig, SourceContext},
+        SourceSender,
+        common::http::server_auth::HttpServerAuthConfig,
+        config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{
-            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
             next_addr, random_string, spawn_collect_n, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]
@@ -493,7 +493,7 @@ mod tests {
         query: &str,
     ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(format!("http://{}/events?{}", address, query));
+        let mut req = reqwest::Client::new().post(format!("http://{address}/events?{query}"));
         if let Some(HttpServerAuthConfig::Basic { username, password }) = auth {
             req = req.basic_auth(username, Some(password.inner()));
         }

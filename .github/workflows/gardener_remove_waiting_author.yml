@@ -1,15 +1,23 @@
 name: Remove Awaiting Author Label
 
+permissions:
+  pull-requests: write
+
 on:
+  pull_request_target:
+    types: [synchronize, review_requested]
+
   pull_request:
     types: [synchronize, review_requested]
 
 jobs:
   remove_label:
+    if: "contains(github.event.pull_request.labels.*.name, 'meta: awaiting author')"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions-ecosystem/action-remove-labels@v1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions-ecosystem/action-remove-labels@2ce5d41b4b6aa8503e285553f75ed56e0a40bae0 # v1.3.0
         with:
           labels: "meta: awaiting author"
+          fail_on_error: true

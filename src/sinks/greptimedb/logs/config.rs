@@ -1,26 +1,27 @@
+use std::collections::HashMap;
+
+use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
+
 use crate::{
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
-            default_dbname_template, default_pipeline_template,
+            GreptimeDBDefaultBatchSettings, default_dbname_template, default_pipeline_template,
             logs::{
                 http_request_builder::{
-                    http_healthcheck, GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder,
-                    PartitionKey,
+                    GreptimeDBHttpRetryLogic, GreptimeDBLogsHttpRequestBuilder, PartitionKey,
+                    http_healthcheck,
                 },
                 sink::{GreptimeDBLogsHttpSink, LogsSinkSetting},
             },
-            GreptimeDBDefaultBatchSettings,
         },
         prelude::*,
         util::http::HttpService,
     },
-};
-use std::collections::HashMap;
-use vector_lib::{
-    codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig},
-    configurable::configurable_component,
-    sensitive_string::SensitiveString,
 };
 
 fn extra_params_examples() -> HashMap<String, String> {

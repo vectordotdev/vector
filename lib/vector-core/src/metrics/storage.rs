@@ -1,12 +1,12 @@
 use std::sync::{
-    atomic::{AtomicU32, Ordering},
     Arc,
+    atomic::{AtomicU32, Ordering},
 };
 
-use metrics::{atomics::AtomicU64, GaugeFn, HistogramFn};
+use metrics::{GaugeFn, HistogramFn, atomics::AtomicU64};
 use metrics_util::registry::Storage;
 
-use crate::event::{metric::Bucket, MetricValue};
+use crate::event::{MetricValue, metric::Bucket};
 
 pub(super) struct VectorStorage;
 

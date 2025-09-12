@@ -4,10 +4,10 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures_util::{future::ok, FutureExt, Sink};
-use vector_lib::configurable::configurable_component;
+use futures_util::{FutureExt, Sink, future::ok};
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
+    configurable::configurable_component,
     event::Event,
     sink::VectorSink,
 };

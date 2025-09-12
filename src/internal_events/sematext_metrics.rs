@@ -1,6 +1,7 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 use crate::event::metric::Metric;
 
@@ -19,7 +20,7 @@ impl InternalEvent for SematextMetricsInvalidMetricError<'_> {
             stage = error_stage::PROCESSING,
             value = ?self.metric.value(),
             kind = ?self.metric.kind(),
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -46,7 +47,7 @@ impl<E: std::fmt::Display> InternalEvent for SematextMetricsEncodeEventError<E> 
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

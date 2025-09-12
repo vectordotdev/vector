@@ -34,7 +34,7 @@ components: transforms: tag_cardinality_limit: {
 
 	// TODO: It'd be nice to have a way to define the description of the enum tag field on the Rust
 	// side and propagate it forward, since this is a common pattern that gets used.
-	configuration: base.components.transforms.tag_cardinality_limit.configuration & {
+	configuration: generated.components.transforms.tag_cardinality_limit.configuration & {
 		mode: description: "Controls the approach taken for tracking tag cardinality."
 	}
 
@@ -49,6 +49,12 @@ components: transforms: tag_cardinality_limit: {
 			summary:      true
 		}
 		traces: false
+	}
+
+	output: {
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
 	}
 
 	examples: [

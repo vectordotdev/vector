@@ -8,15 +8,17 @@ labels: "domain: releasing"
 
 # Setup and Automation
 
-Note the preparation steps are now automated. You can run:
+Note the preparation steps are now automated. First, alter/create release.env
 
 ```shell
-export NEW_VERSION=0.47.0 # replace this with the actual new version
-export MINOR_VERSION=$(echo "$NEW_VERSION" | cut -d. -f2)
-export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VERSION}"-website
+export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version (e.g.: 0.50.0)
+export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version (e.g.: 0.30.0)
+export MINOR_VERSION=$(echo "$NEW_VECTOR_VERSION" | cut -d. -f2)
+export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VECTOR_VERSION}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
-export NEW_VRL_VERSION=0.42.0 # replace this with the actual new VRL version
 ```
+
+and then source it by running `source ./release.env`
 
 # The week before the release
 
@@ -30,7 +32,7 @@ export NEW_VRL_VERSION=0.42.0 # replace this with the actual new VRL version
 Run the following:
 
 ```shell
-vdev release prepare --version "${NEW_VERSION_NUMBER}" --vrl-version NEW_VRL_VERSION
+cargo vdev release prepare --version "${NEW_VECTOR_VERSION}" --vrl-version "${NEW_VRL_VERSION}"
 ```
 
 Automated steps include:
@@ -55,7 +57,7 @@ Automated steps include:
 
 ## 3. Manual Steps
 
-- [ ] Edit `website/cue/reference/releases/"${NEW_VERSION_NUMBER}".cue`
+- [ ] Edit `website/cue/reference/releases/"${NEW_VECTOR_VERSION}".cue`
   - [ ] Add description key to the generated cue file with a description of the release (see
         previous releases for examples).
   - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
@@ -67,30 +69,39 @@ Automated steps include:
 
 # On the day of release
 
-- [ ] Rebase the release preparation branch on the release branch
-    - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
-        commit. This makes it easier to cherry-pick to master after the release.
-    - [ ] Ensure release date in cue matches current date.
-- [ ] Merge release preparation branch into the release branch
-    - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+- [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case
+  - [ ] `git checkout "${RELEASE_BRANCH}"`
+  - [ ] `git show --stat HEAD` - This should show the squashed prepare commit
+  - [ ] `git diff HEAD~1 origin/master --quiet && echo "Same" || echo "Different"` - Should output `Same`
+  - Follow these steps if the release branch needs to be updated
+    - [ ] Rebase the release preparation branch on the release branch
+      - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
+          commit. This makes it easier to cherry-pick to master after the release.
+      - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
+        - If this needs to be updated commit and squash it in the release branch
+    - [ ] Merge release preparation branch into the release branch
+        - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
+
 - [ ] Tag new release
-  - [ ] `git tag v"${NEW_VERSION_NUMBER}" -a -m v"${NEW_VERSION_NUMBER}"`
-  - [ ] `git push origin v"${NEW_VERSION_NUMBER}"`
+  - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
+  - [ ] `git push origin v"${NEW_VECTOR_VERSION}"`
 - [ ] Wait for release workflow to complete
-  - Discoverable via [https://github.com/timberio/vector/actions/workflows/release.yml](https://github.com/timberio/vector/actions/workflows/release.yml)
+  - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git switch website && git reset --hard origin/"{RELEASE_BRANCH}" && git push`
+  - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - The deployment is done by Amplify. You can see
       the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
 - [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
-  - Note: the pipeline inputs are the version number `v"${NEW_VERSION_NUMBER}"` and a personal GitHub token.
+  - Note: the pipeline inputs are the version number `v"${NEW_VECTOR_VERSION}"` and a personal GitHub token.
   - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
 - [ ] Once Helm chart is released, updated Vector manifests
     - Run `cargo vdev build manifests` and open a PR with changes
-- [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally.
-- [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
-- [ ] Bump the release number in the `Cargo.toml` on master to the next major release.
-  - Also, update `Cargo.lock` with: `cargo update -p vector`
+- [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally. ([Example PR](https://github.com/DataDog/images/pull/7104))
+- [ ] Create a new PR with title starting as `chore(releasing):`
+  - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
+  - [ ] Bump the release number in the `Cargo.toml` on master to the next minor release.
+  - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`
+  - [ ] If there is a VRL version update, revert it and make it track the git `main` branch and then run `cargo update -p vrl`.
 - [ ] Kick-off post-mortems for any regressions resolved by the release

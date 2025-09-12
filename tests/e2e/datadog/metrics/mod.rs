@@ -1,11 +1,11 @@
+use std::io::Read;
+
 use async_compression::tokio::bufread::{ZstdDecoder, ZstdEncoder};
-use base64::{prelude::BASE64_STANDARD, Engine};
+use base64::{Engine, prelude::BASE64_STANDARD};
 use bytes::Bytes;
 use flate2::read::ZlibDecoder;
-use std::io::Read;
 use tokio::io::{AsyncReadExt, BufReader};
-use vector::test_util::compression::is_zstd;
-use vector::test_util::trace_init;
+use vector::test_util::{compression::is_zstd, trace_init};
 
 mod series;
 mod sketches;
@@ -13,14 +13,14 @@ mod sketches;
 use super::*;
 
 async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
-    if is_zstd(&payload) {
+    if is_zstd(payload) {
         let mut decompressor = ZstdDecoder::new(payload);
         let mut decompressed = Vec::new();
         decompressor.read_to_end(&mut decompressed).await?;
         return Ok(decompressed);
     }
 
-    let mut decompressor = ZlibDecoder::new(&payload[..]);
+    let mut decompressor = ZlibDecoder::new(payload);
     let mut decompressed = Vec::new();
     let result = decompressor.read_to_end(&mut decompressed);
     result.map(|_| decompressed)

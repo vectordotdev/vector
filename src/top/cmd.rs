@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::{connect_subscription_client, Client};
+use vector_lib::api_client::{Client, connect_subscription_client};
 
 use super::{
     dashboard::{init_dashboard, is_tty},
@@ -76,7 +76,7 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("[top] Encountered shutdown error: {}", err);
+                eprintln!("[top] Encountered shutdown error: {err}");
             }
             connection.abort();
             exitcode::IOERR

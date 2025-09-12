@@ -174,7 +174,6 @@ eeyun
 efgh
 Elhage
 emerg
-Enableable
 endianess
 endler
 eni
@@ -673,6 +672,7 @@ wtimeout
 WTS
 xact
 xlarge
+XXH
 xxs
 YAMLs
 YBv

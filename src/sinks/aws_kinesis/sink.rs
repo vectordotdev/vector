@@ -4,17 +4,16 @@ use rand::random;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
+use super::{
+    record::Record,
+    request_builder::{KinesisRequest, KinesisRequestBuilder},
+};
 use crate::{
     internal_events::{AwsKinesisStreamNoPartitionKeyError, SinkRequestBuildError},
     sinks::{
         prelude::*,
-        util::{processed_event::ProcessedEvent, StreamSink},
+        util::{StreamSink, processed_event::ProcessedEvent},
     },
-};
-
-use super::{
-    record::Record,
-    request_builder::{KinesisRequest, KinesisRequestBuilder},
 };
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisKey>;

@@ -73,7 +73,7 @@ components: sinks: clickhouse: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.clickhouse.configuration
+	configuration: generated.components.sinks.clickhouse.configuration
 
 	input: {
 		logs:    true

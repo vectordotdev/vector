@@ -11,8 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
@@ -29,53 +27,43 @@ jobs:
   changes:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  checks:
-    name: Checks
-    runs-on: ubuntu-24.04-8core
-    timeout-minutes: 60
+  check-fmt:
+    name: Check code format
+    runs-on: ubuntu-24.04
     needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
-
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-
-      - uses: ruby/setup-ruby@v1
-
-      - run: bash scripts/environment/prepare.sh
-
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make check-fmt
 
-      - name: Check code format
-        run: make check-fmt
+  check-clippy:
+    name: Check clippy
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: sudo bash ./scripts/environment/install-protoc.sh
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - run: make check-clippy
 
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
+  test:
+    name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
 
-      - name: Unit - x86_64-unknown-linux-gnu
-        if: needs.changes.outputs.source == 'true'
+      - name: Unit Test
         run: make test
         env:
           CARGO_BUILD_JOBS: 5
@@ -88,61 +76,141 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-      - name: Check version
-        run: make check-version
+  check-version:
+    name: Check version
+    runs-on: ubuntu-24.04
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - run: make check-version
 
-      - name: Check scripts
-        run: make check-scripts
+  check-scripts:
+    name: Check scripts
+    runs-on: ubuntu-24.04
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: make check-scripts
 
-      - name: Check events
-        if: needs.changes.outputs.source == 'true'
-        run: make check-events
+  check-events:
+    name: Check events
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make check-events
 
-      - name: Check that the 3rd-party license file is up to date
-        if: needs.changes.outputs.dependencies == 'true'
-        run: make check-licenses
+  check-licenses:
+    name: Check that the 3rd-party license file is up to date
+    runs-on: ubuntu-24.04
+    if: needs.changes.outputs.dependencies == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: bash ./scripts/environment/prepare.sh --modules=dd-rust-license-tool
+      - run: make check-licenses
 
-      - name: Check Cue docs
-        if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
+  check-docs:
+    name: Check Cue docs
+    runs-on: ubuntu-24.04
+    if: needs.changes.outputs.cue == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: make check-docs
 
-      - name: Check Markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
+  check-markdown:
+    name: Check Markdown
+    runs-on: ubuntu-24.04
+    if: needs.changes.outputs.markdown == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: bash ./scripts/environment/prepare.sh --modules=markdownlint
+      - run: make check-markdown
 
-      - name: Check Component Docs
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+  check-component-docs:
+    name: Check Component Docs
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: sudo bash ./scripts/environment/install-protoc.sh
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: make check-component-docs
 
-      - name: Check Rust Docs
-        if: needs.changes.outputs.source == 'true'
-        run: cd rust-doc && make docs
+  check-rust-docs:
+    name: Check Rust Docs
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: cd rust-doc && make docs
 
-      - name: VRL - Linux
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
-        run: cargo vdev test-vrl
+  test-vrl:
+    name: VRL - Linux
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: sudo bash ./scripts/environment/install-protoc.sh
+      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - run: make test-vrl
 
-      - name: Build VRL Playground
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
-        run: |
+  build-vrl-playground:
+    name: Build VRL Playground
+    runs-on: ubuntu-24.04-8core
+    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - run: |
           cd lib/vector-vrl/web-playground/
-          ~/.cargo/bin/rustup target add wasm32-unknown-unknown
+          rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
-  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
     if: always()
-    needs: [changes, checks]
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    needs:
+      - changes
+      - check-fmt
+      - check-clippy
+      - test
+      - check-version
+      - check-scripts
+      - check-events
+      - check-licenses
+      - check-docs
+      - check-markdown
+      - check-component-docs
+      - check-rust-docs
+      - test-vrl
+      - build-vrl-playground
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

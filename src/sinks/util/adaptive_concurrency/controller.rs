@@ -8,7 +8,7 @@ use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
 use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 
-use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
+use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
@@ -105,7 +105,9 @@ impl<L> Controller<L> {
         }
     }
 
-    pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
+    pub(super) fn acquire(
+        &self,
+    ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
         Arc::clone(&self.semaphore).acquire()
     }
 
@@ -291,6 +293,7 @@ where
                     warn!(
                         message = "Unhandled error response.",
                         %error,
+                        internal_log_rate_limit = true
                     );
                     false
                 }

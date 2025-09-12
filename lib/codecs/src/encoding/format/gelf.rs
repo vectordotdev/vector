@@ -1,5 +1,3 @@
-use crate::gelf::GELF_TARGET_PATHS;
-use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -7,10 +5,12 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
 use vector_core::{
-    config::{log_schema, DataType},
+    config::{DataType, log_schema},
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };
+
+use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -141,13 +141,13 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_common::Result<LogEvent> 
         err_missing_field(HOST)?;
     }
 
-    if !log.contains(&GELF_TARGET_PATHS.short_message) {
-        if let Some(message_key) = log_schema().message_key_target_path() {
-            if log.contains(message_key) {
-                log.rename_key(message_key, &GELF_TARGET_PATHS.short_message);
-            } else {
-                err_missing_field(SHORT_MESSAGE)?;
-            }
+    if !log.contains(&GELF_TARGET_PATHS.short_message)
+        && let Some(message_key) = log_schema().message_key_target_path()
+    {
+        if log.contains(message_key) {
+            log.rename_key(message_key, &GELF_TARGET_PATHS.short_message);
+        } else {
+            err_missing_field(SHORT_MESSAGE)?;
         }
     }
     Ok(log)
@@ -243,13 +243,15 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encoding::SerializerConfig;
-
-    use super::*;
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
-    use vrl::btreemap;
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        btreemap,
+        value::{ObjectMap, Value},
+    };
+
+    use super::*;
+    use crate::encoding::SerializerConfig;
 
     fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
         let config = GelfSerializerConfig::new();
