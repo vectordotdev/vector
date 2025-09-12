@@ -160,6 +160,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -465,7 +466,7 @@ azure_storage = { version = "0.21", default-features = false, features = ["enabl
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
-libc = "0.2.174"
+libc.workspace = true
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
