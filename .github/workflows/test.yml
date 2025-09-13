@@ -34,8 +34,9 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: make check-fmt
 
   check-clippy:
@@ -45,9 +46,10 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo bash ./scripts/environment/install-protoc.sh
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-clippy
 
@@ -58,11 +60,13 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
-
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          datadog-ci: true
+          protoc: true
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - name: Unit Test
         run: make test
         env:
@@ -101,8 +105,9 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: make check-events
 
   check-licenses:
@@ -112,7 +117,11 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: bash ./scripts/environment/prepare.sh --modules=dd-rust-license-tool
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          dd-rust-license-tool: true
       - run: make check-licenses
 
   check-docs:
@@ -122,7 +131,10 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cue: true
       - run: make check-docs
 
   check-markdown:
@@ -132,7 +144,10 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: bash ./scripts/environment/prepare.sh --modules=markdownlint
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          markdownlint: true
       - run: make check-markdown
 
   check-component-docs:
@@ -142,9 +157,11 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: sudo bash ./scripts/environment/install-protoc.sh
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev ruby-bundler
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
       - run: make check-component-docs
 
   check-rust-docs:
@@ -154,8 +171,9 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: cd rust-doc && make docs
 
   test-vrl:
@@ -165,10 +183,11 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo bash ./scripts/environment/install-protoc.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          wasm-pack: true
       - run: make test-vrl
 
   build-vrl-playground:
@@ -178,9 +197,10 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          wasm-pack: true
       - run: |
           cd lib/vector-vrl/web-playground/
           rustup target add wasm32-unknown-unknown
