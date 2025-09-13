@@ -1,0 +1,1 @@
+The `prometheus_remote_write` source no longer returns HTTP 400 errors when receiving requests with conflicting metric metadata. Instead, it now follows Prometheus/Thanos behavior by silently ignoring metadata conflicts and continuing to process the timeseries data.

@@ -56,8 +56,6 @@ pub enum ParserError {
     #[snafu(display("expected value in range [0, {}], found: {}", max, value))]
     ValueOutOfRange { value: f64, max: u64 },
 
-    #[snafu(display("multiple metric kinds given for metric name `{}`", name))]
-    MultipleMetricKinds { name: String },
     #[snafu(display("request is missing metric name label"))]
     RequestNoNameLabel,
 }
@@ -338,7 +336,9 @@ impl MetricGroupSet {
     fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {
         match self.0.get(&name) {
             Some(group) if !group.matches_kind(kind) => {
-                Err(ParserError::MultipleMetricKinds { name })
+                // Ignore conflicting metadata (follow Prometheus/Thanos behavior)
+                // Keep the first metadata entry, ignore subsequent conflicting ones
+                Ok(())
             }
             Some(_) => Ok(()), // metadata already exists and is the right type
             None => {
@@ -882,6 +882,49 @@ mod test {
         match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
+        });
+    }
+
+    #[test]
+    fn parse_request_conflicting_metadata() {
+        let request = proto::WriteRequest {
+            metadata: vec![
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Gauge as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Number of bytes allocated and still in use.".into(),
+                    unit: String::default(),
+                },
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Counter as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Total number of bytes allocated, even if freed.".into(),
+                    unit: String::default(),
+                },
+            ],
+            timeseries: vec![
+                proto::TimeSeries {
+                    labels: vec![proto::Label {
+                        name: "__name__".into(),
+                        value: "go_memstats_alloc_bytes".into(),
+                    }],
+                    samples: vec![proto::Sample {
+                        value: 12345.0,
+                        timestamp: 1395066367500,
+                    }],
+                },
+            ],
+        };
+
+        // Should succeed and use the first metadata entry (Gauge)
+        let parsed = parse_request(request).unwrap();
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "go_memstats_alloc_bytes", Gauge => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367500), labels!(), 12345.0)
+            );
         });
     }
 }
