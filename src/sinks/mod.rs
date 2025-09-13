@@ -45,6 +45,8 @@ pub mod databend;
     feature = "sinks-datadog_traces"
 ))]
 pub mod datadog;
+#[cfg(feature = "sinks-doris")]
+pub mod doris;
 #[cfg(feature = "sinks-elasticsearch")]
 pub mod elasticsearch;
 #[cfg(feature = "sinks-file")]
