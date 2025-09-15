@@ -8,6 +8,7 @@ use vector_lib::{
     configurable::configurable_component,
     enrichment::Table,
     id::ComponentKey,
+    lookup::lookup_v2::OptionalValuePath,
     schema::{self},
     sink::VectorSink,
 };
@@ -64,6 +65,10 @@ pub struct MemoryConfig {
     #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
+    /// Field in the incoming value used as the TTL override.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub ttl_field: OptionalValuePath,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
@@ -89,6 +94,7 @@ impl Default for MemoryConfig {
             log_namespace: None,
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
+            ttl_field: OptionalValuePath::none(),
         }
     }
 }

@@ -159,7 +159,7 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
-    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
