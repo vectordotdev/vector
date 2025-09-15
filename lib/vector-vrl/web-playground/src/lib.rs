@@ -129,7 +129,7 @@ fn compile(
 
     match result {
         Ok(runtime_result) => Ok(VrlCompileResult {
-            runtime_result, // This is the value of the last expression.
+            runtime_result,                   // This is the value of the last expression.
             target_value: target_value.value, // The value of the final event
             elapsed_time,
         }),
