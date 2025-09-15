@@ -182,6 +182,7 @@ mod test {
     use std::sync::LazyLock;
 
     use chrono::{TimeZone, Timelike, Utc};
+    use itertools::Itertools;
     use similar_asserts::assert_eq;
     use vector_lib::{assert_event_data_eq, metric_tags};
 
@@ -740,34 +741,24 @@ mod test {
 
     #[test]
     fn test_histogram_doesnt_panic() {
-        let exp = r#"
+        let mut exp = r#"
             # HELP http_request_duration_seconds A histogram of the request duration.
             # TYPE http_request_duration_seconds histogram
-            http_request_duration_seconds_bucket{le="85.0"} 24054 1612411506789
-            http_request_duration_seconds_bucket{le="47.0"} 33444 1612411506789
-            http_request_duration_seconds_bucket{le="17.0"} 100392 1612411506789
-            http_request_duration_seconds_bucket{le="34.0"} 129389 1612411506789
-            http_request_duration_seconds_bucket{le="18.0"} 133988 1612411506789
-            http_request_duration_seconds_bucket{le="75.0"} 133988 1612411506789
-            http_request_duration_seconds_bucket{le="NaN"} 144320 1612411506789
-            http_request_duration_seconds_bucket{le="NaN"} 24054 1612411506789
-            http_request_duration_seconds_bucket{le="22.0"} 33444 1612411506789
-            http_request_duration_seconds_bucket{le="41.0"} 100392 1612411506789
-            http_request_duration_seconds_bucket{le="38.0"} 129389 1612411506789
-            http_request_duration_seconds_bucket{le="72.0"} 133988 1612411506789
-            http_request_duration_seconds_bucket{le="36.0"} 144320 1612411506789
-            http_request_duration_seconds_bucket{le="42.0"} 24054 1612411506789
-            http_request_duration_seconds_bucket{le="91.0"} 33444 1612411506789
-            http_request_duration_seconds_bucket{le="NaN"} 100392 1612411506789
-            http_request_duration_seconds_bucket{le="62.0"} 129389 1612411506789
-            http_request_duration_seconds_bucket{le="84.0"} 133988 1612411506789
-            http_request_duration_seconds_bucket{le="+Inf"} 144320 1612411506789
-            http_request_duration_seconds_bucket{le="84.0"} 24054 1612411506789
-            http_request_duration_seconds_bucket{le="31.0"} 33444 1612411506789
-            http_request_duration_seconds_bucket{le="59.0"} 100392 1612411506789
-            "#;
+            "#
+        .to_string();
+        fn float(v: i32) -> f64 {
+            v as f64
+        }
+        exp += &(0..=15)
+            .map(float)
+            .chain(std::iter::once(f64::NAN))
+            .chain((16..=20).map(float))
+            .rev()
+            .map(|f| format!("http_request_duration_seconds_bucket{{le=\"{f}\"}} 0 1612411506789"))
+            .join("\n");
+
         assert_event_data_eq!(
-            events_to_metrics(parse_text(exp)),
+            events_to_metrics(parse_text(&exp)),
             Ok(vec![
                 Metric::new(
                     "http_request_duration_seconds",
@@ -775,13 +766,14 @@ mod test {
                     MetricValue::AggregatedHistogram {
                         // These bucket values don't mean/test anything, they just test that the
                         // sort works without panicking
-                        buckets: vector_lib::buckets![
-                            17.0 => 100392, 18.0 => 33596,     22.0 => 0,        31.0 => 0, 34.0 => 95945,
-                            36.0 => 14931,  38.0 => 0,         41.0 => 0,        42.0 => 0, 47.0 => 9390,
-                            59.0 => 66948,  62.0 => 28997,     72.0 => 4599,     75.0 => 0, 84.0 => 0,
-                            84.0 => 109934, 85.0 => 0,         91.0 => 9390,     f64::INFINITY => 110876,
-                            f64::NAN => 0,  f64::NAN => 76338, f64::NAN => 43928
-                        ],
+                        buckets: (0..=20)
+                            .map(float)
+                            .chain(std::iter::once(f64::NAN))
+                            .map(|upper_limit| Bucket {
+                                upper_limit,
+                                count: 0
+                            })
+                            .collect(),
                         count: 0,
                         sum: 0.0,
                     },

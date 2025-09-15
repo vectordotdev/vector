@@ -225,29 +225,16 @@ mod test {
 
     #[test]
     fn sort_unstable_doesnt_panic() {
-        let v: Vec<f64> = vec![
-            85.0,
-            47.0,
-            17.0,
-            34.0,
-            18.0,
-            75.0,
-            f64::NAN,
-            f64::NAN,
-            22.0,
-            41.0,
-            38.0,
-            72.0,
-            36.0,
-            42.0,
-            91.0,
-            f64::NAN,
-            62.0,
-            84.0,
-            31.0,
-            59.0,
-            31.0,
-        ];
+        fn float(v: i32) -> f64 {
+            v as f64
+        }
+        let v: Vec<f64> = (0..=15)
+            .map(float)
+            .chain(std::iter::once(f64::NAN))
+            .chain((16..=20).map(float))
+            .rev()
+            .collect();
+
         // For <20 items the internal sort implementation is different and doesn't panic
         assert!(v.len() > 20);
 
