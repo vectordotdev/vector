@@ -2,10 +2,7 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, SecondsFormat, SubsecRound, Utc};
 use regex::Regex;
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
-use std::fmt::Write;
-use std::str::FromStr;
-use std::sync::LazyLock;
+use std::{collections::HashMap, fmt::Write, str::FromStr, sync::LazyLock};
 use strum::{EnumString, FromRepr, VariantNames};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
@@ -14,8 +11,7 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
-use vrl::path::parse_target_path;
-use vrl::value::ObjectMap;
+use vrl::{path::parse_target_path, value::ObjectMap};
 
 /// Config used to build a `SyslogSerializer`.
 #[configurable_component]
@@ -127,7 +123,8 @@ where
             .map(DynamicOrStatic::Static)
             .ok_or_else(|| {
                 serde::de::Error::custom(format!(
-                    "Invalid {type_name}: '{s}'. Expected a name, integer 0-{max_value}, or path."))
+                    "Invalid {type_name}: '{s}'. Expected a name, integer 0-{max_value}, or path."
+                ))
             })
     }
 }
@@ -716,8 +713,8 @@ mod tests {
         let log_as_json_value = serde_json::to_value(&log).unwrap();
         let message_content = serde_json::to_string(&log_as_json_value).unwrap();
         let output = run_encode(config, Event::Log(log));
-        let expected = format!(
-            "<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {message_content}");
+        let expected =
+            format!("<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {message_content}");
         assert_eq!(output, expected);
     }
 

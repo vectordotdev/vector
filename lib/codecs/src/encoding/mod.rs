@@ -13,8 +13,8 @@ pub use format::{
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
-    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
-    SyslogSerializer, SyslogSerializerConfig, TextSerializerConfig,
+    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, SyslogSerializer,
+    SyslogSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
