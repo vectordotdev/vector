@@ -1,4 +1,3 @@
-Fix a bug where some float values like `f64::NAN`, `f64::INFINITY` and similars would cause Vector
-to panic if the amount of items being sorted in those internal functions exceeded 20 items.
+Fix a bug where certain floating-point values such as `f64::NAN`, `f64::INFINITY`, and similar would cause Vector to panic when sorting more than 20 items in some internal functions.
 
 authors: thomasqueirozb
