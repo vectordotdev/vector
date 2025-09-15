@@ -35,19 +35,9 @@ impl Input {
 // and the execution time.
 #[derive(Deserialize, Serialize)]
 pub struct VrlCompileResult {
-    pub output: Value,
-    pub result: Value,
+    pub runtime_result: Value,
+    pub target_value: Value,
     pub elapsed_time: Option<f64>,
-}
-
-impl VrlCompileResult {
-    fn new(output: Value, result: Value, elapsed_time: Option<f64>) -> Self {
-        Self {
-            output,
-            result,
-            elapsed_time,
-        }
-    }
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -138,9 +128,11 @@ fn compile(
         };
 
     match result {
-        // The final event is in `target_value.value`.
-        // The value of the last expression is in `res`.
-        Ok(res) => Ok(VrlCompileResult::new(res, target_value.value, elapsed_time)),
+        Ok(runtime_result) => Ok(VrlCompileResult {
+            runtime_result, // This is the value of the last expression.
+            target_value: target_value.value, // The value of the final event
+            elapsed_time,
+        }),
         Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }
