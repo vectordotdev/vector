@@ -12167,6 +12167,8 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-credential-types",
+ "aws-lc-rs",
+ "aws-lc-sys",
  "aws-runtime",
  "aws-sdk-cloudwatch",
  "aws-sdk-cloudwatchlogs",

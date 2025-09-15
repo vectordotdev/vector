@@ -138,6 +138,7 @@ members = [
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
+aws-lc-rs = { version = "1.14.0", features = ["bindgen"] }
 aws-lc-sys = { version = "0.31.0", features = ["bindgen"] } # Required for FIPS enabled cross compilation
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 base64 = { version = "0.22.1", default-features = false }
@@ -199,6 +200,9 @@ vector-config-macros = { path = "lib/vector-config-macros" }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
+
+aws-lc-rs = { workspace = true, optional = true }
+aws-lc-sys = { workspace = true, optional = true }
 cfg-if.workspace = true
 clap.workspace = true
 indoc.workspace = true
@@ -505,6 +509,9 @@ default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build"
 default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# Enable the FIPS-only crypto backend
+crypto-aws-lc-fips = ["dep:aws-lc-rs", "dep:aws-lc-sys"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
