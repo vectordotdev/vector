@@ -1,22 +1,24 @@
-use crate::template::Template;
-use crate::test_util::components::assert_transform_compliance;
-use crate::transforms::sample::config::SampleConfig;
-use crate::transforms::test::create_topology;
-use crate::transforms::{FunctionTransform, OutputBuffer};
-use crate::{
-    conditions::{Condition, ConditionalConfig, VrlConfig},
-    config::log_schema,
-    event::{Event, LogEvent, TraceEvent},
-    test_util::random_lines,
-    transforms::sample::config::default_sample_rate_key,
-    transforms::sample::transform::{Sample, SampleMode},
-    transforms::test::transform_one,
-};
 use approx::assert_relative_eq;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vrl::owned_value_path;
+
+use crate::{
+    conditions::{Condition, ConditionalConfig, VrlConfig},
+    config::log_schema,
+    event::{Event, LogEvent, TraceEvent},
+    template::Template,
+    test_util::{components::assert_transform_compliance, random_lines},
+    transforms::{
+        FunctionTransform, OutputBuffer,
+        sample::{
+            config::{SampleConfig, default_sample_rate_key},
+            transform::{Sample, SampleMode},
+        },
+        test::{create_topology, transform_one},
+    },
+};
 
 #[tokio::test]
 async fn emits_internal_events() {

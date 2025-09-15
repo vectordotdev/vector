@@ -2,18 +2,16 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures_util::Stream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, LogNamespace, TransformOutput},
+    configurable::configurable_component,
     event::{Event, EventContainer},
     schema::Definition,
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
 };
 
-use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
-
 use super::TransformType;
+use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
 
 /// Configuration for the `test_noop` transform.
 #[configurable_component(transform("test_noop", "Test (no-op)"))]

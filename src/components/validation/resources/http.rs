@@ -19,17 +19,21 @@ use tokio::{
     sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        CharacterDelimitedEncoder,
+        encoding::{Framer, Serializer::Json},
+    },
+    config::LogNamespace,
+    event::Event,
+};
 
+use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 use crate::components::validation::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
-    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
-};
-
-use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 
 /// An HTTP resource.
 #[derive(Clone)]

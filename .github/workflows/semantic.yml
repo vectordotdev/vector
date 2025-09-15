@@ -162,6 +162,7 @@ jobs:
             nats source
             new source
             nginx_metrics source
+            okta source
             opentelemetry source
             postgresql_metrics source
             prometheus_remote_write source
@@ -259,5 +260,7 @@ jobs:
             template website
             website
             website deps
+
+            vrl playground
 
             opentelemetry lib

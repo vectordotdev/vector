@@ -1,7 +1,7 @@
 ARG RUST_VERSION=1.85
 ARG FEATURES
 
-FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
+FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
 RUN apt-get update && apt-get -y --no-install-recommends install \
     build-essential \
@@ -11,7 +11,6 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     clang \
     libclang-dev \
     libsasl2-dev \
-    libstdc++-11-dev \
     libssl-dev \
     libxxhash-dev \
     unzip \

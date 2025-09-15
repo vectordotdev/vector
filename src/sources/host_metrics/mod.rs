@@ -13,11 +13,13 @@ use serde_with::serde_as;
 use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
 };
 
 use crate::{
@@ -673,10 +675,10 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
     use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
+    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
 
     #[test]
     fn filterlist_default_includes_everything() {

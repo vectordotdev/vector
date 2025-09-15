@@ -9,9 +9,11 @@ pub mod logproto {
 }
 
 pub mod util {
-    use super::logproto;
-    use prost::Message;
     use std::collections::HashMap;
+
+    use prost::Message;
+
+    use super::logproto;
 
     const NANOS_RANGE: i64 = 1_000_000_000;
 
@@ -92,10 +94,12 @@ pub mod util {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use chrono::prelude::*;
+
     use super::util;
     use crate::util::{Batch, Entry, Stream};
-    use chrono::prelude::*;
-    use std::collections::HashMap;
 
     #[test]
     fn encode_labels() {

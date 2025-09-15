@@ -1,3 +1,7 @@
+use futures_util::StreamExt;
+use tokio::time::{Duration, sleep};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
 use crate::{
     config::Config,
     sinks::socket::SocketSinkConfig,
@@ -8,9 +12,6 @@ use crate::{
         next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
     },
 };
-use futures_util::StreamExt;
-use tokio::time::{Duration, sleep};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]

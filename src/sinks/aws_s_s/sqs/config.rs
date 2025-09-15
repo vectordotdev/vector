@@ -1,17 +1,18 @@
 use aws_sdk_sqs::Client as SqsClient;
-
-use crate::aws::RegionOrEndpoint;
-
-use crate::config::{
-    AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
-};
 use vector_lib::configurable::configurable_component;
 
 use super::{
     BaseSSSinkConfig, SSRequestBuilder, SSSink, client::SqsMessagePublisher,
     message_deduplication_id, message_group_id,
 };
-use crate::{aws::create_client, common::sqs::SqsClientBuilder};
+use crate::{
+    aws::{RegionOrEndpoint, create_client},
+    common::sqs::SqsClientBuilder,
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
+};
 
 /// Configuration for the `aws_sqs` sink.
 #[configurable_component(sink(
