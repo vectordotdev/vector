@@ -8,8 +8,9 @@ use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{
-    FutureExt, future,
+    future,
     stream::{BoxStream, StreamExt},
+    FutureExt,
 };
 use serde_with::serde_as;
 use tokio::{
@@ -18,13 +19,13 @@ use tokio::{
 };
 use tokio_util::{codec::Encoder as _, time::delay_queue::Expired};
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{
-        TextSerializerConfig,
         encoding::{Framer, FramingConfig},
+        TextSerializerConfig,
     },
     configurable::configurable_component,
     internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
+    EstimatedJsonEncodedSizeOf, TimeZone,
 };
 
 use crate::{
@@ -35,7 +36,7 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::{StreamSink, timezone_to_offset},
+    sinks::util::{timezone_to_offset, StreamSink},
     template::Template,
 };
 
@@ -94,7 +95,7 @@ pub struct FileSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub truncate: FileTruncateConfig,
+    pub truncate_config: FileTruncateConfig,
 }
 
 /// Configuration for truncating files.
@@ -123,7 +124,7 @@ impl GenerateConfig for FileSinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             internal_metrics: Default::default(),
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         })
         .unwrap()
     }
@@ -269,7 +270,7 @@ impl FileSink {
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
             include_file_metric_tag: config.internal_metrics.include_file_tag,
-            truncation_config: config.truncate.clone(),
+            truncation_config: config.truncate_config.clone(),
         })
     }
 
@@ -365,42 +366,8 @@ impl FileSink {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
-        let mut truncate = false;
         let bytes_path = BytesPath::new(path.clone());
-
-        if let Some(after_closetime_secs) = self.truncation_config.after_closetime_secs
-            && self.files.get(&path).is_none()
-            && let Ok(metadata) = fs::metadata(&bytes_path).await
-            && let Ok(time) = metadata
-                .modified()
-                .map_err(|_| ())
-                .and_then(|t| t.elapsed().map_err(|_| ()))
-            && time.as_secs() > after_closetime_secs.into()
-        {
-            truncate = true;
-        }
-
-        if let Some(after_secs) = self.truncation_config.after_secs
-            && let Some(file) = self.files.get(&path)
-            && (file.created_at().elapsed().as_secs() > after_secs.into())
-        {
-            truncate = true;
-        }
-
-        if let Some(after_modifiedtime_secs) = self.truncation_config.after_modifiedtime_secs
-            && let Some(previous_modification) = self
-                .files
-                .get_with_deadline(&path)
-                .and_then(|(_, deadline)| deadline.checked_sub(self.idle_timeout))
-            && previous_modification.elapsed().as_secs() > after_modifiedtime_secs.into()
-        {
-            truncate = true;
-        }
-
-        if truncate && let Some((file, path)) = self.files.remove(&path) {
-            self.close_file(file, path).await;
-        }
-
+        let truncate = self.should_truncate(&bytes_path, &path).await;
         let file = if !truncate && let Some(file) = self.files.reset_at(&path, next_deadline) {
             trace!(message = "Working with an already opened file.", path = ?path);
             file
@@ -457,6 +424,45 @@ impl FileSink {
                 });
             }
         }
+    }
+
+    async fn should_truncate(&mut self, bytes_path: &BytesPath, path: &bytes::Bytes) -> bool {
+        let mut truncate = false;
+
+        if let Some(after_closetime_secs) = self.truncation_config.after_closetime_secs
+            && self.files.get(path).is_none()
+            && let Ok(metadata) = fs::metadata(bytes_path).await
+            && let Ok(time) = metadata
+                .modified()
+                .map_err(|_| ())
+                .and_then(|t| t.elapsed().map_err(|_| ()))
+            && time.as_secs() > after_closetime_secs.into()
+        {
+            truncate = true;
+        }
+
+        if let Some(after_secs) = self.truncation_config.after_secs
+            && let Some(file) = self.files.get(path)
+            && (file.created_at().elapsed().as_secs() > after_secs.into())
+        {
+            truncate = true;
+        }
+
+        if let Some(after_modifiedtime_secs) = self.truncation_config.after_modifiedtime_secs
+            && let Some(previous_modification) = self
+                .files
+                .get_with_deadline(path)
+                .and_then(|(_, deadline)| deadline.checked_sub(self.idle_timeout))
+            && previous_modification.elapsed().as_secs() > after_modifiedtime_secs.into()
+        {
+            truncate = true;
+        }
+
+        if truncate && let Some((file, path)) = self.files.remove(path) {
+            self.close_file(file, path).await;
+        }
+
+        truncate
     }
 
     async fn close_file(&self, mut file: OutFile, path: Expired<Bytes>) {
@@ -522,7 +528,7 @@ mod tests {
     use std::convert::TryInto;
 
     use chrono::{SubsecRound, Utc};
-    use futures::{SinkExt, stream};
+    use futures::{stream, SinkExt};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::JsonSerializerConfig,
@@ -534,7 +540,7 @@ mod tests {
     use crate::{
         config::log_schema,
         test_util::{
-            components::{FILE_SINK_TAGS, assert_sink_compliance},
+            components::{assert_sink_compliance, FILE_SINK_TAGS},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
             random_lines_with_stream, random_metrics_with_stream,
             random_metrics_with_stream_timestamp, temp_dir, temp_file, trace_init,
@@ -560,7 +566,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -587,7 +593,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -614,7 +620,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -646,7 +652,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -729,7 +735,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -786,7 +792,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -818,7 +824,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let metric_count = 3;
@@ -870,7 +876,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate: Default::default(),
+            truncate_config: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);

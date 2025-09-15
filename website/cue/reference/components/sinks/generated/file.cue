@@ -515,7 +515,7 @@ generated: components: sinks: file: configuration: {
 		required: false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
 	}
-	truncate: {
+	truncate_config: {
 		description: "Configuration for truncating files."
 		required:    false
 		type: object: options: {
