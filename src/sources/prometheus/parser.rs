@@ -95,8 +95,9 @@ fn reparse_groups(
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let mut buckets = metric.buckets;
-                    buckets
-                        .sort_by(|a, b| a.bucket.total_cmp(&b.bucket).then(a.count.cmp(&b.count)));
+                    buckets.sort_unstable_by(|a, b| {
+                        a.bucket.total_cmp(&b.bucket).then(a.count.cmp(&b.count))
+                    });
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
