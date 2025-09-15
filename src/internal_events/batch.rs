@@ -18,7 +18,7 @@ impl InternalEvent for LargeEventDroppedError {
             length = %self.length,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -9,7 +9,6 @@ use crate::{
     },
     test_util,
 };
-use vector_lib::config::log_schema;
 
 #[test]
 fn generate_config() {

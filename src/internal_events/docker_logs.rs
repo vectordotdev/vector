@@ -169,7 +169,7 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

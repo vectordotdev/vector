@@ -126,7 +126,7 @@ impl InternalEvent for HttpBadRequest<'_> {
             error_type = error_type::REQUEST_FAILED,
             error_stage = error_stage::RECEIVING,
             http_code = %self.code,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

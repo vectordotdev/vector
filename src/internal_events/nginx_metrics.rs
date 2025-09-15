@@ -47,7 +47,7 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -72,7 +72,7 @@ impl InternalEvent for NginxMetricsStubStatusParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

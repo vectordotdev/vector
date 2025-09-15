@@ -4,7 +4,6 @@ use std::{
     task::{Context, Poll, ready},
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;

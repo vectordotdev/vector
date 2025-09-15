@@ -14,11 +14,6 @@ LABEL org.opencontainers.image.url="https://vector.dev"
 LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
 LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
 
-# https://github.com/opencontainers/image-spec/blob/main/annotations.md
-LABEL org.opencontainers.image.url="https://vector.dev"
-LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector"
-LABEL org.opencontainers.image.documentation="https://vector.dev/docs"
-
 # we want the latest versions of these
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
