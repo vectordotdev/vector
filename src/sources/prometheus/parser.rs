@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "sources-prometheus-remote-write")]
 use vector_lib::prometheus::parser::proto;
@@ -97,7 +95,8 @@ fn reparse_groups(
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let mut buckets = metric.buckets;
-                    buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+                    buckets
+                        .sort_by(|a, b| a.bucket.total_cmp(&b.bucket).then(a.count.cmp(&b.count)));
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
@@ -178,6 +177,7 @@ fn combine_tags(
 
 #[cfg(test)]
 mod test {
+    use core::f64;
     use std::sync::LazyLock;
 
     use chrono::{TimeZone, Timelike, Utc};
@@ -730,6 +730,59 @@ mod test {
                         ],
                         count: 144320,
                         sum: 53423.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_doesnt_panic() {
+        let exp = r#"
+            # HELP http_request_duration_seconds A histogram of the request duration.
+            # TYPE http_request_duration_seconds histogram
+            http_request_duration_seconds_bucket{le="85.0"} 24054 1612411506789
+            http_request_duration_seconds_bucket{le="47.0"} 33444 1612411506789
+            http_request_duration_seconds_bucket{le="17.0"} 100392 1612411506789
+            http_request_duration_seconds_bucket{le="34.0"} 129389 1612411506789
+            http_request_duration_seconds_bucket{le="18.0"} 133988 1612411506789
+            http_request_duration_seconds_bucket{le="75.0"} 133988 1612411506789
+            http_request_duration_seconds_bucket{le="NaN"} 144320 1612411506789
+            http_request_duration_seconds_bucket{le="NaN"} 24054 1612411506789
+            http_request_duration_seconds_bucket{le="22.0"} 33444 1612411506789
+            http_request_duration_seconds_bucket{le="41.0"} 100392 1612411506789
+            http_request_duration_seconds_bucket{le="38.0"} 129389 1612411506789
+            http_request_duration_seconds_bucket{le="72.0"} 133988 1612411506789
+            http_request_duration_seconds_bucket{le="36.0"} 144320 1612411506789
+            http_request_duration_seconds_bucket{le="42.0"} 24054 1612411506789
+            http_request_duration_seconds_bucket{le="91.0"} 33444 1612411506789
+            http_request_duration_seconds_bucket{le="NaN"} 100392 1612411506789
+            http_request_duration_seconds_bucket{le="62.0"} 129389 1612411506789
+            http_request_duration_seconds_bucket{le="84.0"} 133988 1612411506789
+            http_request_duration_seconds_bucket{le="+Inf"} 144320 1612411506789
+            http_request_duration_seconds_bucket{le="84.0"} 24054 1612411506789
+            http_request_duration_seconds_bucket{le="31.0"} 33444 1612411506789
+            http_request_duration_seconds_bucket{le="59.0"} 100392 1612411506789
+            "#;
+        assert_event_data_eq!(
+            events_to_metrics(parse_text(exp)),
+            Ok(vec![
+                Metric::new(
+                    "http_request_duration_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        // These bucket values don't mean/test anything, they just test that the
+                        // sort works without panicking
+                        buckets: vector_lib::buckets![
+                            17.0 => 100392, 18.0 => 33596,     22.0 => 0,        31.0 => 0, 34.0 => 95945,
+                            36.0 => 14931,  38.0 => 0,         41.0 => 0,        42.0 => 0, 47.0 => 9390,
+                            59.0 => 66948,  62.0 => 28997,     72.0 => 4599,     75.0 => 0, 84.0 => 0,
+                            84.0 => 109934, 85.0 => 0,         91.0 => 9390,     f64::INFINITY => 110876,
+                            f64::NAN => 0,  f64::NAN => 76338, f64::NAN => 43928
+                        ],
+                        count: 0,
+                        sum: 0.0,
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))

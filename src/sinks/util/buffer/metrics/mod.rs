@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
@@ -106,7 +104,7 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
         return Vec::new();
     }
 
-    samples.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
+    samples.sort_by(|a, b| a.value.total_cmp(&b.value));
 
     let mut acc = Sample {
         value: samples[0].value,
@@ -129,6 +127,7 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use similar_asserts::assert_eq;
     use vector_lib::{
         event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind},
@@ -585,6 +584,43 @@ mod tests {
         assert_eq!(
             compress_distribution(&mut samples),
             vector_lib::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+        );
+    }
+
+    #[test]
+    fn compress_distributions_doesnt_panic() {
+        let mut samples = vector_lib::samples![
+            18.0 => 1,
+            f64::NAN => 1,
+            17.0 => 1,
+            16.0 => 1,
+            15.0 => 1,
+            14.0 => 1,
+            f64::NAN => 1,
+            13.0 => 1,
+            12.0 => 1,
+            11.0 => 1,
+            10.0 => 1,
+            9.0 => 1,
+            8.0 => 1,
+            7.0 => 1,
+            f64::NAN => 1,
+            f64::NAN => 1,
+            6.0 => 1,
+            5.0 => 1,
+            4.0 => 1,
+            3.0 => 1,
+            2.0 => 1,
+            1.0 => 1
+        ];
+
+        assert_eq!(
+            compress_distribution(&mut samples),
+            (1..=18)
+                .map(|value| value as f64)
+                .chain(std::iter::repeat_n(f64::NAN, 4))
+                .map(|value| Sample { value, rate: 1 })
+                .collect_vec()
         );
     }
 
