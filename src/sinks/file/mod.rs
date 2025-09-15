@@ -105,10 +105,10 @@ pub struct FileSinkConfig {
 pub struct FileTruncateConfig {
     /// If this is set, files will be truncated after being closed for a set amount of seconds.
     #[serde(default)]
-    pub after_closetime_secs: Option<NonZeroU64>,
+    pub after_close_time_secs: Option<NonZeroU64>,
     /// If this is set, files will be truncated after set amount of seconds of no modifications.
     #[serde(default)]
-    pub after_modifiedtime_secs: Option<NonZeroU64>,
+    pub after_modified_time_secs: Option<NonZeroU64>,
     /// If this is set, files will be truncated after set amount of seconds regardless of the state.
     #[serde(default)]
     pub after_secs: Option<NonZeroU64>,
@@ -429,14 +429,14 @@ impl FileSink {
     async fn should_truncate(&mut self, bytes_path: &BytesPath, path: &bytes::Bytes) -> bool {
         let mut truncate = false;
 
-        if let Some(after_closetime_secs) = self.truncation_config.after_closetime_secs
+        if let Some(after_close_time_secs) = self.truncation_config.after_close_time_secs
             && self.files.get(path).is_none()
             && let Ok(metadata) = fs::metadata(bytes_path).await
             && let Ok(time) = metadata
                 .modified()
                 .map_err(|_| ())
                 .and_then(|t| t.elapsed().map_err(|_| ()))
-            && time.as_secs() > after_closetime_secs.into()
+            && time.as_secs() > after_close_time_secs.into()
         {
             truncate = true;
         }
@@ -448,12 +448,12 @@ impl FileSink {
             truncate = true;
         }
 
-        if let Some(after_modifiedtime_secs) = self.truncation_config.after_modifiedtime_secs
+        if let Some(after_modified_time_secs) = self.truncation_config.after_modified_time_secs
             && let Some(previous_modification) = self
                 .files
                 .get_with_deadline(path)
                 .and_then(|(_, deadline)| deadline.checked_sub(self.idle_timeout))
-            && previous_modification.elapsed().as_secs() > after_modifiedtime_secs.into()
+            && previous_modification.elapsed().as_secs() > after_modified_time_secs.into()
         {
             truncate = true;
         }
