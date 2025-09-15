@@ -6,26 +6,24 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
 use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    emit,
+    EstimatedJsonEncodedSizeOf, emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
-    EstimatedJsonEncodedSizeOf,
 };
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::websocket::{is_closed, PingInterval, WebSocketConnector},
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
     event::{Event, EventStatus, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
     },
-    sinks::util::StreamSink,
-    sinks::websocket::config::WebSocketSinkConfig,
+    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 
 pub struct WebSocketSink {
@@ -57,21 +55,21 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = TungsteniteError>,
-        impl Stream<Item = Result<Message, TungsteniteError>>,
+        impl Sink<Message, Error = TungsteniteError> + use<>,
+        impl Stream<Item = Result<Message, TungsteniteError>> + use<>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
     }
 
     fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
-        if let Some(ping_timeout) = self.ping_timeout {
-            if last_pong.elapsed() > Duration::from_secs(ping_timeout.into()) {
-                return Err(TungsteniteError::Io(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "Pong not received in time",
-                )));
-            }
+        if let Some(ping_timeout) = self.ping_timeout
+            && last_pong.elapsed() > Duration::from_secs(ping_timeout.into())
+        {
+            return Err(TungsteniteError::Io(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "Pong not received in time",
+            )));
         }
 
         Ok(())
@@ -79,14 +77,12 @@ impl WebSocketSink {
 
     const fn should_encode_as_binary(&self) -> bool {
         use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Syslog,
-            Text,
+            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
         };
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
-            | Syslog(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
 
@@ -152,7 +148,7 @@ impl WebSocketSink {
                     let event_byte_size = event.estimated_json_encoded_size_of();
 
                     let mut bytes = BytesMut::new();
-                    let res = match self.encoder.encode(event, &mut bytes) {
+                    match self.encoder.encode(event, &mut bytes) {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
@@ -174,9 +170,7 @@ impl WebSocketSink {
                             finalizers.update_status(EventStatus::Errored);
                             Ok(())
                         }
-                    };
-
-                    res
+                    }
                 },
                 else => break,
             };
@@ -225,7 +219,7 @@ impl StreamSink<Event> for WebSocketSink {
 mod tests {
     use std::net::SocketAddr;
 
-    use futures::{future, FutureExt, StreamExt};
+    use futures::{FutureExt, StreamExt, future};
     use serde_json::Value as JsonValue;
     use tokio::{time, time::timeout};
     use tokio_tungstenite::{
@@ -243,8 +237,9 @@ mod tests {
         config::{SinkConfig, SinkContext},
         http::Auth,
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
-            next_addr, random_lines_with_stream, trace_init, CountReceiver,
+            CountReceiver,
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
+            next_addr, random_lines_with_stream, trace_init,
         },
         tls::{self, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
     };
@@ -361,9 +356,11 @@ mod tests {
         assert!(!receiver.await.is_empty());
 
         let mut receiver = create_count_receiver(addr, tls, false, None);
-        assert!(timeout(Duration::from_secs(10), receiver.connected())
-            .await
-            .is_ok());
+        assert!(
+            timeout(Duration::from_secs(10), receiver.connected())
+                .await
+                .is_ok()
+        );
     }
 
     async fn send_events_and_assert(

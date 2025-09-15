@@ -127,9 +127,7 @@ where
             .map(DynamicOrStatic::Static)
             .ok_or_else(|| {
                 serde::de::Error::custom(format!(
-                    "Invalid {}: '{}'. Expected a name, integer 0-{}, or path.",
-                    type_name, s, max_value
-                ))
+                    "Invalid {type_name}: '{s}'. Expected a name, integer 0-{max_value}, or path."))
             })
     }
 }
@@ -402,9 +400,9 @@ impl SyslogMessage {
         let main_message = parts.join(" ");
 
         if *rfc == SyslogRFC::Rfc5424 {
-            format!("{}{} {}", pri_header, SYSLOG_V1, main_message)
+            format!("{pri_header}{SYSLOG_V1} {main_message}")
         } else {
-            format!("{}{}", pri_header, main_message)
+            format!("{pri_header}{main_message}")
         }
     }
 }
@@ -463,9 +461,9 @@ impl StructuredData {
             self.elements
                 .iter()
                 .fold(String::new(), |mut acc, (sd_id, sd_params)| {
-                    let _ = write!(acc, "[{}", sd_id);
+                    let _ = write!(acc, "[{sd_id}");
                     for (key, value) in sd_params {
-                        let _ = write!(acc, " {}=\"{}\"", key, value);
+                        let _ = write!(acc, " {key}=\"{value}\"");
                     }
                     let _ = write!(acc, "]");
                     acc
@@ -502,7 +500,7 @@ impl Pri {
     // https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1
     fn encode(&self) -> String {
         let pri_val = (self.facility as u8 * 8) + self.severity as u8;
-        format!("<{}>", pri_val)
+        format!("<{pri_val}>")
     }
 }
 
@@ -719,9 +717,7 @@ mod tests {
         let message_content = serde_json::to_string(&log_as_json_value).unwrap();
         let output = run_encode(config, Event::Log(log));
         let expected = format!(
-            "<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {}",
-            message_content
-        );
+            "<14>1 2025-08-28T18:30:00Z test-host.com vector - - - {message_content}");
         assert_eq!(output, expected);
     }
 

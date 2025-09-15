@@ -19,7 +19,6 @@ mod text;
 
 use std::fmt::Debug;
 
-pub use self::csv::{CsvSerializer, CsvSerializerConfig};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
@@ -33,6 +32,8 @@ pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
+
+pub use self::csv::{CsvSerializer, CsvSerializerConfig};
 
 /// Serialize a structured event into a byte frame.
 pub trait Serializer:

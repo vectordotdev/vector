@@ -15,7 +15,10 @@ use metrics_util::layers::Layer;
 use snafu::Snafu;
 
 pub use self::ddsketch::{AgentDDSketch, BinMap, Config};
-use self::{label_filter::VectorLabelFilter, recorder::Registry, recorder::VectorRecorder};
+use self::{
+    label_filter::VectorLabelFilter,
+    recorder::{Registry, VectorRecorder},
+};
 use crate::{
     config::metrics_expiration::PerMetricSetExpiration,
     event::{Metric, MetricValue},
@@ -154,10 +157,10 @@ impl Controller {
         global_timeout: Option<f64>,
         expire_metrics_per_metric_set: Vec<PerMetricSetExpiration>,
     ) -> Result<()> {
-        if let Some(timeout) = global_timeout {
-            if timeout <= 0.0 {
-                return Err(Error::TimeoutMustBePositive { timeout });
-            }
+        if let Some(timeout) = global_timeout
+            && timeout <= 0.0
+        {
+            return Err(Error::TimeoutMustBePositive { timeout });
         }
         let per_metric_expiration = expire_metrics_per_metric_set
             .into_iter()
@@ -244,7 +247,6 @@ macro_rules! update_counter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::{
         config::metrics_expiration::{
             MetricLabelMatcher, MetricLabelMatcherConfig, MetricNameMatcherConfig,

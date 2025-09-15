@@ -1,41 +1,40 @@
-use std::sync::Arc;
-use std::{collections::HashMap, num::ParseFloatError};
+use std::{collections::HashMap, num::ParseFloatError, sync::Arc};
 
 use chrono::Utc;
 use indexmap::IndexMap;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::LogEvent;
 use vector_lib::{
     config::LogNamespace,
-    event::DatadogMetricOriginMetadata,
+    configurable::configurable_component,
     event::{
-        metric::Sample,
-        metric::{Bucket, Quantile},
+        DatadogMetricOriginMetadata, LogEvent,
+        metric::{Bucket, Quantile, Sample},
     },
 };
-use vrl::path::{parse_target_path, PathParseError};
-use vrl::{event_path, path};
+use vrl::{
+    event_path, path,
+    path::{PathParseError, parse_target_path},
+};
 
-use crate::config::schema::Definition;
-use crate::transforms::log_to_metric::TransformError::PathNotFound;
 use crate::{
     common::expansion::pair_expansion,
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
-        TransformOutput,
+        TransformOutput, schema::Definition,
     },
     event::{
-        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
         Event, Value,
+        metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind, TagValue},
     },
     internal_events::{
-        LogToMetricFieldNullError, LogToMetricParseFloatError,
+        DROP_EVENT, LogToMetricFieldNullError, LogToMetricParseFloatError,
         MetricMetadataInvalidFieldValueError, MetricMetadataMetricDetailsNotFoundError,
-        MetricMetadataParseError, ParserMissingFieldError, DROP_EVENT,
+        MetricMetadataParseError, ParserMissingFieldError,
     },
     schema,
     template::{Template, TemplateRenderingError},
-    transforms::{FunctionTransform, OutputBuffer, Transform},
+    transforms::{
+        FunctionTransform, OutputBuffer, Transform, log_to_metric::TransformError::PathNotFound,
+    },
 };
 
 const ORIGIN_SERVICE_VALUE: u32 = 3;
@@ -266,7 +265,11 @@ enum TransformError {
         error: ParseFloatError,
     },
     TemplateRenderingError(TemplateRenderingError),
-    PairExpansionError,
+    PairExpansionError {
+        key: String,
+        value: String,
+        error: serde_json::Error,
+    },
 }
 
 fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
@@ -333,7 +336,7 @@ fn render_tag_into(
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,
 ) -> Result<(), TransformError> {
-    let key_s = match render_template(key_template, event) {
+    let key = match render_template(key_template, event) {
         Ok(key_s) => key_s,
         Err(TransformError::TemplateRenderingError(err)) => {
             emit!(crate::internal_events::TemplateRenderingError {
@@ -347,12 +350,12 @@ fn render_tag_into(
     };
     match value_template {
         None => {
-            result.insert(key_s, TagValue::Bare);
+            result.insert(key, TagValue::Bare);
         }
         Some(template) => match render_template(template, event) {
-            Ok(value_s) => {
-                let expanded_pairs = pair_expansion(&key_s, &value_s, static_tags, dynamic_tags)
-                    .map_err(|_| TransformError::PairExpansionError)?;
+            Ok(value) => {
+                let expanded_pairs = pair_expansion(&key, &value, static_tags, dynamic_tags)
+                    .map_err(|error| TransformError::PairExpansionError { key, value, error })?;
                 result.extend(expanded_pairs);
             }
             Err(TransformError::TemplateRenderingError(value_error)) => {
@@ -617,7 +620,7 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
         None => {
             return Err(TransformError::PathNotFound {
                 path: "distribution.statistic".to_string(),
-            })
+            });
         }
     };
     let statistic_kind = match statistic_str.as_str() {
@@ -790,17 +793,17 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         None => {
             return Err(TransformError::PathNotFound {
                 path: "name".to_string(),
-            })
+            });
         }
     };
 
     let mut tags = MetricTags::default();
 
-    if let Some(els) = log.get(event_path!("tags")) {
-        if let Some(el) = els.as_object() {
-            for (key, value) in el {
-                tags.insert(key.to_string(), bytes_to_str(value));
-            }
+    if let Some(els) = log.get(event_path!("tags"))
+        && let Some(el) = els.as_object()
+    {
+        for (key, value) in el {
+            tags.insert(key.to_string(), bytes_to_str(value));
         }
     }
     let tags_result = Some(tags);
@@ -810,7 +813,7 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
         None => {
             return Err(TransformError::PathNotFound {
                 path: "kind".to_string(),
-            })
+            });
         }
     };
 
@@ -886,6 +889,14 @@ impl FunctionTransform for LogToMetric {
                         TransformError::MetricDetailsNotFound => {
                             emit!(MetricMetadataMetricDetailsNotFoundError {})
                         }
+                        TransformError::PairExpansionError { key, value, error } => {
+                            emit!(crate::internal_events::PairExpansionError {
+                                key: &key,
+                                value: &value,
+                                drop_event: true,
+                                error
+                            })
+                        }
                         _ => {}
                     };
                 }
@@ -921,6 +932,14 @@ impl FunctionTransform for LogToMetric {
                                     field: None,
                                 })
                             }
+                            TransformError::PairExpansionError { key, value, error } => {
+                                emit!(crate::internal_events::PairExpansionError {
+                                    key: &key,
+                                    value: &value,
+                                    drop_event: true,
+                                    error
+                                })
+                            }
                             _ => {}
                         };
                         // early return to prevent the partial buffer from being sent
@@ -939,24 +958,27 @@ impl FunctionTransform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::Arc, time::Duration};
+
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::{
+        config::ComponentKey,
+        event::{EventMetadata, ObjectMap},
+        metric_tags,
+    };
+
     use super::*;
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
     use crate::{
         config::log_schema,
         event::{
-            metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, LogEvent,
+            metric::{Metric, MetricKind, MetricValue, StatisticKind},
         },
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
     };
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::event::{EventMetadata, ObjectMap};
-    use vector_lib::metric_tags;
 
     #[test]
     fn generate_config() {

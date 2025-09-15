@@ -2,7 +2,7 @@
 name = "codecs"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [[bin]]
@@ -10,9 +10,8 @@ name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
-akin = { version = "0.4", optional = true }
 apache-avro = { version = "0.16.0", default-features = false }
-bytes = { version = "1", default-features = false }
+bytes.workspace = true
 chrono.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
 derivative = { version = "2", default-features = false }
@@ -22,7 +21,7 @@ flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
+ordered-float.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
@@ -36,8 +35,8 @@ snafu.workspace = true
 strum = { version = "0.26", features = ["derive"], optional = true }
 syslog_loose = { version = "0.22", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
-tokio.workspace = true
-tracing = { version = "0.1", default-features = false }
+tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
@@ -48,7 +47,7 @@ toml = "0.9.4"
 [dev-dependencies]
 futures.workspace = true
 indoc.workspace = true
-tokio = { version = "1", features = ["test-util"] }
+tokio = { workspace = true, features = ["test-util"] }
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
@@ -57,4 +56,4 @@ uuid.workspace = true
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose", "dep:strum", "dep:akin", "dep:derive_more", "dep:serde-aux"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux"]

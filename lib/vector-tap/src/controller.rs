@@ -3,7 +3,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-use futures::{future::try_join_all, FutureExt};
+use futures::{FutureExt, future::try_join_all};
 use tokio::sync::{
     mpsc as tokio_mpsc,
     mpsc::error::{SendError, TrySendError},
@@ -11,13 +11,17 @@ use tokio::sync::{
 };
 use tracing::{Instrument, Span};
 use uuid::Uuid;
-use vector_buffers::{topology::builder::TopologyBuilder, WhenFull};
+use vector_buffers::{WhenFull, topology::builder::TopologyBuilder};
 use vector_common::config::ComponentKey;
-use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
-use vector_core::fanout;
+use vector_core::{
+    event::{EventArray, LogArray, MetricArray, TraceArray},
+    fanout,
+};
 
-use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
-use crate::topology::{TapOutput, TapResource, WatchRx};
+use crate::{
+    notification::{InvalidMatch, Matched, NotMatched, Notification},
+    topology::{TapOutput, TapResource, WatchRx},
+};
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
@@ -123,7 +127,9 @@ impl TapPayload {
         invalid_matches: Vec<String>,
     ) -> Self {
         let pattern = pattern.into();
-        let message = format!("[tap] Warning: source inputs cannot be tapped. Input pattern '{pattern}' matches sources {invalid_matches:?}");
+        let message = format!(
+            "[tap] Warning: source inputs cannot be tapped. Input pattern '{pattern}' matches sources {invalid_matches:?}"
+        );
         Self::Notification(Notification::InvalidMatch(InvalidMatch::new(
             message,
             pattern,

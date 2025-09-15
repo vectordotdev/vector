@@ -1,28 +1,25 @@
 //! Service implementation for the `http` sink.
 
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use bytes::Bytes;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_TYPE},
     HeaderName, HeaderValue, Method, Request,
-};
-
-use crate::{
-    http::{Auth, MaybeAuth},
-    sinks::{
-        util::{
-            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
-            UriSerde,
-        },
-        HTTPRequestBuilderSnafu,
-    },
+    header::{CONTENT_ENCODING, CONTENT_TYPE},
 };
 use snafu::ResultExt;
 
-use super::config::HttpMethod;
-use super::sink::PartitionKey;
+use super::{config::HttpMethod, sink::PartitionKey};
+use crate::{
+    http::{Auth, MaybeAuth},
+    sinks::{
+        HTTPRequestBuilderSnafu,
+        util::{
+            UriSerde,
+            http::{HttpRequest, HttpServiceRequestBuilder, OrderedHeaderName},
+        },
+    },
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct HttpSinkRequestBuilder {

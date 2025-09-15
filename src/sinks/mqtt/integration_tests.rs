@@ -1,12 +1,17 @@
-use crate::common::mqtt::MqttCommonConfig;
-use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::mqtt::config::MqttQoS;
-use crate::sinks::mqtt::MqttSinkConfig;
-use crate::template::Template;
-use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
-use crate::test_util::{random_lines_with_stream, trace_init};
-use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
+
+use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
+
+use crate::{
+    common::mqtt::MqttCommonConfig,
+    config::{SinkConfig, SinkContext},
+    sinks::mqtt::{MqttSinkConfig, config::MqttQoS},
+    template::Template,
+    test_util::{
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        random_lines_with_stream, trace_init,
+    },
+};
 
 fn mqtt_broker_address() -> String {
     std::env::var("MQTT_BROKER_ADDRESS").unwrap_or_else(|_| "emqx".into())

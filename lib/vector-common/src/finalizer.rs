@@ -1,15 +1,28 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::marker::{PhantomData, Unpin};
-use std::{fmt::Debug, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll};
+use std::{
+    fmt::Debug,
+    future::Future,
+    marker::{PhantomData, Unpin},
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
-use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
-use futures::{future::OptionFuture, FutureExt, Stream, StreamExt};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio::sync::Notify;
+use futures::{
+    FutureExt, Stream, StreamExt,
+    future::OptionFuture,
+    stream::{BoxStream, FuturesOrdered, FuturesUnordered},
+};
+use tokio::sync::{
+    Notify,
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
+};
 
-use crate::finalization::{BatchStatus, BatchStatusReceiver};
-use crate::shutdown::ShutdownSignal;
+use crate::{
+    finalization::{BatchStatus, BatchStatusReceiver},
+    shutdown::ShutdownSignal,
+};
 
 /// The `OrderedFinalizer` framework produces a stream of acknowledged
 /// event batch identifiers from a source in a single background task
@@ -86,10 +99,10 @@ where
     }
 
     pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
-        if let Some(sender) = &self.sender {
-            if let Err(error) = sender.send((receiver, entry)) {
-                error!(message = "FinalizerSet task ended prematurely.", %error);
-            }
+        if let Some(sender) = &self.sender
+            && let Err(error) = sender.send((receiver, entry))
+        {
+            error!(message = "FinalizerSet task ended prematurely.", %error);
         }
     }
 

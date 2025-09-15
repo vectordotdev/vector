@@ -4,19 +4,17 @@ use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
-use vrl::event_path;
-use vrl::path::OwnedValuePath;
-use vrl::value::Kind;
-
-use vector_lib::config::log_schema;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::PathPrefix;
-use vector_lib::schema;
+use vector_lib::{
+    config::log_schema,
+    configurable::configurable_component,
+    lookup::{PathPrefix, lookup_v2::OptionalValuePath},
+    schema,
+};
+use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-    InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
+    Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp, healthcheck,
+    influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
@@ -25,11 +23,11 @@ use crate::{
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
-        util::{
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
-            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
-        },
         Healthcheck, VectorSink,
+        util::{
+            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+        },
     },
     tls::{TlsConfig, TlsSettings},
 };
@@ -391,14 +389,16 @@ fn to_field(value: &Value) -> Field {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
-    use futures::{channel::mpsc, stream, StreamExt};
-    use http::{request::Parts, StatusCode};
+    use chrono::{Utc, offset::TimeZone};
+    use futures::{StreamExt, channel::mpsc, stream};
+    use http::{StatusCode, request::Parts};
     use indoc::indoc;
+    use vector_lib::{
+        event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        lookup::owned_value_path,
+    };
 
-    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vector_lib::lookup::owned_value_path;
-
+    use super::*;
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
@@ -406,14 +406,12 @@ mod tests {
         },
         test_util::{
             components::{
-                run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-                HTTP_SINK_TAGS,
+                COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, run_and_assert_sink_compliance,
+                run_and_assert_sink_error,
             },
             next_addr,
         },
     };
-
-    use super::*;
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -872,24 +870,24 @@ mod integration_tests {
 
     use chrono::Utc;
     use futures::stream;
+    use vector_lib::{
+        codecs::BytesDeserializerConfig,
+        config::{LegacyKey, LogNamespace},
+        event::{BatchNotifier, BatchStatus, Event, LogEvent},
+        lookup::{owned_value_path, path},
+    };
     use vrl::value;
 
-    use vector_lib::codecs::BytesDeserializerConfig;
-    use vector_lib::config::{LegacyKey, LogNamespace};
-    use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    use vector_lib::lookup::{owned_value_path, path};
-
+    use super::*;
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            logs::InfluxDbLogsConfig,
-            test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
+            logs::InfluxDbLogsConfig,
+            test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
-        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {

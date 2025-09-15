@@ -6,17 +6,20 @@ use k8s_openapi::{
     api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
-use kube::runtime::reflector::{store::Store, ObjectRef};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{
-    lookup_v2::{OptionalTargetPath, ValuePath},
-    owned_value_path, path, OwnedTargetPath,
+use kube::runtime::reflector::{ObjectRef, store::Store};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, ValuePath},
+        owned_value_path, path,
+    },
 };
 
 use super::{
-    path_helpers::{parse_log_file_path, LogFileInfo},
     Config,
+    path_helpers::{LogFileInfo, parse_log_file_path},
 };
 use crate::event::{Event, LogEvent};
 
@@ -478,6 +481,8 @@ fn annotate_from_container(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use k8s_openapi::api::core::v1::PodIP;
     use similar_asserts::assert_eq;
     use std::path::PathBuf;

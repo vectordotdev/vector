@@ -1,6 +1,5 @@
 use std::{
-    fs::create_dir,
-    fs::read_dir,
+    fs::{create_dir, read_dir},
     io::Write,
     net::SocketAddr,
     path::PathBuf,
@@ -11,10 +10,10 @@ use std::{
 
 use assert_cmd::prelude::*;
 use nix::{
-    sys::signal::{kill, Signal},
+    sys::signal::{Signal, kill},
     unistd::Pid,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use similar_asserts::assert_eq;
 use vector::test_util::{next_addr, temp_file};
 

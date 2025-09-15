@@ -1,11 +1,14 @@
-use std::path::{Path, PathBuf};
-use std::{fs, io::ErrorKind, sync::LazyLock};
+use std::{
+    fs,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-use super::config::Environment;
-use crate::{platform, util};
+use crate::{environment::Environment, platform, util};
 
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     [platform::data_dir(), Path::new("integration")]
@@ -13,6 +16,7 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         .collect()
 });
 
+#[derive(Debug)]
 pub struct EnvsDir {
     path: PathBuf,
 }
@@ -54,7 +58,7 @@ impl EnvsDir {
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => {
                 return Err(error)
-                    .context(format!("Could not read state file {}", self.path.display()))
+                    .context(format!("Could not read state file {}", self.path.display()));
             }
         };
         let state: State = serde_json::from_str(&json)

@@ -3,21 +3,18 @@ use std::time::Duration;
 use tokio::{select, sync::mpsc, task::JoinHandle};
 use vector_lib::event::Event;
 
+use super::io::{EventForwardService, spawn_grpc_server};
 use crate::{
     components::validation::{
         sync::{Configuring, TaskCoordinator},
         util::GrpcAddress,
     },
-    proto::vector::Server as VectorServer,
-};
-use crate::{
     config::ConfigBuilder,
+    proto::vector::Server as VectorServer,
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::{internal_logs::InternalLogsConfig, internal_metrics::InternalMetricsConfig},
     test_util::next_addr,
 };
-
-use super::io::{spawn_grpc_server, EventForwardService};
 
 const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
 const INTERNAL_METRICS_KEY: &str = "_telemetry_metrics";

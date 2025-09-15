@@ -6,7 +6,7 @@ use std::{
     time::Instant,
 };
 
-use futures::{stream::FuturesOrdered, FutureExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
@@ -16,30 +16,29 @@ use tokio::{
     time::timeout,
 };
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
-use vector_lib::internal_event::{
-    self, CountByteSize, EventsSent, InternalEventHandle as _, Registered,
-};
-use vector_lib::transform::update_runtime_schema_definition;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     buffers::{
+        BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
-        BufferType, WhenFull,
     },
+    config::LogNamespace,
+    internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     schema::Definition,
-    EstimatedJsonEncodedSizeOf,
+    transform::update_runtime_schema_definition,
 };
 
 use super::{
+    BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
     schema,
     task::{Task, TaskOutput, TaskResult},
-    BuiltBuffer, ConfigDiff,
 };
 use crate::{
+    SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
@@ -48,12 +47,11 @@ use crate::{
     extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    source_sender::{SourceSenderItem, CHUNK_SIZE},
+    source_sender::{CHUNK_SIZE, SourceSenderItem},
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{wrap, UtilizationComponentSender, UtilizationEmitter},
-    SourceSender,
+    utilization::{UtilizationComponentSender, UtilizationEmitter, wrap},
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -191,7 +189,8 @@ impl<'a> Builder<'a> {
                                 // Just report the error and continue.
                                 error!(message = "Unable to add index to reloaded enrichment table.",
                                     table = ?name.to_string(),
-                                    %error);
+                                    %error,
+                                    internal_log_rate_limit = true);
                                 continue 'tables;
                             }
                         }
@@ -710,6 +709,55 @@ impl<'a> Builder<'a> {
             self.detach_triggers.insert(key.clone(), trigger);
         }
     }
+}
+
+pub async fn reload_enrichment_tables(config: &Config) {
+    let mut enrichment_tables = HashMap::new();
+    // Build enrichment tables
+    'tables: for (name, table_outer) in config.enrichment_tables.iter() {
+        let table_name = name.to_string();
+        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            let indexes = Some(ENRICHMENT_TABLES.index_fields(&table_name));
+
+            let mut table = match table_outer.inner.build(&config.global).await {
+                Ok(table) => table,
+                Err(error) => {
+                    error!(
+                        internal_log_rate_limit = true,
+                        "Enrichment table \"{name}\" reload failed: {error}",
+                    );
+                    continue;
+                }
+            };
+
+            if let Some(indexes) = indexes {
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(
+                                internal_log_rate_limit = true,
+                                message = "Unable to add index to reloaded enrichment table.",
+                                table = ?name.to_string(),
+                                %error
+                            );
+                            continue 'tables;
+                        }
+                    }
+                }
+            }
+
+            enrichment_tables.insert(table_name, table);
+        }
+    }
+
+    ENRICHMENT_TABLES.load(enrichment_tables);
+    ENRICHMENT_TABLES.finish_load();
 }
 
 pub struct TopologyPieces {

@@ -2,21 +2,20 @@
 use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
-use headers::{authorization::Credentials, Authorization};
-use http::{header::AUTHORIZATION, HeaderMap, HeaderValue, StatusCode};
+use headers::{Authorization, authorization::Credentials};
+use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use serde::{
-    de::{Error, MapAccess, Visitor},
     Deserialize,
+    de::{Error, MapAccess, Visitor},
 };
 use vector_config::configurable_component;
 use vector_lib::{
-    compile_vrl,
+    TimeZone, compile_vrl,
     event::{Event, LogEvent, VrlTarget},
     sensitive_string::SensitiveString,
-    TimeZone,
 };
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, CompileConfig, Program},
+    compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
     diagnostic::Formatter,
     prelude::TypeState,
@@ -287,10 +286,10 @@ impl HttpServerAuthMatcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::{next_addr, random_string};
     use indoc::indoc;
 
     use super::*;
+    use crate::test_util::{next_addr, random_string};
 
     impl HttpServerAuthMatcher {
         fn auth_header(self) -> (HeaderValue, &'static str) {

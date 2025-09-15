@@ -9,9 +9,8 @@ pub use self::source::*;
 mod sink {
     use metrics::{counter, gauge};
     use serde_json::Error;
-    use vector_lib::internal_event::InternalEvent;
     use vector_lib::internal_event::{
-        error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL,
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     };
 
     use crate::{
@@ -203,10 +202,9 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
-    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     use crate::sources::splunk_hec::ApiError;
-    use vector_lib::internal_event::{error_stage, error_type};
 
     #[derive(Debug)]
     pub struct SplunkHecRequestBodyInvalidError {

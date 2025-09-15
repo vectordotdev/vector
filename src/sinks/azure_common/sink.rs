@@ -1,5 +1,7 @@
 use std::fmt;
 
+use vector_lib::{event::Event, partition::Partitioner};
+
 use crate::sinks::{prelude::*, util::partitioner::KeyPartitioner};
 use vector_lib::{event::Event, partition::Partitioner};
 

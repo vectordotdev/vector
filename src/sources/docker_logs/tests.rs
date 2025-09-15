@@ -31,29 +31,26 @@ mod integration_tests {
 
     use bollard::{
         query_parameters::{
-            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
-        },
-        query_parameters::{
-            KillContainerOptions, RemoveContainerOptions, StartContainerOptions,
+            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, KillContainerOptions,
+            ListImagesOptionsBuilder, RemoveContainerOptions, StartContainerOptions,
             WaitContainerOptions,
         },
         secret::ContainerCreateBody,
     };
-    use futures::{stream::TryStreamExt, FutureExt};
+    use futures::{FutureExt, stream::TryStreamExt};
     use itertools::Itertools as _;
     use similar_asserts::assert_eq;
     use vrl::value;
 
-    use crate::sources::docker_logs::*;
-    use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
+        SourceSender,
         event::Event,
+        sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME, *},
         test_util::{
             collect_n, collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             trace_init,
         },
-        SourceSender,
     };
 
     /// None if docker is not present on the system
@@ -61,7 +58,7 @@ mod integration_tests {
         names: &[&str],
         label: L,
         log_namespace: Option<bool>,
-    ) -> impl Stream<Item = Event> {
+    ) -> impl Stream<Item = Event> + use<L> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -396,16 +393,18 @@ mod integration_tests {
                 meta.get(path!(DockerLogsConfig::NAME, CONTAINER)).unwrap(),
                 &value!(id)
             );
-            assert!(meta
-                .get(path!(DockerLogsConfig::NAME, CREATED_AT))
-                .is_some());
+            assert!(
+                meta.get(path!(DockerLogsConfig::NAME, CREATED_AT))
+                    .is_some()
+            );
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, IMAGE)).unwrap(),
                 &value!("busybox")
             );
-            assert!(meta
-                .get(path!(DockerLogsConfig::NAME, "labels", label))
-                .is_some());
+            assert!(
+                meta.get(path!(DockerLogsConfig::NAME, "labels", label))
+                    .is_some()
+            );
             assert_eq!(
                 meta.get(path!(DockerLogsConfig::NAME, NAME)).unwrap(),
                 &value!(name)
@@ -414,10 +413,11 @@ mod integration_tests {
                 meta.get(path!("vector", "source_type")).unwrap(),
                 &value!(DockerLogsConfig::NAME)
             );
-            assert!(meta
-                .get(path!("vector", "ingest_timestamp"))
-                .unwrap()
-                .is_timestamp())
+            assert!(
+                meta.get(path!("vector", "ingest_timestamp"))
+                    .unwrap()
+                    .is_timestamp()
+            )
         })
         .await;
     }
@@ -785,13 +785,14 @@ mod integration_tests {
             assert_eq!(log[CONTAINER], id.into());
             assert!(log.get(CREATED_AT).is_some());
             assert_eq!(log[IMAGE], "busybox".into());
-            assert!(log
-                .get("label")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get(label)
-                .is_some());
+            assert!(
+                log.get("label")
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .get(label)
+                    .is_some()
+            );
             assert_eq!(events[0].as_log()[&NAME], name.into());
             assert_eq!(
                 events[0].as_log()[log_schema().source_type_key().unwrap().to_string()],

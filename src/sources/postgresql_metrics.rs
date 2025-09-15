@@ -8,8 +8,8 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use futures::{
-    future::{join_all, try_join_all},
     FutureExt, StreamExt,
+    future::{join_all, try_join_all},
 };
 use openssl::{
     error::ErrorStack,
@@ -20,18 +20,19 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
+    Client, Config, Error as PgError, NoTls, Row,
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},
     types::FromSql,
-    Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     json_size::JsonSize,
+    metric_tags,
 };
-use vector_lib::{metric_tags, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -345,7 +346,7 @@ impl PostgresqlClient {
             Ok(_) | Err(_) => {
                 return Err(ConnectError::InvalidVersion {
                     version: version.to_string(),
-                })
+                });
             }
         };
 
@@ -517,7 +518,7 @@ impl PostgresqlMetrics {
             _ => {
                 return Err(BuildError::MultipleHostsNotSupported {
                     hosts: config.get_hosts().to_owned(),
-                })
+                });
             }
         };
 
@@ -692,17 +693,21 @@ impl PostgresqlMetrics {
                 metrics.extend_from_slice(&[
                     self.create_metric(
                         "pg_stat_database_checksum_failures_total",
-                        counter!(reader
-                            .read::<Option<i64>>(row, "checksum_failures")?
-                            .unwrap_or(0)),
+                        counter!(
+                            reader
+                                .read::<Option<i64>>(row, "checksum_failures")?
+                                .unwrap_or(0)
+                        ),
                         tags!(self.tags, "db" => db),
                     ),
                     self.create_metric(
                         "pg_stat_database_checksum_last_failure",
-                        gauge!(reader
-                            .read::<Option<DateTime<Utc>>>(row, "checksum_last_failure")?
-                            .map(|t| t.timestamp())
-                            .unwrap_or(0)),
+                        gauge!(
+                            reader
+                                .read::<Option<DateTime<Utc>>>(row, "checksum_last_failure")?
+                                .map(|t| t.timestamp())
+                                .unwrap_or(0)
+                        ),
                         tags!(self.tags, "db" => db),
                     ),
                 ]);
@@ -720,10 +725,12 @@ impl PostgresqlMetrics {
                 ),
                 self.create_metric(
                     "pg_stat_database_stats_reset",
-                    gauge!(reader
-                        .read::<Option<DateTime<Utc>>>(row, "stats_reset")?
-                        .map(|t| t.timestamp())
-                        .unwrap_or(0)),
+                    gauge!(
+                        reader
+                            .read::<Option<DateTime<Utc>>>(row, "stats_reset")?
+                            .map(|t| t.timestamp())
+                            .unwrap_or(0)
+                    ),
                     tags!(self.tags, "db" => db),
                 ),
             ]);
@@ -842,9 +849,11 @@ impl PostgresqlMetrics {
                 ),
                 self.create_metric(
                     "pg_stat_bgwriter_stats_reset",
-                    gauge!(reader
-                        .read::<DateTime<Utc>>(&row, "stats_reset")?
-                        .timestamp()),
+                    gauge!(
+                        reader
+                            .read::<DateTime<Utc>>(&row, "stats_reset")?
+                            .timestamp()
+                    ),
                     tags!(self.tags),
                 ),
             ],
@@ -997,12 +1006,13 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        SourceSender,
         event::Event,
         test_util::{
-            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            components::{PULL_SOURCE_TAGS, assert_source_compliance},
             integration::postgres::{pg_socket, pg_url},
         },
-        tls, SourceSender,
+        tls,
     };
 
     async fn test_postgresql_metrics(

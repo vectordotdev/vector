@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
@@ -8,28 +8,27 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::lookup::{metadata_path, path, PathPrefix};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-    EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
+    lookup::{PathPrefix, metadata_path, path},
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{
+    Compression,
     errors::{ParseRecordsSnafu, RequestError},
     models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
-    Compression,
 };
 use crate::{
+    SourceSender,
     codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
@@ -37,7 +36,6 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
     sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
-    SourceSender,
 };
 
 #[derive(Clone)]
@@ -134,13 +132,12 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            if context.store_access_key {
-                                if let Some(access_key) = &request.access_key {
-                                    log.metadata_mut().secrets_mut().insert_secret(
-                                        "aws_kinesis_firehose_access_key",
-                                        access_key,
-                                    );
-                                }
+                            if context.store_access_key
+                                && let Some(access_key) = &request.access_key
+                            {
+                                log.metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("aws_kinesis_firehose_access_key", access_key);
                             }
                         }
                     }
@@ -258,8 +255,9 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use flate2::{write::GzEncoder, Compression};
     use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
 
     use super::*;
 

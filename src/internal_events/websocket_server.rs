@@ -1,10 +1,7 @@
-use std::error::Error;
-use std::fmt::Debug;
+use std::{error::Error, fmt::Debug};
 
 use metrics::{counter, gauge};
-use vector_lib::internal_event::InternalEvent;
-
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct WebSocketListenerConnectionEstablished {
@@ -43,7 +40,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_code = "ws_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         let mut all_tags = self.extra_tags.clone();
         all_tags.extend([
@@ -100,7 +97,7 @@ impl InternalEvent for WebSocketListenerSendError {
             error_code = "ws_server_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -4,6 +4,8 @@ use crate::built_info;
 use metrics::gauge;
 use vector_lib::internal_event::InternalEvent;
 
+use crate::built_info;
+
 #[derive(Debug)]
 pub struct Heartbeat {
     pub since: Instant,

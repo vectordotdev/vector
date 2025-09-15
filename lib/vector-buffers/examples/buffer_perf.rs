@@ -2,8 +2,8 @@ use std::{
     cmp, error, fmt,
     path::PathBuf,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -13,19 +13,21 @@ use clap::{Arg, Command};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
-use tracing::{debug, info, Span};
+use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;
 use vector_buffers::{
+    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
 };
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

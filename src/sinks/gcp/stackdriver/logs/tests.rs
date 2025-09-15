@@ -1,15 +1,20 @@
 //! Unit tests for the `gcp_stackdriver_logs` sink.
 
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
 use http::Uri;
 use indoc::indoc;
 use serde::Deserialize;
-use std::collections::HashMap;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
 
+use super::{
+    config::{StackdriverConfig, StackdriverResource, default_endpoint},
+    encoder::StackdriverLogsEncoder,
+};
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     event::{LogEvent, Value},
@@ -27,14 +32,9 @@ use crate::{
         },
     },
     test_util::{
-        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
     },
-};
-
-use super::{
-    config::{default_endpoint, StackdriverConfig, StackdriverResource},
-    encoder::StackdriverLogsEncoder,
 };
 
 #[test]

@@ -4,18 +4,16 @@
 use aws_sdk_kinesis::types::{Record, ShardIteratorType};
 use aws_smithy_types::DateTime;
 use futures::StreamExt;
-
-use tokio::time::{sleep, Duration};
-use vector_lib::codecs::TextSerializerConfig;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use tokio::time::{Duration, sleep};
+use vector_lib::{codecs::TextSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 
 use super::{config::KinesisClientBuilder, *};
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression},
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
     },
 };

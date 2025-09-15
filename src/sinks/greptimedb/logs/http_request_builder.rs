@@ -1,23 +1,25 @@
+use std::collections::HashMap;
+
+use bytes::Bytes;
+use http::{
+    Request, StatusCode,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+};
+use hyper::Body;
+use snafu::ResultExt;
+use vector_lib::codecs::encoding::Framer;
+
 use crate::{
+    Error,
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     http::{Auth, HttpClient, HttpError},
     sinks::{
+        HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
         util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
-        HTTPRequestBuilderSnafu, HealthcheckError,
     },
-    Error,
 };
-use bytes::Bytes;
-use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, StatusCode,
-};
-use hyper::Body;
-use snafu::ResultExt;
-use std::collections::HashMap;
-use vector_lib::codecs::encoding::Framer;
 
 /// Partition key for GreptimeDB logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -239,18 +241,19 @@ pub(super) async fn http_healthcheck(
 /// GreptimeDB HTTP retry logic.
 #[derive(Clone, Default)]
 pub(super) struct GreptimeDBHttpRetryLogic {
-    inner: HttpRetryLogic,
+    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
 }
 
 impl RetryLogic for GreptimeDBHttpRetryLogic {
     type Error = HttpError;
+    type Request = HttpRequest<PartitionKey>;
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         error.is_retriable()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         self.inner.should_retry_response(&response.http_response)
     }
 }

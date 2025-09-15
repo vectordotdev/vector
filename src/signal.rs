@@ -1,7 +1,8 @@
 #![allow(missing_docs)]
 
-use snafu::Snafu;
 use std::collections::HashSet;
+
+use snafu::Snafu;
 use tokio::{runtime::Runtime, sync::broadcast};
 use tokio_stream::{Stream, StreamExt};
 
@@ -21,6 +22,8 @@ pub enum SignalTo {
     ReloadFromConfigBuilder(ConfigBuilder),
     /// Signal to reload config from the filesystem.
     ReloadFromDisk,
+    /// Signal to reload all enrichment tables.
+    ReloadEnrichmentTables,
     /// Signal to shutdown process.
     Shutdown(Option<ShutdownError>),
     /// Shutdown process immediately.
@@ -36,6 +39,7 @@ impl PartialEq for SignalTo {
             // TODO: This will require a lot of plumbing but ultimately we can derive equality for config builders.
             (ReloadFromConfigBuilder(_), ReloadFromConfigBuilder(_)) => true,
             (ReloadFromDisk, ReloadFromDisk) => true,
+            (ReloadEnrichmentTables, ReloadEnrichmentTables) => true,
             (Shutdown(a), Shutdown(b)) => a == b,
             (Quit, Quit) => true,
             _ => false,
@@ -69,7 +73,15 @@ impl SignalPair {
     /// Create a new signal handler pair, and set them up to receive OS signals.
     pub fn new(runtime: &Runtime) -> Self {
         let (handler, receiver) = SignalHandler::new();
+
+        #[cfg(unix)]
         let signals = os_signals(runtime);
+
+        // If we passed `runtime` here, we would get the following:
+        // error[E0521]: borrowed data escapes outside of associated function
+        #[cfg(windows)]
+        let signals = os_signals();
+
         handler.forever(runtime, signals);
         Self { handler, receiver }
     }
@@ -174,7 +186,7 @@ impl SignalHandler {
 /// Signals from OS/user.
 #[cfg(unix)]
 fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> + use<> {
-    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::signal::unix::{SignalKind, signal};
 
     // The `signal` function must be run within the context of a Tokio runtime.
     runtime.block_on(async {
@@ -212,7 +224,7 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> + use<> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-fn os_signals(_: &Runtime) -> impl Stream<Item = SignalTo> {
+fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {

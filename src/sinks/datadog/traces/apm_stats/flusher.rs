@@ -9,9 +9,9 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use vector_lib::{finalization::EventFinalizers, request_metadata::RequestMetadata};
 
 use super::{
-    aggregation::Aggregator, build_request, DDTracesMetadata, DatadogTracesEndpoint,
-    DatadogTracesEndpointConfiguration, RequestBuilderError, StatsPayload,
-    BUCKET_DURATION_NANOSECONDS,
+    BUCKET_DURATION_NANOSECONDS, DDTracesMetadata, DatadogTracesEndpoint,
+    DatadogTracesEndpointConfiguration, RequestBuilderError, StatsPayload, aggregation::Aggregator,
+    build_request,
 };
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
@@ -107,10 +107,9 @@ impl ApmStatsSender {
 
                 Some((payload, aggregator.get_api_key()))
             }
-        } {
-            if let Err(error) = self.compress_and_send(payload, api_key).await {
-                emit!(DatadogTracesAPMStatsError { error });
-            }
+        } && let Err(error) = self.compress_and_send(payload, api_key).await
+        {
+            emit!(DatadogTracesAPMStatsError { error });
         }
     }
 

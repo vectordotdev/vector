@@ -4,12 +4,13 @@ pub mod metric;
 pub mod output;
 pub mod trace;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use futures::{stream, Stream, StreamExt};
-use output::{from_tap_payload_to_output_events, OutputEventsPayload};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
-use std::time::{SystemTime, UNIX_EPOCH};
+use futures::{Stream, StreamExt, stream};
+use output::{OutputEventsPayload, from_tap_payload_to_output_events};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::tap::{

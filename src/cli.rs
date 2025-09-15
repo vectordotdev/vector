@@ -10,8 +10,10 @@ use crate::service;
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
-use crate::{generate_schema, signal};
+use crate::{
+    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
+    validate,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]

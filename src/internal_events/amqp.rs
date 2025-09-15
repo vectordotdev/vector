@@ -1,8 +1,7 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
     use metrics::counter;
-    use vector_lib::internal_event::InternalEvent;
-    use vector_lib::internal_event::{error_stage, error_type};
+    use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     #[derive(Debug)]
     pub struct AmqpBytesReceived {
@@ -36,7 +35,7 @@ pub mod source {
                    error = ?self.error,
                    error_type = error_type::REQUEST_FAILED,
                    stage = error_stage::RECEIVING,
-
+                   internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",

@@ -15,32 +15,31 @@ use std::{
 };
 
 use futures::{
+    FutureExt, SinkExt,
     channel::oneshot,
     future::{self, BoxFuture},
-    stream, FutureExt, SinkExt,
+    stream,
 };
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
 use snafu::Snafu;
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{self, Duration, Instant, sleep};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
-use super::controller::ControllerStatistics;
-use super::AdaptiveConcurrencySettings;
+use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    event::{metric::MetricValue, Event},
+    event::{Event, metric::MetricValue},
     metrics,
     sinks::{
-        util::{
-            retries::{JitterMode, RetryLogic},
-            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
-        },
         Healthcheck, VectorSink,
+        util::{
+            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
+            retries::{JitterMode, RetryLogic},
+        },
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::{
@@ -321,6 +320,7 @@ enum Error {
 struct TestRetryLogic;
 
 impl RetryLogic for TestRetryLogic {
+    type Request = Vec<Event>;
     type Response = Response;
     type Error = Error;
 
@@ -366,10 +366,10 @@ impl TestController {
 
     fn end_request(&mut self, now: Instant, completed: bool) {
         self.stats.end_request(now, completed);
-        if self.stats.completed >= self.todo {
-            if let Some(done) = self.send_done.take() {
-                done.send(()).expect("Could not send done signal");
-            }
+        if self.stats.completed >= self.todo
+            && let Some(done) = self.send_done.take()
+        {
+            done.send(()).expect("Could not send done signal");
         }
     }
 }

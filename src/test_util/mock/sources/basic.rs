@@ -1,21 +1,21 @@
 use std::{
     num::NonZeroUsize,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
 use async_trait::async_trait;
-use vector_lib::buffers::{
-    config::MemoryBufferSize,
-    topology::channel::{limited, LimitedReceiver},
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::{config::LogNamespace, schema::Definition};
 use vector_lib::{
-    config::{DataType, SourceOutput},
+    buffers::{
+        config::MemoryBufferSize,
+        topology::channel::{LimitedReceiver, limited},
+    },
+    config::{DataType, LogNamespace, SourceOutput},
+    configurable::configurable_component,
     event::EventContainer,
+    schema::Definition,
     source::Source,
 };
 

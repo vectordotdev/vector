@@ -5,33 +5,35 @@ use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
-
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 use vector_lib::{
-    event::{DatadogMetricOriginMetadata, EventMetadata},
-    metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
+    event::{DatadogMetricOriginMetadata, EventMetadata},
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    metrics::AgentDDSketch,
 };
+use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use crate::common::http::ErrorMessage;
 use crate::{
-    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
+    SourceSender,
+    common::{
+        datadog::{DatadogMetricType, DatadogSeriesMetric},
+        http::ErrorMessage,
+    },
     config::log_schema,
     event::{
-        metric::{Metric, MetricValue},
         Event, MetricKind, MetricTags,
+        metric::{Metric, MetricValue},
     },
     internal_events::EventsReceived,
     schema,
     sources::{
         datadog_agent::{
-            ddmetric_proto::{metric_payload, Metadata, MetricPayload, SketchPayload},
-            handle_request, ApiKeyQueryParams, DatadogAgentSource,
+            ApiKeyQueryParams, DatadogAgentSource,
+            ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload},
+            handle_request,
         },
         util::extract_tag_key_and_value,
     },
-    SourceSender,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -238,9 +240,7 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
         .map_or_else(EventMetadata::default, |origin| {
             trace!(
                 "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
-                origin.origin_product,
-                origin.origin_category,
-                origin.origin_service,
+                origin.origin_product, origin.origin_category, origin.origin_service,
             );
             EventMetadata::default().with_origin_metadata(DatadogMetricOriginMetadata::new(
                 Some(origin.origin_product),

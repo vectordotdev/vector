@@ -10,9 +10,9 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use futures::{StreamExt, poll, stream::BoxStream, task::Poll};
 use nix::{
-    sys::signal::{kill, Signal},
+    sys::signal::{Signal, kill},
     unistd::Pid,
 };
 use serde_json::{Error as JsonError, Value as JsonValue};
@@ -25,27 +25,28 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{metadata_path, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
+    codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
     finalizer::OrderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
+    lookup::{metadata_path, owned_value_path, path},
+    schema::Definition,
 };
-use vrl::event_path;
-use vrl::value::{kind::Collection, Kind, Value};
+use vrl::{
+    event_path,
+    value::{Kind, Value, kind::Collection},
+};
 
 use crate::{
+    SourceSender,
     config::{
-        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -55,7 +56,6 @@ use crate::{
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -330,7 +330,9 @@ type Record = HashMap<String, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
-            warn!("DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+            warn!(
+                "DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
+            );
         }
 
         let data_dir = cx
@@ -1111,12 +1113,13 @@ mod tests {
     use std::{fs, path::Path};
 
     use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration, Instant};
-    use vrl::value::{kind::Collection, Value};
+    use tokio::time::{Duration, Instant, sleep, timeout};
+    use vrl::value::{Value, kind::Collection};
 
     use super::*;
     use crate::{
-        config::ComponentKey, event::Event, event::EventStatus,
+        config::ComponentKey,
+        event::{Event, EventStatus},
         test_util::components::assert_source_compliance,
     };
 

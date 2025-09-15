@@ -66,7 +66,7 @@ where
 mod tests {
     use futures::FutureExt;
     use tokio::{
-        fs::{remove_file, File},
+        fs::{File, remove_file},
         io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     };
 

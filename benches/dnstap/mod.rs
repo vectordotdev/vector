@@ -1,7 +1,6 @@
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
+use base64::{Engine, engine::general_purpose::STANDARD};
 use bytes::Bytes;
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use dnstap_parser::parser::DnstapParser;
 use vector::event::LogEvent;
