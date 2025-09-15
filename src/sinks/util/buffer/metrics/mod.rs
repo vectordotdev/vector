@@ -589,14 +589,12 @@ mod tests {
 
     #[test]
     fn compress_distributions_doesnt_panic() {
-        fn float(v: i32) -> f64 {
-            v as f64
-        }
+        let to_float = |v: i32| -> f64 { v as f64 };
 
         let mut samples = (0..=15)
-            .map(float)
+            .map(to_float)
             .chain(std::iter::once(f64::NAN))
-            .chain((16..=20).map(float))
+            .chain((16..=20).map(to_float))
             .rev()
             .map(|value| Sample { value, rate: 1 })
             .collect_vec();
@@ -604,7 +602,7 @@ mod tests {
         assert_eq!(
             compress_distribution(&mut samples),
             (0..=20)
-                .map(float)
+                .map(to_float)
                 .chain(std::iter::once(f64::NAN))
                 .map(|value| Sample { value, rate: 1 })
                 .collect_vec()

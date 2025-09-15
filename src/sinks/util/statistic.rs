@@ -225,13 +225,12 @@ mod test {
 
     #[test]
     fn sort_unstable_doesnt_panic() {
-        fn float(v: i32) -> f64 {
-            v as f64
-        }
+        let to_float = |v: i32| -> f64 { v as f64 };
+
         let v: Vec<f64> = (0..=15)
-            .map(float)
+            .map(to_float)
             .chain(std::iter::once(f64::NAN))
-            .chain((16..=20).map(float))
+            .chain((16..=20).map(to_float))
             .rev()
             .collect();
 

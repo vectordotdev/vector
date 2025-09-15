@@ -746,13 +746,12 @@ mod test {
             # TYPE http_request_duration_seconds histogram
             "#
         .to_string();
-        fn float(v: i32) -> f64 {
-            v as f64
-        }
+
+        let to_float = |v: i32| -> f64 { v as f64 };
         exp += &(0..=15)
-            .map(float)
+            .map(to_float)
             .chain(std::iter::once(f64::NAN))
-            .chain((16..=20).map(float))
+            .chain((16..=20).map(to_float))
             .rev()
             .map(|f| format!("http_request_duration_seconds_bucket{{le=\"{f}\"}} 0 1612411506789"))
             .join("\n");
@@ -767,7 +766,7 @@ mod test {
                         // These bucket values don't mean/test anything, they just test that the
                         // sort works without panicking
                         buckets: (0..=20)
-                            .map(float)
+                            .map(to_float)
                             .chain(std::iter::once(f64::NAN))
                             .map(|upper_limit| Bucket {
                                 upper_limit,
