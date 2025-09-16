@@ -171,20 +171,14 @@ impl FileWatcher {
         // After that, we'll rely on notifications for further changes
 
         // Create a notify watcher for all files
-        let notify_watcher = match NotifyWatcher::new() {
-            Ok(mut watcher) => {
-                // Start watching this file immediately
-                // Use the tokio runtime to run the async watch_file method if available
-                if let Err(e) = watcher.watch_file(path.clone(), file_position).await {
-                    debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
-                }
-                watcher
+        let notify_watcher = {
+            let mut watcher = NotifyWatcher::new();
+
+            // Start watching this file immediately
+            if let Err(e) = watcher.watch_file(path.clone(), file_position).await {
+                debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
             }
-            Err(e) => {
-                warn!(message = "Failed to create notify watcher", error = ?e);
-                // Create a dummy watcher that doesn't do anything
-                NotifyWatcher::dummy()
-            }
+            watcher
         };
 
         // We don't need to keep the file open permanently, but we'll read it once

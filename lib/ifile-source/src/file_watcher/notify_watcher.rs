@@ -34,29 +34,13 @@ pub struct NotifyWatcher {
 
 impl NotifyWatcher {
     /// Create a new NotifyWatcher
-    pub fn new() -> Result<Self, notify::Error> {
-        Self::create()
-    }
-
-    /// Create a dummy NotifyWatcher that doesn't do anything
-    /// This is used when we can't create a real watcher
-    pub fn dummy() -> Self {
-        Self {
+    pub fn new() -> Self {
+        NotifyWatcher {
             watcher: None,
             event_rx: None,
             watched_files: Arc::new(Mutex::new(Vec::new())),
             event_mutex: Arc::new(TokioMutex::new(())),
         }
-    }
-
-    /// Internal method to create a new NotifyWatcher
-    fn create() -> Result<Self, notify::Error> {
-        Ok(NotifyWatcher {
-            watcher: None,
-            event_rx: None,
-            watched_files: Arc::new(Mutex::new(Vec::new())),
-            event_mutex: Arc::new(TokioMutex::new(())),
-        })
     }
 
     /// Create an async watcher that uses futures channels
