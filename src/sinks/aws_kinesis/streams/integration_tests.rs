@@ -1,4 +1,3 @@
-#![allow(clippy::print_stdout)] // tests
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
@@ -332,15 +331,6 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
         .into_iter()
         .map(|e| String::from_utf8(e.data.into_inner()).unwrap())
         .collect::<Vec<_>>();
-
-    // With retry_partial disabled, we might lose some records on partial failures
-    // but the test should still complete successfully
-    // The exact count may vary depending on localstack behavior
-    println!(
-        "Input records: {}, Output records: {}",
-        input_lines.len(),
-        output_lines.len()
-    );
 
     // At minimum, we should get some records through
     assert!(
