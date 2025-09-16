@@ -300,8 +300,9 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            if let Ok(datetime) = chrono::DateTime::from_str(str) {
-                return Value::Timestamp(datetime);
+            // Try RFC3339/ISO8601 first and convert to UTC
+            if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(str) {
+                return Value::Timestamp(datetime.into());
             }
 
             let datetime = TIMESTAMP_FORMATS
@@ -338,7 +339,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .and_then(|s| chrono::NaiveDate::from_str(s).ok())
                 .map(|date| {
                     let datetime = NaiveDateTime::new(date, NaiveTime::default());
-                    let tz = tz.offset_from_utc_date(&date);
+                    let tz = tz.offset_from_utc_datetime(&datetime);
                     Value::Timestamp(
                         DateTime::<Tz>::from_naive_utc_and_offset(datetime, tz).to_utc(),
                     )

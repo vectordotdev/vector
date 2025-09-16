@@ -1,4 +1,5 @@
 use crate::config::{log_schema, LogNamespace, SourceConfig, SourceContext, SourceOutput};
+use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::serde::default_decoding;
 use crate::sinks::prelude::*;
 use crate::sources::odbc::{
@@ -23,7 +24,9 @@ use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
 use typetag::serde;
+use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::codecs::decoding::DeserializerConfig;
+use vector_lib::emit;
 use vrl::prelude::*;
 
 /// Configuration for the `odbc` source.
@@ -305,11 +308,21 @@ impl Context {
         let schedule = schedule.clone().stream(self.cfg.schedule_timezone).take_until(shutdown);
         pin_mut!(schedule);
 
+        let _ = register!(BytesReceived::from(Protocol::NONE));
+
         loop {
-            if let Err(e) = self.process().await {
-                error!(
-                    message = "Error processing ODBC SQL statement",
-                    error = %e);
+            emit!(OdbcEventsReceived {
+                count: 1,
+            });
+
+            if self.process().await.is_ok() {
+                emit!(OdbcQueryExecuted {
+                  statement: &self.cfg.statement.clone().unwrap_or_default()
+              })
+            } else {
+                emit!(OdbcFailedError {
+                    statement: &self.cfg.statement.clone().unwrap_or_default(),
+                })
             }
 
             // If there is no schedule, we only run once
@@ -317,6 +330,9 @@ impl Context {
                 debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
                 break
             }
+
+            #[cfg(all(test, feature = "odbc-integration-tests"))]
+            break
         }
 
         Ok(())
@@ -366,10 +382,9 @@ impl Context {
             log_schema.message_key_target_path(),
             Value::Array(rows.clone()),
         );
+
         let mut out = out.clone();
-        out.send_batch(vec![Event::from(event)])
-            .await
-            .context(ClosedSnafu)?;
+        out.send_event(event).await.context(ClosedSnafu)?;
 
         if let Some(last) = rows.last() {
             let Some(path) = cfg.last_run_metadata_path else {
