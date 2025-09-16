@@ -49,6 +49,7 @@ impl InternalEvent for OdbcFailedError<'_> {
 #[derive(Debug)]
 pub struct OdbcQueryExecuted<'a> {
     pub statement: &'a str,
+    pub elapsed: u128,
 }
 
 impl InternalEvent for OdbcQueryExecuted<'_> {
@@ -56,6 +57,7 @@ impl InternalEvent for OdbcQueryExecuted<'_> {
         trace!(
             message = "Executed statement.",
             statement = %self.statement,
+            elapsedMs = %self.elapsed
         );
         counter!(
             "component_executed_events_total"

@@ -1,13 +1,8 @@
 version: '3'
 
 services:
-  mysql:
-    #image: docker.io/mysql:${CONFIG_VERSION}
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - RUST_VERSION=${RUST_VERSION}
+  mariadb:
+    image: docker.io/mariadb:${CONFIG_VERSION}
     ports:
       - "3306:3306"
     environment:
@@ -15,11 +10,3 @@ services:
       - MYSQL_PASSWORD=vector
       - MYSQL_ROOT_PASSWORD=vector
       - MYSQL_DATABASE=vector_db
-#    volumes:
-#      - socket:/var/run/mysqld
-#      - ../../../tests/data/odbc/odbc-init.sh:/odbc-init.sh:ro
-#      - ../../../tests/data/odbc/odbc-init.sh:/odbc-init.sh:ro
-#    command: /odbc-init.sh
-
-volumes:
-  socket: {}

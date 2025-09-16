@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fs;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use typetag::serde;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::codecs::decoding::DeserializerConfig;
@@ -315,10 +315,12 @@ impl Context {
                 count: 1,
             });
 
+            let instant = Instant::now();
             if self.process().await.is_ok() {
                 emit!(OdbcQueryExecuted {
-                  statement: &self.cfg.statement.clone().unwrap_or_default()
-              })
+                  statement: &self.cfg.statement.clone().unwrap_or_default(),
+                  elapsed: instant.elapsed().as_millis()
+                })
             } else {
                 emit!(OdbcFailedError {
                     statement: &self.cfg.statement.clone().unwrap_or_default(),

@@ -3,10 +3,11 @@ use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS
 use std::time::Duration;
 
 #[tokio::test]
-async fn healthcheck_passed() {
+async fn parse_odbc_config() {
+    let conn_str = get_conn_str();
     let config_str = format!(
         r#"
-            connection_string = "driver={{MariaDB ODBC 3.0 Driver}};server=mariadb;port=3306;database=vector_db;uid=vector;pwd=vectorVECTOR123!@#;"
+            connection_string = "{conn_str}"
             statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
             schedule = "*/5 * * * * *"
             schedule_timezone = "UTC"
@@ -21,9 +22,10 @@ async fn healthcheck_passed() {
 
 #[tokio::test]
 async fn scheduled_query_executed() {
+    let conn_str = get_conn_str();
     let events = run_and_assert_source_compliance(
         OdbcConfig {
-            connection_string: "driver={MariaDB ODBC 3.0 Driver};server=localhost;port=3306;database=vector_db;uid=vector;pwd=vectorVECTOR123!@#;".to_string(),
+            connection_string: conn_str,
             schedule: Some("*/1 * * * * *".into()),
             statement: Some("SELECT 1".to_string()),
             ..Default::default()
@@ -33,4 +35,9 @@ async fn scheduled_query_executed() {
     ).await;
 
     println!("{:?}", events);
+}
+
+fn get_conn_str() -> String {
+    std::env::var("ODBC_CONN_STRING")
+        .expect("Required environment variable 'ODBC_CONN_STRING'")
 }
