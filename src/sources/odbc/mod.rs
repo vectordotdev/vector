@@ -172,15 +172,12 @@ impl OdbcSchedule {
     pub(crate) fn stream(self, tz: Tz) -> impl Stream<Item=DateTime<Tz>> {
         let schedule = self.inner.clone();
         stream::unfold(schedule, move |schedule| {
-            let tz = tz.clone();
             async move {
                 let now = Utc::now().with_timezone(&tz);
                 let mut upcoming = schedule.upcoming(tz);
-                let Some(next) = upcoming.next() else {
-                    return None;
-                };
-
+                let next = upcoming.next()?;
                 let delay = (next - now).abs();
+                
                 sleep(delay.to_std().unwrap_or_default()).await;
                 Some((next, schedule))
             }

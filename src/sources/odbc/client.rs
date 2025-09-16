@@ -23,6 +23,7 @@ use std::fmt::Debug;
 use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::select;
 use typetag::serde;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::codecs::decoding::DeserializerConfig;
@@ -305,36 +306,45 @@ impl Context {
             warn!(message = "No next schedule found. Retry in 10 seconds.");
             return Err(());
         };
-        let schedule = schedule.clone().stream(self.cfg.schedule_timezone).take_until(shutdown);
+        //let schedule = schedule.clone().stream(self.cfg.schedule_timezone).take_until(shutdown);
+        let schedule = schedule.clone().stream(self.cfg.schedule_timezone);
         pin_mut!(schedule);
 
         let _ = register!(BytesReceived::from(Protocol::NONE));
 
         loop {
-            emit!(OdbcEventsReceived {
-                count: 1,
-            });
+            select! {
+                _ = shutdown => {
+                    debug!("Shutdown signal received. Shutting down ODBC source.");
+                    break;
+                }
+                next = schedule.next() => {
+                    emit!(OdbcEventsReceived {
+                        count: 1,
+                    });
 
-            let instant = Instant::now();
-            if self.process().await.is_ok() {
-                emit!(OdbcQueryExecuted {
-                  statement: &self.cfg.statement.clone().unwrap_or_default(),
-                  elapsed: instant.elapsed().as_millis()
-                })
-            } else {
-                emit!(OdbcFailedError {
-                    statement: &self.cfg.statement.clone().unwrap_or_default(),
-                })
+                    let instant = Instant::now();
+                    if self.process().await.is_ok() {
+                        emit!(OdbcQueryExecuted {
+                          statement: &self.cfg.statement.clone().unwrap_or_default(),
+                          elapsed: instant.elapsed().as_millis()
+                        })
+                    } else {
+                        emit!(OdbcFailedError {
+                            statement: &self.cfg.statement.clone().unwrap_or_default(),
+                        })
+                    }
+
+                    // If there is no schedule, we only run once
+                    if next.is_none() {
+                        debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
+                        break
+                    }
+
+                    #[cfg(all(test, feature = "odbc-integration-tests"))]
+                    break
+                }
             }
-
-            // If there is no schedule, we only run once
-            if schedule.next().await.is_none() {
-                debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
-                break
-            }
-
-            #[cfg(all(test, feature = "odbc-integration-tests"))]
-            break
         }
 
         Ok(())

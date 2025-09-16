@@ -23,7 +23,7 @@ async fn parse_odbc_config() {
 #[tokio::test]
 async fn scheduled_query_executed() {
     let conn_str = get_conn_str();
-    let events = run_and_assert_source_compliance(
+    run_and_assert_source_compliance(
         OdbcConfig {
             connection_string: conn_str,
             schedule: Some("*/1 * * * * *".into()),
@@ -33,8 +33,6 @@ async fn scheduled_query_executed() {
         Duration::from_secs(3),
         &SOURCE_TAGS
     ).await;
-
-    println!("{:?}", events);
 }
 
 fn get_conn_str() -> String {
