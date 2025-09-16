@@ -34,9 +34,7 @@ pub(super) fn parse_text_with_overrides(
 }
 
 #[cfg(test)]
-fn parse_text_with_nan_filtering(
-    packet: &str,
-) -> Result<Vec<Event>, ParserError> {
+fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
         .map(|group| reparse_groups(group, vec![], false, true))
 }
