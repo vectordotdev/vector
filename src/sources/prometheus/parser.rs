@@ -34,13 +34,19 @@ pub(super) fn parse_text_with_overrides(
 }
 
 #[cfg(test)]
-fn parse_text_with_nan_filtering(packet: &str, skip_nan_values: bool) -> Result<Vec<Event>, ParserError> {
+fn parse_text_with_nan_filtering(
+    packet: &str,
+    skip_nan_values: bool,
+) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
         .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]
-pub(super) fn parse_request(request: proto::WriteRequest, skip_nan_values: bool) -> Result<Vec<Event>, ParserError> {
+pub(super) fn parse_request(
+    request: proto::WriteRequest,
+    skip_nan_values: bool,
+) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_request(request)
         .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
@@ -107,7 +113,9 @@ fn reparse_groups(
             }
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
-                    if skip_nan_values && (metric.sum.is_nan() || metric.buckets.iter().any(|b| b.bucket.is_nan())) {
+                    if skip_nan_values
+                        && (metric.sum.is_nan() || metric.buckets.iter().any(|b| b.bucket.is_nan()))
+                    {
                         continue;
                     }
 
@@ -151,7 +159,13 @@ fn reparse_groups(
             }
             GroupKind::Summary(metrics) => {
                 for (key, metric) in metrics {
-                    if skip_nan_values && (metric.sum.is_nan() || metric.quantiles.iter().any(|q| q.quantile.is_nan() || q.value.is_nan())) {
+                    if skip_nan_values
+                        && (metric.sum.is_nan()
+                            || metric
+                                .quantiles
+                                .iter()
+                                .any(|q| q.quantile.is_nan() || q.value.is_nan()))
+                    {
                         continue;
                     }
 
@@ -1409,9 +1423,10 @@ mod test {
         assert_eq!(result.len(), 2);
 
         // Find the NaN metric
-        let nan_metric = result.iter().find(|m| {
-            m.tags().as_ref().and_then(|tags| tags.get("labelname")) == Some("val1")
-        }).unwrap();
+        let nan_metric = result
+            .iter()
+            .find(|m| m.tags().as_ref().and_then(|tags| tags.get("labelname")) == Some("val1"))
+            .unwrap();
 
         match nan_metric.value() {
             MetricValue::Counter { value } => {

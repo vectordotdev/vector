@@ -574,18 +574,16 @@ mod test {
                         unit: String::default(),
                     },
                 ],
-                timeseries: vec![
-                    proto::TimeSeries {
-                        labels: vec![proto::Label {
-                            name: "__name__".into(),
-                            value: "test_metric".into(),
-                        }],
-                        samples: vec![proto::Sample {
-                            value: 42.0,
-                            timestamp: chrono::Utc::now().timestamp_millis(),
-                        }],
-                    },
-                ],
+                timeseries: vec![proto::TimeSeries {
+                    labels: vec![proto::Label {
+                        name: "__name__".into(),
+                        value: "test_metric".into(),
+                    }],
+                    samples: vec![proto::Sample {
+                        value: 42.0,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    }],
+                }],
             };
 
             let mut buf = Vec::new();
@@ -607,7 +605,11 @@ mod test {
             .unwrap();
 
         // Should succeed (not return 400) despite conflicting metadata
-        assert!(response.status().is_success(), "Expected success but got: {}", response.status());
+        assert!(
+            response.status().is_success(),
+            "Expected success but got: {}",
+            response.status()
+        );
 
         // Verify we received the metric data
         let output = test_util::collect_ready(rx).await;
