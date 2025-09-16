@@ -9,7 +9,7 @@ use memmap2::MmapMut;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncSeekExt, AsyncWriteExt},
-    time::{timeout, Duration},
+    time::{Duration, timeout},
 };
 use tracing::Instrument;
 use vector_common::{
