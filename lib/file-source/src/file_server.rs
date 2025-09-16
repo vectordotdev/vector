@@ -559,7 +559,6 @@ impl TimingStats {
     }
 
     fn report(&self) {
-        // Return if debug logging is disabled
         if !tracing::level_enabled!(tracing::Level::DEBUG) {
             return;
         }
