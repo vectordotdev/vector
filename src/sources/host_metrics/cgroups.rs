@@ -1,4 +1,9 @@
-use std::{io, num::ParseIntError, path::Path, path::PathBuf, str::FromStr};
+use std::{
+    io,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
@@ -8,7 +13,7 @@ use tokio::{
 };
 use vector_lib::metric_tags;
 
-use super::{filter_result_sync, CGroupsConfig, HostMetrics, MetricsBuffer};
+use super::{CGroupsConfig, HostMetrics, MetricsBuffer, filter_result_sync};
 use crate::event::MetricTags;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
@@ -450,22 +455,24 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::path::{Path, PathBuf};
+    use std::{
+        collections::BTreeSet,
+        fs::{self, File},
+        io::Write,
+        path::{Path, PathBuf},
+    };
 
-    use rand::{rngs::ThreadRng, Rng};
+    use rand::{Rng, rngs::ThreadRng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_lib::event::Metric;
 
     use super::{
         super::{
-            tests::{count_name, count_tag},
             HostMetrics, HostMetricsConfig,
+            tests::{count_name, count_tag},
         },
-        join_name, join_path, MetricsBuffer,
+        MetricsBuffer, join_name, join_path,
     };
 
     #[test]

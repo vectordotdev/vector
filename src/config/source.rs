@@ -1,11 +1,12 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    schema::{SchemaGenerator, SchemaObject},
+};
 use vector_config_macros::configurable_component;
 use vector_lib::{
     config::{
@@ -15,8 +16,8 @@ use vector_lib::{
     source::Source,
 };
 
-use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
-use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
+use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 

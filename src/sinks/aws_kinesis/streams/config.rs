@@ -1,25 +1,26 @@
-use aws_sdk_kinesis::operation::describe_stream::DescribeStreamError;
-use aws_sdk_kinesis::operation::put_records::PutRecordsError;
+use aws_sdk_kinesis::operation::{
+    describe_stream::DescribeStreamError, put_records::PutRecordsError,
+};
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
-use crate::sinks::util::retries::RetryAction;
+use super::{
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
+    record::{KinesisStreamClient, KinesisStreamRecord},
+    sink::BatchKinesisRequest,
+};
 use crate::{
-    aws::{create_client, is_retriable_error, ClientBuilder},
+    aws::{ClientBuilder, create_client, is_retriable_error},
     config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
-        util::{retries::RetryLogic, BatchConfig, SinkBatchSettings},
         Healthcheck, VectorSink,
+        util::{
+            BatchConfig, SinkBatchSettings,
+            retries::{RetryAction, RetryLogic},
+        },
     },
-};
-
-use super::sink::BatchKinesisRequest;
-use super::{
-    build_sink,
-    record::{KinesisStreamClient, KinesisStreamRecord},
-    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig,
 };
 
 #[allow(clippy::large_enum_variant)]

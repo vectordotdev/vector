@@ -30,7 +30,7 @@
 
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 
-use rand::{rng, Rng};
+use rand::{Rng, rng};
 
 pub type Port = u16;
 
@@ -89,6 +89,28 @@ pub fn pick_unused_port(ip: IpAddr) -> Port {
                 if is_free_udp(ip, port) {
                     return port;
                 }
+            }
+        }
+    }
+}
+
+pub fn bind_unused_udp(ip: IpAddr) -> UdpSocket {
+    let mut rng = rng();
+
+    loop {
+        // Try random port first
+        for _ in 0..10 {
+            let port = rng.random_range(15000..25000);
+
+            if let Ok(socket) = UdpSocket::bind(SocketAddr::new(ip, port)) {
+                return socket;
+            }
+        }
+
+        // Ask the OS for a port
+        for _ in 0..10 {
+            if let Ok(socket) = UdpSocket::bind(SocketAddr::new(ip, 0)) {
+                return socket;
             }
         }
     }

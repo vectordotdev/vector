@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use vector::{
     config::{DataType, TransformOutput},
     event::{Event, LogEvent, Value},
     transforms::{
-        remap::{Remap, RemapConfig},
         SyncTransform, TransformOutputsBuf,
+        remap::{Remap, RemapConfig},
     },
 };
-use vrl::event_path;
-use vrl::prelude::*;
+use vrl::{event_path, prelude::*};
 
 criterion_group!(
     name = benches;

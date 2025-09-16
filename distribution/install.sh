@@ -13,7 +13,7 @@ set -u
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.48.0"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.49.0"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -456,19 +456,6 @@ get_architecture() {
                 _cputype=$(get_endianness mips64 '' el)
             fi
             ;;
-
-        ppc)
-            _cputype=powerpc
-            ;;
-
-        ppc64)
-            _cputype=powerpc64
-            ;;
-
-        ppc64le)
-            _cputype=powerpc64le
-            ;;
-
         s390x)
             _cputype=s390x
             ;;
@@ -505,9 +492,6 @@ get_architecture() {
                 ;;
             mips64)
                 _cputype=$(get_endianness mips '' el)
-                ;;
-            powerpc64)
-                _cputype=powerpc
                 ;;
             aarch64)
                 _cputype=armv7

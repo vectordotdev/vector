@@ -1,19 +1,19 @@
 use futures::stream;
 use indoc::indoc;
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 use crate::{
     config::SinkConfig,
     event::Event,
     sinks::{
-        datadog::traces::{tests::simple_trace_event, DatadogTracesConfig},
+        datadog::traces::{DatadogTracesConfig, tests::simple_trace_event},
         util::test::load_sink,
     },
     test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance},
         map_event_batch_stream,
     },
 };
-use vector_lib::event::{BatchNotifier, BatchStatus};
 
 #[tokio::test]
 async fn to_real_traces_endpoint() {

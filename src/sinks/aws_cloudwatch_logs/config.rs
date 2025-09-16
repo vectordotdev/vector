@@ -1,29 +1,28 @@
+use std::collections::HashMap;
+
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
-use serde::{de, Deserialize, Deserializer};
-use std::collections::HashMap;
+use serde::{Deserialize, Deserializer, de};
 use tower::ServiceBuilder;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema;
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
     codecs::{Encoder, EncodingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
     },
     sinks::{
+        Healthcheck, VectorSink,
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            http::RequestConfig, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsConfig,

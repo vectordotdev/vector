@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -53,7 +54,7 @@ impl InternalEvent for ExecFailedError<'_> {
             error_type = error_type::COMMAND_FAILED,
             error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -82,7 +83,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             error = %self.error,
             error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -118,7 +119,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             command = %self.command,
             exit_status = %exit_status,
             elapsed_millis = %self.exec_duration.as_millis(),
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "command_executed_total",
@@ -194,7 +195,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             error_code = %self.error.to_error_code(),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -216,6 +217,7 @@ impl InternalEvent for ExecChannelClosedError {
             message = exec_reason,
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

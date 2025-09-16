@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -6,23 +7,27 @@ use std::{
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
     HeaderValue, Request, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use hyper::Body;
-use std::collections::BTreeMap;
 use tower::Service;
 use tracing::Instrument;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{
     http::HttpClient,
-    sinks::util::{retries::RetryLogic, Compression},
     sinks::{
         datadog::DatadogApiError,
-        util::http::{validate_headers, OrderedHeaderName},
+        util::{
+            Compression,
+            http::{OrderedHeaderName, validate_headers},
+            retries::RetryLogic,
+        },
     },
 };
 

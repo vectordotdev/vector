@@ -1,10 +1,12 @@
-use serde_json::{json, Value};
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, event::Event, EstimatedJsonEncodedSizeOf};
+use serde_json::{Value, json};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, config::telemetry, event::Event,
+    request_metadata::GroupedCountByteSize,
+};
 
 use crate::{
     codecs::Transformer,
-    sinks::util::encoding::{as_tracked_write, Encoder},
+    sinks::util::encoding::{Encoder, as_tracked_write},
 };
 
 #[derive(Clone)]
@@ -31,7 +33,7 @@ impl Encoder<Vec<Event>> for AppsignalEncoder {
                 _ => {
                     return Err(std::io::Error::other(format!(
                         "The AppSignal sink does not support this type of event: {event:?}"
-                    )))
+                    )));
                 }
             };
             if let Value::Array(ref mut array) = result {

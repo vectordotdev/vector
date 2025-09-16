@@ -5,19 +5,19 @@ use std::{
     slice,
 };
 
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 use vector_common::{config::ComponentKey, finalization::Finalizable};
 use vector_config::configurable_component;
 
 use crate::{
+    Bufferable, WhenFull,
     topology::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
     variants::{DiskV2Buffer, MemoryBuffer},
-    Bufferable, WhenFull,
 };
 
 #[derive(Debug, Snafu)]
@@ -220,7 +220,7 @@ pub enum BufferType {
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
     Memory {
-        /// The terms around how to express buffering limits, can be in size or bytes_size.
+        /// The terms around how to express buffering limits, can be in size or `bytes_size`.
         #[serde(flatten)]
         size: MemoryBufferSize,
 

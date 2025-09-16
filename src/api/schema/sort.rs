@@ -8,8 +8,8 @@ use itertools::{
 
 use crate::api::schema::{
     components::{
-        sink::SinksSortFieldName, source::SourcesSortFieldName, transform::TransformsSortFieldName,
-        ComponentsSortFieldName,
+        ComponentsSortFieldName, sink::SinksSortFieldName, source::SourcesSortFieldName,
+        transform::TransformsSortFieldName,
     },
     metrics::source::file::FileSourceMetricFilesSortFieldName,
 };

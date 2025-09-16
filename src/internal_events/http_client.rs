@@ -1,13 +1,12 @@
 use std::time::Duration;
 
 use http::{
-    header::{self, HeaderMap, HeaderValue},
     Request, Response,
+    header::{self, HeaderMap, HeaderValue},
 };
-use hyper::{body::HttpBody, Error};
+use hyper::{Error, body::HttpBody};
 use metrics::{counter, histogram};
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {
@@ -86,7 +85,7 @@ impl InternalEvent for GotHttpWarning<'_> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = true,
         );
         counter!("http_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
         histogram!("http_client_rtt_seconds").record(self.roundtrip);

@@ -1,6 +1,7 @@
 use bytes::Bytes;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::{json_size::JsonSize, request_metadata::RequestMetadata};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, json_size::JsonSize, request_metadata::RequestMetadata,
+};
 
 use crate::{
     event::{EventFinalizers, Finalizable},
@@ -10,8 +11,8 @@ use crate::{
             service::ElasticsearchRequest,
         },
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };

@@ -1,23 +1,27 @@
-use http::Uri;
 use std::collections::HashMap;
-use tokio::time::Duration;
-use vector_lib::config::LogNamespace;
-use warp::{http::HeaderMap, Filter};
 
-use crate::components::validation::prelude::*;
-use crate::http::{ParamType, ParameterValue, QueryParameterValue};
-use crate::sources::util::http::HttpMethod;
-use crate::{serde::default_decoding, serde::default_framing_message_based};
-use vector_lib::codecs::decoding::{
-    CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
+use http::Uri;
+use tokio::time::Duration;
+use vector_lib::{
+    codecs::{
+        CharacterDelimitedDecoderConfig,
+        decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig},
+    },
+    config::LogNamespace,
+    event::Event,
 };
-use vector_lib::codecs::CharacterDelimitedDecoderConfig;
-use vector_lib::event::Event;
+use warp::{Filter, http::HeaderMap};
 
 use super::HttpClientConfig;
-use crate::test_util::{
-    components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-    next_addr, test_generate_config, wait_for_tcp,
+use crate::{
+    components::validation::prelude::*,
+    http::{ParamType, ParameterValue, QueryParameterValue},
+    serde::{default_decoding, default_framing_message_based},
+    sources::util::http::HttpMethod,
+    test_util::{
+        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        next_addr, test_generate_config, wait_for_tcp,
+    },
 };
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);

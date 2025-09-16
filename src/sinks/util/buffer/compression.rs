@@ -3,14 +3,14 @@ use std::{cell::RefCell, collections::BTreeSet, fmt};
 use indexmap::IndexMap;
 use serde::{de, ser};
 use serde_json::Value;
-use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_const_string_schema, generate_enum_schema,
-        generate_one_of_schema, generate_struct_schema, get_or_generate_schema, SchemaGenerator,
-        SchemaObject,
-    },
     Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
+    schema::{
+        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        generate_enum_schema, generate_one_of_schema, generate_struct_schema,
+        get_or_generate_schema,
+    },
 };
 
 use crate::sinks::util::zstd::ZstdCompressionLevel;

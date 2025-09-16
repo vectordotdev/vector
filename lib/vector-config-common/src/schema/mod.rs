@@ -2,7 +2,7 @@
 // copied from the `schemars` crate. The license for `schemars` is included in `LICENSE-schemars`,
 // pursuant to the listed conditions in the license.
 
-mod gen;
+mod generator;
 mod json_schema;
 pub mod visit;
 
@@ -13,5 +13,7 @@ pub(crate) const DEFINITIONS_PREFIX: &str = "#/definitions/";
 pub type Map<K, V> = std::collections::BTreeMap<K, V>;
 pub type Set<V> = std::collections::BTreeSet<V>;
 
-pub use self::gen::{SchemaGenerator, SchemaSettings};
-pub use self::json_schema::*;
+pub use self::{
+    generator::{SchemaGenerator, SchemaSettings},
+    json_schema::*,
+};

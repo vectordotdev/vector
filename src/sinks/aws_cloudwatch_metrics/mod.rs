@@ -3,39 +3,42 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-use aws_config::Region;
-use aws_sdk_cloudwatch::error::SdkError;
-use aws_sdk_cloudwatch::operation::put_metric_data::PutMetricDataError;
-use aws_sdk_cloudwatch::types::{Dimension, MetricDatum};
-use aws_sdk_cloudwatch::Client as CloudwatchClient;
-use aws_smithy_types::DateTime as AwsDateTime;
-use futures::{stream, FutureExt, SinkExt};
-use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
-use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
-use crate::{
-    aws::{
-        auth::AwsAuthentication, create_client, is_retriable_error, ClientBuilder, RegionOrEndpoint,
-    },
-    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
-    event::{
-        metric::{Metric, MetricTags, MetricValue},
-        Event,
-    },
-    sinks::util::{
-        batch::BatchConfig,
-        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-        retries::RetryLogic,
-        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
-        TowerRequestConfig,
-    },
-    tls::TlsConfig,
+use aws_config::Region;
+use aws_sdk_cloudwatch::{
+    Client as CloudwatchClient,
+    error::SdkError,
+    operation::put_metric_data::PutMetricDataError,
+    types::{Dimension, MetricDatum},
+};
+use aws_smithy_types::DateTime as AwsDateTime;
+use futures::{FutureExt, SinkExt, stream};
+use futures_util::{future, future::BoxFuture};
+use tower::Service;
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, sink::VectorSink,
 };
 
 use super::util::service::TowerRequestConfigDefaults;
+use crate::{
+    aws::{
+        ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client, is_retriable_error,
+    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    event::{
+        Event,
+        metric::{Metric, MetricTags, MetricValue},
+    },
+    sinks::util::{
+        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+        TowerRequestConfig,
+        batch::BatchConfig,
+        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+        retries::RetryLogic,
+    },
+    tls::TlsConfig,
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CloudWatchMetricsDefaultBatchSettings;

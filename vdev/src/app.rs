@@ -1,10 +1,15 @@
-use std::ffi::{OsStr, OsString};
 use std::{
-    borrow::Cow, env, io::Read, path::PathBuf, process::Command, process::ExitStatus,
-    process::Stdio, sync::LazyLock, sync::OnceLock, time::Duration,
+    borrow::Cow,
+    env,
+    ffi::{OsStr, OsString},
+    io::Read,
+    path::PathBuf,
+    process::{Command, ExitStatus, Stdio},
+    sync::{LazyLock, OnceLock},
+    time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
@@ -57,7 +62,9 @@ pub fn version() -> Result<String> {
         }
         let tag = String::from_utf8_lossy(&head.stdout).trim().to_string();
         if tag != format!("v{version}") {
-            bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
+            bail!(
+                "On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting"
+            );
         }
 
     // extend version for custom builds if not already

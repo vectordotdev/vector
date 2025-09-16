@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::event_path;
 
 use super::Region;
@@ -11,12 +10,12 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
+        Healthcheck, VectorSink,
         elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            StreamSink, TowerRequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
+            TowerRequestConfig, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
 };

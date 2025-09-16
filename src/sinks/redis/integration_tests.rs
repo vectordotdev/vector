@@ -1,26 +1,23 @@
 use futures::stream;
 use rand::Rng;
 use redis::AsyncCommands;
-use vector_lib::codecs::JsonSerializerConfig;
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    codecs::JsonSerializerConfig,
+    config::{Tags, Telemetry, init_telemetry},
     event::LogEvent,
-};
-
-use crate::event::{
-    BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent,
 };
 
 use super::config::{
     DataTypeConfig, ListMethod, ListOption, RedisSinkConfig, SortedSetMethod, SortedSetOption,
 };
 use crate::{
+    event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue, TraceEvent},
     serde::OneOrMany,
     sinks::prelude::*,
     test_util::{
         components::{
-            assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
-            SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
+            assert_sink_compliance,
         },
         map_event_batch_stream, random_lines_with_stream, random_string, trace_init,
     },
@@ -65,10 +62,12 @@ async fn redis_sink_sentinel_reaches_primary() {
         .unwrap()
         .connection;
 
-    assert!(redis::cmd("PING")
-        .query_async::<()>(&mut conn)
-        .await
-        .is_ok());
+    assert!(
+        redis::cmd("PING")
+            .query_async::<()>(&mut conn)
+            .await
+            .is_ok()
+    );
 }
 
 #[tokio::test]
@@ -623,7 +622,7 @@ async fn redis_sink_metrics() {
 
 #[tokio::test]
 async fn redis_sink_traces() {
-    use crate::test_util::components::{assert_sink_compliance, SINK_TAGS};
+    use crate::test_util::components::{SINK_TAGS, assert_sink_compliance};
 
     trace_init();
 

@@ -2,22 +2,28 @@
 
 use std::{
     future::ready,
-    sync::{atomic, Arc},
+    sync::{Arc, atomic},
 };
 
 use bytes::{Buf, Bytes};
-use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
-use serde::{de, Deserialize};
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+use serde::{Deserialize, de};
+use vector_lib::{
+    codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    finalization::AddBatchNotifier,
 };
-use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-use vector_lib::finalization::AddBatchNotifier;
 
+use super::{
+    config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
+    encoder::HttpEncoder,
+};
 use crate::{
     assert_downcast_matches,
     codecs::{EncodingConfigWithFraming, SinkType},
@@ -35,17 +41,11 @@ use crate::{
     },
     test_util::{
         components::{
-            self, init_test, run_and_assert_sink_compliance, run_and_assert_sink_error_with_events,
-            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+            self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
+            run_and_assert_sink_error_with_events,
         },
         create_events_batch_with_fn, next_addr, random_lines_with_stream,
     },
-};
-
-use super::{
-    config::HttpSinkConfig,
-    config::{validate_headers, validate_payload_wrapper},
-    encoder::HttpEncoder,
 };
 
 #[test]

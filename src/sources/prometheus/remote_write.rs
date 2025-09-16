@@ -2,14 +2,14 @@ use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::Bytes;
 use prost::Message;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::prometheus::parser::proto;
+use vector_lib::{
+    config::LogNamespace, configurable::configurable_component, prometheus::parser::proto,
+};
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
 use crate::{
-    common::http::{server_auth::HttpServerAuthConfig, ErrorMessage},
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
         GenerateConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
     },
@@ -19,7 +19,7 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         self,
-        util::{decode, http::HttpMethod, HttpSource},
+        util::{HttpSource, decode, http::HttpMethod},
     },
     tls::TlsEnableableConfig,
 };
@@ -158,11 +158,11 @@ mod test {
 
     use super::*;
     use crate::{
+        SourceSender,
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
-        SourceSender,
     };
 
     #[test]
@@ -305,28 +305,32 @@ mod test {
 
         let timestamp = Utc::now().trunc_subsecs(3);
 
-        let events = vec![Metric::new(
-            "gauge_2",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 41.0 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(metric_tags! {
-            "code" => "200".to_string(),
-            "code" => "success".to_string(),
-        }))
-        .into()];
+        let events = vec![
+            Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "200".to_string(),
+                "code" => "success".to_string(),
+            }))
+            .into(),
+        ];
 
-        let expected = vec![Metric::new(
-            "gauge_2",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 41.0 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(metric_tags! {
-            "code" => "success".to_string(),
-        }))
-        .into()];
+        let expected = vec![
+            Metric::new(
+                "gauge_2",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 41.0 },
+            )
+            .with_timestamp(Some(timestamp))
+            .with_tags(Some(metric_tags! {
+                "code" => "success".to_string(),
+            }))
+            .into(),
+        ];
 
         let output = test_util::spawn_collect_ready(
             async move {
@@ -344,10 +348,11 @@ mod test {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use std::net::{SocketAddr, ToSocketAddrs as _};
+
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
+    use crate::test_util::components::{HTTP_PUSH_SOURCE_TAGS, run_and_assert_source_compliance};
 
     fn source_receive_address() -> SocketAddr {
         let address = std::env::var("REMOTE_WRITE_SOURCE_RECEIVE_ADDRESS")

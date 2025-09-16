@@ -6,15 +6,15 @@ use derivative::Derivative;
 use influxdb_line_protocol::{FieldValue, ParsedLine};
 use smallvec::SmallVec;
 use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::event::{Event, Metric, MetricKind, MetricTags, MetricValue};
-use vector_core::{config::DataType, schema};
-use vrl::value::kind::Collection;
-use vrl::value::Kind;
-
-use crate::decoding::format::default_lossy;
+use vector_core::{
+    config::{DataType, LogNamespace},
+    event::{Event, Metric, MetricKind, MetricTags, MetricValue},
+    schema,
+};
+use vrl::value::{Kind, kind::Collection};
 
 use super::Deserializer;
+use crate::decoding::format::default_lossy;
 
 /// Config used to build a `InfluxdbDeserializer`.
 /// - [InfluxDB Line Protocol](https://docs.influxdata.com/influxdb/v1/write_protocols/line_protocol_tutorial/):

@@ -1,13 +1,15 @@
+use std::collections::BTreeMap;
+
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use vrl::compiler::runtime::{Runtime, Terminate};
-use vrl::compiler::TimeZone;
-use vrl::compiler::{compile_with_state, CompileConfig, TargetValue, TypeState};
-use vrl::diagnostic::DiagnosticList;
-use vrl::diagnostic::Formatter;
-use vrl::value::Secrets;
-use vrl::value::Value;
+use vrl::{
+    compiler::{
+        CompileConfig, TargetValue, TimeZone, TypeState, compile_with_state,
+        runtime::{Runtime, Terminate},
+    },
+    diagnostic::{DiagnosticList, Formatter},
+    value::{Secrets, Value},
+};
 use wasm_bindgen::prelude::*;
 
 pub mod built_info {

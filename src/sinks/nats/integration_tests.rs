@@ -1,28 +1,31 @@
+use std::time::Duration;
+
+use async_nats::jetstream::stream::StorageType;
+use futures_util::StreamExt;
+use serde::Deserialize;
+use snafu::ResultExt;
+use vector_lib::{
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
+    event::{EventArray, LogEvent},
+};
+use vrl::value;
+
 use super::{
+    ConfigSnafu, NatsError,
     config::{NatsHeaderConfig, NatsSinkConfig},
     sink::NatsSink,
-    ConfigSnafu, NatsError,
 };
 use crate::{
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
-    sinks::nats::config::JetStreamConfig,
-    sinks::prelude::*,
+    sinks::{nats::config::JetStreamConfig, prelude::*},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
     },
     tls::TlsEnableableConfig,
 };
-use async_nats::jetstream::stream::StorageType;
-use futures_util::StreamExt;
-use serde::Deserialize;
-use snafu::ResultExt;
-use std::time::Duration;
-use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::event::{EventArray, LogEvent};
-use vrl::value;
 
 fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
     NatsSinkConfig {
@@ -381,8 +384,8 @@ async fn nats_tls_jwt_auth_invalid() {
 
     let r = publish_and_check(conf).await;
     assert!(
-        matches!(r, Err(NatsError::Connect { .. })),
-        "publish_and_check failed, expected NatsError::Connect, got: {r:?}"
+        matches!(r, Err(NatsError::Config { .. })),
+        "publish_and_check failed, expected NatsError::Config, got: {r:?}"
     );
 }
 

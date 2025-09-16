@@ -1,9 +1,17 @@
 #![allow(missing_docs)]
+use std::{
+    collections::HashMap,
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
-    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
-    Version,
+    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
+    uri::InvalidUri,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -15,13 +23,6 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -29,16 +30,14 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
-
 use crate::{
     config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
+    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
 };
 
 pub mod status {
@@ -682,13 +681,12 @@ pub type QueryParameters = HashMap<String, QueryParameterValue>;
 mod tests {
     use std::convert::Infallible;
 
-    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
