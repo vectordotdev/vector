@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use snafu::Snafu;
 use tracing::{error, warn};
+use vector_lib::EstimatedJsonEncodedSizeOf;
 use vector_lib::internal_event::{
     ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 use vrl::core::Value;
 
 use crate::sinks::journald::journald_writer::JournaldWriter;
@@ -66,7 +66,9 @@ impl JournaldSink {
                     Value::Object(_) | Value::Array(_) => {
                         // Currently this code is unreachable because `all_event_fields` flattens
                         // the event fields and does not include complex types like Object or Array.
-                        warn!("Journald sink does not support sending complex types like Object or Array. Key: {k}");
+                        warn!(
+                            "Journald sink does not support sending complex types like Object or Array. Key: {k}"
+                        );
                         continue;
                     }
                     Value::Null => {

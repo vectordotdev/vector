@@ -1,9 +1,9 @@
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{journald::sink::JournaldSink, Healthcheck, VectorSink},
+    sinks::{Healthcheck, VectorSink, journald::sink::JournaldSink},
 };
 
 /// Configuration for the `journald` sink.
