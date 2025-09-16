@@ -16,12 +16,12 @@ impl InternalEvent for OdbcEventsReceived {
             "component_received_events_total",
             "protocol" => "odbc"
         )
-            .increment(self.count as u64);
+        .increment(self.count as u64);
         counter!(
             "component_received_event_bytes_total",
             "protocol" => "odbc"
         )
-            .increment(0);
+        .increment(0);
     }
 }
 
@@ -42,7 +42,7 @@ impl InternalEvent for OdbcFailedError<'_> {
             "statement" => self.statement.to_owned(),
             "error_type" => error_type::COMMAND_FAILED
         )
-            .increment(1);
+        .increment(1);
     }
 }
 
@@ -59,9 +59,6 @@ impl InternalEvent for OdbcQueryExecuted<'_> {
             statement = %self.statement,
             elapsedMs = %self.elapsed
         );
-        counter!(
-            "component_executed_events_total"
-        )
-            .increment(1);
+        counter!("component_executed_events_total").increment(1);
     }
 }

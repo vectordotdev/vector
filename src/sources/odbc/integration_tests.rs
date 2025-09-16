@@ -17,7 +17,11 @@ async fn parse_odbc_config() {
         "#
     );
     let config = toml::from_str::<OdbcConfig>(&config_str);
-    assert!(config.is_ok(), "Failed to parse config: {}", config.unwrap_err());
+    assert!(
+        config.is_ok(),
+        "Failed to parse config: {}",
+        config.unwrap_err()
+    );
 }
 
 #[tokio::test]
@@ -31,11 +35,11 @@ async fn scheduled_query_executed() {
             ..Default::default()
         },
         Duration::from_secs(3),
-        &SOURCE_TAGS
-    ).await;
+        &SOURCE_TAGS,
+    )
+    .await;
 }
 
 fn get_conn_str() -> String {
-    std::env::var("ODBC_CONN_STRING")
-        .expect("Required environment variable 'ODBC_CONN_STRING'")
+    std::env::var("ODBC_CONN_STRING").expect("Required environment variable 'ODBC_CONN_STRING'")
 }

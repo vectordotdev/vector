@@ -169,18 +169,16 @@ impl Debug for OdbcSchedule {
 
 impl OdbcSchedule {
     /// Creates a stream that asynchronously waits until the next cron time.
-    pub(crate) fn stream(self, tz: Tz) -> impl Stream<Item=DateTime<Tz>> {
+    pub(crate) fn stream(self, tz: Tz) -> impl Stream<Item = DateTime<Tz>> {
         let schedule = self.inner.clone();
-        stream::unfold(schedule, move |schedule| {
-            async move {
-                let now = Utc::now().with_timezone(&tz);
-                let mut upcoming = schedule.upcoming(tz);
-                let next = upcoming.next()?;
-                let delay = (next - now).abs();
-                
-                sleep(delay.to_std().unwrap_or_default()).await;
-                Some((next, schedule))
-            }
+        stream::unfold(schedule, move |schedule| async move {
+            let now = Utc::now().with_timezone(&tz);
+            let mut upcoming = schedule.upcoming(tz);
+            let next = upcoming.next()?;
+            let delay = (next - now).abs();
+
+            sleep(delay.to_std().unwrap_or_default()).await;
+            Some((next, schedule))
         })
     }
 }

@@ -314,7 +314,7 @@ impl Context {
 
         loop {
             select! {
-                _ = shutdown => {
+                _ = shutdown.clone() => {
                     debug!("Shutdown signal received. Shutting down ODBC source.");
                     break;
                 }
