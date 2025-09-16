@@ -36,10 +36,9 @@ pub(super) fn parse_text_with_overrides(
 #[cfg(test)]
 fn parse_text_with_nan_filtering(
     packet: &str,
-    skip_nan_values: bool,
 ) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
-        .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
+        .map(|group| reparse_groups(group, vec![], false, true))
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]
@@ -1399,7 +1398,7 @@ mod test {
             name{labelname="val2"} 123.0 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].name(), "name");
         match result[0].value() {
@@ -1419,7 +1418,7 @@ mod test {
             name{labelname="val2"} 123.0 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, false)).unwrap();
+        let result = events_to_metrics(parse_text(exp)).unwrap();
         assert_eq!(result.len(), 2);
 
         // Find the NaN metric
@@ -1444,7 +1443,7 @@ mod test {
             name{labelname="val2"} 123.0 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].name(), "name");
         match result[0].value() {
@@ -1465,7 +1464,7 @@ mod test {
             duration_count 144320 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 0); // Should skip entire histogram due to NaN bucket le value
     }
 
@@ -1479,7 +1478,7 @@ mod test {
             duration_count 144320 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 0); // Should skip entire histogram due to NaN sum
     }
 
@@ -1493,7 +1492,7 @@ mod test {
             duration_count 2693 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 0); // Should skip entire summary due to NaN quantile value
     }
 
@@ -1506,7 +1505,7 @@ mod test {
             gauge_metric 456.0 1612411506789
             "#;
 
-        let result = events_to_metrics(parse_text_with_nan_filtering(exp, true)).unwrap();
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
         assert_eq!(result.len(), 2); // Both should be preserved
     }
 }
