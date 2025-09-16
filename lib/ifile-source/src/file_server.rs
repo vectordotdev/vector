@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
-    sync::Arc,
     time::Instant,
     time::{self, Duration},
 };
@@ -616,8 +615,7 @@ async fn checkpoint_writer(
     sleep_duration: Duration,
     mut shutdown: impl Future + Unpin,
     emitter: impl FileSourceInternalEvents,
-) -> Arc<Checkpointer> {
-    let checkpointer = Arc::new(checkpointer);
+) -> Checkpointer {
     loop {
         let sleep = sleep(sleep_duration);
         tokio::select! {
@@ -626,7 +624,6 @@ async fn checkpoint_writer(
         }
 
         let emitter = emitter.clone();
-        let checkpointer: Arc<Checkpointer> = Arc::clone(&checkpointer);
         let start = time::Instant::now();
         match checkpointer.write_checkpoints().await {
             Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
