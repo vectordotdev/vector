@@ -957,7 +957,7 @@ mod tests {
     use tokio::{
         fs::{self, File},
         io::{AsyncSeekExt, AsyncWriteExt},
-        sync::mpsc,
+        sync::mpsc::{self, UnboundedReceiver},
         time::{Duration, sleep, timeout},
     };
     use vector_lib::schema::Definition;
@@ -987,6 +987,31 @@ mod tests {
         async fn write_str<T: AsRef<str>>(&mut self, line: T) -> std::io::Result<()> {
             let line = line.as_ref();
             self.write_all(line.as_bytes()).await
+        }
+    }
+    async fn wait_for_n_reads(
+        rx: &mut UnboundedReceiver<TestEvent>,
+        count: usize,
+        timeout_ms: u64,
+    ) {
+        let mut counter = 0;
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
+
+        tokio::select! {
+            _ = shutdown => {
+                panic!("Timed out, reads = {}", counter);
+            }
+            _ = async {
+                while let Some(ev) = rx.recv().await {
+                    // Wait for n * 2 read events
+                    if let TestEvent::Read(_, _) = ev {
+                        counter += 1;
+                    }
+                    if counter == count {
+                        break;
+                    }
+                }
+            } => {}
         }
     }
 
@@ -1331,27 +1356,7 @@ mod tests {
                 file1.flush().await.unwrap();
                 file2.flush().await.unwrap();
 
-                dbg!("flushed");
-
-                let mut counter = 0;
-                let shutdown = sleep(Duration::from_secs(5));
-
-                tokio::select! {
-                    _ = shutdown => {
-                        panic!("Timed out, counter = {}", counter);
-                    }
-                    _ = async {
-                        while let Some(ev) = rx.recv().await {
-                            // Wait for n * 2 read events
-                            if let TestEvent::Read(_, _) = ev {
-                                counter += 1;
-                            }
-                            if counter == n * 2 {
-                                break;
-                            }
-                        }
-                    } => {}
-                }
+                wait_for_n_reads(&mut rx, n * 2, 5000).await;
             },
         )
         .await;
@@ -1505,42 +1510,25 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file.old");
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
                 let mut file = File::create(&path).await.unwrap();
 
                 assert!(path.exists());
-
-                // Wait for the file to be observed at its original length before writing to it
-                retry_until(
-                    || {
-                        // Check if the file exists and is being watched
-                        path.exists()
-                    },
-                    10,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("File should be discovered");
 
                 for i in 0..n {
                     file.write_line(format!("prerot {i}")).await.unwrap();
                 }
                 file.flush().await.unwrap();
 
-                // Wait for the writes to be observed before rotating
-                let mut count = 0;
-                retry_until(
-                    || {
-                        // This is just a delay mechanism - we can't actually check the events yet
-                        count += 1;
-                        count >= 10
-                    },
-                    20,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("Timeout waiting for pre-rotation processing");
+                wait_for_n_reads(&mut rx, n, 5000).await;
 
                 fs::rename(&path, &archive_path)
                     .await
@@ -1564,21 +1552,10 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                // Wait for the final writes to be observed
-                let mut count2 = 0;
-                retry_until(
-                    || {
-                        // This is just a delay mechanism - we can't actually check the events yet
-                        count2 += 1;
-                        count2 >= 10
-                    },
-                    20,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("Timeout waiting for post-rotation processing");
-            })
-            .await;
+                wait_for_n_reads(&mut rx, n, 5000).await;
+            },
+        )
+        .await;
 
         // With the new implementation, we need to be more flexible in our assertions
         // Collect all the lines
