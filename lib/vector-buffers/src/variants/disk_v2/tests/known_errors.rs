@@ -1,17 +1,17 @@
-use std::{
-    io::{self, SeekFrom},
-    ops::Add,
-    sync::atomic::{AtomicU32, Ordering},
-};
-
 use bytes::{Buf, BufMut};
 use memmap2::MmapMut;
+use std::{
+    io::{self, SeekFrom},
+    path::PathBuf,
+    sync::atomic::{AtomicU32, Ordering},
+};
 use tokio::{
     fs::OpenOptions,
     io::{AsyncSeekExt, AsyncWriteExt},
     time::{Duration, timeout},
 };
 use tracing::Instrument;
+use tracing_fluent_assertions::{Assertion, AssertionRegistry};
 use vector_common::{
     byte_size_of::ByteSizeOf,
     finalization::{AddBatchNotifier, BatchNotifier},
@@ -817,7 +817,77 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
     .await;
 }
 
-#[allow(clippy::too_many_lines)]
+struct ScrambledTestSetup {
+    marked_for_skip: Assertion,
+    data_file_path: PathBuf,
+    starting_writer_file_id: u16,
+    expected_final_writer_file_id: u16,
+    expected_final_write_data_file: PathBuf,
+    expected_data_file_len: u64,
+}
+
+async fn write_two_records_and_read_all_then_drop(
+    data_dir: PathBuf,
+    assertion_registry: &AssertionRegistry,
+) -> ScrambledTestSetup {
+    let marked_for_skip = assertion_registry
+        .build()
+        .with_name("mark_for_skip")
+        .with_parent_name("writer_detects_when_last_record_has_scrambled_archive_data")
+        .was_entered()
+        .finalize();
+
+    let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+
+    let starting_writer_file_id = ledger.get_current_writer_file_id();
+    let expected_final_writer_file_id = ledger.get_next_writer_file_id();
+    let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
+    assert_file_does_not_exist_async!(&expected_final_write_data_file);
+
+    let bytes_written_1 = writer
+        .write_record(SizedRecord::new(64))
+        .await
+        .expect("write failed");
+    let bytes_written_2 = writer
+        .write_record(SizedRecord::new(68))
+        .await
+        .expect("write failed");
+    writer.flush().await.expect("flush failed");
+    writer.close();
+
+    let expected_data_file_len = bytes_written_1 + bytes_written_2;
+
+    let first_read = reader
+        .next()
+        .await
+        .expect("read failed")
+        .expect("missing record");
+    assert_eq!(SizedRecord::new(64), first_read);
+    acknowledge(first_read).await;
+
+    let second_read = reader
+        .next()
+        .await
+        .expect("read failed")
+        .expect("missing record");
+    assert_eq!(SizedRecord::new(68), second_read);
+    acknowledge(second_read).await;
+
+    let third_read = reader.next().await.expect("read failed");
+    assert!(third_read.is_none());
+
+    ledger.flush().expect("flush failed");
+
+    ScrambledTestSetup {
+        marked_for_skip,
+        data_file_path: ledger.get_current_writer_data_file_path(),
+        starting_writer_file_id,
+        expected_final_writer_file_id,
+        expected_final_write_data_file,
+        expected_data_file_len: expected_data_file_len as u64,
+    }
+}
+
 #[tokio::test]
 async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() {
     let assertion_registry = install_tracing_helpers();
@@ -825,65 +895,15 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
         let data_dir = dir.to_path_buf();
 
         async move {
-            let marked_for_skip = assertion_registry
-                .build()
-                .with_name("mark_for_skip")
-                .with_parent_name("writer_detects_when_last_record_has_scrambled_archive_data")
-                .was_entered()
-                .finalize();
-
-            // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
-            let starting_writer_file_id = ledger.get_current_writer_file_id();
-            let expected_final_writer_file_id = ledger.get_next_writer_file_id();
-            let expected_final_write_data_file = ledger.get_next_writer_data_file_path();
-            assert_file_does_not_exist_async!(&expected_final_write_data_file);
-
-            // Write a `SizedRecord` record that we can scramble.  Since it will be the last record
-            // in the data file, the writer should detect this error when the buffer is recreated,
-            // even though it doesn't actually _emit_ anything we can observe when creating the
-            // buffer... but it should trigger a call to `reset`, which we _can_ observe with
-            // tracing assertions.
-            let bytes_written_1 = writer
-                .write_record(SizedRecord::new(64))
-                .await
-                .expect("write should not fail");
-            let bytes_written_2 = writer
-                .write_record(SizedRecord::new(68))
-                .await
-                .expect("write should not fail");
-            writer.flush().await.expect("flush should not fail");
-            writer.close();
-            let expected_data_file_len = bytes_written_1.add(bytes_written_2) as u64;
-
-            let first_read = reader
-                .next()
-                .await
-                .expect("should not fail to read record")
-                .expect("should contain first record");
-            assert_eq!(SizedRecord::new(64), first_read);
-            acknowledge(first_read).await;
-
-            let second_read = reader
-                .next()
-                .await
-                .expect("should not fail to read record")
-                .expect("should contain first record");
-            assert_eq!(SizedRecord::new(68), second_read);
-            acknowledge(second_read).await;
-
-            let third_read = reader.next().await.expect("should not fail to read record");
-            assert!(third_read.is_none());
-
-            ledger.flush().expect("should not fail to flush ledger");
-
-            // Grab the current writer data file path, and then drop the writer/reader.  Once the
-            // buffer is closed, we'll purposefully scramble the archived data -- but not the length
-            // delimiter -- which should trigger `rkyv` to throw an error when we check the data.
-            let data_file_path = ledger.get_current_writer_data_file_path();
-            drop(writer);
-            drop(reader);
-            drop(ledger);
+            let ScrambledTestSetup {
+                marked_for_skip,
+                data_file_path,
+                starting_writer_file_id,
+                expected_final_writer_file_id,
+                expected_final_write_data_file,
+                expected_data_file_len,
+            } = write_two_records_and_read_all_then_drop(data_dir.clone(), &assertion_registry)
+                .await;
 
             // We should not have seen a call to `mark_for_skip` yet.
             assert!(!marked_for_skip.try_assert());
