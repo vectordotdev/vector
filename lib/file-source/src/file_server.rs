@@ -559,9 +559,12 @@ impl TimingStats {
     }
 
     fn report(&self) {
+        if !tracing::level_enabled!(tracing::Level::DEBUG) {
+            return;
+        }
         let total = self.started_at.elapsed();
         let counted: Duration = self.segments.values().sum();
-        let other: Duration = self.started_at.elapsed() - counted;
+        let other: Duration = total.saturating_sub(counted);
         let mut ratios = self
             .segments
             .iter()
