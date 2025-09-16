@@ -1,4 +1,5 @@
-use crate::internal_telemetry::is_allocation_tracking_enabled;
+use std::{io::stdout, time::Duration};
+
 use crossterm::{
     ExecutableCommand,
     cursor::Show,
@@ -17,13 +18,13 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
 };
-use std::{io::stdout, time::Duration};
 use tokio::sync::oneshot;
 
 use super::{
     events::capture_key_press,
     state::{self, ConnectionStatus},
 };
+use crate::internal_telemetry::is_allocation_tracking_enabled;
 
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {

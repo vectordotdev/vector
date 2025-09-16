@@ -1,8 +1,8 @@
-use super::config::AmqpSinkConfig;
-use super::service::AmqpError;
-use crate::amqp::AmqpConfig;
 use deadpool::managed::Pool;
 use lapin::options::ConfirmSelectOptions;
+
+use super::{config::AmqpSinkConfig, service::AmqpError};
+use crate::amqp::AmqpConfig;
 
 pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 

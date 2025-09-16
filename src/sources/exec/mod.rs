@@ -12,15 +12,18 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    lookup::{owned_value_path, path},
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey};
-use vrl::path::OwnedValuePath;
-use vrl::value::Kind;
+use vrl::{path::OwnedValuePath, value::Kind};
 
 use crate::{
     SourceSender,
@@ -34,8 +37,6 @@ use crate::{
     serde::default_decoding,
     shutdown::ShutdownSignal,
 };
-use vector_lib::config::{LogNamespace, log_schema};
-use vector_lib::lookup::{owned_value_path, path};
 
 #[cfg(test)]
 mod tests;
@@ -207,7 +208,7 @@ const COMMAND_KEY: &str = "command";
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
-    fn validate(&self) -> Result<(), ExecConfigError> {
+    const fn validate(&self) -> Result<(), ExecConfigError> {
         if self.command.is_empty() {
             Err(ExecConfigError::CommandEmpty)
         } else if self.maximum_buffer_size_bytes == 0 {

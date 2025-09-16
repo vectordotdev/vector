@@ -47,10 +47,14 @@
 //! observed, to build a complete picture that allows deciding if a given metric has gone "idle" or
 //! not, and thus whether it should actually be deleted.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 
 use metrics::{Counter, CounterFn, Gauge, GaugeFn, HistogramFn, atomics::AtomicU64};
 use metrics_util::{
@@ -390,44 +394,44 @@ where
             .get_timeout_for_key(key, self.global_idle_timeout);
 
         let generation = value.get_generation();
-        if let Some(timeout) = key_timeout {
-            if self.mask.matches(kind) {
-                let mut guard = self.inner.lock();
-                let (clock, entries) = &mut *guard;
+        if let Some(timeout) = key_timeout
+            && self.mask.matches(kind)
+        {
+            let mut guard = self.inner.lock();
+            let (clock, entries) = &mut *guard;
 
-                let now = clock.now();
-                let deleted = if let Some((last_gen, last_update)) = entries.get_mut(key) {
-                    // If the value is the same as the latest value we have internally, and
-                    // we're over the idle timeout period, then remove it and continue.
-                    if *last_gen == generation {
-                        // We don't want to delete the metric if there is an outstanding handle that
-                        // could later update the shared value. So, here we look up the count of
-                        // references to the inner value to see if there are more than expected.
-                        //
-                        // The magic value for `strong_count` below comes from:
-                        // 1. The reference in the registry
-                        // 2. The reference held by the value passed in here
-                        // If there is another reference, then there is handle elsewhere.
-                        let referenced = Arc::strong_count(&value.inner) > 2;
-                        // If the delete returns false, that means that our generation counter is
-                        // out-of-date, and that the metric has been updated since, so we don't
-                        // actually want to delete it yet.
-                        !referenced && (now - *last_update) > timeout && delete_op(registry, key)
-                    } else {
-                        // Value has changed, so mark it such.
-                        *last_update = now;
-                        *last_gen = generation;
-                        false
-                    }
+            let now = clock.now();
+            let deleted = if let Some((last_gen, last_update)) = entries.get_mut(key) {
+                // If the value is the same as the latest value we have internally, and
+                // we're over the idle timeout period, then remove it and continue.
+                if *last_gen == generation {
+                    // We don't want to delete the metric if there is an outstanding handle that
+                    // could later update the shared value. So, here we look up the count of
+                    // references to the inner value to see if there are more than expected.
+                    //
+                    // The magic value for `strong_count` below comes from:
+                    // 1. The reference in the registry
+                    // 2. The reference held by the value passed in here
+                    // If there is another reference, then there is handle elsewhere.
+                    let referenced = Arc::strong_count(&value.inner) > 2;
+                    // If the delete returns false, that means that our generation counter is
+                    // out-of-date, and that the metric has been updated since, so we don't
+                    // actually want to delete it yet.
+                    !referenced && (now - *last_update) > timeout && delete_op(registry, key)
                 } else {
-                    entries.insert(key.clone(), (generation, now));
+                    // Value has changed, so mark it such.
+                    *last_update = now;
+                    *last_gen = generation;
                     false
-                };
-
-                if deleted {
-                    entries.remove(key);
-                    return false;
                 }
+            } else {
+                entries.insert(key.clone(), (generation, now));
+                false
+            };
+
+            if deleted {
+                entries.remove(key);
+                return false;
             }
         }
 

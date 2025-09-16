@@ -1,14 +1,3 @@
-use crate::{
-    codecs::DecodingConfig,
-    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
-    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
-    serde::{default_decoding, default_framing_message_based},
-    sources::{
-        Source,
-        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
-    },
-    tls::TlsEnableableConfig,
-};
 use async_nats::jetstream::{
     consumer::{PullConsumer, StreamError as ConsumerStreamError},
     context::GetStreamError,
@@ -21,6 +10,18 @@ use vector_lib::{
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
 };
 use vrl::value::Kind;
+
+use crate::{
+    codecs::DecodingConfig,
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config},
+    serde::{default_decoding, default_framing_message_based},
+    sources::{
+        Source,
+        nats::source::{create_subscription, run_nats_core, run_nats_jetstream},
+    },
+    tls::TlsEnableableConfig,
+};
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
@@ -294,7 +295,7 @@ impl NatsSourceConfig {
         options.connect(server_addrs).await.context(ConnectSnafu)
     }
 
-    const fn mode(&self) -> NatsMode {
+    const fn mode(&self) -> NatsMode<'_> {
         match &self.jetstream {
             Some(config) => NatsMode::JetStream(config),
             None => NatsMode::Core,
@@ -327,12 +328,14 @@ impl TryFrom<&NatsSourceConfig> for async_nats::ConnectOptions {
 mod tests {
     #![allow(clippy::print_stdout)]
 
-    use crate::sources::nats::config::default_subject_key_field;
-    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
-    use vector_lib::schema::Definition;
+    use vector_lib::{
+        lookup::{OwnedTargetPath, owned_value_path},
+        schema::Definition,
+    };
     use vrl::value::{Kind, kind::Collection};
 
     use super::*;
+    use crate::sources::nats::config::default_subject_key_field;
 
     #[test]
     fn generate_config() {

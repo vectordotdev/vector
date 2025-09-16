@@ -1,11 +1,47 @@
-use crate::config::OutputId;
-use crate::event::metric::{Bucket, Quantile};
-use crate::event::{MetricKind, MetricTags, MetricValue};
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use chrono::{DateTime, TimeZone, Utc};
+use futures::Stream;
+use futures_util::StreamExt;
+use prost::Message;
+use similar_asserts::assert_eq;
+use tonic::Request;
+use vector_lib::{
+    config::LogNamespace,
+    lookup::path,
+    opentelemetry::proto::{
+        collector::{
+            logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+            metrics::v1::{
+                ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient,
+            },
+        },
+        common::v1::{
+            AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
+        },
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+        metrics::v1::{
+            AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+            Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics,
+            Sum, Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets,
+            metric::Data, summary_data_point::ValueAtQuantile,
+        },
+        resource::v1::{Resource, Resource as OtelResource},
+    },
+};
+use vrl::value;
+use warp::http::HeaderMap;
+
 use crate::{
     SourceSender,
-    config::{SourceConfig, SourceContext},
+    config::{OutputId, SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value, into_event_stream,
+        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+        ObjectMap, Value, into_event_stream,
+        metric::{Bucket, Quantile},
     },
     sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
@@ -14,35 +50,6 @@ use crate::{
         next_addr,
     },
 };
-use chrono::{DateTime, TimeZone, Utc};
-use futures::Stream;
-use futures_util::StreamExt;
-use prost::Message;
-use similar_asserts::assert_eq;
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tonic::Request;
-use vector_lib::config::LogNamespace;
-use vector_lib::lookup::path;
-use vector_lib::opentelemetry::proto::{
-    collector::{
-        logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
-        metrics::v1::{ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient},
-    },
-    common::v1::{
-        AnyValue, InstrumentationScope, KeyValue, any_value, any_value::Value::StringValue,
-    },
-    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
-    metrics::v1::{
-        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
-        Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
-        Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets, metric::Data,
-        summary_data_point::ValueAtQuantile,
-    },
-    resource::v1::{Resource, Resource as OtelResource},
-};
-use vrl::value;
-use warp::http::HeaderMap;
 
 fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
     Request::new(ExportLogsServiceRequest {
@@ -207,7 +214,8 @@ async fn receive_grpc_logs_legacy_namespace() {
             .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .schema_definition(true);
+            .schema_definition(true)
+            .unwrap();
 
         // send request via grpc client
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
@@ -219,9 +227,7 @@ async fn receive_grpc_logs_legacy_namespace() {
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
-        schema_definitions
-            .unwrap()
-            .assert_valid_for_event(&actual_event);
+        schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",
@@ -1089,6 +1095,7 @@ async fn http_headers() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            use_otlp_decoding: false,
         };
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
@@ -1194,6 +1201,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        use_otlp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());

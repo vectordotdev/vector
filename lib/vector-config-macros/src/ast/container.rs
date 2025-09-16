@@ -280,7 +280,7 @@ impl<'a> Container<'a> {
     /// Data for the container.
     ///
     /// This would be the fields of a struct, or the variants for an enum.
-    pub fn data(&self) -> &Data {
+    pub fn data(&self) -> &Data<'_> {
         &self.data
     }
 

@@ -3,8 +3,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
-    event::ObjectMap,
-    event::Value,
+    event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
@@ -126,19 +125,19 @@ pub fn normalize_event(event: &mut Event) {
     // NOTE: we don't access by semantic meaning here because in the prior step
     // we ensured reserved attributes are in expected locations.
     let ddtags_path = event_path!(DDTAGS);
-    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path) {
-        if !tags_arr.is_empty() {
-            let all_tags: String = tags_arr
-                .iter()
-                .filter_map(|tag_kv| {
-                    tag_kv
-                        .as_bytes()
-                        .map(|bytes| String::from_utf8_lossy(bytes))
-                })
-                .join(",");
+    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path)
+        && !tags_arr.is_empty()
+    {
+        let all_tags: String = tags_arr
+            .iter()
+            .filter_map(|tag_kv| {
+                tag_kv
+                    .as_bytes()
+                    .map(|bytes| String::from_utf8_lossy(bytes))
+            })
+            .join(",");
 
-            log.insert(ddtags_path, all_tags);
-        }
+        log.insert(ddtags_path, all_tags);
     }
 
     // ensure the timestamp is in expected format

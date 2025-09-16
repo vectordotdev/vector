@@ -1,10 +1,13 @@
+//! Shared helper functions for NATS source and sink.
+#![allow(missing_docs)]
+
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::tls::TlsEnableableConfig;
 
+/// Errors that can occur during NATS configuration.
 #[derive(Debug, Snafu)]
 pub enum NatsConfigError {
     #[snafu(display("NATS Auth Config Error: {}", source))]

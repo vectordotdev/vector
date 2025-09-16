@@ -1,9 +1,12 @@
 #![allow(clippy::print_stdout)]
-use crate::config::{SourceConfig, SourceContext};
+use async_nats::jetstream::stream::StorageType;
+use bytes::Bytes;
+use vector_lib::config::log_schema;
+
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
-    config::LogNamespace,
+    config::{LogNamespace, SourceConfig, SourceContext},
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
@@ -20,9 +23,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsEnableableConfig},
 };
-use async_nats::jetstream::stream::StorageType;
-use bytes::Bytes;
-use vector_lib::config::log_schema;
 
 fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
     NatsSourceConfig {
@@ -516,4 +516,80 @@ async fn nats_jetstream_consumer_not_found() {
             assert!(matches!(build_err, BuildError::Consumer { .. }));
         }
     }
+}
+
+#[tokio::test]
+async fn nats_shutdown_drain_messages() {
+    use futures::StreamExt;
+    use tokio::time::{Duration, timeout};
+
+    let subject = format!("test-drain-{}", random_string(10));
+    let url =
+        std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
+    let conf = generate_source_config(&url, &subject);
+
+    let (shutdown_trigger, shutdown_signal, shutdown_done) = ShutdownSignal::new_wired();
+
+    let (nc, sub) = create_subscription(&conf).await.unwrap();
+    let nc_pub = nc.clone();
+    let (tx, mut rx) = SourceSender::new_test();
+    let decoder = DecodingConfig::new(
+        conf.framing.clone(),
+        conf.decoding.clone(),
+        LogNamespace::Legacy,
+    )
+    .build()
+    .unwrap();
+
+    let source_handle = tokio::spawn(run_nats_core(
+        conf.clone(),
+        nc,
+        sub,
+        decoder,
+        LogNamespace::Legacy,
+        shutdown_signal,
+        tx,
+    ));
+
+    nc_pub
+        .publish(subject.clone(), Bytes::from_static(b"msg1"))
+        .await
+        .unwrap();
+    nc_pub
+        .publish(subject.clone(), Bytes::from_static(b"msg2"))
+        .await
+        .unwrap();
+    nc_pub
+        .publish(subject.clone(), Bytes::from_static(b"msg3"))
+        .await
+        .unwrap();
+
+    // Ensure the messages are sent to the server before we trigger the shutdown
+    nc_pub.flush().await.unwrap();
+
+    // Trigger the graceful shutdown
+    shutdown_trigger.cancel();
+
+    // Publish another message *after* shutdown. This should be ignored by the draining source.
+    nc_pub
+        .publish(subject.clone(), Bytes::from_static(b"ignored"))
+        .await
+        .unwrap();
+    nc_pub.flush().await.unwrap();
+
+    let mut events = Vec::new();
+    for _ in 0..3 {
+        let event = timeout(Duration::from_secs(5), rx.next())
+            .await
+            .expect("Test timed out waiting for drained messages.")
+            .expect("Stream ended before all messages were drained.");
+        events.push(event);
+    }
+    assert_eq!(events.len(), 3);
+    let msg = &events[0].as_log()[log_schema().message_key().unwrap().to_string()];
+    assert_eq!(*msg, "msg1".into());
+
+    // Verify the source has completed its work and the shutdown is fully done.
+    source_handle.await.unwrap().expect("Source task failed");
+    shutdown_done.await;
 }

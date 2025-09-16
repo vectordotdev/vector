@@ -1,17 +1,25 @@
 use std::{
     collections::HashMap,
-    fs::{self, File, metadata},
-    io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    io::{ErrorKind, Result, SeekFrom},
     path::{Path, PathBuf},
     time,
 };
 
+use async_compression::tokio::bufread::GzipDecoder;
 use crc::Crc;
-use flate2::bufread::GzDecoder;
 use serde::{Deserialize, Serialize};
+use tokio::{
+    fs::{self, File},
+    io::{
+        AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
+        BufReader,
+    },
+};
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt};
+use crate::{
+    AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
+};
 
 const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
@@ -49,7 +57,7 @@ pub enum FileFingerprint {
 }
 
 impl FileFingerprint {
-    pub fn as_legacy(&self) -> u64 {
+    pub async fn as_legacy(&self) -> u64 {
         use FileFingerprint::*;
 
         match self {
@@ -57,8 +65,12 @@ impl FileFingerprint {
             FirstLinesChecksum(c) => *c,
             DevInode(dev, ino) => {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
-                buf.write_all(&dev.to_be_bytes()).expect("writing to array");
-                buf.write_all(&ino.to_be_bytes()).expect("writing to array");
+                buf.write_all(&dev.to_be_bytes())
+                    .await
+                    .expect("writing to array");
+                buf.write_all(&ino.to_be_bytes())
+                    .await
+                    .expect("writing to array");
                 FINGERPRINT_CRC.checksum(&buf[..])
             }
             Unknown(c) => *c,
@@ -91,8 +103,8 @@ impl SupportedCompressionAlgorithms {
 }
 
 trait UncompressedReader {
-    fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>, std::io::Error>;
-    fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn BufRead + 'a>, std::io::Error>;
+    async fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>>;
+    async fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn AsyncBufRead + Unpin + Send + 'a>>;
 }
 
 struct UncompressedReaderImpl;
@@ -110,7 +122,7 @@ impl UncompressedReader for UncompressedReaderImpl {
     /// - `Ok(Some(algorithm))` if a supported compression algorithm is detected.
     /// - `Ok(None)` if no supported compression algorithm is detected.
     /// - `Err(std::io::Error)` if an I/O error occurs.
-    fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>, std::io::Error> {
+    async fn check(fp: &mut File) -> Result<Option<SupportedCompressionAlgorithms>> {
         let mut algorithm: Option<SupportedCompressionAlgorithms> = None;
         for compression_algorithm in SupportedCompressionAlgorithms::values() {
             // magic headers for algorithms can be of different lengths, and using a buffer too long could exceed the length of the file
@@ -119,12 +131,12 @@ impl UncompressedReader for UncompressedReaderImpl {
 
             let mut magic = vec![0u8; magic_header_bytes.len()];
 
-            fp.seek(SeekFrom::Start(0))?;
-            let result = fp.read_exact(&mut magic);
+            fp.seek(SeekFrom::Start(0)).await?;
+            let result = fp.read_exact(&mut magic).await;
 
-            if result.is_err() {
-                fp.seek(SeekFrom::Start(0))?;
-                return Err(result.unwrap_err());
+            if let Err(err) = result {
+                fp.seek(SeekFrom::Start(0)).await?;
+                return Err(err);
             }
 
             if magic == magic_header_bytes {
@@ -132,28 +144,31 @@ impl UncompressedReader for UncompressedReaderImpl {
                 break;
             }
         }
-        fp.seek(SeekFrom::Start(0))?;
+        fp.seek(SeekFrom::Start(0)).await?;
         Ok(algorithm)
     }
 
-    fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn BufRead + 'a>, std::io::Error> {
+    async fn reader<'a>(fp: &'a mut File) -> Result<Box<dyn AsyncBufRead + Unpin + Send + 'a>> {
         // To support new compression algorithms, add them below
-        match Self::check(fp)? {
-            Some(SupportedCompressionAlgorithms::Gzip) => {
-                Ok(Box::new(BufReader::new(GzDecoder::new(BufReader::new(fp)))))
-            }
+        match Self::check(fp).await? {
+            Some(SupportedCompressionAlgorithms::Gzip) => Ok(Box::new(BufReader::new(
+                GzipDecoder::new(BufReader::new(fp)),
+            ))),
             // No compression, or read the raw bytes
             None => Ok(Box::new(BufReader::new(fp))),
         }
     }
 }
 
-fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
+async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
+    reader: &mut R,
+    n: usize,
+) -> Result<()> {
     // We cannot simply seek the file by n because the file may be compressed;
     // to skip the first n decompressed bytes, we decompress up to n and discard the output.
     let mut skipped_bytes = 0;
     while skipped_bytes < n {
-        let chunk = reader.fill_buf()?;
+        let chunk = reader.fill_buf().await?;
         let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
         skipped_bytes += bytes_to_skip;
@@ -162,18 +177,19 @@ fn skip_first_n_bytes<R: BufRead>(reader: &mut R, n: usize) -> io::Result<()> {
 }
 
 impl Fingerprinter {
-    pub fn get_fingerprint_of_file(
+    pub async fn get_fingerprint_of_file(
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<FileFingerprint, io::Error> {
+    ) -> Result<FileFingerprint> {
         use FileFingerprint::*;
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
-                let file_handle = File::open(path)?;
-                let dev = file_handle.portable_dev()?;
-                let ino = file_handle.portable_ino()?;
+                let file_handle = File::open(path).await?;
+                let file_info = file_handle.file_info().await?;
+                let dev = file_info.portable_dev();
+                let ino = file_info.portable_ino();
                 Ok(DevInode(dev, ino))
             }
             FingerprintStrategy::Checksum {
@@ -186,46 +202,50 @@ impl Fingerprinter {
                 lines,
             } => {
                 buffer.resize(self.max_line_length, 0u8);
-                let mut fp = fs::File::open(path)?;
-                let mut reader = UncompressedReaderImpl::reader(&mut fp)?;
+                let mut fp = File::open(path).await?;
+                let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
-                skip_first_n_bytes(&mut reader, ignored_header_bytes)?;
-                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer)?;
+                skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
+                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
         }
     }
 
-    pub fn get_fingerprint_or_log_error(
+    pub async fn get_fingerprint_or_log_error(
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
-        metadata(path)
-            .and_then(|metadata| {
-                if metadata.is_dir() {
-                    Ok(None)
+        let metadata = match fs::metadata(path).await {
+            Ok(metadata) => {
+                if !metadata.is_dir() {
+                    self.get_fingerprint_of_file(path, buffer).await.map(Some)
                 } else {
-                    self.get_fingerprint_of_file(path, buffer).map(Some)
+                    Ok(None)
                 }
-            })
+            }
+            Err(e) => Err(e),
+        };
+
+        metadata
             .inspect(|_| {
                 // Drop the path from the small files map if we've got enough data to fingerprint it.
                 known_small_files.remove(&path.to_path_buf());
             })
             .map_err(|error| {
                 match error.kind() {
-                    io::ErrorKind::UnexpectedEof => {
+                    ErrorKind::UnexpectedEof => {
                         if !known_small_files.contains_key(path) {
                             emitter.emit_file_checksum_failed(path);
                             known_small_files.insert(path.to_path_buf(), time::Instant::now());
                         }
                         return;
                     }
-                    io::ErrorKind::NotFound => {
+                    ErrorKind::NotFound => {
                         if !self.ignore_not_found {
                             emitter.emit_file_fingerprint_read_error(path, error);
                         }
@@ -241,11 +261,11 @@ impl Fingerprinter {
             .flatten()
     }
 
-    pub fn get_bytes_checksum(
+    pub async fn get_bytes_checksum(
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 bytes,
@@ -253,9 +273,10 @@ impl Fingerprinter {
                 lines: _,
             } => {
                 buffer.resize(bytes, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
-                fp.read_exact(&mut buffer[..bytes])?;
+                let mut fp = File::open(path).await?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
+                    .await?;
+                fp.read_exact(&mut buffer[..bytes]).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
@@ -265,11 +286,11 @@ impl Fingerprinter {
 
     /// Calculates checksums using strategy pre-0.14.0
     /// <https://github.com/vectordotdev/vector/issues/8182>
-    pub fn get_legacy_checksum(
+    pub async fn get_legacy_checksum(
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -281,9 +302,10 @@ impl Fingerprinter {
                 lines,
             } => {
                 buffer.resize(self.max_line_length, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
+                let mut fp = File::open(path).await?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
+                    .await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
@@ -292,11 +314,11 @@ impl Fingerprinter {
     }
     /// For upgrades from legacy strategy version
     /// <https://github.com/vectordotdev/vector/issues/15700>
-    pub fn get_legacy_first_lines_checksum(
+    pub async fn get_legacy_first_lines_checksum(
         &self,
         path: &Path,
         buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>, io::Error> {
+    ) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -308,9 +330,10 @@ impl Fingerprinter {
                 lines,
             } => {
                 buffer.resize(self.max_line_length, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer)?;
+                let mut fp = File::open(path).await?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
+                    .await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
@@ -320,17 +343,17 @@ impl Fingerprinter {
 }
 
 /// Saved for backwards compatibility.
-fn fingerprinter_read_until_and_zerofill_buf(
-    mut r: impl Read,
+async fn fingerprinter_read_until_and_zerofill_buf(
+    mut r: impl AsyncRead + Unpin + Send,
     delim: u8,
     mut count: usize,
     mut buf: &mut [u8],
-) -> io::Result<()> {
+) -> Result<()> {
     'main: while !buf.is_empty() {
-        let read = match r.read(buf) {
-            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
+        let read = match r.read(buf).await {
+            Ok(0) => return Err(std::io::Error::new(ErrorKind::UnexpectedEof, "EOF reached")),
             Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
 
@@ -351,18 +374,18 @@ fn fingerprinter_read_until_and_zerofill_buf(
     Ok(())
 }
 
-fn fingerprinter_read_until(
-    mut r: impl Read,
+async fn fingerprinter_read_until(
+    mut r: impl AsyncRead + Unpin + Send,
     delim: u8,
     mut count: usize,
     mut buf: &mut [u8],
-) -> io::Result<usize> {
+) -> Result<usize> {
     let mut total_read = 0;
     'main: while !buf.is_empty() {
-        let read = match r.read(buf) {
-            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
+        let read = match r.read(buf).await {
+            Ok(0) => return Err(std::io::Error::new(ErrorKind::UnexpectedEof, "EOF reached")),
             Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
 
@@ -384,40 +407,35 @@ fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{
-        collections::HashMap,
-        fs,
-        io::{Error, Read, Write},
-        path::Path,
-        time::Duration,
-    };
+    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
 
+    use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
-    use flate2::write::GzEncoder;
     use tempfile::{TempDir, tempdir};
 
     use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
 
-    fn gzip(data: &mut [u8]) -> Vec<u8> {
-        let mut buffer = vec![];
-        let mut encoder = GzEncoder::new(&mut buffer, flate2::Compression::default());
-        encoder.write_all(data).expect("Failed to write data");
-        encoder
-            .finish()
-            .expect("Failed to finish encoding with gzip footer");
-        buffer
-    }
+    use tokio::io::AsyncReadExt;
 
+    pub async fn gzip(data: &[u8]) -> Vec<u8> {
+        let mut encoder = GzipEncoder::new(data);
+
+        let mut out = Vec::new();
+        encoder.read_to_end(&mut out).await.expect("Failed to read");
+        out
+    }
     fn read_byte_content(target_dir: &TempDir, file: &str) -> Vec<u8> {
+        use std::{fs::File, io::Read};
+
         let path = target_dir.path().join(file);
-        let mut file = fs::File::open(path).unwrap();
+        let mut file = File::open(path).unwrap();
         let mut content = Vec::new();
         file.read_to_end(&mut content).unwrap();
         content
     }
 
-    #[test]
-    fn test_checksum_fingerprint() {
+    #[tokio::test]
+    async fn test_checksum_fingerprint() {
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::Checksum {
                 bytes: 256,
@@ -445,30 +463,35 @@ mod test {
         assert!(
             fingerprinter
                 .get_fingerprint_of_file(&empty_path, &mut buf)
+                .await
                 .is_err()
         );
         assert!(
             fingerprinter
                 .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .await
                 .is_ok()
         );
         assert!(
             fingerprinter
                 .get_fingerprint_of_file(&not_full_line_path, &mut buf)
+                .await
                 .is_err()
         );
         assert_eq!(
             fingerprinter
                 .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .await
                 .unwrap(),
             fingerprinter
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .await
                 .unwrap(),
         );
     }
 
-    #[test]
-    fn test_first_line_checksum_fingerprint() {
+    #[tokio::test]
+    async fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -503,18 +526,18 @@ mod test {
         let incomplete_line = prepare_test("incomplete_line.log", b"missing newline char");
         let one_line = prepare_test(
             "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()),
+            &gzip(b"hello world\n").await,
         );
         let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
         let one_line_duplicate_compressed = prepare_test(
             "one_line_duplicate_compressed.log",
-            &gzip(&mut b"hello world\n".to_vec()),
+            &gzip(b"hello world\n").await,
         );
         let one_line_continued =
             prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
         let one_line_continued_compressed = prepare_test(
             "one_line_continued_compressed.log",
-            &gzip(&mut b"hello world\nthe next line\n".to_vec()),
+            &gzip(b"hello world\nthe next line\n").await,
         );
         let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
 
@@ -528,41 +551,44 @@ mod test {
         );
 
         let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+        let mut run = async |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
 
-        assert!(run(&empty).is_err());
-        assert!(run(&incomplete_line).is_err());
-        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
+        assert!(run(&empty).await.is_err());
+        assert!(run(&incomplete_line).await.is_err());
+        assert!(run(&incomplete_under_max_line_length_by_one).await.is_err());
 
-        assert!(run(&one_line).is_ok());
-        assert!(run(&one_line_duplicate).is_ok());
-        assert!(run(&one_line_continued).is_ok());
-        assert!(run(&different_two_lines).is_ok());
-        assert!(run(&exactly_max_line_length).is_ok());
-        assert!(run(&exceeding_max_line_length).is_ok());
+        assert!(run(&one_line).await.is_ok());
+        assert!(run(&one_line_duplicate).await.is_ok());
+        assert!(run(&one_line_continued).await.is_ok());
+        assert!(run(&different_two_lines).await.is_ok());
+        assert!(run(&exactly_max_line_length).await.is_ok());
+        assert!(run(&exceeding_max_line_length).await.is_ok());
 
         assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_duplicate_compressed).unwrap()
+            run(&one_line).await.unwrap(),
+            run(&one_line_duplicate_compressed).await.unwrap()
         );
         assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_continued_compressed).unwrap()
+            run(&one_line).await.unwrap(),
+            run(&one_line_continued_compressed).await.unwrap()
         );
         assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_duplicate_compressed).unwrap()
+            run(&one_line).await.unwrap(),
+            run(&one_line_duplicate_compressed).await.unwrap()
         );
         assert_eq!(
-            run(&one_line).unwrap(),
-            run(&one_line_continued_compressed).unwrap()
+            run(&one_line).await.unwrap(),
+            run(&one_line_continued_compressed).await.unwrap()
         );
 
-        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
+        assert_ne!(
+            run(&one_line).await.unwrap(),
+            run(&different_two_lines).await.unwrap()
+        );
 
         assert_eq!(
-            run(&exactly_max_line_length).unwrap(),
-            run(&exceeding_max_line_length).unwrap()
+            run(&exactly_max_line_length).await.unwrap(),
+            run(&exceeding_max_line_length).await.unwrap()
         );
 
         assert_ne!(
@@ -576,8 +602,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_first_two_lines_checksum_fingerprint() {
+    #[tokio::test]
+    async fn test_first_two_lines_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -608,11 +634,11 @@ mod test {
         );
         let two_lines_duplicate_compressed = prepare_test(
             "two_lines_duplicate_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\n".to_vec()),
+            &gzip(b"hello world\nfrom vector\n").await,
         );
         let two_lines_continued_compressed = prepare_test(
             "two_lines_continued_compressed.log",
-            &gzip(&mut b"hello world\nfrom vector\nthe next line\n".to_vec()),
+            &gzip(b"hello world\nfrom vector\nthe next line\n").await,
         );
 
         let different_three_lines = prepare_test(
@@ -621,29 +647,35 @@ mod test {
         );
 
         let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
 
-        assert!(run(&incomplete_lines).is_err());
+        assert!(run(&incomplete_lines).await.is_err());
 
-        assert!(run(&two_lines).is_ok());
-        assert!(run(&two_lines_duplicate).is_ok());
-        assert!(run(&two_lines_continued).is_ok());
-        assert!(run(&different_three_lines).is_ok());
+        assert!(run(&two_lines).await.is_ok());
+        assert!(run(&two_lines_duplicate).await.is_ok());
+        assert!(run(&two_lines_continued).await.is_ok());
+        assert!(run(&different_three_lines).await.is_ok());
 
-        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_duplicate).unwrap());
-        assert_eq!(run(&two_lines).unwrap(), run(&two_lines_continued).unwrap());
         assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_duplicate_compressed).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_duplicate).await.unwrap()
         );
         assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_continued_compressed).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_continued).await.unwrap()
+        );
+        assert_eq!(
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_duplicate_compressed).await.unwrap()
+        );
+        assert_eq!(
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_continued_compressed).await.unwrap()
         );
 
         assert_ne!(
-            run(&two_lines).unwrap(),
-            run(&different_three_lines).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&different_three_lines).await.unwrap()
         );
 
         assert_ne!(
@@ -656,8 +688,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_first_two_lines_checksum_fingerprint_with_headers() {
+    #[tokio::test]
+    async fn test_first_two_lines_checksum_fingerprint_with_headers() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLinesChecksum {
@@ -681,37 +713,39 @@ mod test {
         );
         let two_lines_compressed_same_header = prepare_test(
             "two_lines_compressed_same_header.log",
-            &gzip(&mut b"some-header-1\nhello world\nfrom vector\n".to_vec()),
+            &gzip(b"some-header-1\nhello world\nfrom vector\n").await,
         );
         let two_lines_compressed_same_header_size = prepare_test(
             "two_lines_compressed_same_header_size.log",
-            &gzip(&mut b"some-header-2\nhello world\nfrom vector\n".to_vec()),
+            &gzip(b"some-header-2\nhello world\nfrom vector\n").await,
         );
         let two_lines_compressed_different_header_size = prepare_test(
             "two_lines_compressed_different_header_size.log",
-            &gzip(&mut b"some-header-22\nhellow world\nfrom vector\n".to_vec()),
+            &gzip(b"some-header-22\nhellow world\nfrom vector\n").await,
         );
 
         let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
 
-        assert!(run(&two_lines).is_ok());
+        assert!(run(&two_lines).await.is_ok());
         assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_same_header).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_compressed_same_header).await.unwrap()
         );
         assert_eq!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_same_header_size).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_compressed_same_header_size).await.unwrap()
         );
         assert_ne!(
-            run(&two_lines).unwrap(),
-            run(&two_lines_compressed_different_header_size).unwrap()
+            run(&two_lines).await.unwrap(),
+            run(&two_lines_compressed_different_header_size)
+                .await
+                .unwrap()
         );
     }
 
-    #[test]
-    fn test_inode_fingerprint() {
+    #[tokio::test]
+    async fn test_inode_fingerprint() {
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::DevInode,
             max_line_length: 42,
@@ -734,25 +768,29 @@ mod test {
         assert!(
             fingerprinter
                 .get_fingerprint_of_file(&empty_path, &mut buf)
+                .await
                 .is_ok()
         );
         assert!(
             fingerprinter
                 .get_fingerprint_of_file(&small_path, &mut buf)
+                .await
                 .is_ok()
         );
         assert_ne!(
             fingerprinter
                 .get_fingerprint_of_file(&medium_path, &mut buf)
+                .await
                 .unwrap(),
             fingerprinter
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .await
                 .unwrap()
         );
     }
 
-    #[test]
-    fn no_error_on_dir() {
+    #[tokio::test]
+    async fn no_error_on_dir() {
         let target_dir = tempdir().unwrap();
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::Checksum {
@@ -774,6 +812,7 @@ mod test {
                     &mut small_files,
                     &NoErrors
                 )
+                .await
                 .is_none()
         );
     }

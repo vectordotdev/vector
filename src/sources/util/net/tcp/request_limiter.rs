@@ -1,5 +1,7 @@
-use std::cmp::Ordering;
-use std::sync::{Arc, Mutex};
+use std::{
+    cmp::Ordering,
+    sync::{Arc, Mutex},
+};
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 

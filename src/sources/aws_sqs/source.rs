@@ -8,9 +8,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select};
 use tracing_futures::Instrument;
-use vector_lib::config::LogNamespace;
-use vector_lib::finalizer::UnorderedFinalizer;
-use vector_lib::internal_event::{EventsReceived, Registered};
+use vector_lib::{
+    config::LogNamespace,
+    finalizer::UnorderedFinalizer,
+    internal_event::{EventsReceived, Registered},
+};
 
 use crate::{
     SourceSender,
@@ -86,10 +88,10 @@ impl SqsSource {
         // Wait for all of the processes to finish.  If any one of them panics, we resume
         // that panic here to properly shutdown Vector.
         for task_handle in task_handles.drain(..) {
-            if let Err(e) = task_handle.await {
-                if e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+            if let Err(e) = task_handle.await
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
             }
         }
         Ok(())
@@ -220,12 +222,15 @@ async fn delete_messages(client: SqsClient, receipts: Vec<String>, queue_url: St
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::codecs::DecodingConfig;
-    use crate::config::{SourceConfig, log_schema};
-    use crate::sources::aws_sqs::AwsSqsConfig;
     use chrono::SecondsFormat;
     use vector_lib::lookup::path;
+
+    use super::*;
+    use crate::{
+        codecs::DecodingConfig,
+        config::{SourceConfig, log_schema},
+        sources::aws_sqs::AwsSqsConfig,
+    };
 
     #[tokio::test]
     async fn test_decode_vector_namespace() {

@@ -1,3 +1,10 @@
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll, ready},
+};
+
 use aws_sdk_cloudwatchlogs::{
     Client as CloudwatchLogsClient,
     operation::{
@@ -13,16 +20,9 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::{FutureExt, future::BoxFuture};
 use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll, ready},
-};
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::config::Retention;
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -112,17 +112,17 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError(inner) = &err {
-                                if matches!(
+                            if let SdkError::ServiceError(inner) = &err
+                                && matches!(
                                     inner.err(),
                                     DescribeLogStreamsError::ResourceNotFoundException(_)
-                                ) && self.create_missing_group
-                                {
-                                    info!("Log group provided does not exist; creating a new one.");
+                                )
+                                && self.create_missing_group
+                            {
+                                info!("Log group provided does not exist; creating a new one.");
 
-                                    self.state = State::CreateGroup(self.client.create_log_group());
-                                    continue;
-                                }
+                                self.state = State::CreateGroup(self.client.create_log_group());
+                                continue;
                             }
                             return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
                         }

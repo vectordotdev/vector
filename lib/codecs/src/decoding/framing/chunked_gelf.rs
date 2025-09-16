@@ -1,20 +1,23 @@
-use super::{BoxedFramingError, FramingError};
-use crate::{BytesDecoder, StreamDecodingError};
+use std::{
+    any::Any,
+    collections::HashMap,
+    io::Read,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use snafu::{ResultExt, Snafu, ensure};
-use std::any::Any;
-use std::collections::HashMap;
-use std::io::Read;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio;
-use tokio::task::JoinHandle;
+use tokio::{self, task::JoinHandle};
 use tokio_util::codec::Decoder;
 use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
 use vector_config::configurable_component;
+
+use super::{BoxedFramingError, FramingError};
+use crate::{BytesDecoder, StreamDecodingError};
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
@@ -178,11 +181,11 @@ impl ChunkedGelfDecompression {
 
         if data.starts_with(ZLIB_MAGIC) {
             // Based on https://datatracker.ietf.org/doc/html/rfc1950#section-2.2
-            if let Some([first_byte, second_byte]) = data.get(0..2) {
-                if (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0 {
-                    trace!("Detected Zlib compression");
-                    return Self::Zlib;
-                }
+            if let Some([first_byte, second_byte]) = data.get(0..2)
+                && (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0
+            {
+                trace!("Detected Zlib compression");
+                return Self::Zlib;
             };
 
             warn!(
@@ -521,14 +524,15 @@ impl Decoder for ChunkedGelfDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{fmt::Write as FmtWrite, io::Write as IoWrite};
+
     use bytes::{BufMut, BytesMut};
-    use flate2::{write::GzEncoder, write::ZlibEncoder};
+    use flate2::write::{GzEncoder, ZlibEncoder};
     use rand::{SeedableRng, rngs::SmallRng, seq::SliceRandom};
     use rstest::{fixture, rstest};
-    use std::fmt::Write as FmtWrite;
-    use std::io::Write as IoWrite;
     use tracing_test::traced_test;
+
+    use super::*;
 
     pub enum Compression {
         Gzip,

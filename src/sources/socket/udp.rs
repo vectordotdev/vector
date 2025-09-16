@@ -1,23 +1,23 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use super::default_host_key;
 use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 
+use super::default_host_key;
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -200,10 +200,10 @@ pub(super) fn udp(
             }
         }
 
-        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
+        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
+            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+        {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
         let mut max_length = config.max_length;

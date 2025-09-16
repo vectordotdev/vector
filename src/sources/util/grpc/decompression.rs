@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    future::Future,
     io::Write,
     mem,
     pin::Pin,
@@ -14,7 +15,6 @@ use hyper::{
     Body,
     body::{HttpBody, Sender},
 };
-use std::future::Future;
 use tokio::{pin, select};
 use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};
@@ -229,10 +229,10 @@ async fn drive_body_decompression(
     let result = source.trailers().await;
     let maybe_trailers =
         result.map_err(|_| Status::internal("error reading trailers from underlying body"))?;
-    if let Some(trailers) = maybe_trailers {
-        if destination.send_trailers(trailers).await.is_err() {
-            return Err(Status::internal("destination body abnormally closed"));
-        }
+    if let Some(trailers) = maybe_trailers
+        && destination.send_trailers(trailers).await.is_err()
+    {
+        return Err(Status::internal("destination body abnormally closed"));
     }
 
     Ok(bytes_received)

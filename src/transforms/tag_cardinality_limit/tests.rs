@@ -1,25 +1,25 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use config::PerMetricConfig;
-use vector_lib::config::ComponentKey;
-use vector_lib::config::OutputId;
-use vector_lib::event::EventMetadata;
-use vector_lib::metric_tags;
-
-use super::*;
-use crate::config::LogNamespace;
-use crate::config::schema::Definition;
-use crate::event::metric::TagValue;
-use crate::event::{Event, Metric, MetricTags, metric};
-use crate::test_util::components::assert_transform_compliance;
-use crate::transforms::tag_cardinality_limit::config::{
-    BloomFilterConfig, Mode, default_cache_size,
-};
-use crate::transforms::test::create_topology;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use vector_lib::{
+    config::{ComponentKey, OutputId},
+    event::EventMetadata,
+    metric_tags,
+};
 use vrl::compiler::prelude::Kind;
+
+use super::*;
+use crate::{
+    config::{LogNamespace, schema::Definition},
+    event::{Event, Metric, MetricTags, metric, metric::TagValue},
+    test_util::components::assert_transform_compliance,
+    transforms::{
+        tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
+        test::create_topology,
+    },
+};
 
 #[test]
 fn generate_config() {

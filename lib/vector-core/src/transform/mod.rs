@@ -1,21 +1,26 @@
 use std::{collections::HashMap, error, pin::Pin, sync::Arc, time::Instant};
 
 use futures::{Stream, StreamExt};
-use vector_common::internal_event::{
-    self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered, register,
+use vector_common::{
+    EventDataEq,
+    byte_size_of::ByteSizeOf,
+    internal_event::{
+        self, CountByteSize, DEFAULT_OUTPUT, EventsSent, InternalEventHandle as _, Registered,
+        register,
+    },
+    json_size::JsonSize,
 };
-use vector_common::{EventDataEq, byte_size_of::ByteSizeOf, json_size::JsonSize};
 
-use crate::config::{ComponentKey, OutputId};
-use crate::event::EventMutRef;
-use crate::schema::Definition;
 use crate::{
     config,
+    config::{ComponentKey, OutputId},
     event::{
-        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventRef, into_event_stream,
+        EstimatedJsonEncodedSizeOf, Event, EventArray, EventContainer, EventMutRef, EventRef,
+        into_event_stream,
     },
     fanout::{self, Fanout},
     schema,
+    schema::Definition,
 };
 
 #[cfg(feature = "lua")]
@@ -470,7 +475,7 @@ impl OutputBuffer {
         self.0.capacity()
     }
 
-    pub fn first(&self) -> Option<EventRef> {
+    pub fn first(&self) -> Option<EventRef<'_>> {
         self.0.first().and_then(|first| match first {
             EventArray::Logs(l) => l.first().map(Into::into),
             EventArray::Metrics(m) => m.first().map(Into::into),
@@ -494,11 +499,11 @@ impl OutputBuffer {
         Ok(())
     }
 
-    fn iter_events(&self) -> impl Iterator<Item = EventRef> {
+    fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
         self.0.iter().flat_map(EventArray::iter_events)
     }
 
-    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+    fn events_mut(&mut self) -> impl Iterator<Item = EventMutRef<'_>> {
         self.0.iter_mut().flat_map(EventArray::iter_events_mut)
     }
 

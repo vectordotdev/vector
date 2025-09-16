@@ -1,5 +1,10 @@
+use std::{
+    fs::{read_to_string, write},
+    io::Result,
+    path::{Path, PathBuf},
+};
+
 use glob::glob;
-use std::{env, io::Result, path::PathBuf};
 
 fn main() -> Result<()> {
     let proto_root = PathBuf::from("src/proto/opentelemetry-proto");
@@ -10,12 +15,7 @@ fn main() -> Result<()> {
         .filter_map(|result| result.ok())
         .collect();
 
-    // Set up re-run triggers
-    for proto in &proto_paths {
-        println!("cargo:rerun-if-changed={}", proto.display());
-    }
-
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let descriptor_path = out_dir.join("opentelemetry-proto.desc");
 
     tonic_build::configure()
@@ -23,6 +23,23 @@ fn main() -> Result<()> {
         .build_server(true)
         .file_descriptor_set_path(&descriptor_path)
         .compile(&proto_paths, &[include_path])?;
+
+    write_static_descriptor_reference(&descriptor_path, &out_dir)?;
+
+    Ok(())
+}
+
+fn write_static_descriptor_reference(descriptor_path: &Path, out_dir: &Path) -> Result<()> {
+    let include_line = format!(
+        "pub static DESCRIPTOR_BYTES: &[u8] = include_bytes!(r\"{}\");\n",
+        descriptor_path.display()
+    );
+
+    let include_file = out_dir.join("opentelemetry-proto.rs");
+    let existing = read_to_string(&include_file).ok();
+    if existing.as_deref() != Some(&include_line) {
+        write(&include_file, include_line)?;
+    }
 
     Ok(())
 }

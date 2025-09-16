@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
@@ -8,14 +10,12 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, util};
+use crate::{app, environment::Environment, util};
 
 const FILE_NAME: &str = "test.yaml";
 
 pub const INTEGRATION_TESTS_DIR: &str = "integration";
 pub const E2E_TESTS_DIR: &str = "e2e";
-
-pub type Environment = BTreeMap<String, Option<String>>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {

@@ -16,10 +16,12 @@ use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::watch;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
-use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
+use crate::{
+    config::ProxyConfig,
+    http::{HttpClient, HttpError},
+};
 
 const SERVICE_ACCOUNT_TOKEN_URL: &str =
     "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -257,7 +259,13 @@ impl InnerCreds {
 }
 
 async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
-    let claims = JwtClaims::new(creds.iss(), &[scope.clone()], creds.token_uri(), None, None);
+    let claims = JwtClaims::new(
+        creds.iss(),
+        std::slice::from_ref(scope),
+        creds.token_uri(),
+        None,
+        None,
+    );
     let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
     let jwt = Jwt::new(claims, rsa_key, None);
 

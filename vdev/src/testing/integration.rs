@@ -1,17 +1,28 @@
-use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context, Result, bail};
 use tempfile::{Builder, NamedTempFile};
 
-use super::config::{
-    ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, Environment, INTEGRATION_TESTS_DIR,
-    RustToolchainConfig,
+use super::{
+    config::{
+        ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+    },
+    runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
+    state::EnvsDir,
 };
-use super::runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _};
-use super::state::EnvsDir;
-use crate::app::CommandExt as _;
-use crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG;
-use crate::testing::docker::{CONTAINER_TOOL, DOCKER_SOCKET};
+use crate::{
+    app::CommandExt as _,
+    environment::{Environment, extract_present, rename_environment_keys},
+    testing::{
+        build::ALL_INTEGRATIONS_FEATURE_FLAG,
+        docker::{CONTAINER_TOOL, DOCKER_SOCKET},
+    },
+};
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
@@ -103,7 +114,7 @@ impl ComposeTest {
             envs_dir,
             runner,
             compose,
-            env_config,
+            env_config: rename_environment_keys(&env_config),
             build_all,
             retries,
         };
@@ -121,8 +132,8 @@ impl ComposeTest {
 
         let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in config_env(&self.env_config) {
-            env_vars.insert(key, Some(value));
+        for (key, value) in self.env_config.clone() {
+            env_vars.insert(key, value);
         }
 
         env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
@@ -181,8 +192,11 @@ impl ComposeTest {
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
         if self.local_config.kind == ComposeTestKind::E2E {
-            self.runner
-                .build(Some(&self.config.features), self.local_config.directory)?;
+            self.runner.build(
+                Some(&self.config.features),
+                self.local_config.directory,
+                &self.env_config,
+            )?;
         }
 
         self.config.check_required()?;
@@ -275,9 +289,11 @@ impl Compose {
         }
     }
 
-    fn start(&self, config: &Environment) -> Result<()> {
-        self.prepare()?;
-        self.run("Starting", &["up", "--detach"], Some(config))
+    fn start(&self, environment: &Environment) -> Result<()> {
+        #[cfg(unix)]
+        unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
+
+        self.run("Starting", &["up", "--detach"], Some(environment))
     }
 
     fn stop(&self) -> Result<()> {
@@ -289,7 +305,12 @@ impl Compose {
         )
     }
 
-    fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
+    fn run(
+        &self,
+        action: &str,
+        args: &[&'static str],
+        environment: Option<&Environment>,
+    ) -> Result<()> {
         let mut command = Command::new(CONTAINER_TOOL.clone());
         command.arg("compose");
         // When the integration test environment is already active, the tempfile path does not
@@ -320,41 +341,30 @@ impl Compose {
                 command.env(key, value);
             }
         }
-        if let Some(config) = config {
-            command.envs(config_env(config));
+        if let Some(environment) = environment {
+            command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");
         command.check_run()
     }
-
-    fn prepare(&self) -> Result<()> {
-        #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.config, &self.test_dir)?;
-        Ok(())
-    }
-}
-
-fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
-    config.iter().filter_map(|(var, value)| {
-        value.as_ref().map(|value| {
-            (
-                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
-                value.to_string(),
-            )
-        })
-    })
 }
 
 #[cfg(unix)]
 mod unix {
-    use std::fs::{self, Metadata, Permissions};
-    use std::os::unix::fs::PermissionsExt as _;
-    use std::path::{Path, PathBuf};
+    use std::{
+        fs::{self, Metadata, Permissions},
+        os::unix::fs::PermissionsExt as _,
+        path::{Path, PathBuf},
+    };
+
+    use anyhow::{Context, Result};
 
     use super::super::config::ComposeConfig;
-    use crate::testing::config::VolumeMount;
-    use anyhow::{Context, Result};
+    use crate::{
+        environment::{Environment, resolve_placeholders},
+        testing::config::VolumeMount,
+    };
 
     /// Unix permissions mask to allow everybody to read a file
     const ALL_READ: u32 = 0o444;
@@ -362,7 +372,11 @@ mod unix {
     const ALL_READ_DIR: u32 = 0o555;
 
     /// Fix up potential issues before starting a compose container
-    pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
+    pub fn prepare_compose_volumes(
+        config: &ComposeConfig,
+        test_dir: &Path,
+        environment: &Environment,
+    ) -> Result<()> {
         for service in config.services.values() {
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
@@ -374,12 +388,12 @@ mod unix {
                         }
                         VolumeMount::Long { source, .. } => source,
                     };
-
-                    if !config.volumes.contains_key(source)
+                    let source = resolve_placeholders(source, environment);
+                    if !config.volumes.contains_key(&source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')
                     {
-                        let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
+                        let path: PathBuf = [test_dir, Path::new(&source)].iter().collect();
                         add_read_permission(&path)?;
                     }
                 }
