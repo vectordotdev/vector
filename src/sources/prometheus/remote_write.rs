@@ -286,6 +286,26 @@ mod test {
         ]
     }
 
+    async fn send_request_and_assert(port: u16, request_body: Vec<u8>) {
+        // Send the request via HTTP POST
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("http://localhost:{}/", port))
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", "snappy")
+            .body(request_body)
+            .send()
+            .await
+            .unwrap();
+
+        // Should succeed (not return 400) despite conflicting metadata
+        assert!(
+            response.status().is_success(),
+            "Expected success but got: {}",
+            response.status()
+        );
+    }
+
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
     /// > Label names MUST be unique within a LabelSet.
     /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
@@ -418,18 +438,7 @@ mod test {
             snap::raw::Encoder::new().compress_vec(&buf).unwrap()
         };
 
-        // Send the request via HTTP POST
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://localhost:{}/", address.port()))
-            .header("Content-Type", "application/x-protobuf")
-            .header("Content-Encoding", "snappy")
-            .body(request_body)
-            .send()
-            .await
-            .unwrap();
-
-        assert!(response.status().is_success());
+        send_request_and_assert(address.port(), request_body).await;
 
         // Verify we only received the valid metric (NaN metric should be filtered)
         let output = test_util::collect_ready(rx).await;
@@ -498,18 +507,7 @@ mod test {
             snap::raw::Encoder::new().compress_vec(&buf).unwrap()
         };
 
-        // Send the request via HTTP POST
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://localhost:{}/", address.port()))
-            .header("Content-Type", "application/x-protobuf")
-            .header("Content-Encoding", "snappy")
-            .body(request_body)
-            .send()
-            .await
-            .unwrap();
-
-        assert!(response.status().is_success());
+        send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received both metrics (including NaN metric)
         let mut output = test_util::collect_ready(rx).await;
@@ -593,23 +591,7 @@ mod test {
             snap::raw::Encoder::new().compress_vec(&buf).unwrap()
         };
 
-        // Send the request via HTTP POST
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://localhost:{}/", address.port()))
-            .header("Content-Type", "application/x-protobuf")
-            .header("Content-Encoding", "snappy")
-            .body(request_body)
-            .send()
-            .await
-            .unwrap();
-
-        // Should succeed (not return 400) despite conflicting metadata
-        assert!(
-            response.status().is_success(),
-            "Expected success but got: {}",
-            response.status()
-        );
+        send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received the metric data
         let output = test_util::collect_ready(rx).await;
