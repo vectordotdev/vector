@@ -627,15 +627,11 @@ async fn checkpoint_writer(
 
         let emitter = emitter.clone();
         let checkpointer: Arc<Checkpointer> = Arc::clone(&checkpointer);
-        tokio::spawn(async move {
-            let start = time::Instant::now();
-            match checkpointer.write_checkpoints().await {
-                Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                Err(error) => emitter.emit_file_checkpoint_write_error(error),
-            }
-        })
-        .await
-        .ok();
+        let start = time::Instant::now();
+        match checkpointer.write_checkpoints().await {
+            Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+            Err(error) => emitter.emit_file_checkpoint_write_error(error),
+        }
     }
     checkpointer
 }
