@@ -36,6 +36,9 @@ quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"
 
+[features]
+test = []
+
 [[bench]]
 name = "buffer"
 harness = false

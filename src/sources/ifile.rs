@@ -7,12 +7,16 @@ use itertools::Itertools;
 use regex::bytes::Regex;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+#[cfg(test)]
+use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tracing::{Instrument, Span, debug};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source_common::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 use vector_lib::finalizer::OrderedFinalizer;
+#[cfg(test)]
+use vector_lib::ifile_source::TestEvent;
 use vector_lib::ifile_source::{
     BoxedPathsProvider, Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom,
     ReadFromConfig, calculate_ignore_before, paths_provider::glob::MatchOptions,
@@ -450,7 +454,11 @@ impl SourceConfig for FileConfig {
             self,
             data_dir,
             cx.shutdown,
-            cx.out,
+            Senders {
+                source_sender: cx.out,
+                #[cfg(test)]
+                test_sender: None,
+            },
             acknowledgements,
             log_namespace,
         ))
@@ -507,11 +515,17 @@ impl SourceConfig for FileConfig {
     }
 }
 
+pub struct Senders {
+    pub source_sender: SourceSender,
+    #[cfg(test)]
+    pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
+}
+
 pub fn ifile_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    out: Senders,
     acknowledgements: bool,
     log_namespace: LogNamespace,
 ) -> super::Source {
@@ -653,6 +667,10 @@ pub fn ifile_source(
         emitter,
         rotate_wait: config.rotate_wait,
         checkpoint_interval,
+        #[cfg(not(test))]
+        test_sender: None,
+        #[cfg(test)]
+        test_sender: out.test_sender,
     };
 
     let event_metadata = EventMetadata {
@@ -768,8 +786,10 @@ pub fn ifile_source(
             }
             event
         });
+
+        let mut out_source_sender = out.source_sender;
         tokio::spawn(async move {
-            match out
+            match out_source_sender
                 .send_event_stream(&mut messages)
                 .instrument(span.or_current())
                 .await
@@ -939,7 +959,11 @@ mod tests {
     use encoding_rs::UTF_16LE;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
-    use tokio::time::{Duration, sleep, timeout};
+    use tokio::{
+        io::AsyncWriteExt,
+        sync::mpsc,
+        time::{Duration, sleep, timeout},
+    };
     use vector_lib::schema::Definition;
     use vrl::value::kind::Collection;
 
@@ -1258,6 +1282,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
+        use tokio::fs::File;
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -1269,34 +1294,60 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, async {
-            let mut file1 = File::create(&path1).unwrap();
-            let mut file2 = File::create(&path2).unwrap();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            true,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
+                let mut file1 = File::create(&path1).await.unwrap();
+                let mut file2 = File::create(&path2).await.unwrap();
 
-            // Wait for the files to be observed at their original lengths before writing to them
-            // This ensures the file source has discovered the files
-            retry_until(
-                || {
-                    // Check if both files exist and are being watched
-                    path1.exists() && path2.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Files should be discovered");
+                // Wait for the files to be observed at their original lengths before writing to them
+                // This ensures the file source has discovered the files
+                assert!(path1.exists());
+                assert!(path2.exists());
 
-            for i in 0..n {
-                writeln!(&mut file1, "hello {}", i).unwrap();
-                writeln!(&mut file2, "goodbye {}", i).unwrap();
-            }
+                for i in 0..n {
+                    file1
+                        .write_all(format!("hello {i}\n").as_bytes())
+                        .await
+                        .unwrap();
+                    file2
+                        .write_all(format!("goodbye {i}\n").as_bytes())
+                        .await
+                        .unwrap();
+                }
 
-            // Flush the files to ensure the writes are visible
-            file1.flush().unwrap();
-            file2.flush().unwrap();
+                // Flush the files to ensure the writes are visible
+                file1.flush().await.unwrap();
+                file2.flush().await.unwrap();
 
-            sleep_millis(1000).await;
-        })
+                dbg!("flushed");
+
+                let mut counter = 0;
+                let shutdown = sleep(Duration::from_secs(5));
+
+                tokio::select! {
+                    _ = shutdown => {
+                        panic!("Timed out, counter = {}", counter);
+                    }
+                    _ = async {
+                        while let Some(ev) = rx.recv().await {
+                            // Wait for n * 2 read events
+                            if let TestEvent::Read(_, _) = ev {
+                                counter += 1;
+                            }
+                            if counter == n * 2 {
+                                break;
+                            }
+                        }
+                    } => {}
+                }
+            },
+        )
         .await;
 
         let mut hello_i = 0;
@@ -1328,6 +1379,7 @@ mod tests {
     // https://github.com/vectordotdev/vector/issues/8363
     #[tokio::test]
     async fn file_read_empty_lines() {
+        use tokio::fs::File;
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -1338,33 +1390,34 @@ mod tests {
 
         let path = dir.path().join("file");
 
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).await.unwrap();
 
-            // Wait for the file to be observed at its original length before writing to it
-            retry_until(
-                || {
-                    // Check if the file exists and is being watched
-                    path.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("File should be discovered");
+                // Wait for the file to be observed at its original length before writing to it
+                retry_until(
+                    || {
+                        // Check if the file exists and is being watched
+                        path.exists()
+                    },
+                    10,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("File should be discovered");
 
-            writeln!(&mut file, "line for checkpointing").unwrap();
-            for _i in 0..n {
-                writeln!(&mut file).unwrap();
-            }
+                file.write_all(b"line for checkpointing\n").await.unwrap();
+                for _i in 0..n {
+                    file.write_all(b"\n").await.unwrap();
+                }
 
-            // Flush the file to ensure the writes are visible
-            file.flush().unwrap();
+                // Flush the file to ensure the writes are visible
+                file.flush().await.unwrap();
 
-            // Wait for the file source to process the written content
-            sleep_millis(1000).await;
-        })
-        .await;
+                // Wait for the file source to process the written content
+                sleep_millis(1000).await;
+            })
+            .await;
 
         assert_eq!(received.len(), n + 1);
     }
@@ -1379,34 +1432,35 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-            // Wait for the file to be observed at its original length before writing to it
-            sleep_millis(1000).await;
+                // Wait for the file to be observed at its original length before writing to it
+                sleep_millis(1000).await;
 
-            for i in 0..n {
-                writeln!(&mut file, "pretrunc {}", i).unwrap();
-            }
-            file.flush().unwrap();
+                for i in 0..n {
+                    writeln!(&mut file, "pretrunc {}", i).unwrap();
+                }
+                file.flush().unwrap();
 
-            // Wait for the writes to be observed before truncating
-            sleep_millis(1000).await;
+                // Wait for the writes to be observed before truncating
+                sleep_millis(1000).await;
 
-            file.set_len(0).unwrap();
-            file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                file.set_len(0).unwrap();
+                file.seek(std::io::SeekFrom::Start(0)).unwrap();
 
-            // Wait for the truncate to be observed before writing again
-            sleep_millis(1000).await;
+                // Wait for the truncate to be observed before writing again
+                sleep_millis(1000).await;
 
-            for i in 0..n {
-                writeln!(&mut file, "posttrunc {}", i).unwrap();
-            }
-            file.flush().unwrap();
+                for i in 0..n {
+                    writeln!(&mut file, "posttrunc {}", i).unwrap();
+                }
+                file.flush().unwrap();
 
-            sleep_millis(1000).await;
-        })
-        .await;
+                sleep_millis(1000).await;
+            })
+            .await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -1446,75 +1500,78 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file.old");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-            // Wait for the file to be observed at its original length before writing to it
-            retry_until(
-                || {
-                    // Check if the file exists and is being watched
-                    path.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("File should be discovered");
+                assert!(path.exists());
 
-            for i in 0..n {
-                writeln!(&mut file, "prerot {}", i).unwrap();
-            }
-            file.flush().unwrap();
+                // Wait for the file to be observed at its original length before writing to it
+                retry_until(
+                    || {
+                        // Check if the file exists and is being watched
+                        path.exists()
+                    },
+                    10,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("File should be discovered");
 
-            // Wait for the writes to be observed before rotating
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for pre-rotation processing");
+                for i in 0..n {
+                    writeln!(&mut file, "prerot {}", i).unwrap();
+                }
+                file.flush().unwrap();
 
-            fs::rename(&path, &archive_path).expect("could not rename");
-            let mut file = File::create(&path).unwrap();
+                // Wait for the writes to be observed before rotating
+                let mut count = 0;
+                retry_until(
+                    || {
+                        // This is just a delay mechanism - we can't actually check the events yet
+                        count += 1;
+                        count >= 10
+                    },
+                    20,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("Timeout waiting for pre-rotation processing");
 
-            // Wait for the rotation to be observed before writing again
-            retry_until(
-                || {
-                    // Check if the new file exists and is being watched
-                    path.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("New file should be discovered after rotation");
+                fs::rename(&path, &archive_path).expect("could not rename");
+                let mut file = File::create(&path).unwrap();
 
-            for i in 0..n {
-                writeln!(&mut file, "postrot {}", i).unwrap();
-            }
-            file.flush().unwrap();
+                // Wait for the rotation to be observed before writing again
+                retry_until(
+                    || {
+                        // Check if the new file exists and is being watched
+                        path.exists()
+                    },
+                    10,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("New file should be discovered after rotation");
 
-            // Wait for the final writes to be observed
-            let mut count2 = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count2 += 1;
-                    count2 >= 10
-                },
-                20,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for post-rotation processing");
-        })
-        .await;
+                for i in 0..n {
+                    writeln!(&mut file, "postrot {}", i).unwrap();
+                }
+                file.flush().unwrap();
+
+                // Wait for the final writes to be observed
+                let mut count2 = 0;
+                retry_until(
+                    || {
+                        // This is just a delay mechanism - we can't actually check the events yet
+                        count2 += 1;
+                        count2 >= 10
+                    },
+                    20,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("Timeout waiting for post-rotation processing");
+            })
+            .await;
 
         // With the new implementation, we need to be more flexible in our assertions
         // Collect all the lines
@@ -1587,41 +1644,42 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file1 = File::create(&path1).unwrap();
-            let mut file2 = File::create(&path2).unwrap();
-            let mut file3 = File::create(&path3).unwrap();
-            let mut file4 = File::create(&path4).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file1 = File::create(&path1).unwrap();
+                let mut file2 = File::create(&path2).unwrap();
+                let mut file3 = File::create(&path3).unwrap();
+                let mut file4 = File::create(&path4).unwrap();
 
-            // Wait for the files to be observed at their original lengths before writing to them
-            retry_until(
-                || {
-                    // Check if all files exist and are being watched
-                    path1.exists() && path2.exists() && path3.exists() && path4.exists()
-                },
-                10,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Files should be discovered");
+                // Wait for the files to be observed at their original lengths before writing to them
+                retry_until(
+                    || {
+                        // Check if all files exist and are being watched
+                        path1.exists() && path2.exists() && path3.exists() && path4.exists()
+                    },
+                    10,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("Files should be discovered");
 
-            for i in 0..n {
-                writeln!(&mut file1, "1 {}", i).unwrap();
-                writeln!(&mut file2, "2 {}", i).unwrap();
-                writeln!(&mut file3, "3 {}", i).unwrap();
-                writeln!(&mut file4, "4 {}", i).unwrap();
-            }
+                for i in 0..n {
+                    writeln!(&mut file1, "1 {}", i).unwrap();
+                    writeln!(&mut file2, "2 {}", i).unwrap();
+                    writeln!(&mut file3, "3 {}", i).unwrap();
+                    writeln!(&mut file4, "4 {}", i).unwrap();
+                }
 
-            // Flush the files to ensure the writes are visible
-            file1.flush().unwrap();
-            file2.flush().unwrap();
-            file3.flush().unwrap();
-            file4.flush().unwrap();
+                // Flush the files to ensure the writes are visible
+                file1.flush().unwrap();
+                file2.flush().unwrap();
+                file3.flush().unwrap();
+                file4.flush().unwrap();
 
-            // Wait for the file source to process the written content
-            sleep_millis(1000).await;
-        })
-        .await;
+                // Wait for the file source to process the written content
+                sleep_millis(1000).await;
+            })
+            .await;
 
         let mut is = [0; 3];
 
@@ -1668,18 +1726,19 @@ mod tests {
         // Give the filesystem a moment to register the files
         sleep(Duration::from_millis(100)).await;
 
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-            for i in 0..n {
-                writeln!(&mut file1, "1 {}", i).unwrap();
-                writeln!(&mut file2, "2 {}", i).unwrap();
-            }
+                for i in 0..n {
+                    writeln!(&mut file1, "1 {}", i).unwrap();
+                    writeln!(&mut file2, "2 {}", i).unwrap();
+                }
 
-            // Give more time for the file source to process the files
-            sleep(Duration::from_secs(1)).await;
-        })
-        .await;
+                // Give more time for the file source to process the files
+                sleep(Duration::from_secs(1)).await;
+            })
+            .await;
 
         let mut is = [0; 1];
 
@@ -1724,16 +1783,17 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_ifile_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                sleep_500_millis().await;
+                    sleep_500_millis().await;
 
-                writeln!(&mut file, "hello there").unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
 
-                sleep(Duration::from_secs(2)).await;
-            })
-            .await;
+                    sleep(Duration::from_secs(2)).await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1752,16 +1812,17 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_ifile_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                sleep_500_millis().await;
+                    sleep_500_millis().await;
 
-                writeln!(&mut file, "hello there").unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
 
-                sleep(Duration::from_secs(2)).await;
-            })
-            .await;
+                    sleep(Duration::from_secs(2)).await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1779,16 +1840,17 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_ifile_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                sleep_500_millis().await;
+                    sleep_500_millis().await;
 
-                writeln!(&mut file, "hello there").unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
 
-                sleep(Duration::from_secs(2)).await;
-            })
-            .await;
+                    sleep(Duration::from_secs(2)).await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1837,24 +1899,26 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let received = run_ifile_source(&config, true, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "first line").unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "first line").unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let received = run_ifile_source(&config, true, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "second line").unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "second line").unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1867,12 +1931,13 @@ mod tests {
                 read_from: ifile::ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
-            let received = run_ifile_source(&config, false, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "third line").unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_ifile_source(&config, false, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "third line").unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(
@@ -1901,6 +1966,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -1917,6 +1983,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -1951,6 +2018,7 @@ mod tests {
             true,
             Acks,
             LogNamespace::Legacy,
+            None,
             // shutdown signal is sent after this duration
             sleep_500_millis(),
         )
@@ -1971,6 +2039,7 @@ mod tests {
             true,
             Acks,
             LogNamespace::Legacy,
+            None,
             sleep(Duration::from_secs(5)),
         )
         .await;
@@ -2001,13 +2070,14 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_ifile_source(&config, true, acking, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
-                sleep_500_millis().await;
-                writeln!(&mut file, "first line").unwrap();
-                sleep(Duration::from_secs(2)).await;
-            })
-            .await;
+            let received =
+                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "first line").unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
@@ -2017,13 +2087,14 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received = run_ifile_source(&config, false, acking, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
-                sleep_500_millis().await;
-                writeln!(&mut file, "second line").unwrap();
-                sleep(Duration::from_secs(2)).await;
-            })
-            .await;
+            let received =
+                run_ifile_source(&config, false, acking, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "second line").unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                })
+                .await;
 
             // With the new implementation, we might get empty lines or just the second line
             // Filter out any empty lines and check that we have the second line
@@ -2075,7 +2146,7 @@ mod tests {
             assert_eq!(ret, 0);
         }
 
-        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, async {
+        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, None, async {
             // Need to sleep so that the file is checkpointed before we write to it, which
             // updates the modified time
             sleep_500_millis().await;
@@ -2113,7 +2184,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -2155,32 +2226,33 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-            writeln!(&mut file, "leftover foo").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
-            writeln!(&mut file, "INFO goodbye").unwrap();
-            writeln!(&mut file, "part of goodbye").unwrap();
+                writeln!(&mut file, "leftover foo").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO goodbye").unwrap();
+                writeln!(&mut file, "part of goodbye").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "INFO hi again").unwrap();
-            writeln!(&mut file, "and some more").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO hi again").unwrap();
+                writeln!(&mut file, "and some more").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "too slow").unwrap();
-            writeln!(&mut file, "INFO doesn't have").unwrap();
-            writeln!(&mut file, "to be INFO in").unwrap();
-            writeln!(&mut file, "the middle").unwrap();
+                writeln!(&mut file, "too slow").unwrap();
+                writeln!(&mut file, "INFO doesn't have").unwrap();
+                writeln!(&mut file, "to be INFO in").unwrap();
+                writeln!(&mut file, "the middle").unwrap();
 
-            sleep_500_millis().await;
-        })
-        .await;
+                sleep_500_millis().await;
+            })
+            .await;
 
         let received = extract_messages_value(received);
 
@@ -2214,32 +2286,33 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-            writeln!(&mut file, "leftover foo").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
-            writeln!(&mut file, "INFO goodbye").unwrap();
-            writeln!(&mut file, "part of goodbye").unwrap();
+                writeln!(&mut file, "leftover foo").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO goodbye").unwrap();
+                writeln!(&mut file, "part of goodbye").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "INFO hi again").unwrap();
-            writeln!(&mut file, "and some more").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO hi again").unwrap();
+                writeln!(&mut file, "and some more").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "too slow").unwrap();
-            writeln!(&mut file, "INFO doesn't have").unwrap();
-            writeln!(&mut file, "to be INFO in").unwrap();
-            writeln!(&mut file, "the middle").unwrap();
+                writeln!(&mut file, "too slow").unwrap();
+                writeln!(&mut file, "INFO doesn't have").unwrap();
+                writeln!(&mut file, "to be INFO in").unwrap();
+                writeln!(&mut file, "the middle").unwrap();
 
-            sleep_500_millis().await;
-        })
-        .await;
+                sleep_500_millis().await;
+            })
+            .await;
 
         let received = extract_messages_value(received);
 
@@ -2285,6 +2358,7 @@ mod tests {
             false,
             Acks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2296,7 +2370,7 @@ mod tests {
 
         // After restart, we should not see any part of the previously aggregated lines
         let received_after_restart =
-            run_ifile_source(&config, false, Acks, LogNamespace::Legacy, async {
+            run_ifile_source(&config, false, Acks, LogNamespace::Legacy, None, async {
                 writeln!(&mut file, "INFO goodbye").unwrap();
             })
             .await;
@@ -2345,6 +2419,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2414,6 +2489,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2451,19 +2527,20 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            sleep_500_millis().await;
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                sleep_500_millis().await;
 
-            write!(&mut file, "i am not a full line").unwrap();
+                write!(&mut file, "i am not a full line").unwrap();
 
-            // Longer than the EOF timeout
-            sleep_500_millis().await;
+                // Longer than the EOF timeout
+                sleep_500_millis().await;
 
-            writeln!(&mut file, " until now").unwrap();
+                writeln!(&mut file, " until now").unwrap();
 
-            sleep_500_millis().await;
-        })
-        .await;
+                sleep_500_millis().await;
+            })
+            .await;
 
         let received = extract_messages_value(received);
 
@@ -2499,22 +2576,23 @@ mod tests {
         );
 
         // Give the file source more time to process the gzipped file
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            // Wait for the file source to process the gzipped file
-            let mut count = 0;
-            retry_until(
-                || {
-                    // This is just a delay mechanism - we can't actually check the events yet
-                    count += 1;
-                    count >= 20
-                },
-                30,  // max attempts
-                100, // delay between attempts in ms
-            )
-            .await
-            .expect("Timeout waiting for gzipped file processing");
-        })
-        .await;
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                // Wait for the file source to process the gzipped file
+                let mut count = 0;
+                retry_until(
+                    || {
+                        // This is just a delay mechanism - we can't actually check the events yet
+                        count += 1;
+                        count >= 20
+                    },
+                    30,  // max attempts
+                    100, // delay between attempts in ms
+                )
+                .await
+                .expect("Timeout waiting for gzipped file processing");
+            })
+            .await;
 
         // With the new implementation, we might not get any events if the file is not properly detected
         // Let's make the test more resilient by checking if we got any events at all
@@ -2555,6 +2633,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2583,19 +2662,20 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let received =
+            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-            write!(&mut file, "hello i am a line\r\n").unwrap();
-            write!(&mut file, "and i am too\r\n").unwrap();
-            write!(&mut file, "CRLF is how we end\r\n").unwrap();
-            write!(&mut file, "please treat us well\r\n").unwrap();
+                write!(&mut file, "hello i am a line\r\n").unwrap();
+                write!(&mut file, "and i am too\r\n").unwrap();
+                write!(&mut file, "CRLF is how we end\r\n").unwrap();
+                write!(&mut file, "please treat us well\r\n").unwrap();
 
-            sleep(Duration::from_secs(2)).await;
-        })
-        .await;
+                sleep(Duration::from_secs(2)).await;
+            })
+            .await;
 
         let received = extract_messages_value(received);
 
@@ -2623,7 +2703,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, Acks, LogNamespace::Legacy, async {
+        let received = run_ifile_source(&config, false, Acks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -2667,6 +2747,7 @@ mod tests {
         wait_shutdown: bool,
         acking_mode: AckingMode,
         log_namespace: LogNamespace,
+        test_sender: Option<mpsc::UnboundedSender<vector_lib::ifile_source::TestEvent>>,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         // Make sure we're using the correct tags for file sources
@@ -2687,7 +2768,10 @@ mod tests {
                 config,
                 data_dir,
                 shutdown,
-                tx,
+                Senders {
+                    source_sender: tx,
+                    test_sender,
+                },
                 acks,
                 log_namespace,
             ));

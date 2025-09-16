@@ -5,6 +5,8 @@ mod file_server;
 mod file_watcher;
 pub mod paths_provider;
 
+#[cfg(any(test, feature = "test"))]
+pub use self::file_server::TestEvent;
 pub use self::{
     file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
     file_watcher::{FileWatcher, WatcherState},
@@ -16,6 +18,7 @@ pub use file_source_common::{
     internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents,
     FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
 };
+
 use vector_config::configurable_component;
 
 pub type FilePosition = u64;

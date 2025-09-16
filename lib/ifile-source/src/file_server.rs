@@ -5,6 +5,8 @@ use std::{
     time::{self, Duration},
 };
 
+#[cfg(any(test, feature = "test"))]
+use bytes::Buf;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
@@ -12,8 +14,12 @@ use futures::{
     Future, Sink, SinkExt,
 };
 use indexmap::IndexMap;
-use tokio::fs::{self, remove_file};
-use tokio::time::sleep;
+#[cfg(any(test, feature = "test"))]
+use tokio::sync::mpsc;
+use tokio::{
+    fs::{self, remove_file},
+    time::sleep,
+};
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -24,6 +30,13 @@ use file_source_common::{
     internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents, FileFingerprint,
     Fingerprinter, TaskSet,
 };
+
+#[cfg(any(test, feature = "test"))]
+#[derive(Debug, Clone)]
+pub enum TestEvent {
+    Checkpointed(PathBuf, Box<[u8]>),
+    Read(PathBuf, Box<[u8]>),
+}
 
 /// `FileServer` is a Source which schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
@@ -58,6 +71,8 @@ where
     pub rotate_wait: Duration,
     /// Duration after which to checkpoint files
     pub checkpoint_interval: Duration,
+    #[cfg(any(test, feature = "test"))]
+    pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
 }
 
 /// `FileServer` as Source
@@ -166,8 +181,23 @@ where
                 .await;
 
             // TODO parallelize?
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true, &mut lines)
-                .await;
+            self.watch_new_file(
+                path.clone(),
+                file_id,
+                &mut fp_map,
+                &checkpoints,
+                true,
+                &mut lines,
+            )
+            .await;
+
+            if let Some(sender) = self.test_sender.as_ref() {
+                for line in &lines {
+                    sender
+                        .send(TestEvent::Read(path.clone(), line.text.chunk().into()))
+                        .unwrap()
+                }
+            }
         }
         self.emitter.emit_files_open(fp_map.len());
 
@@ -296,7 +326,7 @@ where
                             let path_clone = path.clone();
                             debug!(message = "Discovered new file during runtime", ?path_clone);
                             self.watch_new_file(
-                                path,
+                                path.clone(),
                                 file_id,
                                 &mut fp_map,
                                 &checkpoints,
@@ -304,6 +334,17 @@ where
                                 &mut lines,
                             )
                             .await;
+
+                            if let Some(sender) = self.test_sender.as_ref() {
+                                for line in &lines {
+                                    sender
+                                        .send(TestEvent::Read(
+                                            path.clone(),
+                                            line.text.chunk().into(),
+                                        ))
+                                        .unwrap()
+                                }
+                            }
 
                             // Immediately read the file to avoid delay in detecting content
                             if let Some(watcher) = fp_map.get_mut(&file_id) {
@@ -313,6 +354,15 @@ where
                                 );
                                 let mut bytes_read: usize = 0;
                                 while let Ok(Some(line)) = watcher.read_line().await {
+                                    #[cfg(any(test, feature = "test"))]
+                                    if let Some(sender) = self.test_sender.as_ref() {
+                                        sender
+                                            .send(TestEvent::Read(
+                                                watcher.path.clone(),
+                                                line.bytes.chunk().into(),
+                                            ))
+                                            .unwrap()
+                                    }
                                     let sz = line.bytes.len();
                                     trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
                                     bytes_read += sz;
@@ -378,6 +428,15 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line().await {
+                    #[cfg(any(test, feature = "test"))]
+                    if let Some(sender) = self.test_sender.as_ref() {
+                        sender
+                            .send(TestEvent::Read(
+                                watcher.path.clone(),
+                                line.bytes.chunk().into(),
+                            ))
+                            .unwrap()
+                    }
                     let sz = line.bytes.len();
                     trace!(
                         message = "Read bytes.",

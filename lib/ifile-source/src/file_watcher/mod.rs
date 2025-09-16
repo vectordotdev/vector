@@ -11,7 +11,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{FilePosition, ReadFrom};
