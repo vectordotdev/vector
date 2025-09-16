@@ -4,8 +4,6 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::{cmp::min, path::PathBuf, time::Duration};
-
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
@@ -21,6 +19,7 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
+use std::{cmp::min, path::PathBuf, sync::Arc, time::Duration};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{BytesDeserializer, BytesDeserializerConfig},
@@ -35,7 +34,7 @@ use vector_lib::{
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use crate::{
     SourceSender,
@@ -54,12 +53,15 @@ use crate::{
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+    sources::kubernetes_logs::{
+        metadata_cache::K8sMetadataCache, partial_events_merger::merge_partial_events,
+    },
     transforms::{FunctionTransform, OutputBuffer},
 };
 
 mod k8s_paths_provider;
 mod lifecycle;
+mod metadata_cache;
 mod namespace_metadata_annotator;
 mod node_metadata_annotator;
 mod parser;
@@ -857,6 +859,7 @@ impl Source {
             rotate_wait,
         };
 
+        let metadata_cache = K8sMetadataCache::default();
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
         let checkpoints = checkpointer.view();
@@ -873,7 +876,15 @@ impl Source {
                 log_namespace,
             );
 
-            let file_info = annotator.annotate(&mut event, &line.filename);
+            let file_info = annotator.get_pod_info(&line.filename);
+            let pod_uid = file_info
+                .as_ref()
+                .map(|info| info.pod_uid)
+                .unwrap_or_else(|| "unknown_pod");
+            let container_name = file_info
+                .as_ref()
+                .map(|info| info.container_name)
+                .unwrap_or_else(|| "unknown_container");
 
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
@@ -884,26 +895,33 @@ impl Source {
                 }),
             });
 
-            if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationError { event: &event });
+            let cached_metadata = metadata_cache.get(&pod_uid, &container_name);
+            if cached_metadata.is_some() {
+                event
+                    .as_mut_log()
+                    .insert("kubernetes", (*cached_metadata).clone());
             } else {
-                let namespace = file_info.as_ref().map(|info| info.pod_namespace);
-
-                if let Some(name) = namespace {
-                    let ns_info = ns_annotator.annotate(&mut event, name);
-
-                    if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                let file_info = annotator.annotate(&mut event, &line.filename);
+                if file_info.is_none() {
+                    emit!(KubernetesLogsEventAnnotationError { event: &event });
+                } else {
+                    if let Some(namespace) = file_info.as_ref().map(|info| info.pod_namespace) {
+                        if ns_annotator.annotate(&mut event, namespace).is_none() {
+                            emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                        }
+                    }
+                    if node_annotator
+                        .annotate(&mut event, self_node_name.as_str())
+                        .is_none()
+                    {
+                        emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                     }
                 }
 
-                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
-
-                if node_info.is_none() {
-                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
+                if let Some(value) = event.as_log().as_map().and_then(|m| m.get("kubernetes")) {
+                    metadata_cache.insert(pod_uid, container_name, value.clone());
                 }
             }
-
             checkpoints.update(line.file_id, line.end_offset);
             event
         });
@@ -1158,8 +1176,9 @@ mod tests {
     };
     use vrl::value::{Kind, kind::Collection};
 
-    use super::Config;
     use crate::config::SourceConfig;
+
+    use super::Config;
 
     #[test]
     fn generate_config() {

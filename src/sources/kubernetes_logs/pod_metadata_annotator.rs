@@ -196,6 +196,12 @@ impl PodMetadataAnnotator {
 }
 
 impl PodMetadataAnnotator {
+    /// only get baseinfo from file to avoid too much btree insert
+    pub fn get_pod_info<'a>(&self, file: &'a str) -> Option<LogFileInfo<'a>> {
+        let file_info = parse_log_file_path(file)?;
+        Some(file_info)
+    }
+
     /// Annotates an event with the information from the [`Pod::metadata`].
     pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
