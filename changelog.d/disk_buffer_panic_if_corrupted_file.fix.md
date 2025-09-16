@@ -1,4 +1,3 @@
-fix panics in disk buffer when both reader and writer are on the at last data file and last data file is corrupted.
-which are generally the case when node shutdown improperly.
+Fix disk buffer panics when both reader and writer are on the last data file and it is corrupted. This scenario typically occurs when a node shuts down improperly, leaving the final data file in a corrupted state.
 
 authors: anil-db
