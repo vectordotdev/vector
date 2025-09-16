@@ -1,27 +1,23 @@
+use std::task::Poll;
+
 use chrono::Utc;
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::prelude::IndexedRandom;
 use serde_with::serde_as;
 use snafu::Snafu;
-use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::lookup::{owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    config::{LegacyKey, LogNamespace},
-};
-use vector_lib::{
     codecs::{
         StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
-    config::DataType,
+    config::{DataType, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::{owned_value_path, path},
 };
 use vrl::value::Kind;
 
@@ -175,7 +171,7 @@ impl OutputFormat {
     }
 
     // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
-    pub(self) fn validate(&self) -> Result<(), DemoLogsConfigError> {
+    pub(self) const fn validate(&self) -> Result<(), DemoLogsConfigError> {
         match self {
             Self::Shuffle { lines, .. } => {
                 if lines.is_empty() {

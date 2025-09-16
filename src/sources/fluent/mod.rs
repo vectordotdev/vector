@@ -1,7 +1,9 @@
-use std::collections::HashMap;
-use std::io::{self, Read};
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    io::{self, Read},
+    net::SocketAddr,
+    time::Duration,
+};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
@@ -11,15 +13,15 @@ use rmp_serde::{Deserializer, Serializer, decode};
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::ipallowlist::IpAllowlistConfig;
-use vector_lib::lookup::lookup_v2::parse_value_path;
-use vector_lib::lookup::{OwnedValuePath, metadata_path, owned_value_path, path};
-use vector_lib::schema::Definition;
-use vrl::value::kind::Collection;
-use vrl::value::{Kind, Value};
+use vector_lib::{
+    codecs::{BytesDeserializerConfig, StreamDecodingError},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
+    schema::Definition,
+};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -653,10 +655,9 @@ impl Decoder for FluentDecoder {
                     decode::Error::InvalidDataRead(ref custom)
                     | decode::Error::InvalidMarkerRead(ref custom),
                 )) = res
+                    && custom.kind() == io::ErrorKind::UnexpectedEof
                 {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+                    return Ok(None);
                 }
 
                 (des.position() as usize, res)
@@ -696,10 +697,10 @@ impl Decoder for FluentEntryStreamDecoder {
             // attempt to parse, if we get unexpected EOF, we need more data
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
-            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                }
+            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res
+                && custom.kind() == io::ErrorKind::UnexpectedEof
+            {
+                return Ok(None);
             }
 
             let byte_size = des.position();
@@ -835,9 +836,7 @@ mod tests {
         time::{Duration, error::Elapsed, timeout},
     };
     use tokio_util::codec::Decoder;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{assert_event_data_eq, lookup::OwnedTargetPath, schema::Definition};
     use vrl::value::{ObjectMap, Value, kind::Collection};
 
     use super::{message::FluentMessageOptions, *};
@@ -1259,12 +1258,11 @@ mod integration_tests {
     use tokio::time::sleep;
     use vector_lib::event::{Event, EventStatus};
 
-    use crate::sources::fluent::{FluentMode, FluentTcpConfig};
     use crate::{
         SourceSender,
         config::{SourceConfig, SourceContext},
         docker::Container,
-        sources::fluent::FluentConfig,
+        sources::fluent::{FluentConfig, FluentMode, FluentTcpConfig},
         test_util::{
             collect_ready,
             components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},

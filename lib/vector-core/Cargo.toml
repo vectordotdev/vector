@@ -2,7 +2,7 @@
 name = "vector-core"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [lints.rust]
@@ -41,7 +41,7 @@ proptest = { version = "1.7", optional = true }
 prost-types.workspace = true
 prost.workspace = true
 quanta = { version = "0.12.6", default-features = false }
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 ryu = { version = "1", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
@@ -67,7 +67,7 @@ vrl.workspace = true
 cfg-if.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "3.2.0"
+security-framework = "3.3.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.27"
@@ -92,7 +92,7 @@ noisy_float = "0.2.0"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
-tracing-subscriber = { version = "0.3.19", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]

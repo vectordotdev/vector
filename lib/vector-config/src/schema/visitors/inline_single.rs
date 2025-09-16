@@ -4,11 +4,10 @@ use serde_json::Value;
 use tracing::debug;
 use vector_config_common::schema::{visit::Visitor, *};
 
-use crate::schema::visitors::merge::Mergeable;
-
 use super::scoped_visit::{
-    visit_schema_object_scoped, SchemaReference, SchemaScopeStack, ScopedVisitor,
+    SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
 };
+use crate::schema::visitors::merge::Mergeable;
 
 /// A visitor that inlines schema references where the referenced schema is only referenced once.
 ///
@@ -188,9 +187,8 @@ mod tests {
     use serde_json::json;
     use vector_config_common::schema::visit::Visitor;
 
-    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
-
     use super::InlineSingleUseReferencesVisitor;
+    use crate::schema::visitors::test::{as_schema, assert_schemas_eq};
 
     #[test]
     fn no_refs() {

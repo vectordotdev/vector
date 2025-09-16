@@ -10,17 +10,17 @@ pub mod topology;
 use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
-use tokio::sync::mpsc as tokio_mpsc;
-use tokio::time::timeout;
-use tokio::time::{Duration, Instant};
+use tokio::{
+    sync::mpsc as tokio_mpsc,
+    time::{Duration, Instant, timeout},
+};
 use tokio_stream::StreamExt;
 use url::Url;
-
 use vector_api_client::{
     connect_subscription_client,
     gql::{
-        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvent,
         TapEncodingFormat, TapSubscriptionExt,
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvent,
     },
 };
 
@@ -203,7 +203,7 @@ impl<'a> TapRunner<'a> {
                 // If the stream times out, that indicates the duration specified by the user
                 // has elapsed. We should exit gracefully.
                 {
-                    return Ok(())
+                    return Ok(());
                 }
                 Ok(_) => return Err(TapExecutorError::GraphQLError),
             }

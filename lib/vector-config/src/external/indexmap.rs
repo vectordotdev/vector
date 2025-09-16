@@ -4,12 +4,12 @@ use indexmap::{IndexMap, IndexSet};
 use serde_json::Value;
 
 use crate::{
+    Configurable, GenerateError, Metadata, ToValue,
     schema::{
-        assert_string_schema_for_map, generate_map_schema, generate_set_schema, SchemaGenerator,
-        SchemaObject,
+        SchemaGenerator, SchemaObject, assert_string_schema_for_map, generate_map_schema,
+        generate_set_schema,
     },
     str::ConfigurableString,
-    Configurable, GenerateError, Metadata, ToValue,
 };
 
 impl<K, V> Configurable for IndexMap<K, V>
@@ -32,15 +32,17 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
         // Make sure our key type is _truly_ a string schema.
         assert_string_schema_for_map(
             &K::as_configurable_ref(),
-            gen,
+            generator,
             std::any::type_name::<Self>(),
         )?;
 
-        generate_map_schema(&V::as_configurable_ref(), gen)
+        generate_map_schema(&V::as_configurable_ref(), generator)
     }
 }
 
@@ -71,8 +73,10 @@ where
         V::validate_metadata(&converted)
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        generate_set_schema(&V::as_configurable_ref(), gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        generate_set_schema(&V::as_configurable_ref(), generator)
     }
 }
 

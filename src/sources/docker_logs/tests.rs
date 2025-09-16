@@ -31,10 +31,8 @@ mod integration_tests {
 
     use bollard::{
         query_parameters::{
-            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
-        },
-        query_parameters::{
-            KillContainerOptions, RemoveContainerOptions, StartContainerOptions,
+            CreateContainerOptionsBuilder, CreateImageOptionsBuilder, KillContainerOptions,
+            ListImagesOptionsBuilder, RemoveContainerOptions, StartContainerOptions,
             WaitContainerOptions,
         },
         secret::ContainerCreateBody,
@@ -44,11 +42,10 @@ mod integration_tests {
     use similar_asserts::assert_eq;
     use vrl::value;
 
-    use crate::sources::docker_logs::*;
-    use crate::sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME};
     use crate::{
         SourceSender,
         event::Event,
+        sources::docker_logs::{CONTAINER, CREATED_AT, IMAGE, NAME, *},
         test_util::{
             collect_n, collect_ready,
             components::{SOURCE_TAGS, assert_source_compliance},

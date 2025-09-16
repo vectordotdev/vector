@@ -3,8 +3,7 @@ use http::{Response, StatusCode, Uri};
 use hyper::{Body, body};
 use serde::Deserialize;
 use snafu::ResultExt;
-use vector_lib::config::LogNamespace;
-use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
 
 use super::{
     ElasticsearchApiVersion, ElasticsearchEncoder, InvalidHostSnafu, Request, VersionType,
@@ -93,13 +92,13 @@ impl ElasticsearchCommon {
             ))),
         );
 
-        if let Some(pipeline) = &config.pipeline {
-            if !pipeline.is_empty() {
-                query_params.insert(
-                    "pipeline".into(),
-                    QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
-                );
-            }
+        if let Some(pipeline) = &config.pipeline
+            && !pipeline.is_empty()
+        {
+            query_params.insert(
+                "pipeline".into(),
+                QueryParameterValue::SingleParam(ParameterValue::String(pipeline.into())),
+            );
         }
 
         let bulk_url = {
@@ -405,14 +404,14 @@ async fn get_version(
     let mut body = body::aggregate(body).await?;
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
-    if let Some(version) = version {
-        if let Some(number) = version.number {
-            let v: Vec<&str> = number.split('.').collect();
-            if !v.is_empty() {
-                if let Ok(major_version) = v[0].parse::<usize>() {
-                    return Ok(major_version);
-                }
-            }
+    if let Some(version) = version
+        && let Some(number) = version.number
+    {
+        let v: Vec<&str> = number.split('.').collect();
+        if !v.is_empty()
+            && let Ok(major_version) = v[0].parse::<usize>()
+        {
+            return Ok(major_version);
         }
     }
     Err("Unexpected response from Elasticsearch endpoint `/`. Consider setting `api_version` option.".into())

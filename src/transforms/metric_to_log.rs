@@ -1,20 +1,23 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use chrono::Utc;
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
-use vector_lib::TimeZone;
-use vector_lib::codecs::MetricTagValues;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{PathPrefix, event_path, owned_value_path, path};
-use vrl::path::OwnedValuePath;
-use vrl::value::Kind;
-use vrl::value::kind::Collection;
+use vector_lib::{
+    TimeZone,
+    codecs::MetricTagValues,
+    config::LogNamespace,
+    configurable::configurable_component,
+    lookup::{PathPrefix, event_path, owned_value_path, path},
+};
+use vrl::{
+    path::OwnedValuePath,
+    value::{Kind, kind::Collection},
+};
 
-use crate::config::OutputId;
 use crate::{
     config::{
-        DataType, GenerateConfig, Input, TransformConfig, TransformContext, TransformOutput,
-        log_schema,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput, log_schema,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
@@ -311,12 +314,11 @@ impl MetricToLog {
 
                         log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
 
-                        if let Some(host_tag) = &self.host_tag {
-                            if let Some(host_value) =
+                        if let Some(host_tag) = &self.host_tag
+                            && let Some(host_value) =
                                 log.remove_prune((PathPrefix::Event, host_tag), true)
-                            {
-                                log.maybe_insert(log_schema().host_key_target_path(), host_value);
-                            }
+                        {
+                            log.maybe_insert(log_schema().host_key_target_path(), host_value);
                         }
                     }
                     if self.log_namespace == LogNamespace::Vector {
@@ -353,16 +355,17 @@ mod tests {
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::{event::EventMetadata, metric_tags};
+    use vector_lib::{config::ComponentKey, event::EventMetadata, metric_tags};
 
     use super::*;
-    use crate::event::{
-        KeyString, Metric, Value,
-        metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
+    use crate::{
+        event::{
+            KeyString, Metric, Value,
+            metric::{MetricKind, MetricTags, MetricValue, StatisticKind, TagValue, TagValueSet},
+        },
+        test_util::{components::assert_transform_compliance, random_string},
+        transforms::test::create_topology,
     };
-    use crate::test_util::{components::assert_transform_compliance, random_string};
-    use crate::transforms::test::create_topology;
 
     #[test]
     fn generate_config() {

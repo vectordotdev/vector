@@ -1,4 +1,4 @@
-use super::{visit::Visitor, Map, RootSchema, Schema, SchemaObject, DEFINITIONS_PREFIX};
+use super::{DEFINITIONS_PREFIX, Map, RootSchema, Schema, SchemaObject, visit::Visitor};
 
 /// Settings to customize how schemas are generated.
 #[derive(Debug)]
@@ -113,7 +113,7 @@ impl SchemaGenerator {
     pub fn dereference<'a>(&'a self, schema: &Schema) -> Option<&'a Schema> {
         match schema {
             Schema::Object(SchemaObject {
-                reference: Some(ref schema_ref),
+                reference: Some(schema_ref),
                 ..
             }) => {
                 let definitions_path = &self.settings().definitions_path;

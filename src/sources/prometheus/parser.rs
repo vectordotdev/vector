@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "sources-prometheus-remote-write")]
 use vector_lib::prometheus::parser::proto;
@@ -97,7 +95,9 @@ fn reparse_groups(
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let mut buckets = metric.buckets;
-                    buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+                    buckets.sort_unstable_by(|a, b| {
+                        a.bucket.total_cmp(&b.bucket).then(a.count.cmp(&b.count))
+                    });
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
@@ -178,12 +178,13 @@ fn combine_tags(
 
 #[cfg(test)]
 mod test {
+    use core::f64;
     use std::sync::LazyLock;
 
     use chrono::{TimeZone, Timelike, Utc};
+    use itertools::Itertools;
     use similar_asserts::assert_eq;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::metric_tags;
+    use vector_lib::{assert_event_data_eq, metric_tags};
 
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -731,6 +732,49 @@ mod test {
                         ],
                         count: 144320,
                         sum: 53423.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_doesnt_panic() {
+        let mut exp = r#"
+            # HELP http_request_duration_seconds A histogram of the request duration.
+            # TYPE http_request_duration_seconds histogram
+            "#
+        .to_string();
+
+        let to_float = |v: i32| -> f64 { v as f64 };
+        exp += &(0..=15)
+            .map(to_float)
+            .chain(std::iter::once(f64::NAN))
+            .chain((16..=20).map(to_float))
+            .rev()
+            .map(|f| format!("http_request_duration_seconds_bucket{{le=\"{f}\"}} 0 1612411506789"))
+            .join("\n");
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text(&exp)),
+            Ok(vec![
+                Metric::new(
+                    "http_request_duration_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        // These bucket values don't mean/test anything, they just test that the
+                        // sort works without panicking
+                        buckets: (0..=20)
+                            .map(to_float)
+                            .chain(std::iter::once(f64::NAN))
+                            .map(|upper_limit| Bucket {
+                                upper_limit,
+                                count: 0
+                            })
+                            .collect(),
+                        count: 0,
+                        sum: 0.0,
                     },
                 )
                 .with_timestamp(Some(*TIMESTAMP))

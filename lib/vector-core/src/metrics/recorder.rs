@@ -1,14 +1,19 @@
-use std::sync::{atomic::Ordering, Arc, RwLock};
-use std::{cell::OnceCell, time::Duration};
+use std::{
+    cell::OnceCell,
+    sync::{Arc, RwLock, atomic::Ordering},
+    time::Duration,
+};
 
 use chrono::Utc;
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
-use metrics_util::{registry::Registry as MetricsRegistry, MetricKindMask};
+use metrics_util::{MetricKindMask, registry::Registry as MetricsRegistry};
 use quanta::Clock;
 
-use super::metric_matcher::MetricKeyMatcher;
-use super::recency::{GenerationalStorage, Recency};
-use super::storage::VectorStorage;
+use super::{
+    metric_matcher::MetricKeyMatcher,
+    recency::{GenerationalStorage, Recency},
+    storage::VectorStorage,
+};
 use crate::event::{Metric, MetricValue};
 
 thread_local!(static LOCAL_REGISTRY: OnceCell<Registry> = const { OnceCell::new() });

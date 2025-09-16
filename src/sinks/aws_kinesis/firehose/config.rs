@@ -6,20 +6,21 @@ use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
-use crate::sinks::util::retries::RetryAction;
+use super::{
+    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
+    record::{KinesisFirehoseClient, KinesisFirehoseRecord},
+    sink::BatchKinesisRequest,
+};
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         Healthcheck, VectorSink,
-        util::{BatchConfig, SinkBatchSettings, retries::RetryLogic},
+        util::{
+            BatchConfig, SinkBatchSettings,
+            retries::{RetryAction, RetryLogic},
+        },
     },
-};
-
-use super::sink::BatchKinesisRequest;
-use super::{
-    KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
-    record::{KinesisFirehoseClient, KinesisFirehoseRecord},
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -177,13 +178,13 @@ impl RetryLogic for KinesisRetryLogic {
     type Response = KinesisResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        if let SdkError::ServiceError(inner) = error {
-            if matches!(
+        if let SdkError::ServiceError(inner) = error
+            && matches!(
                 inner.err(),
                 PutRecordBatchError::ServiceUnavailableException(_)
-            ) {
-                return true;
-            }
+            )
+        {
+            return true;
         }
         is_retriable_error(error)
     }

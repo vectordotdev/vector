@@ -421,11 +421,10 @@ where
 mod tests {
     use proptest::{prop_assert, proptest, test_runner::Config};
 
-    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
-
     use super::{
-        align16, BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT,
+        BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT, align16,
     };
+    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
 
     #[test]
     #[should_panic(expected = "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`")]

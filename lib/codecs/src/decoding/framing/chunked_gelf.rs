@@ -1,20 +1,23 @@
-use super::{BoxedFramingError, FramingError};
-use crate::{BytesDecoder, StreamDecodingError};
+use std::{
+    any::Any,
+    collections::HashMap,
+    io::Read,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
 use bytes::{Buf, Bytes, BytesMut};
 use derivative::Derivative;
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use snafu::{ensure, ResultExt, Snafu};
-use std::any::Any;
-use std::collections::HashMap;
-use std::io::Read;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio;
-use tokio::task::JoinHandle;
+use snafu::{ResultExt, Snafu, ensure};
+use tokio::{self, task::JoinHandle};
 use tokio_util::codec::Decoder;
 use tracing::{debug, trace, warn};
 use vector_common::constants::{GZIP_MAGIC, ZLIB_MAGIC};
 use vector_config::configurable_component;
+
+use super::{BoxedFramingError, FramingError};
+use crate::{BytesDecoder, StreamDecodingError};
 
 const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
@@ -178,11 +181,11 @@ impl ChunkedGelfDecompression {
 
         if data.starts_with(ZLIB_MAGIC) {
             // Based on https://datatracker.ietf.org/doc/html/rfc1950#section-2.2
-            if let Some([first_byte, second_byte]) = data.get(0..2) {
-                if (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0 {
-                    trace!("Detected Zlib compression");
-                    return Self::Zlib;
-                }
+            if let Some([first_byte, second_byte]) = data.get(0..2)
+                && (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0
+            {
+                trace!("Detected Zlib compression");
+                return Self::Zlib;
             };
 
             warn!(
@@ -231,32 +234,42 @@ pub enum ChunkedGelfDecompressionError {
 pub enum ChunkedGelfDecoderError {
     #[snafu(display("Invalid chunk header with less than 10 bytes: 0x{header:0x}"))]
     InvalidChunkHeader { header: Bytes },
-    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has an invalid total chunks value of {total_chunks}. It must be between 1 and {GELF_MAX_TOTAL_CHUNKS}."))]
+    #[snafu(display(
+        "Received chunk with message id {message_id} and sequence number {sequence_number} has an invalid total chunks value of {total_chunks}. It must be between 1 and {GELF_MAX_TOTAL_CHUNKS}."
+    ))]
     InvalidTotalChunks {
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
     },
-    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has a sequence number greater than its total chunks value of {total_chunks}"))]
+    #[snafu(display(
+        "Received chunk with message id {message_id} and sequence number {sequence_number} has a sequence number greater than its total chunks value of {total_chunks}"
+    ))]
     InvalidSequenceNumber {
         message_id: u64,
         sequence_number: u8,
         total_chunks: u8,
     },
-    #[snafu(display("Pending messages limit of {pending_messages_limit} reached while processing chunk with message id {message_id} and sequence number {sequence_number}"))]
+    #[snafu(display(
+        "Pending messages limit of {pending_messages_limit} reached while processing chunk with message id {message_id} and sequence number {sequence_number}"
+    ))]
     PendingMessagesLimitReached {
         message_id: u64,
         sequence_number: u8,
         pending_messages_limit: usize,
     },
-    #[snafu(display("Received chunk with message id {message_id} and sequence number {sequence_number} has different total chunks values: original total chunks value is {original_total_chunks} and received total chunks value is {received_total_chunks}"))]
+    #[snafu(display(
+        "Received chunk with message id {message_id} and sequence number {sequence_number} has different total chunks values: original total chunks value is {original_total_chunks} and received total chunks value is {received_total_chunks}"
+    ))]
     TotalChunksMismatch {
         message_id: u64,
         sequence_number: u8,
         original_total_chunks: u8,
         received_total_chunks: u8,
     },
-    #[snafu(display("Message with id {message_id} has exceeded the maximum message length and it will be dropped: got {length} bytes and max message length is {max_length} bytes. Discarding all buffered chunks of that message"))]
+    #[snafu(display(
+        "Message with id {message_id} has exceeded the maximum message length and it will be dropped: got {length} bytes and max message length is {max_length} bytes. Discarding all buffered chunks of that message"
+    ))]
     MaxLengthExceed {
         message_id: u64,
         sequence_number: u8,
@@ -511,14 +524,15 @@ impl Decoder for ChunkedGelfDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{fmt::Write as FmtWrite, io::Write as IoWrite};
+
     use bytes::{BufMut, BytesMut};
-    use flate2::{write::GzEncoder, write::ZlibEncoder};
-    use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+    use flate2::write::{GzEncoder, ZlibEncoder};
+    use rand::{SeedableRng, rngs::SmallRng, seq::SliceRandom};
     use rstest::{fixture, rstest};
-    use std::fmt::Write as FmtWrite;
-    use std::io::Write as IoWrite;
     use tracing_test::traced_test;
+
+    use super::*;
 
     pub enum Compression {
         Gzip,

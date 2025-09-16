@@ -9,8 +9,10 @@ use vector_lib::event::{
 
 use crate::{
     config::SinkConfig,
-    sinks::appsignal::config::AppsignalConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
+    sinks::{
+        appsignal::config::AppsignalConfig,
+        util::test::{build_test_server_status, load_sink},
+    },
     test_util::{
         components::{
             COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, assert_sink_compliance, assert_sink_error,

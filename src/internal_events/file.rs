@@ -1,14 +1,17 @@
-use metrics::{counter, gauge};
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
+
+use metrics::{counter, gauge};
 use vector_lib::{
     configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-
-use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -108,15 +111,14 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
-    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
-
-    use super::{FileOpen, InternalEvent};
-    use vector_lib::emit;
     use vector_lib::{
-        internal_event::{error_stage, error_type},
+        emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{ComponentEventsDropped, INTENTIONAL, error_stage, error_type},
         json_size::JsonSize,
     };
+
+    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {

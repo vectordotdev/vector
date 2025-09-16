@@ -4,7 +4,12 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    configurable::configurable_component,
+    lookup::{event_path, lookup_v2::ConfigValuePath},
+    schema::Requirement,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -31,10 +36,6 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use vector_lib::lookup::event_path;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vector_lib::schema::Requirement;
-use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -689,5 +690,71 @@ mod tests {
         .unwrap();
         assert_eq!(config.mode, ElasticsearchMode::Bulk);
         assert_eq!(config.bulk, BulkConfig::default());
+    }
+
+    #[test]
+    fn parse_opensearch_service_type_managed() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            opensearch_service_type = "managed"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.opensearch_service_type,
+            OpenSearchServiceType::Managed
+        );
+    }
+
+    #[test]
+    fn parse_opensearch_service_type_serverless() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            opensearch_service_type = "serverless"
+            auth.strategy = "aws"
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.opensearch_service_type,
+            OpenSearchServiceType::Serverless
+        );
+    }
+
+    #[test]
+    fn parse_opensearch_service_type_default() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.opensearch_service_type,
+            OpenSearchServiceType::Managed
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn parse_opensearch_serverless_with_aws_auth() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = [""]
+            opensearch_service_type = "serverless"
+            auth.strategy = "aws"
+            api_version = "auto"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.opensearch_service_type,
+            OpenSearchServiceType::Serverless
+        );
+        assert!(matches!(config.auth, Some(ElasticsearchAuthConfig::Aws(_))));
+        assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
     }
 }

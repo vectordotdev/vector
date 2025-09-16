@@ -1,4 +1,3 @@
-use crate::common::http::{ErrorMessage, server_auth::HttpServerAuthConfig};
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
@@ -22,8 +21,10 @@ use warp::{
     reject::Rejection,
 };
 
+use super::encoding::decode;
 use crate::{
     SourceSender,
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
@@ -32,8 +33,6 @@ use crate::{
     sources::util::http::HttpMethod,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
 };
-
-use super::encoding::decode;
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -129,7 +128,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {

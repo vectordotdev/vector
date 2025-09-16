@@ -4,12 +4,13 @@ use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::lookup_v2::OptionalValuePath,
 };
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, config::LogNamespace};
 
 use crate::{
     SourceSender,
@@ -170,10 +171,10 @@ impl InternalMetrics<'_> {
                     metric = metric.with_namespace(Some(self.namespace.clone()));
                 }
 
-                if let Some(host_key) = &self.host_key.path {
-                    if let Ok(hostname) = &hostname {
-                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                    }
+                if let Some(host_key) = &self.host_key.path
+                    && let Ok(hostname) = &hostname
+                {
+                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
                 }
                 if let Some(pid_key) = &self.pid_key {
                     metric.replace_tag(pid_key.to_owned(), pid.clone());

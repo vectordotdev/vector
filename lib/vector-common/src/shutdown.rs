@@ -5,12 +5,12 @@ use std::{
     future::Future,
     pin::Pin,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
-use futures::{future, FutureExt};
+use futures::{FutureExt, future};
 use stream_cancel::{Trigger, Tripwire};
-use tokio::time::{timeout_at, Instant};
+use tokio::time::{Instant, timeout_at};
 
 use crate::{config::ComponentKey, trigger::DisabledTrigger};
 
@@ -124,7 +124,7 @@ impl SourceShutdownCoordinator {
         &mut self,
         id: &ComponentKey,
         internal: bool,
-    ) -> (ShutdownSignal, impl Future<Output = ()>) {
+    ) -> (ShutdownSignal, impl Future<Output = ()> + use<>) {
         let (shutdown_begun_trigger, shutdown_begun_tripwire) = Tripwire::new();
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
         let (shutdown_complete_trigger, shutdown_complete_tripwire) = Tripwire::new();
@@ -259,7 +259,7 @@ impl SourceShutdownCoordinator {
         &mut self,
         id: &ComponentKey,
         deadline: Instant,
-    ) -> impl Future<Output = bool> {
+    ) -> impl Future<Output = bool> + use<> {
         let (_, begin_shutdown_trigger) = self.begun_triggers.remove(id).unwrap_or_else(|| {
             panic!(
                 "shutdown_begun_trigger for source \"{id}\" not found in the ShutdownCoordinator"

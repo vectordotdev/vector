@@ -1,11 +1,17 @@
-use crate::app;
-use crate::app::CommandExt;
-use crate::testing::config::RustToolchainConfig;
-use crate::testing::docker::docker_command;
-use crate::util::IS_A_TTY;
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
+
 use anyhow::Result;
-use std::path::PathBuf;
-use std::{path::Path, process::Command};
+
+use crate::{
+    app,
+    app::CommandExt,
+    environment::{Environment, extract_present},
+    testing::{config::RustToolchainConfig, docker::docker_command},
+    util::IS_A_TTY,
+};
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 
@@ -17,20 +23,21 @@ pub fn prepare_build_command(
     image: &str,
     dockerfile: &Path,
     features: Option<&[String]>,
+    config_environment_variables: &Environment,
 ) -> Command {
     // Start with `docker build`
-    let mut cmd = docker_command(["build"]);
+    let mut command = docker_command(["build"]);
 
     // Ensure we run from the repo root (so `.` context is correct)
-    cmd.current_dir(app::path());
+    command.current_dir(app::path());
 
     // If we're attached to a TTY, show fancy progress
     if *IS_A_TTY {
-        cmd.args(["--progress", "tty"]);
+        command.args(["--progress", "tty"]);
     }
 
     // Add all of the flags in one go
-    cmd.args([
+    command.args([
         "--pull",
         "--tag",
         image,
@@ -42,10 +49,12 @@ pub fn prepare_build_command(
         &format!("RUST_VERSION={}", RustToolchainConfig::rust_version()),
         "--build-arg",
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
-        ".",
     ]);
 
-    cmd
+    command.envs(extract_present(config_environment_variables));
+
+    command.args(["."]);
+    command
 }
 
 #[allow(dead_code)]
@@ -59,6 +68,7 @@ pub fn build_integration_image() -> Result<()> {
         &image,
         &dockerfile,
         Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
+        &Environment::default(),
     );
     waiting!("Building {image}");
     cmd.check_run()

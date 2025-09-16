@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use codecs::{
-    encoding::VarintLengthDelimitedEncoder, encoding::VarintLengthDelimitedEncoderConfig,
     VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+    encoding::{VarintLengthDelimitedEncoder, VarintLengthDelimitedEncoderConfig},
 };
 use tokio_util::codec::{Decoder, Encoder};
 

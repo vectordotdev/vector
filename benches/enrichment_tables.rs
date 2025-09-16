@@ -2,10 +2,9 @@ use std::time::SystemTime;
 
 use chrono::prelude::*;
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use vector::enrichment_tables::file::FileData;
 use vector::enrichment_tables::{
     Condition, Table,
-    file::File,
+    file::{File, FileData},
     geoip::{Geoip, GeoipConfig},
     mmdb::{Mmdb, MmdbConfig},
 };

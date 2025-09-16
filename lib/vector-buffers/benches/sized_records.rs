@@ -6,8 +6,8 @@ use std::{
 };
 
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    criterion_main, measurement::WallTime,
 };
 use tokio::runtime::{Handle, Runtime};
 use vector_buffers::{BufferType, MemoryBufferSize, WhenFull};
