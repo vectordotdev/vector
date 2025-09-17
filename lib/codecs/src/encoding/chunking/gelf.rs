@@ -26,48 +26,48 @@ pub struct GelfChunker {
 
 impl Chunking for GelfChunker {
     fn chunk(&self, bytes: Bytes) -> Result<Vec<Bytes>, vector_common::Error> {
-        if bytes.len() > self.max_chunk_size {
-            let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
-            let message_id: u64 = rand::random();
-            let chunk_count = (bytes.len() + chunk_size - 1) / chunk_size;
-
-            trace!(
-                message_id = message_id,
-                chunk_count = chunk_count,
-                chunk_size = chunk_size,
-                "Generating chunks for GELF."
-            );
-
-            if chunk_count > GELF_MAX_TOTAL_CHUNKS {
-                return Err(vector_common::Error::from(format!(
-                    "Too many chunks to generate for GELF: {}, max: {}",
-                    chunk_count, GELF_MAX_TOTAL_CHUNKS
-                )));
-            }
-
-            // Split into chunks and add headers to each slice.
-            // Map with index to determine sequence number.
-            let chunks = bytes
-                .chunks(chunk_size)
-                .enumerate()
-                .map(|(i, chunk)| {
-                    let framed = Bytes::copy_from_slice(chunk);
-                    let sequence_number = i as u8;
-                    let sequence_count = chunk_count as u8;
-
-                    let mut headers = BytesMut::with_capacity(GELF_CHUNK_HEADERS_LENGTH);
-                    headers.put_slice(&GELF_MAGIC_BYTES);
-                    headers.put_u64(message_id);
-                    headers.put_u8(sequence_number);
-                    headers.put_u8(sequence_count);
-
-                    [headers.freeze(), framed].concat().into()
-                })
-                .collect();
-            Ok(chunks)
-        } else {
-            Ok(vec![bytes])
+        if bytes.len() <= self.max_chunk_size {
+            return Ok(vec![bytes]);
         }
+
+        let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
+        let message_id: u64 = rand::random();
+        let chunk_count = (bytes.len() + chunk_size - 1) / chunk_size;
+
+        trace!(
+            message_id = message_id,
+            chunk_count = chunk_count,
+            chunk_size = chunk_size,
+            "Generating chunks for GELF."
+        );
+
+        if chunk_count > GELF_MAX_TOTAL_CHUNKS {
+            return Err(vector_common::Error::from(format!(
+                "Too many chunks to generate for GELF: {}, max: {}",
+                chunk_count, GELF_MAX_TOTAL_CHUNKS
+            )));
+        }
+
+        // Split into chunks and add headers to each slice.
+        // Map with index to determine sequence number.
+        let chunks = bytes
+            .chunks(chunk_size)
+            .enumerate()
+            .map(|(i, chunk)| {
+                let framed = Bytes::copy_from_slice(chunk);
+                let sequence_number = i as u8;
+                let sequence_count = chunk_count as u8;
+
+                let mut headers = BytesMut::with_capacity(GELF_CHUNK_HEADERS_LENGTH);
+                headers.put_slice(&GELF_MAGIC_BYTES);
+                headers.put_u64(message_id);
+                headers.put_u8(sequence_number);
+                headers.put_u8(sequence_count);
+
+                [headers.freeze(), framed].concat().into()
+            })
+            .collect();
+        Ok(chunks)
     }
 }
 
