@@ -32,7 +32,7 @@ impl Chunking for GelfChunker {
 
         let chunk_size = self.max_chunk_size - GELF_CHUNK_HEADERS_LENGTH;
         let message_id: u64 = rand::random();
-        let chunk_count = (bytes.len() + chunk_size - 1) / chunk_size;
+        let chunk_count = bytes.len().div_ceil(chunk_size);
 
         trace!(
             message_id = message_id,
