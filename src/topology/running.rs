@@ -28,7 +28,10 @@ use super::{
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        SharedTopologyMetadata,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -56,6 +59,7 @@ pub struct RunningTopology {
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
+    topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl RunningTopology {
@@ -77,6 +81,7 @@ impl RunningTopology {
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
             pending_reload: None,
+            topology_metadata: None,
         }
     }
 
@@ -789,6 +794,15 @@ impl RunningTopology {
         // sources/transforms, to ensure we're connecting components in order.
         self.reattach_severed_inputs(diff);
 
+        // Update topology metadata if present (for internal_metrics source)
+        if let Some(ref metadata) = new_pieces.topology_metadata {
+            self.topology_metadata = Some(Arc::clone(metadata));
+            self.update_topology_metadata();
+        } else if let Some(ref _metadata) = self.topology_metadata {
+            // If we already have topology metadata, update it with current configuration
+            self.update_topology_metadata();
+        }
+
         // Broadcast any topology changes to subscribers.
         if !self.watch.0.is_closed() {
             let outputs = self
@@ -1203,6 +1217,56 @@ impl RunningTopology {
             .insert(key.clone(), spawn_named(source_task, task_name.as_ref()));
     }
 
+    /// Update the topology metadata with current configuration
+    fn update_topology_metadata(&mut self) {
+        if let Some(ref metadata_ref) = self.topology_metadata {
+            let mut metadata = metadata_ref.write().unwrap();
+            metadata.clear();
+
+            // Collect inputs for each component
+            for (key, inputs) in &self.inputs_tap_metadata {
+                for input in inputs {
+                    metadata
+                        .inputs
+                        .entry(key.clone())
+                        .or_default()
+                        .push(input.clone());
+                }
+            }
+
+            // Collect component types
+            for (key, transform) in self.config.transforms() {
+                metadata.component_types.insert(
+                    key.clone(),
+                    (
+                        transform.inner.get_component_name().to_string(),
+                        "transform".to_string(),
+                    ),
+                );
+            }
+
+            for (key, sink) in self.config.sinks() {
+                metadata.component_types.insert(
+                    key.clone(),
+                    (
+                        sink.inner.get_component_name().to_string(),
+                        "sink".to_string(),
+                    ),
+                );
+            }
+
+            for (key, source) in self.config.sources() {
+                metadata.component_types.insert(
+                    key.clone(),
+                    (
+                        source.inner.get_component_name().to_string(),
+                        "source".to_string(),
+                    ),
+                );
+            }
+        }
+    }
+
     pub async fn start_init_validated(
         config: Config,
         extra_context: ExtraContext,
@@ -1276,6 +1340,11 @@ impl RunningTopology {
         {
             return None;
         }
+        // Transfer topology metadata if present
+        if let Some(ref metadata) = pieces.topology_metadata {
+            running_topology.topology_metadata = Some(Arc::clone(metadata));
+        }
+
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
 
