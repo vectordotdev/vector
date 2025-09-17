@@ -103,7 +103,6 @@ jobs:
       - changes
       - test-cli
       - test-misc
-      - test-environment
       - check-msrv
       - cross-linux
       - unit-mac
