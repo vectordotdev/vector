@@ -19,14 +19,14 @@ releases: "0.49.0": {
 
 			```yaml
 			retry_strategy:
-			type: custom
-			status_codes: []
+			  type: custom
+			  status_codes: []
 			```
 
 			or alternatively to retry every request:
 			```yaml
 			retry_strategy:
-			type: all
+			  type: all
 			```
 			""",
 	]
