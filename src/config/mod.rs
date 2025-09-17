@@ -9,23 +9,22 @@ use std::{
     time::Duration,
 };
 
+use indexmap::IndexMap;
+use serde::Serialize;
+use vector_config::configurable_component;
+pub use vector_lib::{
+    config::{
+        AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
+        SourceAcknowledgementsConfig, SourceOutput, TransformOutput, WildcardMatching,
+    },
+    configurable::component::{GenerateConfig, SinkDescription, TransformDescription},
+};
+
 use crate::{
     conditions,
     event::{Metric, Value},
     secrets::SecretBackends,
     serde::OneOrMany,
-};
-
-use indexmap::IndexMap;
-use serde::Serialize;
-
-use vector_config::configurable_component;
-pub use vector_lib::config::{
-    AcknowledgementsConfig, DataType, GlobalOptions, Input, LogNamespace,
-    SourceAcknowledgementsConfig, SourceOutput, TransformOutput, WildcardMatching,
-};
-pub use vector_lib::configurable::component::{
-    GenerateConfig, SinkDescription, TransformDescription,
 };
 
 pub mod api;
@@ -436,7 +435,11 @@ impl TestDefinition<String> {
             .filter_map(|(extract_from, conditions)| {
                 let mut outputs = Vec::new();
                 for from in extract_from {
-                    if let Some(output_id) = output_map.get(&from) {
+                    if no_outputs_from.contains(&from) {
+                        errors.push(format!(
+                            r#"Invalid extract_from target in test '{name}': '{from}' listed in no_outputs_from"#
+                        ));
+                    } else if let Some(output_id) = output_map.get(&from) {
                         outputs.push(output_id.clone());
                     } else {
                         errors.push(format!(
@@ -581,10 +584,10 @@ pub struct TestOutput<T: 'static = OutputId> {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
-    use crate::{config, topology};
     use indoc::indoc;
 
     use super::{ComponentKey, ConfigDiff, Format, builder::ConfigBuilder, format, load_from_str};
+    use crate::{config, topology};
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
@@ -1363,10 +1366,10 @@ mod resource_config_tests {
     #[allow(clippy::print_stdout)]
     #[allow(clippy::print_stderr)]
     fn generate_component_config_schema() {
-        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
         use indexmap::IndexMap;
-        use vector_lib::config::ComponentKey;
-        use vector_lib::configurable::configurable_component;
+        use vector_lib::{config::ComponentKey, configurable::configurable_component};
+
+        use crate::config::{SinkOuter, SourceOuter, TransformOuter};
 
         /// Top-level Vector configuration.
         #[configurable_component]

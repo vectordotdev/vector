@@ -164,10 +164,8 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed services       | Blob               |
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
-
-			Either `storage_account`, or this field, must be specified.
 			"""
-		required: false
+		required: true
 		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
 	}
 	container_name: {
@@ -537,21 +535,6 @@ generated: components: sinks: azure_blob: configuration: {
 			}
 		}
 	}
-	endpoint: {
-		description: """
-			The Azure Blob Storage Endpoint URL.
-
-			This is used to override the default blob storage endpoint URL in cases where you are using
-			credentials read from the environment/managed identities or access tokens without using an
-			explicit connection_string (which already explicitly supports overriding the blob endpoint
-			URL).
-
-			This may only be used with `storage_account` and is ignored when used with
-			`connection_string`.
-			"""
-		required: false
-		type: string: examples: ["https://test.blob.core.usgovcloudapi.net/", "https://test.blob.core.windows.net/"]
-	}
 	framing: {
 		description: "Framing configuration."
 		required:    false
@@ -805,24 +788,5 @@ generated: components: sinks: azure_blob: configuration: {
 				}
 			}
 		}
-	}
-	storage_account: {
-		description: """
-			The Azure Blob Storage Account name.
-
-			Attempts to load credentials for the account in the following ways, in order:
-
-			- read from environment variables ([more information][env_cred_docs])
-			- looks for a [Managed Identity][managed_ident_docs]
-			- uses the `az` CLI tool to get an access token ([more information][az_cli_docs])
-
-			Either `connection_string`, or this field, must be specified.
-
-			[env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
-			[managed_ident_docs]: https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview
-			[az_cli_docs]: https://docs.microsoft.com/en-us/cli/azure/account?view=azure-cli-latest#az-account-get-access-token
-			"""
-		required: false
-		type: string: examples: ["mylogstorage"]
 	}
 }

@@ -2,12 +2,12 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, schema::meaning,
 };
 use vrl::value::Kind;
 
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -19,8 +19,6 @@ use crate::{
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-
-use super::{service::LogApiRetry, sink::LogSinkBuilder};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
 // threshold the API will toss results. We previously serialized Events as they
@@ -215,13 +213,13 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::codecs::EncodingConfigWithFraming;
-    use crate::components::validation::prelude::*;
     use vector_lib::{
         codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
+
+    use super::*;
+    use crate::{codecs::EncodingConfigWithFraming, components::validation::prelude::*};
 
     #[test]
     fn generate_config() {

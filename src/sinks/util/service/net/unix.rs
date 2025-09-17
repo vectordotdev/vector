@@ -2,12 +2,10 @@ use std::path::{Path, PathBuf};
 
 use snafu::ResultExt;
 use tokio::net::{UnixDatagram, UnixStream};
-
 use vector_lib::configurable::configurable_component;
 
-use crate::{net, sinks::util::unix::UnixEither};
-
 use super::{ConnectorType, NetError, NetworkConnector, net_error::*};
+use crate::{net, sinks::util::unix::UnixEither};
 
 /// Unix socket modes.
 #[configurable_component]

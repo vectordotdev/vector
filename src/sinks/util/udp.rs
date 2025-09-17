@@ -9,9 +9,9 @@ use futures::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     codecs::encoding::Chunker,
+    configurable::configurable_component,
     internal_event::{BytesSent, Protocol, Registered},
 };
 

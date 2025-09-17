@@ -1,6 +1,4 @@
-use crate::encoding::GelfChunker;
-use crate::gelf::GELF_TARGET_PATHS;
-use crate::{VALID_FIELD_REGEX, gelf_fields::*};
+use crate::{VALID_FIELD_REGEX, encoding::GelfChunker, gelf::GELF_TARGET_PATHS, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
@@ -276,13 +274,15 @@ fn to_gelf_event(log: LogEvent) -> vector_common::Result<LogEvent> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encoding::SerializerConfig;
-
-    use super::*;
     use chrono::NaiveDateTime;
     use vector_core::event::{Event, EventMetadata};
-    use vrl::btreemap;
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        btreemap,
+        value::{ObjectMap, Value},
+    };
+
+    use super::*;
+    use crate::encoding::SerializerConfig;
 
     fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
         let config = GelfSerializerConfig::new(GelfSerializerOptions::default());

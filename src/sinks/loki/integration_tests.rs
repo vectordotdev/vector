@@ -1,14 +1,13 @@
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
-use vector_lib::encode_logfmt;
-use vector_lib::lookup::{PathPrefix, owned_value_path};
 use vector_lib::{
     config::{LogNamespace, Tags, Telemetry, init_telemetry},
+    encode_logfmt,
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    lookup::{PathPrefix, owned_value_path},
 };
 use vrl::value::{Kind, kind::Collection};
 

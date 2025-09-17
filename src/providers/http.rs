@@ -7,14 +7,13 @@ use tokio::time;
 use url::Url;
 use vector_lib::configurable::configurable_component;
 
+use super::BuildResult;
 use crate::{
     config::{self, Format, ProxyConfig, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
 };
-
-use super::BuildResult;
 
 /// Request settings.
 #[configurable_component]

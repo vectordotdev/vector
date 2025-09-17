@@ -4,7 +4,12 @@ use std::{
 };
 
 use futures::{FutureExt, TryFutureExt};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    configurable::configurable_component,
+    lookup::{event_path, lookup_v2::ConfigValuePath},
+    schema::Requirement,
+};
+use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
@@ -31,10 +36,6 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use vector_lib::lookup::event_path;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vector_lib::schema::Requirement;
-use vrl::value::Kind;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";

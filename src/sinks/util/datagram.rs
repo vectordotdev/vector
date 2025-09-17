@@ -7,10 +7,13 @@ use tokio::net::UdpSocket;
 #[cfg(unix)]
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Encoder;
-use vector_lib::codecs::encoding::{Chunker, Chunking};
-use vector_lib::internal_event::RegisterInternalEvent;
-use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
+use vector_lib::{
+    codecs::encoding::{Chunker, Chunking},
+    internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent},
+};
 
+#[cfg(unix)]
+use crate::internal_events::{UnixSendIncompleteError, UnixSocketSendError};
 use crate::{
     codecs::Transformer,
     event::{Event, EventStatus, Finalizable},
@@ -18,9 +21,6 @@ use crate::{
         SocketEventsSent, SocketMode, SocketSendError, UdpChunkingError, UdpSendIncompleteError,
     },
 };
-
-#[cfg(unix)]
-use crate::internal_events::{UnixSendIncompleteError, UnixSocketSendError};
 
 pub enum DatagramSocket {
     Udp(UdpSocket),

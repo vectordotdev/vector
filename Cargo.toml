@@ -135,15 +135,15 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = { version = "1.0.98", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
 async-stream = { version = "0.3.6", default-features = false }
-async-trait = { version = "0.1.88", default-features = false }
+async-trait = { version = "0.1.89", default-features = false }
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 base64 = { version = "0.22.1", default-features = false }
-cfg-if = { version = "1.0.1", default-features = false }
+cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.42", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.47", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "3.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -152,13 +152,14 @@ derivative = { version = "2.2.0", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 futures-util = { version = "0.3.29", default-features = false }
-glob = { version = "0.3.2", default-features = false }
+glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.2.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -174,22 +175,22 @@ prost-reflect = { version = "0.14", features = ["serde"], default-features = fal
 prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11.26", features = ["json"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.142", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
-snafu = { version = "0.8.6", default-features = false, features = ["futures", "std"] }
+snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.21.0"
 tokio = { version = "1.45.1", default-features = false }
-toml = { version = "0.9.4", default-features = false, features = ["serde", "display", "parse"] }
+toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
-uuid = { version = "1.18.0", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.18.1", features = ["v4", "v7", "serde"] }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
@@ -276,10 +277,16 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.17", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"], optional = true }
+
+# Azure Storage
+azure_storage = { version = "0.21", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
+
+# Needed to bridge with outdated version of azure_core used in azure_storage*
+azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["reqwest", "hmac_openssl"] }
+
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -450,14 +457,14 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.17", default-features = false }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
+azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
-libc = "0.2.174"
+libc.workspace = true
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
@@ -514,10 +521,6 @@ target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "r
 target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-# Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-# Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
