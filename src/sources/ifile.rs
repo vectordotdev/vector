@@ -999,7 +999,7 @@ mod tests {
 
         tokio::select! {
             _ = shutdown => {
-                panic!("Timed out, reads = {}", counter);
+                panic!("Timed out, reads = {counter}/{count}");
             }
             _ = async {
                 while let Some(ev) = rx.recv().await {
@@ -1400,21 +1400,16 @@ mod tests {
 
         let path = dir.path().join("file");
 
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
                 let mut file = File::create(&path).await.unwrap();
-
-                // Wait for the file to be observed at its original length before writing to it
-                retry_until(
-                    || {
-                        // Check if the file exists and is being watched
-                        path.exists()
-                    },
-                    10,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("File should be discovered");
+                assert!(path.exists());
 
                 file.write_line("line for checkpointing").await.unwrap();
                 for _i in 0..n {
@@ -1424,10 +1419,10 @@ mod tests {
                 // Flush the file to ensure the writes are visible
                 file.flush().await.unwrap();
 
-                // Wait for the file source to process the written content
-                sleep_millis(10000).await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, n, 5000).await;
+            },
+        )
+        .await;
 
         assert_eq!(received.len(), n + 1);
     }
@@ -1442,8 +1437,15 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
                 let mut file = File::create(&path).await.unwrap();
 
                 // Wait for the file to be observed at its original length before writing to it
@@ -1454,8 +1456,7 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                // Wait for the writes to be observed before truncating
-                sleep_millis(1000).await;
+                wait_for_n_reads(&mut rx, n, 1000).await;
 
                 file.set_len(0).await.unwrap();
                 file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
@@ -1468,9 +1469,10 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                sleep_millis(1000).await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, n, 1000).await;
+            },
+        )
+        .await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -1628,24 +1630,24 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
                 let mut file1 = File::create(&path1).await.unwrap();
                 let mut file2 = File::create(&path2).await.unwrap();
                 let mut file3 = File::create(&path3).await.unwrap();
                 let mut file4 = File::create(&path4).await.unwrap();
 
-                // Wait for the files to be observed at their original lengths before writing to them
-                retry_until(
-                    || {
-                        // Check if all files exist and are being watched
-                        path1.exists() && path2.exists() && path3.exists() && path4.exists()
-                    },
-                    10,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("Files should be discovered");
+                assert!(path1.exists());
+                assert!(path2.exists());
+                assert!(path3.exists());
+                assert!(path4.exists());
 
                 for i in 0..n {
                     file1.write_line(format!("1 {i}")).await.unwrap();
@@ -1660,10 +1662,10 @@ mod tests {
                 file3.flush().await.unwrap();
                 file4.flush().await.unwrap();
 
-                // Wait for the file source to process the written content
-                sleep_millis(1000).await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, n * 4, 5000).await;
+            },
+        )
+        .await;
 
         let mut is = [0; 3];
 
