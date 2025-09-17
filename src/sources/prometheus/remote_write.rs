@@ -30,10 +30,10 @@ use crate::{
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MetadataConflictsStrategy {
-    /// Silently ignore metadata conflicts, keeping the first metadata entry. This is the default behavior and aligns with Prometheus/Thanos.
-    #[default]
+    /// Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior.
     Ignore,
-    /// Reject requests with conflicting metadata by returning an HTTP 400 error.
+    /// Reject requests with conflicting metadata by returning an HTTP 400 error. This is the default to preserve backwards compatibility.
+    #[default]
     Reject,
 }
 
@@ -568,7 +568,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: Default::default(),
+            metadata_conflicts: MetadataConflictsStrategy::Ignore,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
