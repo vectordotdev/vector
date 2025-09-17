@@ -345,8 +345,22 @@ fn should_retry_error(
 #[configurable(metadata(docs::enum_tag_description = "The retry strategy enum."))]
 pub enum RetryStrategy {
     /// Don't retry any errors
-    #[default]
     None,
+
+    /// Default strategy. The following error types will be retried:
+    /// - `TimeoutError`
+    /// - `DispatchFailure`
+    /// - `ResponseError` or `ServiceError` when:
+    ///   - HTTP status is 5xx
+    ///   - Status is 429 (Too Many Requests)
+    ///   - `x-amz-retry-after` header is present
+    ///   - Response body contains one of:
+    ///     - `"RequestTimeout"`
+    ///     - `"RequestExpired"`
+    ///     - `"ThrottlingException"`
+    /// - Fallback: Any unknown error variant
+    #[default]
+    Default,
 
     /// Retry on *all* errors
     All,
@@ -366,6 +380,7 @@ impl RetryLogic for RetryStrategy {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match self {
             RetryStrategy::None => false,
+            RetryStrategy::Default => is_retriable_error(error),
             RetryStrategy::All => true,
             RetryStrategy::Custom { status_codes } => {
                 is_retriable_error(error) || should_retry_error(Some(status_codes.clone()), error)
