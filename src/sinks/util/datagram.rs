@@ -1,7 +1,6 @@
 use bytes::BytesMut;
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::stream::Peekable;
-use metrics::counter;
 #[cfg(unix)]
 use std::path::PathBuf;
 use tokio::net::UdpSocket;
@@ -15,10 +14,9 @@ use vector_lib::internal_event::{ByteSize, BytesSent, InternalEventHandle};
 use crate::{
     codecs::Transformer,
     event::{Event, EventStatus, Finalizable},
-    internal_events::{SocketEventsSent, SocketMode, SocketSendError, UdpSendIncompleteError},
-};
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    internal_events::{
+        SocketEventsSent, SocketMode, SocketSendError, UdpChunkingError, UdpSendIncompleteError,
+    },
 };
 
 #[cfg(unix)]
@@ -63,7 +61,7 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                     chunks_delivered
                 }
                 Err(err) => {
-                    emit!(DatagramChunkingError {
+                    emit!(UdpChunkingError {
                         data_size,
                         error: err
                     });
@@ -140,32 +138,4 @@ async fn send_datagram(socket: &mut DatagramSocket, buf: &[u8]) -> tokio::io::Re
         }
     }
     Ok(())
-}
-
-#[derive(Debug)]
-pub struct DatagramChunkingError {
-    pub error: vector_common::Error,
-    pub data_size: usize,
-}
-
-impl InternalEvent for DatagramChunkingError {
-    fn emit(self) {
-        let reason = "Could not chunk datagram.";
-        error!(
-            message = reason,
-            data_size = self.data_size,
-            error = self.error,
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            "component_errors_total",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
-    }
 }
