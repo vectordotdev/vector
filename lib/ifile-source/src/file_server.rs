@@ -631,14 +631,13 @@ where
         )
         .await
         {
-            Ok(mut watcher) => {
+            Ok((mut watcher, startup_lines)) => {
                 if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);
                 } else {
                     self.emitter.emit_file_added(&path);
                 }
                 // Process any lines read at startup
-                let startup_lines = watcher.take_startup_lines();
                 if !startup_lines.is_empty() {
                     // Process all startup lines, including empty ones
                     let line_count = startup_lines.len();
@@ -651,6 +650,13 @@ where
 
                         // Add the lines to the output
                         for line in startup_lines {
+                            #[cfg(any(test, feature = "test"))]
+                            if let Some(sender) = self.test_sender.as_ref() {
+                                sender
+                                    .send(TestEvent::Read(path.clone(), line.bytes.chunk().into()))
+                                    .unwrap();
+                            }
+
                             let bytes_len = line.bytes.len() as u64;
                             lines.push(Line {
                                 text: line.bytes,

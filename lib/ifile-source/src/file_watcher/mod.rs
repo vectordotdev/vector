@@ -71,12 +71,10 @@ pub struct FileWatcher {
     buf: BytesMut,
     /// Notify-based watcher for all files
     notify_watcher: NotifyWatcher,
-    /// Buffer of lines read at startup
-    startup_lines: Vec<RawLine>,
 }
 
 impl FileWatcher {
-    /// Create a new `FileWatcher`
+    /// Create a new `FileWatcher` and return all lines read during startup
     ///
     /// The input path will be used by `FileWatcher` to prime its state
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
@@ -87,7 +85,7 @@ impl FileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
-    ) -> Result<FileWatcher, io::Error> {
+    ) -> Result<(FileWatcher, Vec<RawLine>), io::Error> {
         let f = fs::File::open(&path).await?;
         let file_info = f.file_info().await?;
         let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
@@ -201,8 +199,8 @@ impl FileWatcher {
             line_delimiter,
             buf: BytesMut::new(),
             notify_watcher,
-            startup_lines: Vec::new(),
         };
+        let mut startup_lines = Vec::new();
 
         // Read all available lines at startup to get any content that was added while Vector was stopped
         // This is especially important for files with checkpoints
@@ -219,13 +217,13 @@ impl FileWatcher {
                 Ok(Some(line)) => {
                     // Successfully read a line, store it and continue reading
                     // Skip empty lines at the end of the file to avoid processing them on every startup
-                    if !line.bytes.is_empty() || !fw.startup_lines.is_empty() {
+                    if !line.bytes.is_empty() || !startup_lines.is_empty() {
                         trace!(
                             message = "Read a line from file at startup",
                             ?path,
                             new_position = fw.file_position
                         );
-                        fw.startup_lines.push(line);
+                        startup_lines.push(line);
                     } else {
                         trace!(message = "Skipping empty line at beginning of file", ?path);
                     }
@@ -236,7 +234,7 @@ impl FileWatcher {
                         message = "Reached EOF while reading initial content",
                         ?path,
                         final_position = fw.file_position,
-                        lines_read = fw.startup_lines.len()
+                        lines_read = startup_lines.len()
                     );
                     break;
                 }
@@ -248,7 +246,7 @@ impl FileWatcher {
             }
         }
 
-        Ok(fw)
+        Ok((fw, startup_lines))
     }
 
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
@@ -431,13 +429,6 @@ impl FileWatcher {
         }
 
         Ok(())
-    }
-
-    /// Get and clear the startup lines
-    ///
-    /// This returns all lines read at startup and clears the buffer.
-    pub fn take_startup_lines(&mut self) -> Vec<RawLine> {
-        std::mem::take(&mut self.startup_lines)
     }
 
     #[inline]
