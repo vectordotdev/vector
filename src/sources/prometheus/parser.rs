@@ -20,7 +20,7 @@ fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc
 #[cfg(any(test, feature = "sources-prometheus-scrape"))]
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
-        .map(|group| reparse_groups(group, vec![], false))
+        .map(|group| reparse_groups(group, vec![], false, false))
 }
 
 #[cfg(any(test, feature = "sources-prometheus-pushgateway"))]
@@ -30,19 +30,29 @@ pub(super) fn parse_text_with_overrides(
     aggregate_metrics: bool,
 ) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_text(packet)
-        .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics))
+        .map(|group| reparse_groups(group, tag_overrides, aggregate_metrics, false))
+}
+
+#[cfg(test)]
+fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError> {
+    vector_lib::prometheus::parser::parse_text(packet)
+        .map(|group| reparse_groups(group, vec![], false, true))
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]
-pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
+pub(super) fn parse_request(
+    request: proto::WriteRequest,
+    skip_nan_values: bool,
+) -> Result<Vec<Event>, ParserError> {
     vector_lib::prometheus::parser::parse_request(request)
-        .map(|group| reparse_groups(group, vec![], false))
+        .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
 fn reparse_groups(
     groups: Vec<MetricGroup>,
     tag_overrides: impl IntoIterator<Item = (String, String)> + Clone,
     aggregate_metrics: bool,
+    skip_nan_values: bool,
 ) -> Vec<Event> {
     let mut result = Vec::new();
     let start = Utc::now();
@@ -57,6 +67,10 @@ fn reparse_groups(
         match group.metrics {
             GroupKind::Counter(metrics) => {
                 for (key, metric) in metrics {
+                    if skip_nan_values && metric.value.is_nan() {
+                        continue;
+                    }
+
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let counter = Metric::new(
@@ -74,6 +88,10 @@ fn reparse_groups(
             }
             GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
                 for (key, metric) in metrics {
+                    if skip_nan_values && metric.value.is_nan() {
+                        continue;
+                    }
+
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let gauge = Metric::new(
@@ -92,6 +110,12 @@ fn reparse_groups(
             }
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
+                    if skip_nan_values
+                        && (metric.sum.is_nan() || metric.buckets.iter().any(|b| b.bucket.is_nan()))
+                    {
+                        continue;
+                    }
+
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     let mut buckets = metric.buckets;
@@ -132,6 +156,16 @@ fn reparse_groups(
             }
             GroupKind::Summary(metrics) => {
                 for (key, metric) in metrics {
+                    if skip_nan_values
+                        && (metric.sum.is_nan()
+                            || metric
+                                .quantiles
+                                .iter()
+                                .any(|q| q.quantile.is_nan() || q.value.is_nan()))
+                    {
+                        continue;
+                    }
+
                     let tags = combine_tags(key.labels, tag_overrides.clone());
 
                     result.push(
@@ -1352,5 +1386,124 @@ mod test {
                 .with_timestamp(Some(*TIMESTAMP)),
             ]),
         );
+    }
+
+    #[test]
+    fn test_skip_nan_counter_enabled() {
+        let exp = r#"
+            # TYPE name counter
+            name{labelname="val1"} NaN 1612411506789
+            name{labelname="val2"} 123.0 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name(), "name");
+        match result[0].value() {
+            MetricValue::Counter { value } => {
+                assert_eq!(*value, 123.0);
+            }
+            _ => unreachable!(),
+        }
+        assert_eq!(result[0].tags().unwrap().get("labelname").unwrap(), "val2");
+    }
+
+    #[test]
+    fn test_skip_nan_counter_disabled() {
+        let exp = r#"
+            # TYPE name counter
+            name{labelname="val1"} NaN 1612411506789
+            name{labelname="val2"} 123.0 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text(exp)).unwrap();
+        assert_eq!(result.len(), 2);
+
+        // Find the NaN metric
+        let nan_metric = result
+            .iter()
+            .find(|m| m.tags().as_ref().and_then(|tags| tags.get("labelname")) == Some("val1"))
+            .unwrap();
+
+        match nan_metric.value() {
+            MetricValue::Counter { value } => {
+                assert!(value.is_nan());
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_skip_nan_gauge_enabled() {
+        let exp = r#"
+            # TYPE name gauge
+            name{labelname="val1"} NaN 1612411506789
+            name{labelname="val2"} 123.0 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name(), "name");
+        match result[0].value() {
+            MetricValue::Gauge { value } => {
+                assert_eq!(*value, 123.0);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_skip_nan_histogram_bucket_enabled() {
+        let exp = r#"
+            # TYPE duration histogram
+            duration_bucket{le="1"} 133988 1612411506789
+            duration_bucket{le="NaN"} 144320 1612411506789
+            duration_sum 53423 1612411506789
+            duration_count 144320 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 0); // Should skip entire histogram due to NaN bucket le value
+    }
+
+    #[test]
+    fn test_skip_nan_histogram_sum_enabled() {
+        let exp = r#"
+            # TYPE duration histogram
+            duration_bucket{le="1"} 133988 1612411506789
+            duration_bucket{le="+Inf"} 144320 1612411506789
+            duration_sum NaN 1612411506789
+            duration_count 144320 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 0); // Should skip entire histogram due to NaN sum
+    }
+
+    #[test]
+    fn test_skip_nan_summary_enabled() {
+        let exp = r#"
+            # TYPE duration summary
+            duration{quantile="0.5"} NaN 1612411506789
+            duration{quantile="0.99"} 76656 1612411506789
+            duration_sum 1.7560473e+07 1612411506789
+            duration_count 2693 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 0); // Should skip entire summary due to NaN quantile value
+    }
+
+    #[test]
+    fn test_skip_nan_all_valid_values() {
+        let exp = r#"
+            # TYPE counter_metric counter
+            counter_metric 123.0 1612411506789
+            # TYPE gauge_metric gauge
+            gauge_metric 456.0 1612411506789
+            "#;
+
+        let result = events_to_metrics(parse_text_with_nan_filtering(exp)).unwrap();
+        assert_eq!(result.len(), 2); // Both should be preserved
     }
 }
