@@ -314,15 +314,10 @@ impl FileWatcher {
         // Check for events from the notify watcher, but don't update the watcher here
         // This avoids an infinite loop where reading the file triggers events
         // Use the tokio runtime to run the async check_events method
-        let events = match self.notify_watcher.check_events().await {
-            events if !events.is_empty() => {
-                trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
-                events
-            }
-            _ => Vec::new(),
-        };
+        let events = self.notify_watcher.check_events().await;
 
         if !events.is_empty() {
+            trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
             for (path, kind) in events {
                 if path == self.path {
                     debug!(message = "Detected relevant file event", ?path, ?kind);
