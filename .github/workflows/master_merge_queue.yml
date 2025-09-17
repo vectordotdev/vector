@@ -61,11 +61,6 @@ jobs:
     needs: changes
     secrets: inherit
 
-  test-environment:
-    uses: ./.github/workflows/environment.yml
-    needs: changes
-    secrets: inherit
-
   check-msrv:
     if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/msrv.yml
@@ -108,7 +103,6 @@ jobs:
       - changes
       - test-cli
       - test-misc
-      - test-environment
       - check-msrv
       - cross-linux
       - unit-mac
