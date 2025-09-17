@@ -34,7 +34,7 @@ use file_source_common::{
 #[cfg(any(test, feature = "test"))]
 #[derive(Debug, Clone)]
 pub enum TestEvent {
-    Checkpointed(PathBuf, Box<[u8]>),
+    Checkpointed(PathBuf),
     Read(PathBuf, Box<[u8]>),
 }
 
@@ -193,10 +193,11 @@ where
 
             #[cfg(any(test, feature = "test"))]
             if let Some(sender) = self.test_sender.as_ref() {
+                sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
                 for line in &lines {
                     sender
                         .send(TestEvent::Read(path.clone(), line.text.chunk().into()))
-                        .unwrap()
+                        .unwrap();
                 }
             }
         }
@@ -338,13 +339,14 @@ where
 
                             #[cfg(any(test, feature = "test"))]
                             if let Some(sender) = self.test_sender.as_ref() {
+                                sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
                                 for line in &lines {
                                     sender
                                         .send(TestEvent::Read(
                                             path.clone(),
                                             line.text.chunk().into(),
                                         ))
-                                        .unwrap()
+                                        .unwrap();
                                 }
                             }
 
