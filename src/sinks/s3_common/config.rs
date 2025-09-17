@@ -354,7 +354,7 @@ pub enum RetryStrategy {
     ///   - HTTP status is 5xx
     ///   - Status is 429 (Too Many Requests)
     ///   - `x-amz-retry-after` header is present
-    ///   - Response body contains one of:
+    ///   - HTTP status is 4xx and response body contains one of:
     ///     - `"RequestTimeout"`
     ///     - `"RequestExpired"`
     ///     - `"ThrottlingException"`
