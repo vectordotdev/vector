@@ -14,6 +14,21 @@ releases: "0.49.0": {
 
 			Metrics are not supported. Any future updates will be noted in changelogs.
 			""",
+		"""
+			In this version, the `aws_s3` default `retry_strategy` is to never retry. A workaround to restore the correct default behavior is to set:
+
+			```yaml
+			retry_strategy:
+			  type: custom
+			  status_codes: []
+			```
+
+			or alternatively to retry every request:
+			```yaml
+			retry_strategy:
+			  type: all
+			```
+			""",
 	]
 
 	description: """
