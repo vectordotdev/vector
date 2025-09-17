@@ -191,6 +191,7 @@ where
             )
             .await;
 
+            #[cfg(any(test, feature = "test"))]
             if let Some(sender) = self.test_sender.as_ref() {
                 for line in &lines {
                     sender
@@ -335,6 +336,7 @@ where
                             )
                             .await;
 
+                            #[cfg(any(test, feature = "test"))]
                             if let Some(sender) = self.test_sender.as_ref() {
                                 for line in &lines {
                                     sender
