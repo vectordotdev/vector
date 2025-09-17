@@ -317,7 +317,7 @@ async fn kinesis_no_retry_failed_records_when_disabled() {
     let timestamp = chrono::Utc::now().timestamp_millis();
 
     // Create a smaller dataset for this test
-    let (input_lines, events) = random_lines_with_stream(50, 11, None);
+    let (_input_lines, events) = random_lines_with_stream(50, 11, None);
 
     // Send events through the sink
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
