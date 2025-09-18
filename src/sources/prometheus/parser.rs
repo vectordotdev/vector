@@ -42,9 +42,10 @@ fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(
     request: proto::WriteRequest,
+    reject_on_conflict: bool,
     skip_nan_values: bool,
 ) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request)
+    vector_lib::prometheus::parser::parse_request(request, reject_on_conflict)
         .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
