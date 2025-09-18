@@ -148,7 +148,7 @@ pub struct S3SinkConfig {
     #[serde(default = "crate::serde::default_true")]
     pub force_path_style: bool,
 
-    /// Specifies errors to retry
+    /// Specifies retry strategy for failed requests.
     ///
     /// By default, the sink only retries attempts it deems possible to retry.
     /// These settings extend the default behavior.
