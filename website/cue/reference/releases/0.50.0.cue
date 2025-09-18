@@ -254,9 +254,6 @@ releases: "0.50.0": {
 		- Fixed the `http_request` function's ability to run from the VRL CLI, no longer panics.
 		
 		authors: sbalmos (https://github.com/vectordotdev/vrl/pull/1510)
-		
-		
-		### [0.26.0 (2025-08-07)]
 		"""
 
 	commits: [
@@ -279,7 +276,7 @@ releases: "0.50.0": {
 		{sha: "efe2b0c86d0b9f285da35f80a5c19f590c8fcc18", date: "2025-08-18 20:05:50 UTC", description: "Rework gauge metric handling", pr_number: 23561, scopes: ["buffers"], type: "chore", breaking_change: false, author: "Bruce Guenter", files_count: 4, insertions_count: 218, deletions_count: 330},
 		{sha: "c5fa0500941cb6d011fb899a10cd3d8a5ce0de5b", date: "2025-08-18 22:07:29 UTC", description: "refactor file source into common module", pr_number: 23607, scopes: ["file source"], type: "chore", breaking_change: false, author: "Thomas", files_count: 26, insertions_count: 195, deletions_count: 123},
 		{sha: "4e90e05869c8723585cd186770387998103ffd07", date: "2025-08-19 00:11:50 UTC", description: "update Typesense connection string [WEB-6971]", pr_number: 23611, scopes: ["website"], type: "chore", breaking_change: false, author: "Nick Sollecito", files_count: 1, insertions_count: 17, deletions_count: 2},
-		{sha: "bf948f7434ada293f0a8dcc2b43aaaf763504b4f", date: "2025-08-19 00:41:09 UTC", description: "fix protobuf codecs supported data types", pr_number: 23610, scopes: ["codecs"], type: "revert", breaking_change: false, author: "Pavlos Rontidis", files_count: 4, insertions_count: 12, deletions_count: 3},
+		{sha: "bf948f7434ada293f0a8dcc2b43aaaf763504b4f", date: "2025-08-19 00:41:09 UTC", description: "fix protobuf codecs supported data types", pr_number: 23610, scopes: ["codecs"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 4, insertions_count: 12, deletions_count: 3},
 		{sha: "3f7f6ebceed18d34f81afd79761b3e8a654b7b00", date: "2025-08-19 17:01:30 UTC", description: "add varint length delimited framing for protobuf", pr_number: 23352, scopes: ["codecs"], type: "feat", breaking_change: false, author: "MoSecureSyntax", files_count: 41, insertions_count: 942, deletions_count: 5},
 		{sha: "fffcea5b3868c5c0e1e499fba0bba6915b6199c3", date: "2025-08-19 22:31:32 UTC", description: "upgrade to Rust 2024 edition", pr_number: 23522, scopes: ["dev"], type: "chore", breaking_change: false, author: "Pavlos Rontidis", files_count: 583, insertions_count: 3229, deletions_count: 2820},
 		{sha: "e0e8463be767a212c1e4116c3f7edfe94c6aa0f2", date: "2025-08-20 18:38:16 UTC", description: "update libs to 2024 edition", pr_number: 23620, scopes: ["dev"], type: "chore", breaking_change: false, author: "Thomas", files_count: 240, insertions_count: 882, deletions_count: 756},
