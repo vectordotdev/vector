@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use chrono::Utc;
 use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
@@ -14,7 +15,8 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    config::{SourceConfig, SourceContext, SourceOutput, log_schema},
+    config::{SharedTopologyMetadata, SourceConfig, SourceContext, SourceOutput, log_schema},
+    event::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, StreamClosedError},
     metrics::Controller,
     shutdown::ShutdownSignal,
@@ -122,6 +124,7 @@ impl SourceConfig for InternalMetricsConfig {
                 interval,
                 out: cx.out,
                 shutdown: cx.shutdown,
+                topology_metadata: cx.topology_metadata.clone(),
             }
             .run(),
         ))
@@ -144,6 +147,7 @@ struct InternalMetrics<'a> {
     interval: time::Duration,
     out: SourceSender,
     shutdown: ShutdownSignal,
+    topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl InternalMetrics<'_> {
@@ -164,25 +168,35 @@ impl InternalMetrics<'_> {
             bytes_received.emit(ByteSize(byte_size));
             events_received.emit(CountByteSize(count, json_size));
 
-            let batch = metrics.into_iter().map(|mut metric| {
-                // A metric starts out with a default "vector" namespace, but will be overridden
-                // if an explicit namespace is provided to this source.
-                if self.namespace != "vector" {
-                    metric = metric.with_namespace(Some(self.namespace.clone()));
-                }
+            let mut batch: Vec<Metric> = metrics
+                .into_iter()
+                .map(|mut metric| {
+                    // A metric starts out with a default "vector" namespace, but will be overridden
+                    // if an explicit namespace is provided to this source.
+                    if self.namespace != "vector" {
+                        metric = metric.with_namespace(Some(self.namespace.clone()));
+                    }
 
-                if let Some(host_key) = &self.host_key.path
-                    && let Ok(hostname) = &hostname
-                {
-                    metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                }
-                if let Some(pid_key) = &self.pid_key {
-                    metric.replace_tag(pid_key.to_owned(), pid.clone());
-                }
-                metric
-            });
+                    if let Some(host_key) = &self.host_key.path
+                        && let Ok(hostname) = &hostname
+                    {
+                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
+                    }
+                    if let Some(pid_key) = &self.pid_key {
+                        metric.replace_tag(pid_key.to_owned(), pid.clone());
+                    }
+                    metric
+                })
+                .collect();
 
-            if (self.out.send_batch(batch).await).is_err() {
+            // Add topology metrics if available
+            if let Some(topology_metadata) = &self.topology_metadata {
+                let topology = topology_metadata.read().unwrap();
+                let topology_metrics = generate_topology_metrics(&topology, Utc::now());
+                batch.extend(topology_metrics);
+            }
+
+            if (self.out.send_batch(batch.into_iter()).await).is_err() {
                 emit!(StreamClosedError { count });
                 return Err(());
             }
@@ -190,6 +204,50 @@ impl InternalMetrics<'_> {
 
         Ok(())
     }
+}
+
+/// Generate metrics for topology connections
+fn generate_topology_metrics(
+    topology: &crate::config::TopologyMetadata,
+    timestamp: chrono::DateTime<Utc>,
+) -> Vec<Metric> {
+    let mut metrics = Vec::new();
+
+    for (to_component, inputs) in &topology.inputs {
+        for input in inputs {
+            let mut tags = MetricTags::default();
+
+            // Source component labels
+            tags.insert("from_component_id".to_string(), input.component.to_string());
+            if let Some((type_name, kind)) = topology.component_types.get(&input.component) {
+                tags.insert("from_component_type".to_string(), type_name.clone());
+                tags.insert("from_component_kind".to_string(), kind.clone());
+            }
+            if let Some(port) = &input.port {
+                tags.insert("from_output".to_string(), port.clone());
+            }
+
+            // Target component labels
+            tags.insert("to_component_id".to_string(), to_component.to_string());
+            if let Some((type_name, kind)) = topology.component_types.get(to_component) {
+                tags.insert("to_component_type".to_string(), type_name.clone());
+                tags.insert("to_component_kind".to_string(), kind.clone());
+            }
+
+            metrics.push(
+                Metric::new(
+                    "component_connections",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_namespace(Some("vector".to_string()))
+                .with_tags(Some(tags))
+                .with_timestamp(Some(timestamp)),
+            );
+        }
+    }
+
+    metrics
 }
 
 #[cfg(test)]
@@ -201,6 +259,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::{ComponentKey, OutputId},
         event::{
             Event,
             metric::{Metric, MetricValue},
@@ -343,5 +402,80 @@ mod tests {
         let event = event_from_config(config).await;
 
         assert_eq!(event.as_metric().namespace(), Some(namespace));
+    }
+
+    #[test]
+    fn test_topology_metrics_generation() {
+        let mut topology = crate::config::TopologyMetadata::new();
+
+        // Add a source -> transform connection
+        topology.inputs.insert(
+            ComponentKey::from("my_transform"),
+            vec![OutputId {
+                component: ComponentKey::from("my_source"),
+                port: None,
+            }],
+        );
+
+        // Add a transform -> sink connection
+        topology.inputs.insert(
+            ComponentKey::from("my_sink"),
+            vec![OutputId {
+                component: ComponentKey::from("my_transform"),
+                port: Some("output1".to_string()),
+            }],
+        );
+
+        // Add component types
+        topology.component_types.insert(
+            ComponentKey::from("my_source"),
+            ("file".to_string(), "source".to_string()),
+        );
+        topology.component_types.insert(
+            ComponentKey::from("my_transform"),
+            ("remap".to_string(), "transform".to_string()),
+        );
+        topology.component_types.insert(
+            ComponentKey::from("my_sink"),
+            ("console".to_string(), "sink".to_string()),
+        );
+
+        let timestamp = Utc::now();
+        let metrics = generate_topology_metrics(&topology, timestamp);
+
+        // Should have 2 connection metrics
+        assert_eq!(metrics.len(), 2);
+
+        // Find the source -> transform connection
+        let source_to_transform = metrics
+            .iter()
+            .find(|m| m.tags().and_then(|t| t.get("from_component_id")) == Some("my_source"))
+            .expect("Should find source -> transform metric");
+
+        assert_eq!(source_to_transform.name(), "component_connections");
+        assert_eq!(source_to_transform.namespace(), Some("vector"));
+        match source_to_transform.value() {
+            MetricValue::Gauge { value } => assert_eq!(*value, 1.0),
+            _ => panic!("Expected gauge metric"),
+        }
+
+        let tags1 = source_to_transform.tags().expect("Should have tags");
+        assert_eq!(tags1.get("from_component_id"), Some("my_source"));
+        assert_eq!(tags1.get("from_component_type"), Some("file"));
+        assert_eq!(tags1.get("from_component_kind"), Some("source"));
+        assert_eq!(tags1.get("to_component_id"), Some("my_transform"));
+        assert_eq!(tags1.get("to_component_type"), Some("remap"));
+        assert_eq!(tags1.get("to_component_kind"), Some("transform"));
+
+        // Find the transform -> sink connection
+        let transform_to_sink = metrics
+            .iter()
+            .find(|m| m.tags().and_then(|t| t.get("from_component_id")) == Some("my_transform"))
+            .expect("Should find transform -> sink metric");
+
+        let tags2 = transform_to_sink.tags().expect("Should have tags");
+        assert_eq!(tags2.get("from_component_id"), Some("my_transform"));
+        assert_eq!(tags2.get("from_output"), Some("output1"));
+        assert_eq!(tags2.get("to_component_id"), Some("my_sink"));
     }
 }
