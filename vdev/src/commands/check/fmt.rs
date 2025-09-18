@@ -10,6 +10,6 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::exec::<&str>("scripts/check-style.sh", [], true)?;
-        app::exec("cargo", ["fmt", "--", "-q", "--check"], true)
+        app::exec("cargo", ["fmt", "--", "--check"], true)
     }
 }
