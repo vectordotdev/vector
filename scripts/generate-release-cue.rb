@@ -44,7 +44,7 @@ end
 ROOT = find_repo_root
 RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
 CHANGELOG_DIR = File.join(ROOT, "changelog.d")
-TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
+TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf", "revert"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 
 # Parse command-line options
