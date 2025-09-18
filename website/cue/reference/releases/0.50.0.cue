@@ -173,7 +173,7 @@ releases: "0.50.0": {
 	]
 
 	vrl_changelog: """
-		### [0.27.0 (2025-09-18)]
+		### 0.27.0 (2025-09-18)
 		
 		#### Breaking Changes & Upgrade Guide
 		
@@ -198,7 +198,7 @@ releases: "0.50.0": {
 		```
 		
 		Before:
-		```
+		```text
 		$ invalid_object = { "id": "123" }
 		{ "id": "123" }
 		
@@ -213,7 +213,7 @@ releases: "0.50.0": {
 		```
 		
 		After:
-		```
+		```text
 		$ invalid_object = { "id": "123" }
 		{ "id": "123" }
 		
