@@ -424,7 +424,18 @@ Dir.chdir script_dir
 
 Util::Printer.title("Creating release meta file...")
 
-last_tag = `git describe --tags $(git rev-list --tags --max-count=1)`.chomp
+all_tags = `git tag --list --sort=-v:refname`.lines.map(&:chomp)
+valid_tag = all_tags.find do |t|
+    !t.start_with?('vdev-v') &&
+    t.match(/^v\d+\.\d+\.\d+$/)
+end
+
+if valid_tag.nil?
+  Util::Printer.error!("No valid semantic version tag found (e.g. v1.2.3)")
+  exit 1
+end
+
+last_tag = valid_tag
 last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
 current_commits = get_commits_since(last_version)
 
