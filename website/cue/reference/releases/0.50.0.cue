@@ -177,8 +177,8 @@ releases: "0.50.0": {
 		
 		#### Breaking Changes & Upgrade Guide
 		
-		- The `validate_json_schema` functionality has been enhanced to collect and return validation error(s) in the error message return value, in addition to the existing primary Boolean `true / false` return value.
-		
+		- The `validate_json_schema` functionality has been enhanced to collect and return validation error(s) in the error message return value, in addition to the existing primary Boolean `true / false` return value. (https://github.com/vectordotdev/vrl/pull/1483)
+
 		Using JSON schema `test-schema.json` below:
 		```json
 		{
@@ -225,7 +225,7 @@ releases: "0.50.0": {
 		
 		$ err
 		"function call error for \"validate_json_schema\" at (13:82): JSON schema validation failed: \"123\" is not of type \"integer\" at /id, \"test\" is a required property at /"
-		``` (https://github.com/vectordotdev/vrl/pull/1483)
+		```
 		
 		#### New Features
 		
