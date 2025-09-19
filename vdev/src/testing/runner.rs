@@ -27,8 +27,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-default-features",
 ];
 // The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str =
-    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,
