@@ -21,13 +21,16 @@ use vector_lib::{
 use super::{Memory, MemoryConfig};
 use crate::{SourceSender, internal_events::StreamClosedError};
 
+pub(crate) const EXPIRED_ROUTE: &str = "expired";
+
 /// Configuration for memory enrichment table source functionality.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct MemorySourceConfig {
     /// Interval for exporting all data from the table when used as a source.
-    pub export_interval: NonZeroU64,
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub export_interval: Option<NonZeroU64>,
     /// Batch size for data exporting. Used to prevent exporting entire table at
     /// once and blocking the system.
     ///
@@ -40,6 +43,10 @@ pub struct MemorySourceConfig {
     /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
     pub remove_after_export: bool,
+    /// Set to true to add a source output for expired items (named 'expired').
+    /// Expired items ignore other settings and are exported as they are flushed from the table.
+    #[serde(default = "crate::serde::default_false")]
+    pub export_expired_items: bool,
     /// Key to use for this component when used as a source. This must be different from the
     /// component key.
     pub source_key: String,
@@ -64,71 +71,107 @@ impl MemorySource {
             .as_ref()
             .expect("Unexpected missing source config in memory table used as a source.");
         let mut interval = IntervalStream::new(interval(Duration::from_secs(
-            source_config.export_interval.into(),
+            source_config
+                .export_interval
+                .map(Into::into)
+                .unwrap_or(u64::MAX),
         )))
         .take_until(self.shutdown);
+        let mut expired_receiver = self.memory.subscribe_to_expired_items();
 
-        while interval.next().await.is_some() {
-            let mut sent = 0_usize;
-            loop {
-                let mut events = Vec::new();
-                {
-                    let mut writer = self.memory.write_handle.lock().unwrap();
-                    if let Some(reader) = self.memory.get_read_handle().read() {
-                        let now = Instant::now();
-                        let utc_now = Utc::now();
-                        events = reader
-                            .iter()
-                            .skip(if source_config.remove_after_export {
-                                0
-                            } else {
-                                sent
-                            })
-                            .take(if let Some(batch_size) = source_config.export_batch_size {
-                                batch_size as usize
-                            } else {
-                                usize::MAX
-                            })
-                            .filter_map(|(k, v)| {
+        loop {
+            tokio::select! {
+                interal_time = interval.next() => {
+                    if interal_time.is_none() {
+                        break;
+                    }
+                    let mut sent = 0_usize;
+                    loop {
+                        let mut events = Vec::new();
+                        {
+                            let mut writer = self.memory.write_handle.lock().unwrap();
+                            if let Some(reader) = self.memory.get_read_handle().read() {
+                                let now = Instant::now();
+                                let utc_now = Utc::now();
+                                events = reader
+                                    .iter()
+                                    .skip(if source_config.remove_after_export {
+                                        0
+                                    } else {
+                                        sent
+                                    })
+                                .take(if let Some(batch_size) = source_config.export_batch_size {
+                                    batch_size as usize
+                                } else {
+                                    usize::MAX
+                                })
+                                .filter_map(|(k, v)| {
+                                    if source_config.remove_after_export {
+                                        writer.write_handle.empty(k.clone());
+                                    }
+                                    v.get_one().map(|v| (k, v))
+                                })
+                                .filter_map(|(k, v)| {
+                                    let mut event = Event::Log(LogEvent::from_map(
+                                            v.as_object_map(now, k).ok()?,
+                                            EventMetadata::default(),
+                                    ));
+                                    let log = event.as_mut_log();
+                                    self.log_namespace.insert_standard_vector_source_metadata(
+                                        log,
+                                        MemoryConfig::NAME,
+                                        utc_now,
+                                    );
+
+                                    Some(event)
+                                })
+                                .collect::<Vec<_>>();
                                 if source_config.remove_after_export {
-                                    writer.write_handle.empty(k.clone());
+                                    writer.write_handle.refresh();
                                 }
-                                v.get_one().map(|v| (k, v))
-                            })
-                            .filter_map(|(k, v)| {
-                                let mut event = Event::Log(LogEvent::from_map(
-                                    v.as_object_map(now, k).ok()?,
-                                    EventMetadata::default(),
-                                ));
-                                let log = event.as_mut_log();
-                                self.log_namespace.insert_standard_vector_source_metadata(
-                                    log,
-                                    MemoryConfig::NAME,
-                                    utc_now,
-                                );
+                            }
+                        }
+                        let count = events.len();
+                        let byte_size = events.size_of();
+                        let json_size = events.estimated_json_encoded_size_of();
+                        bytes_received.emit(ByteSize(byte_size));
+                        events_received.emit(CountByteSize(count, json_size));
+                        if self.out.send_batch(events).await.is_err() {
+                            emit!(StreamClosedError { count });
+                        }
 
-                                Some(event)
-                            })
-                            .collect::<Vec<_>>();
-                        if source_config.remove_after_export {
-                            writer.write_handle.refresh();
+                        sent += count;
+                        match source_config.export_batch_size {
+                            None => break,
+                            Some(export_batch_size) if count < export_batch_size as usize => break,
+                            _ => {}
                         }
                     }
-                }
-                let count = events.len();
-                let byte_size = events.size_of();
-                let json_size = events.estimated_json_encoded_size_of();
-                bytes_received.emit(ByteSize(byte_size));
-                events_received.emit(CountByteSize(count, json_size));
-                if self.out.send_batch(events).await.is_err() {
-                    emit!(StreamClosedError { count });
-                }
+                },
 
-                sent += count;
-                match source_config.export_batch_size {
-                    None => break,
-                    Some(export_batch_size) if count < export_batch_size as usize => break,
-                    _ => {}
+                Ok(expired) = expired_receiver.recv() => {
+                    let now = Instant::now();
+                    let events = expired.into_iter().filter_map(|(key, expired_event)| {
+                        let mut event = Event::Log(LogEvent::from_map(
+                                expired_event.as_object_map(now, &key).ok()?,
+                                EventMetadata::default(),
+                        ));
+                        let log = event.as_mut_log();
+                        self.log_namespace.insert_standard_vector_source_metadata(
+                            log,
+                            MemoryConfig::NAME,
+                            Utc::now(),
+                        );
+                        Some(event)
+                    }).collect::<Vec<_>>();
+                    let count = events.len();
+                    let byte_size = events.size_of();
+                    let json_size = events.estimated_json_encoded_size_of();
+                    bytes_received.emit(ByteSize(byte_size));
+                    events_received.emit(CountByteSize(count, json_size));
+                    if self.out.send_batch_named(EXPIRED_ROUTE, events).await.is_err() {
+                        emit!(StreamClosedError { count });
+                    }
                 }
             }
         }
