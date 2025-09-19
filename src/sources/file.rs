@@ -1656,7 +1656,7 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
         writeln!(&mut file, "the line").unwrap();
-        file.flush();
+        file.flush().unwrap();
 
         // First time server runs it picks up existing lines.
         let received = run_file_source(
