@@ -344,6 +344,7 @@ mod tests {
 
         assert_request_eq!(handle, "hello").send_response("world");
         assert_eq!(fut.await.unwrap(), "world");
+        assert!(false);
     }
 
     #[test]
