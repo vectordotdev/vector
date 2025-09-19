@@ -9,9 +9,19 @@ releases: "0.50.0": {
 	description: """
 		The Vector team is excited to announce version `0.50.0`!
 
-		**Release highlights**:
+		## Release highlights
 
-		TODO
+		- The `opentelemetry` source can now decode data according to the standard [OTLP protocol](https://opentelemetry.io/docs/specs/otel/protocol)
+		for all telemetry data types (logs, metrics and traces). This eliminates the need for complex event remapping. It
+		greatly simplifies configuration for OTEL -> Vector -> OTEL use cases or when forwarding data to any system that expects OTLP-formatted telemetry.
+		- A new `okta` source for consuming [Okta system logs](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/SystemLog/) is now available.
+		- Intorduced a new `incremental_to_absolute` transform, useful when metric data might be lost in transit or for creating a historical record of the metric.
+		- The `exec` secrets option now supports protocol version `v1.1` which can be used with the [Datadog Secret Backend](https://github.com/DataDog/datadog-secret-backend/blob/v1/README.md).
+		- A new `varint_length_delimited` framing option is now available which enables compatibility with standard protobuf streaming implementations and tools like ClickHouse.
+
+		## Breaking Changes
+
+		- The `azure_blob` sink now requires a `connection_string`. This is the only supported authentication method for now. For more details, see this [pull request](https://github.com/vectordotdev/vector/pull/23351)).
 		"""
 
 	changelog: [
@@ -88,7 +98,20 @@ releases: "0.50.0": {
 		{
 			type: "feat"
 			description: """
-				Add support for v1.1 of the secrets manager protocol
+				Secrets options now support the protocol version 1.1 and can be used with the [datadog-secret-backend](https://github.com/DataDog/datadog-secret-backend/blob/v1/README.md).
+
+				Sample config:
+				```yaml
+				secret:
+					exec_backend:
+						type: "exec"
+						command: [/usr/bin/datadog-secret-backend]
+						protocol:
+							version: v1_1
+							backend_type: file.json
+							backend_config:
+								file_path: ~/secrets.json
+				```
 				"""
 			contributors: ["graphcareful"]
 		},
