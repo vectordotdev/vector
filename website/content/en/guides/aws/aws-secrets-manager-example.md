@@ -234,4 +234,4 @@ aws s3 ls s3://your-archive-bucket/processed-logs/
 
 For detailed configuration options, troubleshooting, and security best practices, see the [AWS Secrets Manager guide](../aws-secrets-manager/).
 
-This example demonstrates a production-ready setup using AWS Secrets Manager with Vector, providing secure credential management across multiple AWS services and external integrations.
+This example provides a production-ready setup using AWS Secrets Manager with Vector, providing secure credential management across multiple AWS services and external integrations.
