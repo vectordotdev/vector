@@ -14,12 +14,15 @@ use vector_lib::{
 };
 use vrl::{path::OwnedTargetPath, value::Kind};
 
-use super::{internal_events::InternalMetricsConfig, source::MemorySourceConfig};
+use super::{
+    Memory,
+    internal_events::InternalMetricsConfig,
+    source::{EXPIRED_ROUTE, MemorySourceConfig},
+};
 use crate::{
     config::{
         EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
-    enrichment_tables::memory::Memory,
     sinks::Healthcheck,
     sources::Source,
 };
@@ -187,10 +190,23 @@ impl SourceConfig for MemoryConfig {
         }
         .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_maybe_logs(
-            DataType::Log,
-            schema_definition,
-        )]
+        if self
+            .source_config
+            .as_ref()
+            .map(|c| c.export_expired_items)
+            .unwrap_or_default()
+        {
+            vec![
+                SourceOutput::new_maybe_logs(DataType::Log, schema_definition.clone()),
+                SourceOutput::new_maybe_logs(DataType::Log, schema_definition)
+                    .with_port(EXPIRED_ROUTE),
+            ]
+        } else {
+            vec![SourceOutput::new_maybe_logs(
+                DataType::Log,
+                schema_definition,
+            )]
+        }
     }
 
     fn can_acknowledge(&self) -> bool {
