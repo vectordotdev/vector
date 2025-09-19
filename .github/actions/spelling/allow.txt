@@ -309,6 +309,7 @@ Medion
 MEF
 Meizu
 meme
+memfd
 Mertz
 messagebird
 metakey
