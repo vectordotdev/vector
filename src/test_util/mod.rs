@@ -149,7 +149,7 @@ pub fn trace_init() {
     #[cfg(not(unix))]
     let color = false;
 
-    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
+    let levels = std::env::var("VECTOR_LOG").unwrap_or_else(|_| "error".to_string());
 
     trace::init(color, false, &levels, 10);
 
