@@ -995,20 +995,20 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
 
 /// MetaExtractor is a helper struct that extracts a field from the request and adds it to the log event metadata.
 /// It maintains last known extracted value of field and uses it in the absence of field.
-struct MetaExtractor {
+struct FieldExtractor {
     field: &'static str,
     to_field: OptionalValuePath,
     value: Option<Value>,
     log_namespace: LogNamespace,
 }
 
-impl MetaExtractor {
+impl FieldExtractor {
     const fn new(
         field: &'static str,
         to_field: OptionalValuePath,
         log_namespace: LogNamespace,
     ) -> Self {
-        MetaExtractor {
+        Self {
             field,
             to_field,
             value: None,
@@ -1022,7 +1022,7 @@ impl MetaExtractor {
         value: impl Into<Option<Value>>,
         log_namespace: LogNamespace,
     ) -> Self {
-        MetaExtractor {
+        Self {
             field,
             to_field,
             value: value.into(),
@@ -1067,7 +1067,7 @@ pub trait Extractor {
 }
 
 pub struct DefaultExtractor {
-    extractors: [MetaExtractor; 4],
+    extractors: [FieldExtractor; 4],
 }
 
 impl Extractor for DefaultExtractor {
@@ -1078,7 +1078,7 @@ impl Extractor for DefaultExtractor {
                 // 1. The host field is present in the event payload
                 // 2. The x-forwarded-for header is present in the incoming request
                 // 3. Use the `remote`: SocketAddr value provided by warp
-                MetaExtractor::new_with(
+                FieldExtractor::new_with(
                     "host",
                     log_schema().host_key().cloned().into(),
                     meta.remote_addr
@@ -1086,9 +1086,9 @@ impl Extractor for DefaultExtractor {
                         .map(Value::from),
                     log_namespace,
                 ),
-                MetaExtractor::new("index", OptionalValuePath::new(INDEX), log_namespace),
-                MetaExtractor::new("source", OptionalValuePath::new(SOURCE), log_namespace),
-                MetaExtractor::new(
+                FieldExtractor::new("index", OptionalValuePath::new(INDEX), log_namespace),
+                FieldExtractor::new("source", OptionalValuePath::new(SOURCE), log_namespace),
+                FieldExtractor::new(
                     "sourcetype",
                     OptionalValuePath::new(SOURCETYPE),
                     log_namespace,
