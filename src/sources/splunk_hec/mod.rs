@@ -290,13 +290,13 @@ impl<E: Extractor> SplunkSource<E> {
             log_namespace,
             events_received: register!(EventsReceived),
             _extractor: PhantomData,
-            shutdown: cx.shutdown.clone(),
-            out: cx.out.clone(),
+            shutdown: cx.shutdown,
+            out: cx.out,
         }
     }
 
     fn listen(
-        &self,
+        self,
         listener: vector_lib::tls::MaybeTlsListener,
         keepalive_settings: KeepaliveConfig,
     ) -> super::Source {
@@ -321,8 +321,6 @@ impl<E: Extractor> SplunkSource<E> {
             )
             .or_else(finish_err);
 
-        let shutdown = self.shutdown.clone();
-
         Box::pin(async move {
             let span = Span::current();
             let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
@@ -341,7 +339,7 @@ impl<E: Extractor> SplunkSource<E> {
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(make_svc)
-                .with_graceful_shutdown(shutdown.map(|_| ()))
+                .with_graceful_shutdown(self.shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
                     error!("An error occurred: {:?}.", err);
