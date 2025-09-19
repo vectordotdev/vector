@@ -354,12 +354,17 @@ impl FileWatcher {
         .await
         {
             Ok(ReadResult {
-                successfully_read: Some(_),
+                successfully_read: Some(_), // TODO check if discarded_for_size_and_truncated is
+                                            // empty
                 ..
             }) => {
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
 
+                debug!(
+                    "read_line {}",
+                    String::from_utf8_lossy(&bytes::Buf::chunk(&bytes))
+                );
                 // Return all lines, including empty ones
                 Ok(Some(RawLine {
                     offset: initial_position,

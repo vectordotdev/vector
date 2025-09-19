@@ -131,7 +131,7 @@ where
 
         let paths = self.paths_provider.paths().await;
         for path in paths.into_iter() {
-            dbg!(&path);
+            debug!(?path, "fingerprinting on startup");
             if let Some(file_id) = self
                 .fingerprinter
                 .get_fingerprint_or_log_error(
@@ -175,7 +175,8 @@ where
 
         let checkpoints = checkpointer.view();
 
-        for (path, file_id) in dbg!(existing_files) {
+        debug!(?existing_files);
+        for (path, file_id) in existing_files {
             checkpointer
                 .maybe_upgrade(&path, file_id, &self.fingerprinter, &mut fingerprint_buffer)
                 .await;
@@ -194,11 +195,6 @@ where
             #[cfg(any(test, feature = "test"))]
             if let Some(sender) = self.test_sender.as_ref() {
                 sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
-                for line in &lines {
-                    sender
-                        .send(TestEvent::Read(path.clone(), line.text.chunk().into()))
-                        .unwrap();
-                }
             }
         }
         self.emitter.emit_files_open(fp_map.len());
@@ -340,14 +336,6 @@ where
                             #[cfg(any(test, feature = "test"))]
                             if let Some(sender) = self.test_sender.as_ref() {
                                 sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
-                                for line in &lines {
-                                    sender
-                                        .send(TestEvent::Read(
-                                            path.clone(),
-                                            line.text.chunk().into(),
-                                        ))
-                                        .unwrap();
-                                }
                             }
 
                             // Immediately read the file to avoid delay in detecting content
@@ -358,15 +346,6 @@ where
                                 );
                                 let mut bytes_read: usize = 0;
                                 while let Ok(Some(line)) = watcher.read_line().await {
-                                    #[cfg(any(test, feature = "test"))]
-                                    if let Some(sender) = self.test_sender.as_ref() {
-                                        sender
-                                            .send(TestEvent::Read(
-                                                watcher.path.clone(),
-                                                line.bytes.chunk().into(),
-                                            ))
-                                            .unwrap()
-                                    }
                                     let sz = line.bytes.len();
                                     trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
                                     bytes_read += sz;
@@ -432,15 +411,6 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line().await {
-                    #[cfg(any(test, feature = "test"))]
-                    if let Some(sender) = self.test_sender.as_ref() {
-                        sender
-                            .send(TestEvent::Read(
-                                watcher.path.clone(),
-                                line.bytes.chunk().into(),
-                            ))
-                            .unwrap()
-                    }
                     let sz = line.bytes.len();
                     trace!(
                         message = "Read bytes.",
@@ -531,6 +501,18 @@ where
             });
             self.emitter.emit_files_open(fp_map.len());
 
+            #[cfg(any(test, feature = "test"))]
+            if let Some(sender) = self.test_sender.as_ref() {
+                for line in &lines {
+                    debug!("sending {}", String::from_utf8_lossy(&line.text.chunk()));
+                    sender
+                        .send(TestEvent::Read(
+                            PathBuf::from(line.filename.clone()),
+                            line.text.chunk().into(),
+                        ))
+                        .unwrap();
+                }
+            }
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             match chans.send(to_send).await {
@@ -652,13 +634,6 @@ where
 
                         // Add the lines to the output
                         for line in startup_lines {
-                            #[cfg(any(test, feature = "test"))]
-                            if let Some(sender) = self.test_sender.as_ref() {
-                                sender
-                                    .send(TestEvent::Read(path.clone(), line.bytes.chunk().into()))
-                                    .unwrap();
-                            }
-
                             let bytes_len = line.bytes.len() as u64;
                             lines.push(Line {
                                 text: line.bytes,

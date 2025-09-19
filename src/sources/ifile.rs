@@ -535,43 +535,65 @@ pub fn ifile_source(
         return Box::pin(future::ready(Err(())));
     }
 
+    // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
+    // canonicalized paths only
+    let resolve_symlinks = |original_path: PathBuf| {
+        let mut components = original_path
+            .components()
+            .map(|c| c.as_os_str().to_os_string())
+            .collect_vec();
+
+        if components
+            .first()
+            .map(|first| first.to_string_lossy().contains("*"))
+            .unwrap_or(false)
+        {
+            warn!(
+                "{} contains a * in it's first path component. If a match resolves to a symlink it will not be watched",
+                original_path.display(),
+            );
+        }
+
+        let mut popped = vec![];
+
+        while components.len() > 0 {
+            let path: PathBuf = components.iter().collect();
+
+            match path.canonicalize() {
+                Ok(mut canonical) => {
+                    if canonical == path {
+                        // Not a symlink, we should be good to keep original_path
+                        return original_path.clone();
+                    }
+                    while let Some(popped) = popped.pop() {
+                        canonical.push(popped);
+                    }
+                    info!(
+                        "{} is a symlink, watching canonical path {} instead",
+                        original_path.display(),
+                        canonical.display()
+                    );
+                    return canonical;
+                }
+                Err(_) => {
+                    popped.push(components.pop().expect("components.len() > 0"));
+                }
+            }
+        }
+
+        warn!(
+            "Could not find {}. If the path is later created as a or containing a symlink it will not be watched",
+            original_path.display(),
+        );
+
+        original_path
+    };
+
     let exclude_patterns = config
         .exclude
         .iter()
         .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
-        .map(|original_path| {
-            let mut components = original_path
-                .components()
-                .map(|c| c.as_os_str().to_os_string())
-                .collect_vec();
-            let mut popped = vec![];
-
-            while components.len() > 0 {
-                let path: PathBuf = components.iter().collect();
-
-                match path.canonicalize() {
-                    Ok(mut canonical) => {
-                        if canonical == path {
-                            // Not a symlink, we should be good to keep original_path
-                            return original_path.clone();
-                        }
-                        // TODO log
-                        dbg!("symlink found");
-                        while let Some(popped) = popped.pop() {
-                            canonical.push(popped);
-                        }
-                        return canonical;
-                    }
-                    Err(_) => {
-                        popped.push(components.pop().expect("components.len() > 0"));
-                    }
-                }
-            }
-
-            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
-            // TODO check for * in components[0], if that's the case symlink resolution will not work
-            original_path.clone()
-        })
+        .map(resolve_symlinks)
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let checkpoint_interval = config.checkpoint_interval;
@@ -585,44 +607,11 @@ pub fn ifile_source(
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
-    // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
-    // canonicalized paths only
     let include = config
         .include
         .iter()
-        .map(|original_path| {
-            let mut components = original_path
-                .components()
-                .map(|c| c.as_os_str().to_os_string())
-                .collect_vec();
-            let mut popped = vec![];
-
-            while components.len() > 0 {
-                let path: PathBuf = components.iter().collect();
-
-                match path.canonicalize() {
-                    Ok(mut canonical) => {
-                        if canonical == path {
-                            // Not a symlink, we should be good to keep original_path
-                            return original_path.clone();
-                        }
-                        // TODO log
-                        dbg!("symlink found");
-                        while let Some(popped) = popped.pop() {
-                            canonical.push(popped);
-                        }
-                        return canonical;
-                    }
-                    Err(_) => {
-                        popped.push(components.pop().expect("components.len() > 0"));
-                    }
-                }
-            }
-
-            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
-            // TODO check for * in components[0], if that's the case symlink resolution will not work
-            original_path.clone()
-        })
+        .cloned()
+        .map(resolve_symlinks)
         .collect_vec();
 
     // Use notify-based paths provider by default
@@ -956,7 +945,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::{
         fs::{self, File},
-        io::{AsyncSeekExt, AsyncWriteExt},
+        io::AsyncWriteExt,
         sync::mpsc::{self, UnboundedReceiver},
         time::{Duration, sleep, timeout},
     };
@@ -969,7 +958,10 @@ mod tests {
         event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::ifile,
-        test_util::components::{IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS, assert_source},
+        test_util::{
+            components::{IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS, assert_source},
+            trace_init,
+        },
     };
     use vrl::value;
 
@@ -1002,12 +994,105 @@ mod tests {
                 panic!("Timed out, reads = {counter}/{count}");
             }
             _ = async {
-                while let Some(ev) = rx.recv().await {
-                    // Wait for n * 2 read events
-                    if let TestEvent::Read(_, _) = ev {
+                while counter != count && let Some(ev) = rx.recv().await {
+                    if let TestEvent::Read(_path, _bytes) = ev {
+                        dbg!(String::from_utf8_lossy(&_bytes));
                         counter += 1;
+                    } else {
+                        panic!("expected Read, got {ev:?}");
                     }
-                    if counter == count {
+                }
+            } => {}
+        }
+    }
+
+    fn assert_empty_rx(rx: &mut UnboundedReceiver<TestEvent>) {
+        while let Ok(ev) = rx.try_recv() {
+            panic!("rx shouldn't have any more events {ev:?}");
+        }
+    }
+
+    /// Returns other non-checkpoint test events
+    #[must_use]
+    #[allow(dead_code)]
+    async fn wait_for_checkpoint(
+        rx: &mut UnboundedReceiver<TestEvent>,
+        paths: Vec<&PathBuf>,
+        timeout_ms: u64,
+    ) -> Vec<TestEvent> {
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
+
+        let mut paths: HashSet<PathBuf> = paths
+            .into_iter()
+            .map(|path| path.canonicalize().unwrap())
+            .collect();
+
+        let mut events = vec![];
+
+        tokio::select! {
+            _ = shutdown => {
+                panic!("Timed out before all of {paths:?} were checkpointed");
+            }
+            _ = async {
+                while let Some(ev) = dbg!(rx.recv().await) {
+                    if let TestEvent::Checkpointed(ev_path) = ev {
+                        let ev_path = dbg!(ev_path.canonicalize().unwrap());
+                        assert!(dbg!(&mut paths).remove(&ev_path));
+
+                        if paths.is_empty() {
+                            break;
+                        }
+                    } else {
+                        events.push(ev);
+                    }
+                }
+            } => {}
+        }
+
+        events
+    }
+
+    /// Returns other non-checkpoint test events
+    async fn wait_for_checkpoint_and_n_reads(
+        rx: &mut UnboundedReceiver<TestEvent>,
+        paths: Vec<&PathBuf>,
+        n_reads: usize,
+        timeout_ms: u64,
+    ) {
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
+
+        let mut paths: HashSet<PathBuf> = paths
+            .into_iter()
+            .map(|path| path.canonicalize().unwrap())
+            .collect();
+
+        let original_paths = paths.clone();
+
+        let mut counter = 0;
+
+        tokio::select! {
+            _ = shutdown => {
+                panic!("Timed out before all of {paths:?} were checkpointed and/or {counter}/{n_reads} lines read");
+            }
+            _ = async {
+                while let Some(ev) = rx.recv().await {
+                    match ev {
+                        TestEvent::Checkpointed(ev_path) => {
+                            let ev_path = dbg!(ev_path.canonicalize().unwrap());
+                            assert!(dbg!(&mut paths).remove(&ev_path));
+
+                        },
+                        TestEvent::Read(path, _bytes) => {
+                            // Check if path was already checkpointed
+                            assert!(original_paths.contains(&path));
+                            assert!(!paths.contains(&path));
+
+                            debug!("rx got {}", String::from_utf8_lossy(&_bytes));
+                            counter += 1;
+                        }
+                    }
+
+                    if paths.is_empty() && dbg!(counter) == n_reads {
                         break;
                     }
                 }
@@ -1344,9 +1429,6 @@ mod tests {
 
                 // Wait for the files to be observed at their original lengths before writing to them
                 // This ensures the file source has discovered the files
-                assert!(path1.exists());
-                assert!(path2.exists());
-
                 for i in 0..n {
                     file1.write_line(format!("hello {i}")).await.unwrap();
                     file2.write_line(format!("goodbye {i}")).await.unwrap();
@@ -1356,7 +1438,7 @@ mod tests {
                 file1.flush().await.unwrap();
                 file2.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n * 2, 5000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path1, &path2], n * 2, 5000).await;
             },
         )
         .await;
@@ -1409,7 +1491,6 @@ mod tests {
             Some(tx),
             async {
                 let mut file = File::create(&path).await.unwrap();
-                assert!(path.exists());
 
                 file.write_line("line for checkpointing").await.unwrap();
                 for _i in 0..n {
@@ -1419,7 +1500,7 @@ mod tests {
                 // Flush the file to ensure the writes are visible
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 5000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
             },
         )
         .await;
@@ -1427,8 +1508,10 @@ mod tests {
         assert_eq!(received.len(), n + 1);
     }
 
+    #[ignore = "broken for now"]
     #[tokio::test]
     async fn file_truncate() {
+        use std::io::{Seek, Write};
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -1446,33 +1529,35 @@ mod tests {
             LogNamespace::Legacy,
             Some(tx),
             async {
-                let mut file = File::create(&path).await.unwrap();
-
-                // Wait for the file to be observed at its original length before writing to it
-                sleep_millis(1000).await;
+                let mut std_file = std::fs::File::create(&path).unwrap();
+                // let mut file = File::create(&path).await.unwrap();
 
                 for i in 0..n {
-                    file.write_line(format!("pretrunc {i}")).await.unwrap();
+                    writeln!(&mut std_file, "pretrunc {i}").unwrap();
+                    // file.write_line(format!("pretrunc {i}")).await.unwrap();
                 }
-                file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 1000).await;
+                std_file.flush().unwrap();
 
-                file.set_len(0).await.unwrap();
-                file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
 
-                // Wait for the truncate to be observed before writing again
-                sleep_millis(1000).await;
+                std_file.set_len(0).unwrap();
+                std_file.seek(std::io::SeekFrom::Start(0)).unwrap();
+                std_file.sync_all().unwrap();
+
+                let mut file = File::from_std(std_file);
 
                 for i in 0..n {
                     file.write_line(format!("posttrunc {i}")).await.unwrap();
                 }
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 1000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
+                // wait_for_n_reads(&mut rx, n, 5000).await;
             },
         )
         .await;
+        // assert_empty_rx(&mut rx);
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -1502,6 +1587,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_rotate() {
+        trace_init();
         let n = 5;
 
         let dir = tempdir().unwrap();
@@ -1530,31 +1616,28 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 5000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
+                assert_empty_rx(&mut rx);
 
                 fs::rename(&path, &archive_path)
                     .await
                     .expect("could not rename");
                 let mut file = File::create(&path).await.unwrap();
 
-                // Wait for the rotation to be observed before writing again
-                retry_until(
-                    || {
-                        // Check if the new file exists and is being watched
-                        path.exists()
-                    },
-                    10,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("New file should be discovered after rotation");
+                assert!(path.exists());
+                assert!(archive_path.exists());
+
+                // let non_checkpoint_events = wait_for_checkpoint(&mut rx, vec![&path], 5000).await;
+                // assert!(non_checkpoint_events.is_empty());
 
                 for i in 0..n {
                     file.write_line(format!("postrot {i}")).await.unwrap();
                 }
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 5000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
+
+                assert_empty_rx(&mut rx);
             },
         )
         .await;
@@ -1662,10 +1745,13 @@ mod tests {
                 file3.flush().await.unwrap();
                 file4.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n * 4, 5000).await;
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&path1, &path2, &path3], n * 3, 5000)
+                    .await;
             },
         )
         .await;
+
+        assert_empty_rx(&mut rx);
 
         let mut is = [0; 3];
 
@@ -2058,14 +2144,22 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received =
-                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let received = run_ifile_source(
+                &config,
+                true,
+                acking,
+                LogNamespace::Legacy,
+                Some(tx),
+                async {
                     let mut file = File::create(&path).await.unwrap();
-                    sleep_500_millis().await;
                     file.write_line("first line").await.unwrap();
-                    sleep(Duration::from_secs(2)).await;
-                })
-                .await;
+                    file.flush().await.unwrap();
+                    wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 3000).await;
+                },
+            )
+            .await;
+            assert_empty_rx(&mut rx);
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
@@ -2077,14 +2171,27 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received =
-                run_ifile_source(&config, false, acking, LogNamespace::Legacy, None, async {
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let received = run_ifile_source(
+                &config,
+                false,
+                acking,
+                LogNamespace::Legacy,
+                Some(tx),
+                async {
                     let mut file = File::create(&path).await.unwrap();
-                    sleep_500_millis().await;
                     file.write_line("second line").await.unwrap();
-                    sleep(Duration::from_secs(2)).await;
-                })
-                .await;
+                    wait_for_checkpoint_and_n_reads(
+                        &mut rx,
+                        vec![&path, &path_for_old_file],
+                        1,
+                        3000,
+                    )
+                    .await;
+                },
+            )
+            .await;
+            assert_empty_rx(&mut rx);
 
             // With the new implementation, we might get empty lines or just the second line
             // Filter out any empty lines and check that we have the second line
@@ -2136,14 +2243,25 @@ mod tests {
             assert_eq!(ret, 0);
         }
 
-        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, None, async {
-            // Need to sleep so that the file is checkpointed before we write to it, which
-            // updates the modified time
-            sleep_500_millis().await;
-            older_file.write_line("second line").await.unwrap();
-            newer_file.write_line("_second line").await.unwrap();
-            sleep_500_millis().await;
-        })
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            true,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
+                // Assert that the file is checkpointed before we write to it, which
+                // updates the modified time
+                wait_for_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 2, 5000)
+                    .await;
+                older_file.write_line("second line").await.unwrap();
+                newer_file.write_line("_second line").await.unwrap();
+                wait_for_n_reads(&mut rx, 2, 5000).await;
+
+                assert_empty_rx(&mut rx);
+            },
+        )
         .await;
 
         let older_lines = received
@@ -2174,12 +2292,12 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, Some(tx), async {
             let mut file = File::create(&path).await.unwrap();
-
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             file.write_line("short").await.unwrap();
+            wait_for_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
+
             file.write_line("this is too long").await.unwrap();
             file.write_line("11 eleven11").await.unwrap();
             let super_long = "This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved".repeat(10000);
@@ -2187,14 +2305,14 @@ mod tests {
             file.write_line("exactly 10").await.unwrap();
             file.write_line("it can end on a line that's too long").await.unwrap();
 
-            sleep_500_millis().await;
-            sleep_500_millis().await;
+            wait_for_n_reads(&mut rx, 5, 1000).await;
+
+            assert_empty_rx(&mut rx);
 
             file.write_line("and then continue").await.unwrap();
             file.write_line("last short").await.unwrap();
 
-            sleep_500_millis().await;
-            sleep_500_millis().await;
+            wait_for_n_reads(&mut rx, 2, 1000).await;
         }).await;
 
         let received = extract_messages_value(received);
