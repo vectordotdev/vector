@@ -15,6 +15,7 @@ use aws_sdk_cloudwatch::{
 use aws_smithy_types::DateTime as AwsDateTime;
 use futures::{FutureExt, SinkExt, stream};
 use futures_util::{future, future::BoxFuture};
+use indexmap::IndexMap;
 use tower::Service;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, sink::VectorSink,
@@ -113,6 +114,14 @@ pub struct CloudWatchMetricsSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    /// A map from metric name to AWS storage resolution.
+    /// Valid values are 1 (high resolution) and 60 (standard resolution).
+    /// If unset, the AWS SDK default of 60 (standard resolution) is used.
+    /// See [AWS Metrics Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Resolution_definition)
+    /// See [MetricDatum::storage_resolution()](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
+    #[serde(default)]
+    pub storage_resolution: IndexMap<String, i32>,
 }
 
 impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
@@ -223,6 +232,7 @@ fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudwatchClient,
+    storage_resolution: IndexMap<String, i32>,
 }
 
 impl CloudWatchMetricsSvc {
@@ -234,7 +244,10 @@ impl CloudWatchMetricsSvc {
         let batch = config.batch.into_batch_settings()?;
         let request_settings = config.request.into_settings();
 
-        let service = CloudWatchMetricsSvc { client };
+        let service = CloudWatchMetricsSvc {
+            client,
+            storage_resolution: config.storage_resolution,
+        };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
@@ -263,6 +276,7 @@ impl CloudWatchMetricsSvc {
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
+        let resolutions = &self.storage_resolution;
         events
             .into_iter()
             .filter_map(|event| {
@@ -271,6 +285,7 @@ impl CloudWatchMetricsSvc {
                     .timestamp()
                     .map(|x| AwsDateTime::from_millis(x.timestamp_millis()));
                 let dimensions = event.tags().map(tags_to_dimensions);
+                let resolution = resolutions.get(&metric_name).map(|x| *x);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.value() {
                     MetricValue::Counter { value } => Some(
@@ -279,6 +294,7 @@ impl CloudWatchMetricsSvc {
                             .value(*value)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Distribution {
@@ -291,6 +307,7 @@ impl CloudWatchMetricsSvc {
                             .set_counts(Some(samples.iter().map(|s| s.rate as f64).collect()))
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Set { values } => Some(
@@ -299,6 +316,7 @@ impl CloudWatchMetricsSvc {
                             .value(values.len() as f64)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Gauge { value } => Some(
@@ -307,6 +325,7 @@ impl CloudWatchMetricsSvc {
                             .value(*value)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     _ => None,
