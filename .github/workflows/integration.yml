@@ -46,7 +46,7 @@ jobs:
     needs:
       - changes
 
-    if: ${{ !failure() && !cancelled() && github.event_name == 'merge_group' }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
