@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.21 AS builder
+FROM docker.io/alpine:3.22 AS builder
 
 WORKDIR /vector
 
