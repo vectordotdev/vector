@@ -2,10 +2,7 @@ use std::net::SocketAddr;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group};
 use futures::TryFutureExt;
-use hyper::{
-    Body, Response, Server,
-    service::{make_service_fn, service_fn},
-};
+use hyper::{Body, Response, Server, service::service_fn};
 use tokio::runtime::Runtime;
 use vector::{
     Error, config,
@@ -95,7 +92,7 @@ fn benchmark_http(c: &mut Criterion) {
 fn serve(addr: SocketAddr) -> Runtime {
     let rt = runtime();
     rt.spawn(async move {
-        let make_service = make_service_fn(|_| async {
+        let make_service = service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_req| async {
                 Ok::<_, Error>(Response::new(Body::empty()))
             }))

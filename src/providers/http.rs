@@ -1,7 +1,7 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
-use hyper::Body;
+use hyper::body::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
@@ -92,7 +92,7 @@ async fn http_request(
     }
 
     let request = builder
-        .body(Body::empty())
+        .body(Empty::<Bytes>::new())
         .map_err(|_| "Couldn't create HTTP request")?;
 
     info!(

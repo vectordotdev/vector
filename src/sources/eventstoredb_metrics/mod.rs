@@ -1,9 +1,10 @@
-use std::time::Duration;
-
+use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
-use hyper::{Body, Request};
+use http_body_util::{BodyExt, Empty};
+use hyper::Request;
 use serde_with::serde_as;
+use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -101,7 +102,7 @@ fn eventstoredb(
             while ticks.next().await.is_some() {
                 let req = Request::get(&url)
                     .header("content-type", "application/json")
-                    .body(Body::empty())
+                    .body(Empty::<Bytes>::new())
                     .expect("Building request should be infallible.");
 
                 match client.send(req).await {
@@ -113,7 +114,7 @@ fn eventstoredb(
                     }
 
                     Ok(resp) => {
-                        let bytes = match hyper::body::to_bytes(resp.into_body()).await {
+                        let bytes = match resp.into_body().collect().await?.to_bytes() {
                             Ok(b) => b,
                             Err(error) => {
                                 emit!(EventStoreDbMetricsHttpError {

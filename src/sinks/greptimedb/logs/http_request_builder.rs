@@ -1,14 +1,3 @@
-use std::collections::HashMap;
-
-use bytes::Bytes;
-use http::{
-    Request, StatusCode,
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-};
-use hyper::Body;
-use snafu::ResultExt;
-use vector_lib::codecs::encoding::Framer;
-
 use crate::{
     Error,
     codecs::{Encoder, Transformer},
@@ -20,6 +9,16 @@ use crate::{
         util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
     },
 };
+use bytes::Bytes;
+use http::{
+    Request, StatusCode,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+};
+use http_body_util::Empty;
+use hyper::body::Body;
+use snafu::ResultExt;
+use std::collections::HashMap;
+use vector_lib::codecs::encoding::Framer;
 
 /// Partition key for GreptimeDB logs sink.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -224,7 +223,7 @@ pub(super) async fn http_healthcheck(
     auth: Option<Auth>,
 ) -> crate::Result<()> {
     let uri = format!("{endpoint}/health");
-    let mut request = Request::get(uri).body(Body::empty())?;
+    let mut request = Request::get(uri).body(Empty::<Bytes>::new())?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

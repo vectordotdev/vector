@@ -1,32 +1,33 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
-use std::{collections::HashMap, io};
-
 use bytes::{Bytes, BytesMut};
+
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::{
-    Request, StatusCode, Uri,
-    header::{self, HeaderName, HeaderValue},
-};
-use hyper::Body;
+use http::header::{self, HeaderName, HeaderValue};
+use http::{Request, StatusCode, Uri};
+use http_body_util::Empty;
+use hyper::body::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
+use std::collections::HashMap;
+use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_lib::configurable::configurable_component;
+use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{AcknowledgementsConfig, Input, telemetry},
-    configurable::configurable_component,
     event::{Event, EventFinalizers, Finalizable},
-    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sink::VectorSink,
 };
 use vrl::value::Kind;
 
+use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -49,7 +50,6 @@ use crate::{
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
-            service::TowerRequestConfigDefaults,
         },
     },
     template::{Template, TemplateParseError},
@@ -281,7 +281,7 @@ pub fn build_healthcheck(
     let uri = base_url.parse::<Uri>()?;
 
     let healthcheck = async move {
-        let mut request = http::Request::get(&uri).body(Body::empty())?;
+        let mut request = http::Request::get(&uri).body(Empty::<Bytes>::new())?;
         auth.apply(&mut request);
 
         let response = client.send(request).await?;

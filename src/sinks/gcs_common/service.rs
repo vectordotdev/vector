@@ -6,7 +6,7 @@ use http::{
     Request, Uri,
     header::{HeaderName, HeaderValue},
 };
-use hyper::Body;
+use hyper::body::Body;
 use tower::Service;
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},

@@ -1,6 +1,6 @@
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
-use hyper::{Body, body};
+use hyper::body::Body;
 use serde::Deserialize;
 use snafu::ResultExt;
 use vector_lib::config::{LogNamespace, proxy::ProxyConfig};

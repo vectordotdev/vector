@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use futures::{future::ready, stream};
 use http::Response;
-use hyper::body;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
 use vector_lib::config::log_schema;

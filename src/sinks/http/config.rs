@@ -1,13 +1,15 @@
 //! Configuration for the `http` sink.
 
-use std::{collections::BTreeMap, path::PathBuf};
-
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
+use bytes::Bytes;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
-use hyper::Body;
+use http_body_util::Empty;
+use hyper::body::Body;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use vector_lib::codecs::{
     CharacterDelimitedEncoder,
     encoding::{Framer, Serializer},
@@ -185,7 +187,7 @@ impl GenerateConfig for HttpSinkConfig {
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let auth = auth.choose_one(&uri.auth)?;
     let uri = uri.with_default_parts();
-    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
+    let mut request = Request::head(&uri.uri).body(Empty::<Bytes>::new()).unwrap();
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -383,11 +385,8 @@ mod tests {
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
             use std::str::FromStr;
-
-            use vector_lib::{
-                codecs::{JsonSerializerConfig, MetricTagValues},
-                config::LogNamespace,
-            };
+            use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
+            use vector_lib::config::LogNamespace;
 
             let endpoint = "http://127.0.0.1:9000/endpoint";
             let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
