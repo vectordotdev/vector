@@ -156,16 +156,16 @@ sinks:
 
 The AWS Secrets Manager backend supports the following configuration options:
 
-| Option                   | Type   | Description                                                                                        |
-| ------------------------ | ------ | -------------------------------------------------------------------------------------------------- |
-| `secret_id`              | string | **Required.** The name or ARN of the secret in AWS Secrets Manager.                                 |
+| Option                   | Type   | Description                                                                                            |
+| ------------------------ | ------ | ------------------------------------------------------------------------------------------------------ |
+| `secret_id`              | string | **Required.** The name or ARN of the secret in AWS Secrets Manager.                                    |
 | `region`                 | string | AWS region where the secret is stored. If not specified, the default AWS region configuration is used. |
-| `auth.access_key_id`     | string | AWS access key ID. Optional, if using default credential chain.                                      |
-| `auth.secret_access_key` | string | AWS secret access key. Optional, if using default credential chain.                                  |
-| `auth.session_token`     | string | AWS session token for temporary credentials.                                                        |
-| `auth.assume_role`       | string | ARN of an IAM role to assume.                                                                       |
-| `auth.external_id`       | string | External ID when assuming a role.                                                                   |
-| `tls`                    | object | TLS configuration options.                                                                          |
+| `auth.access_key_id`     | string | AWS access key ID. Optional, if using default credential chain.                                        |
+| `auth.secret_access_key` | string | AWS secret access key. Optional, if using default credential chain.                                    |
+| `auth.session_token`     | string | AWS session token for temporary credentials.                                                           |
+| `auth.assume_role`       | string | ARN of an IAM role to assume.                                                                          |
+| `auth.external_id`       | string | External ID when assuming a role.                                                                      |
+| `tls`                    | object | TLS configuration options.                                                                             |
 
 ## Secret format
 
