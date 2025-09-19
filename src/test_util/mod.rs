@@ -143,12 +143,9 @@ pub fn trace_init() {
                 .ok()
                 .and(Some(true))
                 .unwrap_or(false)
-                && std::env::var("CI")
+                && !std::env::var("CI")
                     .ok()
-                    .map(|ci| match ci.as_str() {
-                        "true" => true,
-                        "false" | _ => false,
-                    })
+                    .map(|ci| ci.as_str() == "true")
                     .unwrap_or(false))
     };
     // Windows: ANSI colors are not supported by cmd.exe
