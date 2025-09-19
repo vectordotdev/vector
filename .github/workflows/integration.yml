@@ -35,38 +35,19 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
       source: true
       int_tests: true
     secrets: inherit
 
-  check-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Determine if secrets are defined (PR author is team member)
-        id: secret_check
-        env:
-          GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
-        run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]]; then
-            echo "can_access_secrets=true" >> $GITHUB_OUTPUT
-          else
-            echo "can_access_secrets=false" >> $GITHUB_OUTPUT
-          fi
-
   integration-tests:
     runs-on: ubuntu-24.04
     needs:
       - changes
-      - check-secrets
 
-    if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
@@ -86,7 +67,7 @@ jobs:
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
 
