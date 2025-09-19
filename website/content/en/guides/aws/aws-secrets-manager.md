@@ -31,7 +31,7 @@ First, create a secret in AWS Secrets Manager that contains your sensitive value
 }
 ```
 
-You can create this secret using the AWS Console, AWS CLI, or AWS SDK. Note the **Secret ARN** or **Secret Name** as you'll need it for Vector configuration.
+You can create this secret using the AWS Console, AWS CLI, or AWS SDK. Take note of the **Secret ARN** or **Secret Name** because you need it to configure Vector later on.
 
 ### 2. Configure AWS credentials
 
@@ -39,7 +39,7 @@ Vector needs AWS credentials to access Secrets Manager. You can provide credenti
 
 #### Option 1: Using AWS IAM roles (recommended for EC2/ECS/EKS)
 
-If running on AWS infrastructure, use IAM roles attached to your compute resources.
+If you are running Vector on AWS infrastructure, use IAM roles attached to your compute resources.
 
 #### Option 2: Using AWS credentials file
 
@@ -158,14 +158,14 @@ The AWS Secrets Manager backend supports the following configuration options:
 
 | Option                   | Type   | Description                                                                                        |
 | ------------------------ | ------ | -------------------------------------------------------------------------------------------------- |
-| `secret_id`              | string | **Required.** The name or ARN of the secret in AWS Secrets Manager                                 |
-| `region`                 | string | AWS region where the secret is stored. If not specified, uses the default AWS region configuration |
-| `auth.access_key_id`     | string | AWS access key ID. Optional if using default credential chain                                      |
-| `auth.secret_access_key` | string | AWS secret access key. Optional if using default credential chain                                  |
-| `auth.session_token`     | string | AWS session token for temporary credentials                                                        |
-| `auth.assume_role`       | string | ARN of an IAM role to assume                                                                       |
-| `auth.external_id`       | string | External ID when assuming a role                                                                   |
-| `tls`                    | object | TLS configuration options                                                                          |
+| `secret_id`              | string | **Required.** The name or ARN of the secret in AWS Secrets Manager.                                 |
+| `region`                 | string | AWS region where the secret is stored. If not specified, the default AWS region configuration is used. |
+| `auth.access_key_id`     | string | AWS access key ID. Optional, if using default credential chain.                                      |
+| `auth.secret_access_key` | string | AWS secret access key. Optional, if using default credential chain.                                  |
+| `auth.session_token`     | string | AWS session token for temporary credentials.                                                        |
+| `auth.assume_role`       | string | ARN of an IAM role to assume.                                                                       |
+| `auth.external_id`       | string | External ID when assuming a role.                                                                   |
+| `tls`                    | object | TLS configuration options.                                                                          |
 
 ## Secret format
 

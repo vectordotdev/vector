@@ -22,7 +22,7 @@ In this example, Vector is set up to:
 
 ## Step 1: Create secrets in AWS Secrets Manager
 
-First, create a secret containing all the sensitive values:
+First, create a secret containing all sensitive values:
 
 ```bash
 aws secretsmanager create-secret \
