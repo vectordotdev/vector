@@ -157,7 +157,39 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev ruby-bundler
+      - run: |
+          sudo apt-get update --yes
+
+          sudo apt-get install --yes \
+            software-properties-common \
+            apt-utils \
+            apt-transport-https
+
+          # Deps
+          sudo apt-get install --yes --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              cmake \
+              cmark-gfm \
+              curl \
+              gawk \
+              gnupg2 \
+              gnupg-agent \
+              gnuplot \
+              jq \
+              libclang-dev \
+              libsasl2-dev \
+              libssl-dev \
+              llvm \
+              locales \
+              pkg-config \
+              rename \
+              rpm \
+              ruby-bundler \
+              shellcheck \
+              sudo \
+              unzip \
+              wget
       - uses: ./.github/actions/setup
         with:
           rust: true
