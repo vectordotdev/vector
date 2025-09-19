@@ -175,6 +175,17 @@ runs:
         cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
+    - name: Install ruby
+      if: ${{ inputs.cue == 'true' }}
+      shell: bash
+      run: |
+        echo "Installing ruby"
+        sudo apt-get update && \
+          sudo apt-get install -y --no-install-recommends \
+          ruby-bundler \
+          ca-certificates \
+          curl
+
     - name: Run prepare.sh
       shell: bash
       run: |
