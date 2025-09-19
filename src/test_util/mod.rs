@@ -139,14 +139,10 @@ pub fn trace_init() {
     let color = {
         use std::io::IsTerminal;
         std::io::stdout().is_terminal()
-            || (std::env::var("NEXTEST")
+            || std::env::var("NEXTEST")
                 .ok()
                 .and(Some(true))
                 .unwrap_or(false)
-                && !std::env::var("CI")
-                    .ok()
-                    .map(|ci| ci.as_str() == "true")
-                    .unwrap_or(false))
     };
     // Windows: ANSI colors are not supported by cmd.exe
     // Color is false for everything except unix.
