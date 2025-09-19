@@ -690,7 +690,7 @@ struct EventIterator<'de, R: JsonRead<'de>, E: Extractor> {
     /// Default time
     time: Time,
     /// Remaining extracted default values
-    extractors: E,
+    extractor: E,
     /// Event finalization
     batch: Option<BatchNotifier>,
     /// Splunk HEC Token for passthrough
@@ -730,7 +730,7 @@ impl<'de, R: JsonRead<'de>, E: Extractor> From<EventIteratorGenerator<'de, R>>
             channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
             token: f.meta.token.clone().map(Into::into),
-            extractors: E::new(f.meta, f.log_namespace),
+            extractor: E::new(f.meta, f.log_namespace),
             batch: f.batch,
             log_namespace: f.log_namespace,
             events_received: f.events_received,
@@ -834,7 +834,7 @@ impl<'de, R: JsonRead<'de>, E: Extractor> EventIterator<'de, R, E> {
         );
 
         // Extract default extracted fields
-        self.extractors.extract(&mut log, &mut json);
+        self.extractor.extract(&mut log, &mut json);
 
         // Add passthrough token if present
         if let Some(token) = &self.token
