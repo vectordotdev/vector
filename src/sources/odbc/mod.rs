@@ -124,7 +124,7 @@ enum OdbcError {
 }
 
 /// Wrapper struct for Schedule.
-/// This is a wrapper struct for the Schedule struct to implement Configurable.
+/// Wrapper for the Schedule struct to enable Configurable implementation.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OdbcSchedule {
@@ -168,7 +168,7 @@ impl Debug for OdbcSchedule {
 }
 
 impl OdbcSchedule {
-    /// Creates a stream that asynchronously waits until the next cron time.
+    /// Creates a stream that asynchronously waits for the next scheduled cron time.
     pub(crate) fn stream(self, tz: Tz) -> impl Stream<Item = DateTime<Tz>> {
         let schedule = self.inner.clone();
         stream::unfold(schedule, move |schedule| async move {
@@ -183,8 +183,8 @@ impl OdbcSchedule {
     }
 }
 
-/// The last result is loaded as SQL parameters.
-/// The parameters are created in the order of `columns_order`.
+/// Loads the last result as SQL parameters.
+/// Parameters are created in the order specified by `columns_order`.
 fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
     let Ok(file) = File::open(path) else {
         return None;
@@ -219,7 +219,7 @@ fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<Va
     Some(params)
 }
 
-/// Save the last result as SQL parameters.
+/// Saves the last result as SQL parameters.
 ///
 /// # Arguments
 /// * `path`: The path to the JSON file.
@@ -228,7 +228,7 @@ fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     fs::write(path, json).context(IoSnafu)
 }
 
-/// Convert ODBC data types to Vector values.
+/// Converts ODBC data types to Vector values.
 ///
 /// # Arguments
 /// * `data_type`: The ODBC data type.

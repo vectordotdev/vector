@@ -33,7 +33,7 @@ use vrl::prelude::*;
 /// Configuration for the `odbc` source.
 #[serde_as]
 #[configurable_component(
-    source("odbc", "Pull observability data from a ODBC interface by scheduling a query to run at a specific time."
+    source("odbc", "Periodically pulls observability data from an ODBC interface by running a scheduled query."
     )
 )]
 #[derive(Clone, Debug)]
@@ -46,7 +46,7 @@ pub struct OdbcConfig {
     pub connection_string: String,
 
     /// The path to the file that contains the connection string.
-    /// If this is not set or does not exist on the path, the `connection_string` field is used.
+    /// If this is not set, or the file at the specified path does not exist, the `connection_string` field is used instead.`
     #[configurable(metadata(
         docs::examples = "driver={MySQL ODBC 8.0 ANSI Driver};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
@@ -74,20 +74,19 @@ pub struct OdbcConfig {
     #[serde_as(as = "DurationSeconds<u64>")]
     pub statement_timeout: Duration,
 
-    /// This is the parameter for the first execution of the statement.
-    /// If the `last_run_metadata_path` file path does not exist, this parameter is used for the first execution.
-    /// The initial value is set in the order of the parameter name.
-    /// The value is always a string.
+    /// Initial parameters for the first execution of the statement.
+    /// Used if `last_run_metadata_path` does not exist.
+    /// Values must be strings and are set in the parameter name order.
     ///
     /// # Examples
     ///
     /// When the data source is first executed, the file at `last_run_metadata_path` does not exist.
     /// In this case, you need to declare the initial value in `statement_init_params`.
     ///
-    /// ```yaml
+    /// ```toml
     /// [sources.odbc]
     /// statement = "SELECT * FROM users WHERE id = ?"
-    /// statement_init_params = ["0"]
+    /// statement_init_params = { "id": "0" }
     /// tracking_columns = ["id"]
     /// last_run_metadata_path = "/path/to/tracking.json"
     /// # The rest of the fields are omitted
@@ -102,9 +101,8 @@ pub struct OdbcConfig {
     #[configurable(derived)]
     pub statement_init_params: Option<BTreeMap<String, String>>,
 
-    /// The cron expression for the database query.
-    /// There is no schedule by default.
-    /// If no schedule is given, then the statement is run exactly once
+    /// Cron expression for scheduling database queries.
+    /// If not set, the statement runs only once by default.
     #[configurable(derived)]
     pub schedule: Option<OdbcSchedule>,
 
@@ -120,14 +118,13 @@ pub struct OdbcConfig {
     #[serde(default = "default_schedule_timezone")]
     pub schedule_timezone: Tz,
 
-    /// The batch size for the ODBC driver.
-    /// This is the number of rows to fetch at a time.
+    /// Number of rows to fetch per batch from the ODBC driver.
     /// The default is 100.
     #[configurable(metadata(docs::examples = 100))]
     #[serde(default = "default_odbc_batch_size")]
     pub odbc_batch_size: usize,
 
-    /// The maximum string length for the ODBC driver.
+    /// Maximum string length for ODBC driver operations.
     /// The default is 4096.
     #[configurable(metadata(docs::examples = 4096))]
     #[serde(default = "default_odbc_batch_size")]
@@ -147,7 +144,7 @@ pub struct OdbcConfig {
     ///
     /// # Examples
     ///
-    /// ```yaml
+    /// ```toml
     /// [sources.odbc]
     /// statement = "SELECT * FROM users WHERE id = ?"
     /// tracking_columns = ["id"]
@@ -159,7 +156,7 @@ pub struct OdbcConfig {
     /// The path to the file where the last row of the result set will be saved.
     /// The last row of the result set is saved in JSON format.
     /// This file is used as a parameter for the SQL query of the next schedule.
-    /// If the file does not exist or is not set, the `statement_init_params` initial value is used.
+    /// If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
     ///
     /// # Examples
     ///
@@ -180,6 +177,11 @@ pub struct OdbcConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    #[cfg(test)]
+    #[configurable(derived)]
+    #[serde(default)]
+    pub iterations: Option<usize>,
 }
 
 const fn default_query_timeout_sec() -> Duration {
@@ -207,19 +209,21 @@ impl Default for OdbcConfig {
         Self {
             connection_string: "".to_string(),
             connection_string_filepath: None,
-            statement: None,
             schedule: None,
             schedule_timezone: Tz::UTC,
+            statement: None,
+            statement_timeout: Duration::from_secs(3),
             statement_init_params: None,
             odbc_batch_size: default_odbc_batch_size(),
             odbc_max_str_limit: default_odbc_max_str_limit(),
             odbc_default_timezone: Tz::UTC,
             tracking_columns: None,
             last_run_metadata_path: None,
-            statement_timeout: Duration::from_secs(3),
             decoding: default_decoding(),
             log_namespace: None,
             statement_filepath: None,
+            #[cfg(test)]
+            iterations: None,
         }
     }
 }
@@ -306,11 +310,14 @@ impl Context {
             warn!(message = "No next schedule found. Retry in 10 seconds.");
             return Err(());
         };
-        //let schedule = schedule.clone().stream(self.cfg.schedule_timezone).take_until(shutdown);
+
         let schedule = schedule.clone().stream(self.cfg.schedule_timezone);
         pin_mut!(schedule);
 
         let _ = register!(BytesReceived::from(Protocol::NONE));
+
+        #[cfg(test)]
+        let mut count = 0;
 
         loop {
             select! {
@@ -341,8 +348,16 @@ impl Context {
                         break
                     }
 
-                    #[cfg(all(test, feature = "odbc-integration-tests"))]
-                    break
+                    #[cfg(test)]
+                    {
+                        count += 1;
+                        if let Some(iterations) = self.cfg.iterations {
+                            if count >= iterations {
+                                debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
