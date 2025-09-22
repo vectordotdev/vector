@@ -9,10 +9,7 @@ use std::{
 use bytes::Buf;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::{
-    future::{select, Either},
-    Future, Sink, SinkExt,
-};
+use futures::{Future, Sink, SinkExt};
 use indexmap::IndexMap;
 #[cfg(any(test, feature = "test"))]
 use tokio::sync::mpsc;
@@ -519,50 +516,28 @@ where
             }
             stats.record("sending", start.elapsed());
 
-            let start = time::Instant::now();
-            // Use minimal backoff to ensure we detect changes immediately
-            // 1ms is the minimum possible value to ensure immediate responsiveness
-            let backoff = 1;
-
-            // This works only if run inside tokio context since we are using
-            // tokio's Timer. Outside of such context, this will panic on the first
-            // call. Also since we are using block_on here and in the above code,
-            // this should be run in its own thread. `spawn_blocking` fulfills
-            // all of these requirements.
-            let sleep = async move {
-                if backoff > 0 {
-                    // Always use a very short sleep duration to ensure responsiveness
-                    // This is especially important for notify-based watching
-                    sleep(Duration::from_millis(1)).await;
+            if futures::poll!(&mut shutdown_data).is_ready() {
+                // Shut down all file watchers to prevent further events
+                debug!(
+                    message = "Shutting down all file watchers",
+                    count = fp_map.len()
+                );
+                for (_, watcher) in fp_map.iter_mut() {
+                    watcher.shutdown();
                 }
-            };
-            futures::pin_mut!(sleep);
-            match select(shutdown_data, sleep).await {
-                Either::Left((_, _)) => {
-                    // Shut down all file watchers to prevent further events
-                    debug!(
-                        message = "Shutting down all file watchers",
-                        count = fp_map.len()
-                    );
-                    for (_, watcher) in fp_map.iter_mut() {
-                        watcher.shutdown();
-                    }
 
-                    chans
-                        .close()
-                        .await
-                        .expect("error closing file_server data channel.");
-                    let checkpointer = checkpoint_task_handle
-                        .await
-                        .expect("checkpoint task has panicked");
-                    if let Err(error) = checkpointer.write_checkpoints().await {
-                        error!(?error, "Error writing checkpoints before shutdown");
-                    }
-                    return Ok(Shutdown);
+                chans
+                    .close()
+                    .await
+                    .expect("error closing file_server data channel.");
+                let checkpointer = checkpoint_task_handle
+                    .await
+                    .expect("checkpoint task has panicked");
+                if let Err(error) = checkpointer.write_checkpoints().await {
+                    error!(?error, "Error writing checkpoints before shutdown");
                 }
-                Either::Right((_, future)) => shutdown_data = future,
+                return Ok(Shutdown);
             }
-            stats.record("sleeping", start.elapsed());
         }
     }
 
@@ -655,6 +630,7 @@ where
     }
 }
 
+/// Write checkpoints to file, sleeping `sleep_duration` in between writes
 async fn checkpoint_writer(
     checkpointer: Checkpointer,
     sleep_duration: Duration,
