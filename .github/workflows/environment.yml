@@ -3,9 +3,8 @@ name: Environment Suite
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - master
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
 
 env:
   VERBOSE: true
