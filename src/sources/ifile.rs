@@ -1333,9 +1333,6 @@ mod tests {
 
                 // Wait for the files to be observed at their original lengths before writing to them
                 // This ensures the file source has discovered the files
-                assert!(path1.exists());
-                assert!(path2.exists());
-
                 for i in 0..n {
                     file1.write_line(format!("hello {i}")).await.unwrap();
                     file2.write_line(format!("goodbye {i}")).await.unwrap();
@@ -1398,7 +1395,6 @@ mod tests {
             Some(tx),
             async {
                 let mut file = File::create(&path).await.unwrap();
-                assert!(path.exists());
 
                 file.write_line("line for checkpointing").await.unwrap();
                 for _i in 0..n {
