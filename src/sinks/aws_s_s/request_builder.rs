@@ -1,10 +1,11 @@
 use bytes::Bytes;
-use vector_lib::ByteSizeOf;
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
+use vector_lib::{
+    ByteSizeOf,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 
-use crate::codecs::EncodingConfig;
 use crate::{
-    codecs::{Encoder, Transformer},
+    codecs::{Encoder, EncodingConfig, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     internal_events::TemplateRenderingError,
     sinks::util::{

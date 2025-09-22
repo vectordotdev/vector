@@ -1,18 +1,18 @@
-use hickory_proto::dnssec::{PublicKey, Verifier};
-use std::fmt::Write as _;
-use std::str::Utf8Error;
+use std::{fmt::Write as _, str::Utf8Error};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use hickory_proto::dnssec::SupportedAlgorithms;
-use hickory_proto::dnssec::rdata::{CDNSKEY, CDS, DNSKEY, DNSSECRData, DS};
-use hickory_proto::rr::rdata::caa::Property;
 use hickory_proto::{
     ProtoError,
+    dnssec::{
+        PublicKey, SupportedAlgorithms, Verifier,
+        rdata::{CDNSKEY, CDS, DNSKEY, DNSSECRData, DS},
+    },
     op::{Query, message::Message as TrustDnsMessage},
     rr::{
         Name, RecordType,
         rdata::{
             A, AAAA, NULL, OPT, SVCB,
+            caa::Property,
             opt::{EdnsCode, EdnsOption},
         },
         record_data::RData,
@@ -22,12 +22,11 @@ use hickory_proto::{
 };
 use snafu::Snafu;
 
-use crate::ede::{EDE, EDE_OPTION_CODE};
-
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
     QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
 };
+use crate::ede::{EDE, EDE_OPTION_CODE};
 
 /// Error type for DNS message parsing
 #[derive(Debug, Snafu)]
@@ -1298,29 +1297,23 @@ mod tests {
     #[allow(deprecated)]
     use hickory_proto::dnssec::rdata::key::UpdateScope;
     use hickory_proto::{
-        dnssec::PublicKeyBuf,
-        rr::{
-            domain::Name,
-            rdata::{
-                CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
-                caa::KeyValue,
-                sshfp::{Algorithm, FingerprintType},
-                svcb,
-                tlsa::{CertUsage, Matching, Selector},
-            },
-        },
-    };
-    use hickory_proto::{
         dnssec::{
-            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
+            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm, PublicKeyBuf,
             rdata::{
                 KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
                 key::{KeyTrust, KeyUsage, Protocol},
             },
         },
-        rr::rdata::{
-            CERT,
-            cert::{Algorithm as CertAlgorithm, CertType},
+        rr::{
+            domain::Name,
+            rdata::{
+                CAA, CERT, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
+                caa::KeyValue,
+                cert::{Algorithm as CertAlgorithm, CertType},
+                sshfp::{Algorithm, FingerprintType},
+                svcb,
+                tlsa::{CertUsage, Matching, Selector},
+            },
         },
         serialize::binary::Restrict,
     };

@@ -1,8 +1,10 @@
-use vector_lib::codecs::{
-    TextSerializerConfig,
-    encoding::{Framer, FramingConfig},
+use vector_lib::{
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
 
 #[cfg(not(windows))]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -146,8 +148,9 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Udp(UdpMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let serializer = encoding.build()?;
+                let chunker = serializer.chunker();
                 let encoder = Encoder::<()>::new(serializer);
-                config.build(transformer, encoder)
+                config.build(transformer, encoder, chunker)
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {
@@ -208,6 +211,8 @@ mod test {
         net::{SocketAddr, UdpSocket},
     };
 
+    #[cfg(target_os = "windows")]
+    use cfg_if::cfg_if;
     use futures::stream::StreamExt;
     use futures_util::stream;
     use serde_json::Value;
@@ -220,9 +225,6 @@ mod test {
     use vector_lib::codecs::JsonSerializerConfig;
 
     use super::*;
-
-    #[cfg(target_os = "windows")]
-    use cfg_if::cfg_if;
     cfg_if! { if #[cfg(unix)] {
         use vector_lib::codecs::NativeJsonSerializerConfig;
         use crate::test_util::random_metrics_with_stream;
@@ -441,9 +443,9 @@ mod test {
         };
         use tokio_stream::wrappers::IntervalStream;
 
-        use crate::event::EventArray;
-        use crate::tls::{
-            self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig,
+        use crate::{
+            event::EventArray,
+            tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
         };
 
         trace_init();

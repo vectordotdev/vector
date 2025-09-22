@@ -2,12 +2,15 @@
 //! Most of code is cribbed directly from the Rust stdlib and ported to work with winapi.
 //!
 //! In stdlib imported code, warnings are allowed.
+#![allow(async_fn_in_trait)]
 
-use std::fs::File;
+#[cfg(unix)]
+use std::fs::Metadata;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::{mem::zeroed, ptr};
+use tokio::fs::File;
 
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
@@ -18,16 +21,18 @@ use winapi::um::{
     winnt::FILE_ATTRIBUTE_REPARSE_POINT, winnt::MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
 };
 
-#[cfg(not(windows))]
 pub trait PortableFileExt {
-    fn portable_dev(&self) -> std::io::Result<u64>;
-    fn portable_ino(&self) -> std::io::Result<u64>;
+    fn portable_dev(&self) -> u64;
+    fn portable_ino(&self) -> u64;
+}
+
+#[cfg(unix)]
+pub trait AsyncFileInfo {
+    async fn file_info(&self) -> std::io::Result<Metadata>;
 }
 
 #[cfg(windows)]
-pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
-    fn portable_dev(&self) -> std::io::Result<u64>;
-    fn portable_ino(&self) -> std::io::Result<u64>;
+pub trait AsyncFileInfo: std::os::windows::io::AsRawHandle {
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
     #[allow(unused_assignments, unused_variables)]
     fn reparse_point<'a>(
@@ -53,7 +58,7 @@ pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
     }
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L326-L351
     #[allow(unused_assignments, unused_variables)]
-    fn get_file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
+    fn file_info_inner(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
         unsafe {
             let mut info: BY_HANDLE_FILE_INFORMATION = zeroed();
             cvt(GetFileInformationByHandle(self.as_raw_handle(), &mut info))?;
@@ -67,29 +72,45 @@ pub trait PortableFileExt: std::os::windows::io::AsRawHandle {
             Ok(info)
         }
     }
+    async fn file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION>;
 }
 
 #[cfg(unix)]
-impl PortableFileExt for File {
-    fn portable_dev(&self) -> std::io::Result<u64> {
-        Ok(self.metadata()?.dev())
+impl AsyncFileInfo for File {
+    async fn file_info(&self) -> std::io::Result<Metadata> {
+        self.metadata().await
     }
-    fn portable_ino(&self) -> std::io::Result<u64> {
-        Ok(self.metadata()?.ino())
+}
+
+#[cfg(unix)]
+impl PortableFileExt for Metadata {
+    fn portable_dev(&self) -> u64 {
+        self.dev()
+    }
+    fn portable_ino(&self) -> u64 {
+        self.ino()
     }
 }
 
 #[cfg(windows)]
-impl PortableFileExt for File {
-    fn portable_dev(&self) -> std::io::Result<u64> {
-        let info = self.get_file_info()?;
-        Ok(info.dwVolumeSerialNumber.into())
+impl AsyncFileInfo for File {
+    async fn file_info(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
+        let file = self.try_clone().await?;
+        tokio::task::spawn_blocking(move || file.file_info_inner())
+            .await
+            .map_err(std::io::Error::other)?
+    }
+}
+
+#[cfg(windows)]
+impl PortableFileExt for BY_HANDLE_FILE_INFORMATION {
+    fn portable_dev(&self) -> u64 {
+        self.dwVolumeSerialNumber.into()
     }
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
-    fn portable_ino(&self) -> std::io::Result<u64> {
-        let info = self.get_file_info()?;
+    fn portable_ino(&self) -> u64 {
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
-        Ok((info.nFileIndexLow as u64) | ((info.nFileIndexHigh as u64) << 32))
+        (self.nFileIndexLow as u64) | ((self.nFileIndexHigh as u64) << 32)
     }
 }
 

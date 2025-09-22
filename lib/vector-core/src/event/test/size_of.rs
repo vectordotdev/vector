@@ -4,8 +4,7 @@ use lookup::{PathPrefix, path};
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use super::common::Name;
-use super::*;
+use super::{common::Name, *};
 
 #[test]
 fn at_least_wrapper_size() {

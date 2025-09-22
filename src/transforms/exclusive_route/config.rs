@@ -1,14 +1,17 @@
-use crate::conditions::{AnyCondition, ConditionConfig, VrlConfig};
-use crate::config::{
-    DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
-};
-use crate::schema;
-use crate::sinks::prelude::configurable_component;
-use crate::transforms::Transform;
-use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use std::hash::{Hash, Hasher};
+
 use vector_lib::config::clone_input_definitions;
+
+use crate::{
+    conditions::{AnyCondition, ConditionConfig, VrlConfig},
+    config::{
+        DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
+    schema,
+    sinks::prelude::configurable_component,
+    transforms::{Transform, exclusive_route::transform::ExclusiveRoute},
+};
 
 pub(super) const UNMATCHED_ROUTE: &str = "_unmatched";
 
@@ -163,8 +166,9 @@ impl TransformConfig for ExclusiveRouteConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::ExclusiveRouteConfig;
     use indoc::indoc;
+
+    use super::ExclusiveRouteConfig;
 
     #[test]
     fn generate_config() {
