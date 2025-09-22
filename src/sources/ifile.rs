@@ -1034,7 +1034,6 @@ mod tests {
                     match ev {
                         TestEvent::Read(path, _) => {
                             let path = path.canonicalize().unwrap();
-                            trace!(?original_files, ?path, "HERE");
                             assert!(original_files.contains(&path));
                             assert!(!files.contains(&path)); // Was already checkpointed
 
