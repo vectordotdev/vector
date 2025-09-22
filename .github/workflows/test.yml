@@ -162,17 +162,17 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           export ACCEPT_EULA=Y
 
-          echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
 
-          apt-get update --yes
+          sudo apt-get update --yes
 
-          apt-get install --yes \
+          sudo apt-get install --yes \
             software-properties-common \
             apt-utils \
             apt-transport-https
 
           # Deps
-          apt-get install --yes --no-install-recommends \
+          sudo apt-get install --yes --no-install-recommends \
               build-essential \
               ca-certificates \
               cmake \
@@ -198,8 +198,8 @@ jobs:
               wget
 
           # Locales
-          locale-gen en_US.UTF-8
-          dpkg-reconfigure locales
+          sudo locale-gen en_US.UTF-8
+          sudo dpkg-reconfigure locales
 
           # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 24.04 images _and_
           # by our own Ubuntu 24.04 images, so this is really just make sure the path is configured.
@@ -211,8 +211,8 @@ jobs:
               echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
           fi
 
-          mkdir -p /var/lib/vector
-          chmod 777 /var/lib/vector
+          sudo mkdir -p /var/lib/vector
+          sudo chmod 777 /var/lib/vector
 
 
 
