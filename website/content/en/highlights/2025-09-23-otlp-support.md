@@ -1,5 +1,5 @@
 ---
-date: '2025-02-24'
+date: '2025-10-23'
 title: 'OTLP Support'
 description: 'Introducing Opentelemetry Protocol support!'
 authors: ['pront']
