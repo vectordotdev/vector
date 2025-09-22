@@ -42,7 +42,7 @@ releases: "0.50.0": {
 		{
 			type: "enhancement"
 			description: """
-				Adds JetStream support to the `nats` source.
+				Added JetStream support to the `nats` source.
 				"""
 			contributors: ["benjamin-awd"]
 		},
