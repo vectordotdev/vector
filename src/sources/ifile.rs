@@ -2168,14 +2168,25 @@ mod tests {
             assert_eq!(ret, 0);
         }
 
-        let received = run_ifile_source(&config, true, NoAcks, LogNamespace::Legacy, None, async {
-            // Need to sleep so that the file is checkpointed before we write to it, which
-            // updates the modified time
-            sleep_500_millis().await;
-            older_file.write_line("second line").await.unwrap();
-            newer_file.write_line("_second line").await.unwrap();
-            sleep_500_millis().await;
-        })
+        older_file.sync_all().await.unwrap();
+        newer_file.sync_all().await.unwrap();
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            true,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
+                // files need to be checkpointed before we write to them, which
+                // updates the modified time
+                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 2, 5000).await;
+                older_file.write_line("second line").await.unwrap();
+                newer_file.write_line("_second line").await.unwrap();
+                wait_for_n_reads(&mut rx, 2, 5000).await;
+            },
+        )
         .await;
 
         let older_lines = received
