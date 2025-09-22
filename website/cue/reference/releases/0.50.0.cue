@@ -63,7 +63,7 @@ releases: "0.50.0": {
 		{
 			type: "fix"
 			description: """
-				Fixes the `splunk_hec` sink to not use compression on indexer acknowledgement queries.
+				Fixed the `splunk_hec` sink to not use compression on indexer acknowledgement queries.
 				"""
 			contributors: ["sbalmos"]
 		},
