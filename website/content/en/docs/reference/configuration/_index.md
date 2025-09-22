@@ -3,7 +3,7 @@ title: Configuring Vector
 short: Configuration
 weight: 2
 aliases: ["/docs/configuration", "/docs/setup/configuration"]
-tags: ["configuration", "env", "environment variables", "interpolation"]
+tags: ["configuration", "env", "environment variables", "interpolation", "enrichment", "memory"]
 ---
 
 Vector is configured using a configuration file. This section contains a
