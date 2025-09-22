@@ -14,10 +14,10 @@ releases: "0.50.0": {
 		- The `opentelemetry` source can now decode data according to the standard [OTLP protocol](https://opentelemetry.io/docs/specs/otel/protocol)
 		for all telemetry data types (logs, metrics and traces). This eliminates the need for complex event remapping. It
 		greatly simplifies configuration for OTEL -> Vector -> OTEL use cases or when forwarding data to any system that expects OTLP-formatted telemetry.
-		- A new `okta` source for consuming [Okta system logs](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/SystemLog/) is now available.
-		- Introduced a new `incremental_to_absolute` transform, useful when metric data might be lost in transit or for creating a historical record of the metric.
-		- The `exec` secrets option now supports protocol version `v1.1` which can be used with the [Datadog Secret Backend](https://github.com/DataDog/datadog-secret-backend/blob/v1/README.md).
 		- A new `varint_length_delimited` framing option is now available which enables compatibility with standard protobuf streaming implementations and tools like ClickHouse.
+		- Introduced a new `incremental_to_absolute` transform, useful when metric data might be lost in transit or for creating a historical record of the metric.
+		- A new `okta` source for consuming [Okta system logs](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/SystemLog/) is now available.
+		- The `exec` secrets option now supports protocol version `v1.1` which can be used with the [Datadog Secret Backend](https://github.com/DataDog/datadog-secret-backend/blob/v1/README.md).
 
 		## Breaking Changes
 
@@ -56,7 +56,7 @@ releases: "0.50.0": {
 		{
 			type: "enhancement"
 			description: """
-				Adds an option to disable listing Kubernetes namespaces, reducing resource usage in clusters with many namespaces.
+				Added `insert_namespace_fields` config option which can be used to disable listing Kubernetes namespaces, reducing resource usage in clusters with many namespaces.
 				"""
 			contributors: ["imbstack"]
 		},
