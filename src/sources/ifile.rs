@@ -988,6 +988,7 @@ mod tests {
 
         tokio::select! {
             _ = shutdown => {
+                error!("Timed out, reads = {counter}/{count}");
                 panic!("Timed out, reads = {counter}/{count}");
             }
             _ = async {
@@ -997,6 +998,53 @@ mod tests {
                         counter += 1;
                     }
                     if counter == count {
+                        break;
+                    }
+                }
+            } => {}
+        }
+    }
+
+    async fn wait_checkpoint_and_n_reads(
+        rx: &mut UnboundedReceiver<TestEvent>,
+        original_files: Vec<&PathBuf>,
+        count: usize,
+        timeout_ms: u64,
+    ) {
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
+        let mut files: HashSet<PathBuf> = HashSet::from_iter(
+            original_files
+                .into_iter()
+                .map(|path| path.canonicalize().unwrap()),
+        );
+        let original_files = files.clone();
+
+        let mut counter = 0;
+
+        tokio::select! {
+            _ = shutdown => {
+                let message = format!("Timed out, left to checkpoint = {files:#?} or not enough reads {counter}/{count}");
+                error!(message);
+                panic!("{}", message);
+            }
+            _ = async {
+                while let Some(ev) = rx.recv().await {
+                    trace!(?ev, "test rx got event");
+
+                    match ev {
+                        TestEvent::Read(path, _) => {
+                            let path = path.canonicalize().unwrap();
+                            trace!(?original_files, ?path, "HERE");
+                            assert!(original_files.contains(&path));
+                            assert!(!files.contains(&path)); // Was already checkpointed
+
+                            counter += 1;
+                        }
+                        TestEvent::Checkpointed(path) => {
+                            files.remove(&path);
+                        }
+                    };
+                    if files.is_empty() || counter == count {
                         break;
                     }
                 }
@@ -1342,7 +1390,7 @@ mod tests {
                 file1.flush().await.unwrap();
                 file2.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n * 2, 5000).await;
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path1, &path2], n * 2, 5000).await;
             },
         )
         .await;
