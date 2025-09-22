@@ -535,43 +535,65 @@ pub fn ifile_source(
         return Box::pin(future::ready(Err(())));
     }
 
+    // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
+    // canonicalized paths only
+    let resolve_symlinks = |original_path: PathBuf| {
+        let mut components = original_path
+            .components()
+            .map(|c| c.as_os_str().to_os_string())
+            .collect_vec();
+
+        if components
+            .first()
+            .map(|first| first.to_string_lossy().contains("*"))
+            .unwrap_or(false)
+        {
+            warn!(
+                "{} contains a * in it's first path component. If a match resolves to a symlink it will not be watched",
+                original_path.display(),
+            );
+        }
+
+        let mut popped = vec![];
+
+        while components.len() > 0 {
+            let path: PathBuf = components.iter().collect();
+
+            match path.canonicalize() {
+                Ok(mut canonical) => {
+                    if canonical == path {
+                        // Not a symlink, we should be good to keep original_path
+                        return original_path.clone();
+                    }
+                    while let Some(popped) = popped.pop() {
+                        canonical.push(popped);
+                    }
+                    info!(
+                        "{} is a symlink, watching canonical path {} instead",
+                        original_path.display(),
+                        canonical.display()
+                    );
+                    return canonical;
+                }
+                Err(_) => {
+                    popped.push(components.pop().expect("components.len() > 0"));
+                }
+            }
+        }
+
+        warn!(
+            "Could not find {}. If the path is later created as a or containing a symlink it will not be watched",
+            original_path.display(),
+        );
+
+        original_path
+    };
+
     let exclude_patterns = config
         .exclude
         .iter()
         .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
-        .map(|original_path| {
-            let mut components = original_path
-                .components()
-                .map(|c| c.as_os_str().to_os_string())
-                .collect_vec();
-            let mut popped = vec![];
-
-            while components.len() > 0 {
-                let path: PathBuf = components.iter().collect();
-
-                match path.canonicalize() {
-                    Ok(mut canonical) => {
-                        if canonical == path {
-                            // Not a symlink, we should be good to keep original_path
-                            return original_path.clone();
-                        }
-                        // TODO log
-                        dbg!("symlink found");
-                        while let Some(popped) = popped.pop() {
-                            canonical.push(popped);
-                        }
-                        return canonical;
-                    }
-                    Err(_) => {
-                        popped.push(components.pop().expect("components.len() > 0"));
-                    }
-                }
-            }
-
-            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
-            // TODO check for * in components[0], if that's the case symlink resolution will not work
-            original_path.clone()
-        })
+        .map(resolve_symlinks)
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let checkpoint_interval = config.checkpoint_interval;
@@ -585,44 +607,11 @@ pub fn ifile_source(
         include_file_metric_tag: config.internal_metrics.include_file_tag,
     };
 
-    // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
-    // canonicalized paths only
     let include = config
         .include
         .iter()
-        .map(|original_path| {
-            let mut components = original_path
-                .components()
-                .map(|c| c.as_os_str().to_os_string())
-                .collect_vec();
-            let mut popped = vec![];
-
-            while components.len() > 0 {
-                let path: PathBuf = components.iter().collect();
-
-                match path.canonicalize() {
-                    Ok(mut canonical) => {
-                        if canonical == path {
-                            // Not a symlink, we should be good to keep original_path
-                            return original_path.clone();
-                        }
-                        // TODO log
-                        dbg!("symlink found");
-                        while let Some(popped) = popped.pop() {
-                            canonical.push(popped);
-                        }
-                        return canonical;
-                    }
-                    Err(_) => {
-                        popped.push(components.pop().expect("components.len() > 0"));
-                    }
-                }
-            }
-
-            // TODO maybe log we could not find/canonicalize path, therefore it will not work if created as symlink
-            // TODO check for * in components[0], if that's the case symlink resolution will not work
-            original_path.clone()
-        })
+        .cloned()
+        .map(resolve_symlinks)
         .collect_vec();
 
     // Use notify-based paths provider by default
