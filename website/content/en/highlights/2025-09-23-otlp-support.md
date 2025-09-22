@@ -54,6 +54,9 @@ sinks:
           content-type: application/json
 ```
 
+**Note:** This setup is affected by a [known issue](https://github.com/vectordotdev/vector/issues/22054).
+We plan to improve batching for this sink in future Vector versions.
+
 ## Example Configuration 2
 
 Here is another pipeline configuration that can achieve the same as the above:
