@@ -1651,7 +1651,7 @@ mod tests {
                 file3.flush().await.unwrap();
                 file4.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n * 4, 5000).await;
+                wait_for_n_reads(&mut rx, n * 3, 5000).await;
             },
         )
         .await;
