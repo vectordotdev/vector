@@ -131,7 +131,7 @@ where
 
         let paths = self.paths_provider.paths().await;
         for path in paths.into_iter() {
-            dbg!(&path);
+            debug!(?path, "fingerprinting on startup");
             if let Some(file_id) = self
                 .fingerprinter
                 .get_fingerprint_or_log_error(
@@ -175,7 +175,8 @@ where
 
         let checkpoints = checkpointer.view();
 
-        for (path, file_id) in dbg!(existing_files) {
+        debug!(?existing_files);
+        for (path, file_id) in existing_files {
             checkpointer
                 .maybe_upgrade(&path, file_id, &self.fingerprinter, &mut fingerprint_buffer)
                 .await;
