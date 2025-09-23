@@ -4,8 +4,10 @@ use aws_smithy_types::Blob;
 use bytes::Bytes;
 use tracing::Instrument;
 
-use super::super::service::RecordResult;
-use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
+use super::{
+    super::service::RecordResult, KinesisClient, KinesisError, KinesisRecord, KinesisResponse,
+    Record, SendRecord,
+};
 use crate::sinks::prelude::*;
 
 #[derive(Clone)]
@@ -99,8 +101,7 @@ fn extract_failed_records(output: &PutRecordsOutput) -> Vec<RecordResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aws_sdk_kinesis::operation::put_records::PutRecordsOutput;
-    use aws_sdk_kinesis::types::PutRecordsResultEntry;
+    use aws_sdk_kinesis::{operation::put_records::PutRecordsOutput, types::PutRecordsResultEntry};
 
     #[test]
     fn test_extract_failed_records_all_success() {

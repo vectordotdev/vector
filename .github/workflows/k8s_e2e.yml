@@ -42,7 +42,7 @@ concurrency:
 env:
   CONTAINER_TOOL: "docker"
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   DISABLE_MOLD: true
   CI: true
