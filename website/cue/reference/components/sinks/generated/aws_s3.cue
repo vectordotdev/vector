@@ -602,6 +602,20 @@ generated: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			gelf: {
+				description:   "The GELF Serializer Options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: max_chunk_size: {
+					description: """
+						Maximum size for each GELF chunked datagram (including 12-byte header).
+						Chunking starts when datagrams exceed this size.
+						For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+						"""
+					required: false
+					type: uint: default: 8192
+				}
+			}
 			json: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
@@ -1061,7 +1075,7 @@ generated: components: sinks: aws_s3: configuration: {
 	}
 	retry_strategy: {
 		description: """
-			Specifies errors to retry
+			Specifies retry strategy for failed requests.
 
 			By default, the sink only retries attempts it deems possible to retry.
 			These settings extend the default behavior.
@@ -1078,11 +1092,25 @@ generated: components: sinks: aws_s3: configuration: {
 				description: "The retry strategy enum."
 				required:    false
 				type: string: {
-					default: "none"
+					default: "default"
 					enum: {
 						all:    "Retry on *all* errors"
 						custom: "Custom retry strategy"
-						none:   "Don't retry any errors"
+						default: """
+															Default strategy. The following error types will be retried:
+															- `TimeoutError`
+															- `DispatchFailure`
+															- `ResponseError` or `ServiceError` when:
+															  - HTTP status is 5xx
+															  - Status is 429 (Too Many Requests)
+															  - `x-amz-retry-after` header is present
+															  - HTTP status is 4xx and response body contains one of:
+															    - `"RequestTimeout"`
+															    - `"RequestExpired"`
+															    - `"ThrottlingException"`
+															- Fallback: Any unknown error variant
+															"""
+						none: "Don't retry any errors"
 					}
 				}
 			}
