@@ -166,8 +166,10 @@ where
             }
         }
 
-        existing_files.sort_by_key(|(path, _file_id)| {
-            created_map.get(path).unwrap_or(&now);
+        existing_files.sort_by(|(path_a, _), (path_b, _)| {
+            let a = created_map.get(path_a).unwrap_or(&now);
+            let b = created_map.get(path_b).unwrap_or(&now);
+            a.cmp(b)
         });
 
         let checkpoints = checkpointer.view();

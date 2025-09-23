@@ -2432,11 +2432,6 @@ mod tests {
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).await.unwrap();
 
-        sleep_500_millis().await;
-
-        let newer_path = dir.path().join("a_newer_file");
-        let mut newer = File::create(&newer_path).await.unwrap();
-
         older.write_line("hello i am the old file").await.unwrap();
         older
             .write_line("i have been around a while")
@@ -2446,6 +2441,11 @@ mod tests {
             .write_line("you can read newer files at the same time")
             .await
             .unwrap();
+
+        older.sync_all().await.unwrap();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).await.unwrap();
 
         newer.write_line("and i am the new file").await.unwrap();
         newer
@@ -2457,15 +2457,18 @@ mod tests {
             .await
             .unwrap();
 
-        sleep_500_millis().await;
+        newer.sync_all().await.unwrap();
 
+        let (tx, mut rx) = mpsc::unbounded_channel();
         let received = run_ifile_source(
             &config,
             false,
             NoAcks,
             LogNamespace::Legacy,
-            None,
-            sleep_500_millis(),
+            Some(tx),
+            async {
+                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000).await;
+            },
         )
         .await;
 
@@ -2514,8 +2517,6 @@ mod tests {
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).await.unwrap();
 
-        sleep_500_millis().await;
-
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).await.unwrap();
 
@@ -2529,6 +2530,8 @@ mod tests {
             .await
             .unwrap();
 
+        older.sync_all().await.unwrap();
+
         newer.write_line("i'm new").await.unwrap();
         newer
             .write_line("hopefully you read all the old stuff first")
@@ -2539,15 +2542,18 @@ mod tests {
             .await
             .unwrap();
 
-        sleep_500_millis().await;
+        newer.sync_all().await.unwrap();
 
+        let (tx, mut rx) = mpsc::unbounded_channel();
         let received = run_ifile_source(
             &config,
             false,
             NoAcks,
             LogNamespace::Legacy,
-            None,
-            sleep_500_millis(),
+            Some(tx),
+            async {
+                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000).await;
+            },
         )
         .await;
 
