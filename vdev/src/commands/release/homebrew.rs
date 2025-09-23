@@ -14,6 +14,10 @@ pub struct Cli {
     /// GitHub username for the repository.
     #[arg(long, default_value = "vectordotdev")]
     username: String,
+
+    /// Vector version, defaults to $VECTOR_VERSION if not specified.
+    #[arg(long, env = "VECTOR_VERSION")]
+    vector_version: String,
 }
 
 impl Cli {
