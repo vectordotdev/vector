@@ -1043,7 +1043,7 @@ mod tests {
                             files.remove(&path);
                         }
                     };
-                    if files.is_empty() || counter == count {
+                    if files.is_empty() && counter == count {
                         break;
                     }
                 }
@@ -2151,6 +2151,9 @@ mod tests {
         older_file.write_line("first line").await.unwrap(); // first few bytes make up unique file fingerprint
         newer_file.write_line("_first line").await.unwrap(); // and therefore need to be non-identical
 
+        older_file.sync_all().await.unwrap();
+        newer_file.sync_all().await.unwrap();
+
         {
             // Set the modified times
             let older = SystemTime::now() - Duration::from_secs(8);
@@ -2181,9 +2184,12 @@ mod tests {
             async {
                 // files need to be checkpointed before we write to them, which
                 // updates the modified time
-                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 2, 5000).await;
+                // only one line is sent since the other one is too old
+                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 1, 5000).await;
                 older_file.write_line("second line").await.unwrap();
                 newer_file.write_line("_second line").await.unwrap();
+                older_file.flush().await.unwrap();
+                newer_file.flush().await.unwrap();
                 wait_for_n_reads(&mut rx, 2, 5000).await;
             },
         )
