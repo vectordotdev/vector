@@ -1,6 +1,17 @@
 name: Publish to Homebrew
 
 on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref (branch, tag, or SHA) to check out"
+        required: true
+        type: string
+      vector_version:
+        description: "Vector version to publish"
+        required: true
+        type: string
+
   workflow_call:
     inputs:
       git_ref:
