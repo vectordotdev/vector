@@ -332,6 +332,7 @@ generated: components: sources: http_server: configuration: {
 		}
 	}
 	encoding: {
+		deprecated: true
 		description: """
 			The expected encoding of received data.
 

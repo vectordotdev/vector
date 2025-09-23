@@ -4,12 +4,12 @@ use chrono::{TimeZone, Timelike, Utc};
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
 use tokio::time::{Duration, sleep};
-use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
 use vector_lib::{
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
     lookup,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
 };
 use vrl::path::OwnedTargetPath;
 

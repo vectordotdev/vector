@@ -1,4 +1,3 @@
-use ipnet::IpNet;
 use std::{
     collections::HashMap,
     future::Future,
@@ -9,13 +8,16 @@ use std::{
 };
 
 use futures::{FutureExt, Stream, future::BoxFuture, stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
-use openssl::x509::X509;
+use ipnet::IpNet;
+use openssl::{
+    ssl::{Ssl, SslAcceptor, SslMethod},
+    x509::X509,
+};
 use snafu::ResultExt;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
+    sync::{OwnedSemaphorePermit, Semaphore},
 };
 use tokio_openssl::SslStream;
 use tonic::transport::{Certificate, server::Connected};

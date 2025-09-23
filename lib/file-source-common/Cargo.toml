@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [target.'cfg(windows)'.dependencies]
-libc = "0.2"
+libc.workspace = true
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
@@ -21,12 +21,12 @@ serde_json = { version = "1.0.143", default-features = false }
 bstr = { version = "1.12", default-features = false }
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 dashmap = { version = "6.1", default-features = false }
-flate2 = { version = "1.1.2", default-features = false, features = ["rust_backend"] }
+async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
+tokio = { workspace = true, features = ["full"] }
 
 [dev-dependencies]
-criterion = "0.7"
 quickcheck = "1"
 tempfile.workspace = true
 similar-asserts = "1.7.0"

@@ -1,21 +1,5 @@
-use std::time::Duration;
-use std::{convert::Infallible, net::SocketAddr};
+use std::{convert::Infallible, net::SocketAddr, time::Duration};
 
-use super::{reply::protobuf, status::Status};
-use crate::common::http::ErrorMessage;
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
-use crate::sources::http_server::HttpConfigParamKind;
-use crate::sources::opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES};
-use crate::sources::util::add_headers;
-use crate::{
-    SourceSender,
-    event::Event,
-    http::build_http_trace_layer,
-    internal_events::{EventsReceived, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::util::decode,
-    tls::MaybeTlsSettings,
-};
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
@@ -25,25 +9,39 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::codecs::decoding::ProtobufDeserializer;
-use vector_lib::codecs::decoding::format::Deserializer;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
-};
-use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
-use vector_lib::opentelemetry::proto::collector::{
-    logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
-    metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
-    trace::v1::ExportTraceServiceRequest,
-};
-use vector_lib::tls::MaybeTlsIncomingStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
+    },
+    opentelemetry::proto::collector::{
+        logs::v1::{ExportLogsServiceRequest, ExportLogsServiceResponse},
+        metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
+        trace::v1::{ExportTraceServiceRequest, ExportTraceServiceResponse},
+    },
+    tls::MaybeTlsIncomingStream,
 };
 use warp::{
     Filter, Reply, filters::BoxedFilter, http::HeaderMap, reject::Rejection, reply::Response,
+};
+
+use super::{reply::protobuf, status::Status};
+use crate::{
+    SourceSender,
+    common::http::ErrorMessage,
+    event::Event,
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
+    internal_events::{EventsReceived, StreamClosedError},
+    shutdown::ShutdownSignal,
+    sources::{
+        http_server::HttpConfigParamKind,
+        opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+        util::{add_headers, decode},
+    },
+    tls::MaybeTlsSettings,
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]

@@ -159,6 +159,7 @@ indexmap = { version = "2.11.0", default-features = false, features = ["serde", 
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
 metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
@@ -276,10 +277,16 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { version = "0.17", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.17", default-features = false, optional = true }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"], optional = true }
+
+# Azure Storage
+azure_storage = { version = "0.21", default-features = false, optional = true }
+azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
+
+# Needed to bridge with outdated version of azure_core used in azure_storage*
+azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["reqwest", "hmac_openssl"] }
+
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -450,14 +457,14 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.17", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { version = "0.17", default-features = false, features = ["enable_reqwest"] }
-azure_storage_blobs = { version = "0.17", default-features = false, features = ["azurite_workaround"] }
-azure_storage = { version = "0.17", default-features = false }
+azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
+azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
+azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
-libc = "0.2.174"
+libc.workspace = true
 similar-asserts = "1.7.0"
 proptest.workspace = true
 quickcheck = "1.0.3"
@@ -514,10 +521,6 @@ target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "r
 target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-# Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-# Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]

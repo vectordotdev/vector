@@ -1,13 +1,15 @@
+use std::collections::BTreeMap;
+
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use vrl::compiler::TimeZone;
-use vrl::compiler::runtime::{Runtime, Terminate};
-use vrl::compiler::{CompileConfig, TargetValue, TypeState, compile_with_state};
-use vrl::diagnostic::DiagnosticList;
-use vrl::diagnostic::Formatter;
-use vrl::value::Secrets;
-use vrl::value::Value;
+use vrl::{
+    compiler::{
+        CompileConfig, TargetValue, TimeZone, TypeState, compile_with_state,
+        runtime::{Runtime, Terminate},
+    },
+    diagnostic::{DiagnosticList, Formatter},
+    value::{Secrets, Value},
+};
 use wasm_bindgen::prelude::*;
 
 pub mod built_info {
@@ -33,19 +35,9 @@ impl Input {
 // and the execution time.
 #[derive(Deserialize, Serialize)]
 pub struct VrlCompileResult {
-    pub output: Value,
-    pub result: Value,
+    pub runtime_result: Value,
+    pub target_value: Value,
     pub elapsed_time: Option<f64>,
-}
-
-impl VrlCompileResult {
-    fn new(output: Value, result: Value, elapsed_time: Option<f64>) -> Self {
-        Self {
-            output,
-            result,
-            elapsed_time,
-        }
-    }
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -118,27 +110,29 @@ fn compile(
         secrets: Secrets::new(),
     };
 
-    let program = match compile_with_state(&input.program, &functions, &state, config) {
-        Ok(program) => program,
+    let compilation_result = match compile_with_state(&input.program, &functions, &state, config) {
+        Ok(result) => result,
         Err(diagnostics) => return Err(VrlDiagnosticResult::new(&input.program, diagnostics)),
     };
 
     let (result, elapsed_time) =
         if let Some(performance) = web_sys::window().and_then(|w| w.performance()) {
             let start_time = performance.now();
-            let result = runtime.resolve(&mut target_value, &program.program, &timezone);
+            let result = runtime.resolve(&mut target_value, &compilation_result.program, &timezone);
             let end_time = performance.now();
             (result, Some(end_time - start_time))
         } else {
             // If performance API is not available, run the program without timing.
-            let result = runtime.resolve(&mut target_value, &program.program, &timezone);
+            let result = runtime.resolve(&mut target_value, &compilation_result.program, &timezone);
             (result, None)
         };
 
     match result {
-        // The final event is in `target_value.value`.
-        // The value of the last expression is in `res`.
-        Ok(res) => Ok(VrlCompileResult::new(res, target_value.value, elapsed_time)),
+        Ok(runtime_result) => Ok(VrlCompileResult {
+            runtime_result,                   // This is the value of the last expression.
+            target_value: target_value.value, // The value of the final event
+            elapsed_time,
+        }),
         Err(err) => Err(VrlDiagnosticResult::new_runtime_error(&input.program, err)),
     }
 }

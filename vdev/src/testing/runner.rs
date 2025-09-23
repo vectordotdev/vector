@@ -1,15 +1,17 @@
-use std::collections::HashSet;
-use std::process::Command;
-use std::{env, path::PathBuf};
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use anyhow::Result;
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::app::{self, CommandExt as _};
-use crate::environment::{Environment, append_environment_variables};
-use crate::testing::build::prepare_build_command;
-use crate::testing::docker::{DOCKER_SOCKET, docker_command};
-use crate::util::{ChainArgs as _, IS_A_TTY};
+use crate::{
+    app::{self, CommandExt as _},
+    environment::{Environment, append_environment_variables},
+    testing::{
+        build::prepare_build_command,
+        docker::{DOCKER_SOCKET, docker_command},
+    },
+    util::{ChainArgs as _, IS_A_TTY},
+};
 
 const MOUNT_PATH: &str = "/home/vector";
 const TARGET_PATH: &str = "/home/target";
@@ -25,8 +27,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-default-features",
 ];
 // The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str =
-    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,

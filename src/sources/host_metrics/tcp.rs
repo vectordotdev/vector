@@ -1,8 +1,6 @@
-use crate::sources::host_metrics::HostMetricsScrapeDetailError;
-use byteorder::{ByteOrder, NativeEndian};
 use std::{collections::HashMap, io, path::Path};
-use vector_lib::event::MetricTags;
 
+use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_core::{
     NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST, NetlinkHeader, NetlinkMessage, NetlinkPayload,
 };
@@ -15,8 +13,10 @@ use netlink_sys::{
     AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket, protocols::NETLINK_SOCK_DIAG,
 };
 use snafu::{ResultExt, Snafu};
+use vector_lib::event::MetricTags;
 
 use super::HostMetrics;
+use crate::sources::host_metrics::HostMetricsScrapeDetailError;
 
 const PROC_IPV6_FILE: &str = "/proc/net/if_inet6";
 const TCP_CONNS_TOTAL: &str = "tcp_connections_total";
@@ -288,19 +288,20 @@ fn is_ipv6_enabled() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use tokio::net::{TcpListener, TcpStream};
-
     use netlink_packet_sock_diag::{
         AF_INET,
         inet::{InetResponseHeader, SocketId},
     };
+    use tokio::net::{TcpListener, TcpStream};
 
     use super::{
         STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL, TcpStats,
         fetch_netlink_inet_headers, parse_nl_inet_hdrs,
     };
-    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-    use crate::test_util::next_addr;
+    use crate::{
+        sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer},
+        test_util::next_addr,
+    };
 
     #[test]
     fn parses_nl_inet_hdrs() {
