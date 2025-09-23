@@ -3,7 +3,7 @@ package metadata
 remap: functions: pop: {
 	category: "Array"
 	description: """
-		Removes the last item from the `value` array, the array is modified in place.
+		Removes the last item from the `value` array.
 		"""
 
 	arguments: [
@@ -18,7 +18,7 @@ remap: functions: pop: {
 	return: {
 		types: ["array"]
 		rules: [
-			"The `value` array is modified in place.",
+			"The original `value` is not modified.",
 		]
 	}
 
