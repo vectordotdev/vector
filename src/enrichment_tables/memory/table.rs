@@ -448,7 +448,7 @@ mod tests {
     use super::*;
     use crate::{
         enrichment_tables::memory::{
-            internal_events::InternalMetricsConfig, source::MemorySourceConfig,
+            config::MemorySourceConfig, internal_events::InternalMetricsConfig,
         },
         event::{Event, LogEvent},
         test_util::components::{

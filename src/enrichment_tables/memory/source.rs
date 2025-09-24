@@ -23,35 +23,6 @@ use crate::{SourceSender, internal_events::StreamClosedError};
 
 pub(crate) const EXPIRED_ROUTE: &str = "expired";
 
-/// Configuration for memory enrichment table source functionality.
-#[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct MemorySourceConfig {
-    /// Interval for exporting all data from the table when used as a source.
-    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub export_interval: Option<NonZeroU64>,
-    /// Batch size for data exporting. Used to prevent exporting entire table at
-    /// once and blocking the system.
-    ///
-    /// By default, batches are not used and entire table is exported.
-    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
-    pub export_batch_size: Option<u64>,
-    /// If set to true, all data will be removed from cache after exporting.
-    /// Only valid if used as a source and export_interval > 0
-    ///
-    /// By default, export will not remove data from cache
-    #[serde(default = "crate::serde::default_false")]
-    pub remove_after_export: bool,
-    /// Set to true to add a source output for expired items (named 'expired').
-    /// Expired items ignore other settings and are exported as they are flushed from the table.
-    #[serde(default = "crate::serde::default_false")]
-    pub export_expired_items: bool,
-    /// Key to use for this component when used as a source. This must be different from the
-    /// component key.
-    pub source_key: String,
-}
-
 /// A struct that represents Memory when used as a source.
 pub(crate) struct MemorySource {
     pub(super) memory: Memory,
