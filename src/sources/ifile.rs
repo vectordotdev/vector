@@ -1454,7 +1454,7 @@ mod tests {
                 // Flush the file to ensure the writes are visible
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 5000).await;
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path], n + 1, 5000).await;
             },
         )
         .await;
@@ -1483,15 +1483,12 @@ mod tests {
             async {
                 let mut file = File::create(&path).await.unwrap();
 
-                // Wait for the file to be observed at its original length before writing to it
-                sleep_millis(1000).await;
-
                 for i in 0..n {
                     file.write_line(format!("pretrunc {i}")).await.unwrap();
                 }
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 1000).await;
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path], n, 1000).await;
 
                 file.set_len(0).await.unwrap();
                 file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
@@ -2475,9 +2472,7 @@ mod tests {
             NoAcks,
             LogNamespace::Legacy,
             Some(tx),
-            async {
-                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000).await;
-            },
+            wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000),
         )
         .await;
 
@@ -2581,8 +2576,6 @@ mod tests {
         );
     }
 
-    // Ignoring on mac: https://github.com/vectordotdev/vector/issues/8373
-    #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {
         let dir = tempdir().unwrap();
@@ -2597,22 +2590,32 @@ mod tests {
 
         file.write_line("hello i am a normal line").await.unwrap();
 
-        sleep_500_millis().await;
+        file.flush().await.unwrap();
 
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
-                sleep_500_millis().await;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
 
                 file.write_str("i am not a full line").await.unwrap();
 
                 // Longer than the EOF timeout
                 sleep_500_millis().await;
+                sleep_500_millis().await;
+
+                assert!(rx.is_empty(), "{:?}", rx.try_recv());
 
                 file.write_line(" until now").await.unwrap();
 
-                sleep_500_millis().await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, 1, 5000).await;
+            },
+        )
+        .await;
 
         let received = extract_messages_value(received);
 
@@ -2628,8 +2631,9 @@ mod tests {
     #[tokio::test]
     async fn test_gzipped_file() {
         let dir = tempdir().unwrap();
+        let path = PathBuf::from("tests/data/gzipped.log");
         let config = ifile::FileConfig {
-            include: vec![PathBuf::from("tests/data/gzipped.log")],
+            include: vec![path.clone()],
             // TODO: remove this once files are fingerprinted after decompression
             //
             // Currently, this needs to be smaller than the total size of the compressed file
@@ -2694,19 +2698,21 @@ mod tests {
     #[tokio::test]
     async fn test_non_utf8_encoded_file() {
         let dir = tempdir().unwrap();
+        let path = PathBuf::from("tests/data/utf-16le.log");
         let config = ifile::FileConfig {
-            include: vec![PathBuf::from("tests/data/utf-16le.log")],
+            include: vec![path.clone()],
             encoding: Some(EncodingConfig { charset: UTF_16LE }),
             ..test_default_file_config(&dir)
         };
 
+        let (tx, mut rx) = mpsc::unbounded_channel();
         let received = run_ifile_source(
             &config,
             false,
             NoAcks,
             LogNamespace::Legacy,
-            None,
-            sleep_500_millis(),
+            Some(tx),
+            wait_checkpoint_and_n_reads(&mut rx, vec![&path], 5, 5000),
         )
         .await;
 
