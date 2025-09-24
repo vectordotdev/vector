@@ -23,10 +23,11 @@ impl InternalEvent for ConfigReloadRejected {
                 )
                 .increment(1);
             }
-            ReloadRejectReason::FailedToComputeGlobalDiff => {
+            ReloadRejectReason::FailedToComputeGlobalDiff(err) => {
                 error!(
                     message = "Config reload rejected due to failed to compute global diff.",
                     reason = %self.reason.as_str(),
+                    error = %err,
                     internal_log_rate_limit = true,
                 );
 
@@ -45,15 +46,15 @@ impl InternalEvent for ConfigReloadRejected {
 }
 
 impl ConfigReloadRejected {
-    pub fn global_options_changed(fields: Vec<String>) -> Self {
+    pub const fn global_options_changed(fields: Vec<String>) -> Self {
         Self {
             reason: ReloadRejectReason::GlobalOptionsChanged { fields },
         }
     }
 
-    pub fn failed_to_compute_global_diff() -> Self {
+    pub const fn failed_to_compute_global_diff(err: serde_json::Error) -> Self {
         Self {
-            reason: ReloadRejectReason::FailedToComputeGlobalDiff,
+            reason: ReloadRejectReason::FailedToComputeGlobalDiff(err),
         }
     }
 }
@@ -61,7 +62,7 @@ impl ConfigReloadRejected {
 #[derive(Debug)]
 enum ReloadRejectReason {
     GlobalOptionsChanged { fields: Vec<String> },
-    FailedToComputeGlobalDiff,
+    FailedToComputeGlobalDiff(serde_json::Error),
 }
 
 impl ReloadRejectReason {
