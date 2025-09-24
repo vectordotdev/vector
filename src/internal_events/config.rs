@@ -8,8 +8,8 @@ pub struct ConfigReloadRejected {
 
 impl InternalEvent for ConfigReloadRejected {
     fn emit(self) {
-        match self.reason {
-            ReloadRejectReason::GlobalOptionsChanged { ref fields } => {
+        match &self.reason {
+            ReloadRejectReason::GlobalOptionsChanged { fields } => {
                 error!(
                     message = "Config reload rejected due to non-reloadable global options.",
                     reason = %self.reason.as_str(),
@@ -52,9 +52,9 @@ impl ConfigReloadRejected {
         }
     }
 
-    pub const fn failed_to_compute_global_diff(err: serde_json::Error) -> Self {
+    pub const fn failed_to_compute_global_diff(error: serde_json::Error) -> Self {
         Self {
-            reason: ReloadRejectReason::FailedToComputeGlobalDiff(err),
+            reason: ReloadRejectReason::FailedToComputeGlobalDiff(error),
         }
     }
 }
@@ -69,7 +69,7 @@ impl ReloadRejectReason {
     const fn as_str(&self) -> &'static str {
         match self {
             Self::GlobalOptionsChanged { fields: _ } => "global_options changed",
-            Self::FailedToComputeGlobalDiff => "failed to compute global diff",
+            Self::FailedToComputeGlobalDiff(_) => "failed to compute global diff",
         }
     }
 }
