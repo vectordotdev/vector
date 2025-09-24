@@ -1,7 +1,4 @@
-use std::{
-    num::NonZeroU64,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use futures::StreamExt;
@@ -10,7 +7,6 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    configurable::configurable_component,
     event::{Event, EventMetadata, LogEvent},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle, Protocol,
@@ -19,7 +15,9 @@ use vector_lib::{
 };
 
 use super::{Memory, MemoryConfig};
-use crate::{SourceSender, internal_events::StreamClosedError};
+use crate::{
+    SourceSender, enrichment_tables::memory::MemoryEntryPair, internal_events::StreamClosedError,
+};
 
 pub(crate) const EXPIRED_ROUTE: &str = "expired";
 
@@ -122,7 +120,7 @@ impl MemorySource {
 
                 Ok(expired) = expired_receiver.recv() => {
                     let now = Instant::now();
-                    let events = expired.into_iter().filter_map(|(key, expired_event)| {
+                    let events = expired.into_iter().filter_map(|MemoryEntryPair { key, entry: expired_event }| {
                         let mut event = Event::Log(LogEvent::from_map(
                                 expired_event.as_object_map(now, &key).ok()?,
                                 EventMetadata::default(),

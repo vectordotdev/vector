@@ -91,6 +91,15 @@ struct MemoryMetadata {
     byte_size: u64,
 }
 
+/// [`MemoryEntry`] combined with its key
+#[derive(Clone)]
+pub(super) struct MemoryEntryPair {
+    /// Key of this entry
+    pub(super) key: String,
+    /// The value of this entry
+    pub(super) entry: MemoryEntry,
+}
+
 // Used to ensure that these 2 are locked together
 pub(super) struct MemoryWriter {
     pub(super) write_handle: evmap::WriteHandle<String, MemoryEntry>,
@@ -104,8 +113,8 @@ pub struct Memory {
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
     #[allow(dead_code)]
-    expired_items_receiver: Receiver<Vec<(String, MemoryEntry)>>,
-    expired_items_sender: Sender<Vec<(String, MemoryEntry)>>,
+    expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
+    expired_items_sender: Sender<Vec<MemoryEntryPair>>,
 }
 
 impl Memory {
@@ -134,7 +143,7 @@ impl Memory {
             .get_or(|| self.read_handle_factory.handle())
     }
 
-    pub(super) fn subscribe_to_expired_items(&self) -> Receiver<Vec<(String, MemoryEntry)>> {
+    pub(super) fn subscribe_to_expired_items(&self) -> Receiver<Vec<MemoryEntryPair>> {
         self.expired_items_sender.subscribe()
     }
 
@@ -248,10 +257,10 @@ impl Memory {
                     _ => None,
                 })
                 .filter_map(|key| {
-                    writer
-                        .write_handle
-                        .get_one(key)
-                        .map(|v| (key.to_string(), v.clone()))
+                    writer.write_handle.get_one(key).map(|v| MemoryEntryPair {
+                        key: key.to_string(),
+                        entry: v.clone(),
+                    })
                 })
                 .collect::<Vec<_>>();
             let _ = self.expired_items_sender.send(pending_removal);
