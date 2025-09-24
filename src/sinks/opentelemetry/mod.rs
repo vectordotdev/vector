@@ -105,7 +105,9 @@ impl SinkConfig for OpenTelemetryConfig {
                         FramingConfig::Bytes.build(),
                         Serializer::Protobuf(serializer),
                     );
-                    config.build_with_encoder(cx, encoder, config.encoding.transformer()).await
+                    config
+                        .build_with_encoder(cx, encoder, config.encoding.transformer())
+                        .await
                 } else {
                     config.build(cx).await
                 }

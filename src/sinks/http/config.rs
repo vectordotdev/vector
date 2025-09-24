@@ -357,7 +357,8 @@ pub(super) fn validate_payload_wrapper(
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoder = self.build_encoder()?;
-        self.build_with_encoder(cx, encoder, self.encoding.transformer()).await
+        self.build_with_encoder(cx, encoder, self.encoding.transformer())
+            .await
     }
 
     fn input(&self) -> Input {
