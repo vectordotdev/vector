@@ -239,6 +239,7 @@ fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
 /// A Vector value.
 fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Value {
     match data_type {
+        // To bytes
         odbc_api::DataType::Unknown
         | odbc_api::DataType::Char { .. }
         | odbc_api::DataType::WChar { .. }
@@ -249,7 +250,6 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
         | odbc_api::DataType::Varbinary { .. }
         | odbc_api::DataType::Binary { .. }
         | odbc_api::DataType::Other { .. }
-        | odbc_api::DataType::BigInt
         | odbc_api::DataType::LongVarbinary { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -258,13 +258,22 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             Value::Bytes(Bytes::copy_from_slice(value))
         }
 
+        // To integer
         odbc_api::DataType::TinyInt
         | odbc_api::DataType::SmallInt
-        | odbc_api::DataType::Numeric { .. }
+        | odbc_api::DataType::BigInt
         | odbc_api::DataType::Integer => {
             let Some(value) = value else {
                 return Value::Null;
             };
+
+            // tinyint(1) -> Value::Boolean
+            if *data_type == odbc_api::DataType::TinyInt
+                && value.len() == 1
+                && (value[0] == b'0' || value[0] == b'1')
+            {
+                return Value::Boolean(value[0] == b'1');
+            }
 
             std::str::from_utf8(value)
                 .ok()
@@ -272,9 +281,11 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .map_or(Value::Null, Value::Integer)
         }
 
+        // To float
         odbc_api::DataType::Float { .. }
         | odbc_api::DataType::Real
         | odbc_api::DataType::Decimal { .. }
+        | odbc_api::DataType::Numeric { .. }
         | odbc_api::DataType::Double => {
             let Some(value) = value else {
                 return Value::Null;
@@ -286,6 +297,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .map_or(Value::Null, Value::Float)
         }
 
+        // To timestamp
         odbc_api::DataType::Timestamp { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -307,6 +319,8 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
 
             datetime.map(Value::Timestamp).unwrap_or(Value::Null)
         }
+
+        // To timestamp
         odbc_api::DataType::Time { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -324,6 +338,8 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 })
                 .unwrap_or(Value::Null)
         }
+
+        // To timestamp
         odbc_api::DataType::Date => {
             let Some(value) = value else {
                 return Value::Null;
@@ -341,6 +357,8 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 })
                 .unwrap_or(Value::Null)
         }
+
+        // To boolean
         odbc_api::DataType::Bit => {
             let Some(value) = value else {
                 return Value::Null;
