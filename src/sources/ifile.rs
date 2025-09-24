@@ -1493,10 +1493,12 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                wait_checkpoint_and_n_reads(&mut rx, vec![&path], n, 1000).await;
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path], n, 5000).await;
 
                 file.set_len(0).await.unwrap();
                 file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+
+                file.sync_all().await.unwrap();
 
                 // Wait for the truncate to be observed before writing again
                 sleep_millis(1000).await;
@@ -1506,7 +1508,7 @@ mod tests {
                 }
                 file.flush().await.unwrap();
 
-                wait_for_n_reads(&mut rx, n, 1000).await;
+                wait_for_n_reads(&mut rx, n, 5000).await;
             },
         )
         .await;
@@ -2280,12 +2282,14 @@ mod tests {
                 file.write_line("INFO hello").await.unwrap();
                 file.write_line("INFO goodbye").await.unwrap();
                 file.write_line("part of goodbye").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
 
                 file.write_line("INFO hi again").await.unwrap();
                 file.write_line("and some more").await.unwrap();
                 file.write_line("INFO hello").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
 
@@ -2293,6 +2297,7 @@ mod tests {
                 file.write_line("INFO doesn't have").await.unwrap();
                 file.write_line("to be INFO in").await.unwrap();
                 file.write_line("the middle").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
             })
@@ -2340,12 +2345,14 @@ mod tests {
                 file.write_line("INFO hello").await.unwrap();
                 file.write_line("INFO goodbye").await.unwrap();
                 file.write_line("part of goodbye").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
 
                 file.write_line("INFO hi again").await.unwrap();
                 file.write_line("and some more").await.unwrap();
                 file.write_line("INFO hello").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
 
@@ -2353,6 +2360,7 @@ mod tests {
                 file.write_line("INFO doesn't have").await.unwrap();
                 file.write_line("to be INFO in").await.unwrap();
                 file.write_line("the middle").await.unwrap();
+                file.flush().await.unwrap();
 
                 sleep_500_millis().await;
             })
@@ -2560,9 +2568,7 @@ mod tests {
             NoAcks,
             LogNamespace::Legacy,
             Some(tx),
-            async {
-                wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000).await;
-            },
+            wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000),
         )
         .await;
 
