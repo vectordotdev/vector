@@ -237,6 +237,9 @@ uuid_from_friendly_id!\(".*"\)
 # GitHub username regex derived from https://github.com/shinnn/github-username-regex
 # [a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}
 
+# authors array in .md files
+(?i)^authors: \["[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}"(?:, "[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}")*\]$
+
 # changelog.d fragment authors line
 (?i)^authors:(?: [a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38})+$
 
