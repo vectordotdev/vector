@@ -172,7 +172,7 @@ generated: configuration: configuration: {
 					export_expired_items: {
 						type: bool: default: false
 						description: """
-														Set to true to add a source output for expired items (named 'expired').
+														Set to true to export expired items via the `expired` output port.
 														Expired items ignore other settings and are exported as they are flushed from the table.
 														"""
 						required: false

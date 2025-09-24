@@ -93,7 +93,7 @@ pub struct MemorySourceConfig {
     /// By default, export will not remove data from cache
     #[serde(default = "crate::serde::default_false")]
     pub remove_after_export: bool,
-    /// Set to true to add a source output for expired items (named 'expired').
+    /// Set to true to export expired items via the `expired` output port.
     /// Expired items ignore other settings and are exported as they are flushed from the table.
     #[serde(default = "crate::serde::default_false")]
     pub export_expired_items: bool,
