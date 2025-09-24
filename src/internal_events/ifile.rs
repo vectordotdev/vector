@@ -169,12 +169,12 @@ mod source {
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_events_total",
-                    "ifile" => self.file.to_owned(),
+                    "file" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
                     "component_received_event_bytes_total",
-                    "ifile" => self.file.to_owned(),
+                    "file" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {

@@ -38,8 +38,11 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, StreamClosedError,
-        ifile::{FileInternalMetricsConfig, FileSourceInternalEventsEmitter},
+        StreamClosedError,
+        ifile::{
+            FileBytesReceived, FileEventsReceived, FileInternalMetricsConfig, FileOpen,
+            FileSourceInternalEventsEmitter,
+        },
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
