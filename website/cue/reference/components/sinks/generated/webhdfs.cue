@@ -368,6 +368,20 @@ generated: components: sinks: webhdfs: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			gelf: {
+				description:   "The GELF Serializer Options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: max_chunk_size: {
+					description: """
+						Maximum size for each GELF chunked datagram (including 12-byte header).
+						Chunking starts when datagrams exceed this size.
+						For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+						"""
+					required: false
+					type: uint: default: 8192
+				}
+			}
 			json: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
@@ -498,6 +512,12 @@ generated: components: sinks: webhdfs: configuration: {
 					}
 				}
 			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
 			method: {
 				description: "The framing method."
 				required:    true
@@ -510,6 +530,11 @@ generated: components: sinks: webhdfs: configuration: {
 						The prefix is a 32-bit unsigned integer, little endian.
 						"""
 					newline_delimited: "Event data is delimited by a newline (LF) character."
+					varint_length_delimited: """
+						Event data is prefixed with its length in bytes as a varint.
+
+						This is compatible with protobuf's length-delimited encoding.
+						"""
 				}
 			}
 		}

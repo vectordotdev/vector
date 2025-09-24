@@ -1,8 +1,16 @@
 use vector_lib::{
-    config::{clone_input_definitions, LogNamespace},
+    config::{LogNamespace, clone_input_definitions},
     configurable::configurable_component,
 };
 
+use super::{
+    common::{
+        CacheConfig, FieldMatchConfig, TimedCacheConfig, default_cache_config,
+        fill_default_fields_match,
+    },
+    timed_transform::TimedDedupe,
+    transform::Dedupe,
+};
 use crate::{
     config::{
         DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
@@ -10,15 +18,6 @@ use crate::{
     },
     schema,
     transforms::Transform,
-};
-
-use super::{
-    common::{
-        default_cache_config, fill_default_fields_match, CacheConfig, FieldMatchConfig,
-        TimedCacheConfig,
-    },
-    timed_transform::TimedDedupe,
-    transform::Dedupe,
 };
 
 /// Configuration for the `dedupe` transform.
@@ -87,22 +86,24 @@ impl TransformConfig for DedupeConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::config::OutputId;
-    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
+    use vector_lib::{
+        config::{ComponentKey, OutputId},
+        lookup::lookup_v2::ConfigTargetPath,
+    };
 
-    use crate::config::schema::Definition;
-    use crate::transforms::dedupe::common::TimedCacheConfig;
     use crate::{
+        config::schema::Definition,
         event::{Event, LogEvent, ObjectMap, Value},
         test_util::components::assert_transform_compliance,
         transforms::{
-            dedupe::config::{CacheConfig, DedupeConfig, FieldMatchConfig},
+            dedupe::{
+                common::TimedCacheConfig,
+                config::{CacheConfig, DedupeConfig, FieldMatchConfig},
+            },
             test::create_topology,
         },
     };

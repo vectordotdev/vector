@@ -8,32 +8,35 @@
 //!   - Call call() supplying the generic inputs for calling and the source-specific
 //!     context.
 
+// Okta source only imports defaults but doesn't use the rest of the client
+#![cfg_attr(feature = "sources-okta", allow(dead_code))]
+
+use std::{collections::HashMap, future::ready, time::Duration};
+
 use bytes::Bytes;
-use futures_util::{stream, FutureExt, StreamExt, TryFutureExt};
-use http::{response::Parts, Uri};
+use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use http::{Uri, response::Parts};
 use hyper::{Body, Request};
-use std::time::Duration;
-use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
+    shutdown::ShutdownSignal,
+};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::sign_request_with_empty_body;
-use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
-    http::{Auth, HttpClient},
+    SourceSender,
+    http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::TlsSettings,
-    SourceSender,
 };
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
-use vector_lib::shutdown::ShutdownSignal;
-use vector_lib::{config::proxy::ProxyConfig, event::Event, EstimatedJsonEncodedSizeOf};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {

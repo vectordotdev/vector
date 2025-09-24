@@ -32,7 +32,7 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -58,11 +58,6 @@ jobs:
   test-misc:
     if: needs.changes.outputs.source == 'true'
     uses: ./.github/workflows/misc.yml
-    needs: changes
-    secrets: inherit
-
-  test-environment:
-    uses: ./.github/workflows/environment.yml
     needs: changes
     secrets: inherit
 
@@ -108,7 +103,6 @@ jobs:
       - changes
       - test-cli
       - test-misc
-      - test-environment
       - check-msrv
       - cross-linux
       - unit-mac

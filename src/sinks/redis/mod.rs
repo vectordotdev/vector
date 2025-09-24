@@ -18,14 +18,12 @@ use redis::RedisError;
 use snafu::Snafu;
 use tokio::sync::watch::error::RecvError;
 
-use crate::sinks::prelude::*;
-
 use self::{
     config::{ListMethod, SortedSetMethod},
     sink::GenerationCount,
 };
-
 use super::util::EncodedLength;
+use crate::sinks::prelude::*;
 
 #[derive(Debug, Snafu)]
 pub(super) enum RedisSinkError {
@@ -33,7 +31,7 @@ pub(super) enum RedisSinkError {
     RedisCreateFailed { source: RedisError },
     #[snafu(display(
         "Error sending query: {source}{}",
-        if let Some(gen) = generation { format!(", gen={gen}") } else { String::new() }
+        if let Some(generation) = generation { format!(", gen={generation}") } else { String::new() }
     ))]
     SendError {
         source: RedisError,

@@ -1,4 +1,3 @@
-use ipnet::IpNet;
 #[cfg(unix)]
 use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
 use std::{
@@ -8,8 +7,8 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -21,7 +20,8 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use futures_util::{future::BoxFuture, Future, FutureExt};
+use futures_util::{Future, FutureExt, future::BoxFuture};
+use ipnet::IpNet;
 use listenfd::ListenFd;
 use tokio::{
     self,
@@ -31,15 +31,17 @@ use tokio::{
     time::sleep,
 };
 use tokio_stream::wrappers::UnixListenerStream;
-use tokio_util::codec::{length_delimited, Framed};
-use tracing::{field, Instrument, Span};
+use tokio_util::codec::{Framed, length_delimited};
+use tracing::{Instrument, Span, field};
 use vector_lib::{
     lookup::OwnedValuePath,
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
 };
 
+use super::net::{RequestLimiter, SocketListenAddr};
 use crate::{
+    SourceSender,
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketMode, SocketReceiveError,
@@ -48,16 +50,13 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     sources::{
-        util::{
-            net::{try_bind_tcp_listener, MAX_IN_FLIGHT_EVENTS_TARGET},
-            AfterReadExt,
-        },
         Source,
+        util::{
+            AfterReadExt,
+            net::{MAX_IN_FLIGHT_EVENTS_TARGET, try_bind_tcp_listener},
+        },
     },
-    SourceSender,
 };
-
-use super::net::{RequestLimiter, SocketListenAddr};
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
@@ -544,16 +543,16 @@ async fn handle_stream(
         }
     };
 
-    if let Some(keepalive) = frame_handler.keepalive() {
-        if let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+    if let Some(keepalive) = frame_handler.keepalive()
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
     }
 
-    if let Some(receive_buffer_bytes) = frame_handler.receive_buffer_bytes() {
-        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+    if let Some(receive_buffer_bytes) = frame_handler.receive_buffer_bytes()
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
     }
 
     let socket = socket.after_read(move |byte_size| {
@@ -676,13 +675,13 @@ async fn handle_tcp_frame<T>(
             frame_handler.max_frame_handling_tasks(),
         )
         .await;
-    } else if let Some(event) = frame_handler.handle_event(received_from, frame) {
-        if let Err(e) = event_sink.send_event(event).await {
-            error!(
-                internal_log_rate_limit = true,
-                "Error sending event: {e:?}."
-            );
-        }
+    } else if let Some(event) = frame_handler.handle_event(received_from, frame)
+        && let Err(e) = event_sink.send_event(event).await
+    {
+        error!(
+            internal_log_rate_limit = true,
+            "Error sending event: {e:?}."
+        );
     }
 }
 
@@ -917,10 +916,10 @@ async fn spawn_event_handling_tasks(
 
     tokio::spawn(async move {
         future::ready({
-            if let Some(evt) = event_handler.handle_event(received_from, event_data) {
-                if event_sink.send_event(evt).await.is_err() {
-                    error!("Encountered error while sending event.");
-                }
+            if let Some(evt) = event_handler.handle_event(received_from, event_data)
+                && event_sink.send_event(evt).await.is_err()
+            {
+                error!("Encountered error while sending event.");
             }
             active_task_nums.fetch_sub(1, Ordering::AcqRel);
         })
@@ -937,54 +936,50 @@ async fn wait_for_task_quota(active_task_nums: &Arc<AtomicUsize>, max_tasks: usi
 
 #[cfg(test)]
 mod test {
-    use futures_util::Stream;
     use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
         path::PathBuf,
         sync::{
-            atomic::{AtomicUsize, Ordering},
             Arc,
+            atomic::{AtomicUsize, Ordering},
         },
         thread,
     };
-    use tokio::net::TcpStream;
 
-    use bytes::{buf::Buf, Bytes, BytesMut};
+    use bytes::{Bytes, BytesMut, buf::Buf};
     use futures::{
         future,
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
+    use futures_util::Stream;
     use ipnet::IpNet;
     use tokio::{
         self,
-        net::UnixStream,
+        net::{TcpStream, UnixStream},
         task::JoinHandle,
         time::{Duration, Instant},
     };
-    use tokio_util::codec::{length_delimited, Framed};
+    use tokio_util::codec::{Framed, length_delimited};
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
+        lookup::{OwnedValuePath, owned_value_path, path},
         tcp::TcpKeepaliveConfig,
-        tls::{CertificateMetadata, MaybeTls},
-    };
-    use vector_lib::{
-        lookup::{owned_value_path, path, OwnedValuePath},
-        tls::MaybeTlsSettings,
+        tls::{CertificateMetadata, MaybeTls, MaybeTlsSettings},
     };
 
     use super::{
-        build_framestream_tcp_source, build_framestream_unix_source, spawn_event_handling_tasks,
         ControlField, ControlHeader, FrameHandler, TcpFrameHandler, UnixFrameHandler,
+        build_framestream_tcp_source, build_framestream_unix_source, spawn_event_handling_tasks,
     };
     use crate::{
-        config::{log_schema, ComponentKey},
+        SourceSender,
+        config::{ComponentKey, log_schema},
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         sources::util::net::SocketListenAddr,
         test_util::{collect_n, collect_n_stream, next_addr},
-        SourceSender,
     };
 
     #[derive(Clone)]
@@ -1431,12 +1426,16 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         let message_key = log_schema().message_key().unwrap().to_string();
-        assert!(events
-            .iter()
-            .any(|e| e.as_log()[&message_key] == "hello".into()));
-        assert!(events
-            .iter()
-            .any(|e| e.as_log()[&message_key] == "world".into()));
+        assert!(
+            events
+                .iter()
+                .any(|e| e.as_log()[&message_key] == "hello".into())
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.as_log()[&message_key] == "world".into())
+        );
 
         drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
 
@@ -1805,6 +1804,9 @@ mod test {
             max_task_nums_reached_value > 1,
             "MultiThreaded mode does NOT work"
         );
-        assert!((max_task_nums_reached_value - max_frame_handling_tasks) < 2, "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much");
+        assert!(
+            (max_task_nums_reached_value - max_frame_handling_tasks) < 2,
+            "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much"
+        );
     }
 }

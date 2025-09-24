@@ -1,13 +1,12 @@
 //! Configuration functionality for the `AMQP` sink.
-use super::channel::AmqpSinkChannels;
-use crate::{amqp::AmqpConfig, sinks::prelude::*};
-use lapin::{types::ShortString, BasicProperties};
+use lapin::{BasicProperties, types::ShortString};
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},
 };
 
-use super::sink::AmqpSink;
+use super::{channel::AmqpSinkChannels, sink::AmqpSink};
+use crate::{amqp::AmqpConfig, sinks::prelude::*};
 
 /// AMQP properties configuration.
 #[configurable_component]
@@ -164,7 +163,7 @@ pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::format::{deserialize, Format};
+    use crate::config::format::{Format, deserialize};
 
     #[test]
     pub fn generate_config() {

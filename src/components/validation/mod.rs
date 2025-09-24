@@ -12,20 +12,20 @@ use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
 /// For components implementing `ValidatableComponent`
 pub mod prelude {
-    pub use super::ComponentTestCaseConfig;
-    pub use super::ExternalResource;
-    pub use super::HttpResourceConfig;
-    pub use super::ResourceDirection;
-    pub use super::ValidatableComponent;
-    pub use super::ValidationConfiguration;
+    pub use super::{
+        ComponentTestCaseConfig, ExternalResource, HttpResourceConfig, ResourceDirection,
+        ValidatableComponent, ValidationConfiguration,
+    };
     pub use crate::register_validatable_component;
 }
 
-pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
-pub use self::test_case::{TestCase, TestCaseExpectation};
-pub use self::validators::*;
+pub use self::{
+    resources::*,
+    test_case::{TestCase, TestCaseExpectation},
+    validators::*,
+};
 
 pub mod component_names {
     pub const TEST_SOURCE_NAME: &str = "test_source";
@@ -436,7 +436,10 @@ fn get_validation_configuration_from_test_case_path(
 #[cfg(feature = "component-validation-runner")]
 pub fn validate_component(test_case_data_path: std::path::PathBuf) {
     if !test_case_data_path.exists() {
-        panic!("Component validation test invoked with path to test case data that could not be found: {}", test_case_data_path.to_string_lossy());
+        panic!(
+            "Component validation test invoked with path to test case data that could not be found: {}",
+            test_case_data_path.to_string_lossy()
+        );
     }
 
     let configuration = get_validation_configuration_from_test_case_path(&test_case_data_path)

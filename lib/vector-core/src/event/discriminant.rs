@@ -1,5 +1,7 @@
-use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 use super::{LogEvent, ObjectMap, Value};
 
@@ -177,7 +179,7 @@ impl fmt::Display for Discriminant {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{hash_map::DefaultHasher, HashMap};
+    use std::collections::{HashMap, hash_map::DefaultHasher};
 
     use super::*;
     use crate::event::LogEvent;

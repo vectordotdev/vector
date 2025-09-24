@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use futures_util::{stream::BoxStream, StreamExt};
+use futures_util::{StreamExt, stream::BoxStream};
 use tokio::sync::oneshot::Sender;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
+    configurable::configurable_component,
     event::EventArray,
     sink::{StreamSink, VectorSink},
 };

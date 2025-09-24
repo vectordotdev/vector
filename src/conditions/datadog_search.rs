@@ -1,12 +1,18 @@
 use std::{borrow::Cow, str::FromStr};
-use vrl::path::PathParseError;
 
 use bytes::Bytes;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{Event, LogEvent, Value};
-use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
-use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
-use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
+use vector_lib::{
+    configurable::configurable_component,
+    event::{Event, LogEvent, Value},
+};
+use vrl::{
+    datadog_filter::{
+        Filter, Matcher, Resolver, Run, build_matcher,
+        regex::{wildcard_regex, word_regex},
+    },
+    datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode},
+    path::PathParseError,
+};
 
 use super::{Condition, Conditional, ConditionalConfig};
 

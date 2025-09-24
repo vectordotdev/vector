@@ -1,12 +1,12 @@
 use std::task::{Context, Poll};
 
-use crate::sinks::prelude::*;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use rumqttc::{AsyncClient, ClientError};
 use snafu::Snafu;
 
 use super::config::MqttQoS;
+use crate::sinks::prelude::*;
 
 pub(super) struct MqttResponse {
     byte_size: usize,

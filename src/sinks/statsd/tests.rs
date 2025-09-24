@@ -5,21 +5,20 @@ use tokio::{net::UdpSocket, sync::mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 use vector_lib::{
-    event::{metric::TagValue, Event, Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    event::{Event, Metric, MetricKind, MetricTags, MetricValue, StatisticKind, metric::TagValue},
     metric_tags,
 };
 
+use super::StatsdSinkConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{statsd::config::Mode, util::service::net::UdpConnectorConfig},
     test_util::{
         collect_n,
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, assert_sink_compliance},
         next_addr, trace_init,
     },
 };
-
-use super::StatsdSinkConfig;
 
 fn tags() -> MetricTags {
     metric_tags!(
@@ -95,6 +94,8 @@ async fn test_send_to_statsd() {
     let messages = collect_n(ReceiverStream::new(rx), 1).await;
     assert_eq!(
         messages[0],
-        Bytes::from("vector.counter:1.5|c|#bare_tag,multi_value:true,multi_value:false,multi_value,normal_tag:value\nvector.histogram:2|h|@0.01\n"),
+        Bytes::from(
+            "vector.counter:1.5|c|#bare_tag,multi_value:true,multi_value:false,multi_value,normal_tag:value\nvector.histogram:2|h|@0.01\n"
+        ),
     );
 }

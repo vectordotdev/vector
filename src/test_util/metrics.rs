@@ -1,14 +1,17 @@
-use std::collections::{HashMap, HashSet};
-
-use std::fmt::Display;
-
-use vector_lib::event::{
-    metric::{Bucket, MetricData, MetricSeries, Sample},
-    Event, EventMetadata, Metric, MetricValue, StatisticKind,
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
 };
 
-use crate::event::MetricKind;
-use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
+use vector_lib::event::{
+    Event, EventMetadata, Metric, MetricValue, StatisticKind,
+    metric::{Bucket, MetricData, MetricSeries, Sample},
+};
+
+use crate::{
+    event::MetricKind,
+    sinks::util::buffer::metrics::{MetricNormalize, MetricSet},
+};
 
 type SplitMetrics = HashMap<MetricSeries, (MetricData, EventMetadata)>;
 pub type AbsoluteMetricState = MetricState<AbsoluteMetricNormalizer>;

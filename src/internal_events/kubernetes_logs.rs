@@ -1,7 +1,8 @@
 use metrics::counter;
-use vector_lib::internal_event::{InternalEvent, INTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 use vrl::core::Value;

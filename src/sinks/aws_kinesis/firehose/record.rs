@@ -4,9 +4,8 @@ use aws_smithy_types::Blob;
 use bytes::Bytes;
 use tracing::Instrument;
 
-use crate::sinks::prelude::*;
-
 use super::{KinesisClient, KinesisError, KinesisRecord, KinesisResponse, Record, SendRecord};
+use crate::sinks::prelude::*;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseRecord {
@@ -67,6 +66,8 @@ impl SendRecord for KinesisFirehoseClient {
             .map(|output: PutRecordBatchOutput| KinesisResponse {
                 failure_count: output.failed_put_count() as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
+                #[cfg(feature = "sinks-aws_kinesis_streams")]
+                failed_records: vec![], // Firehose doesn't support partial failure retry
             })
     }
 }

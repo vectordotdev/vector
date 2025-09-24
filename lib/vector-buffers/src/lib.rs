@@ -19,9 +19,8 @@ mod buffer_usage_data;
 pub mod config;
 pub use config::{BufferConfig, BufferType, MemoryBufferSize};
 use encoding::Encodable;
-use vector_config::configurable_component;
-
 pub(crate) use vector_common::Result;
+use vector_config::configurable_component;
 
 pub mod encoding;
 
@@ -31,7 +30,6 @@ mod internal_events;
 pub mod test;
 pub mod topology;
 
-mod cast_utils;
 pub(crate) mod variants;
 
 use std::fmt::Debug;

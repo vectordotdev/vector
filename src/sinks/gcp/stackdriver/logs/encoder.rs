@@ -3,18 +3,16 @@
 use std::{collections::HashMap, io};
 
 use bytes::BytesMut;
-use serde_json::{json, to_vec, Map};
+use serde_json::{Map, json, to_vec};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vrl::event_path;
-use vrl::path::PathPrefix;
+use vrl::{event_path, path::PathPrefix};
 
+use super::config::{
+    StackdriverLabelConfig, StackdriverLogName, StackdriverResource, default_labels_key,
+};
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
-};
-
-use super::config::{
-    default_labels_key, StackdriverLabelConfig, StackdriverLogName, StackdriverResource,
 };
 
 #[derive(Clone, Debug)]

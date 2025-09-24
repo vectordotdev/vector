@@ -6,14 +6,16 @@ use aws_config::{
     profile::ProfileFileCredentialsProvider, provider_config::ProviderConfig,
     sts::AssumeRoleProviderBuilder,
 };
-use aws_credential_types::{provider::SharedCredentialsProvider, Credentials};
+use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
 use aws_runtime::env_config::file::{EnvConfigFileKind, EnvConfigFiles};
 use aws_smithy_async::time::SystemTimeSource;
 use aws_smithy_runtime_api::client::identity::SharedIdentityCache;
-use aws_types::{region::Region, SdkConfig};
+use aws_types::{SdkConfig, region::Region};
 use serde_with::serde_as;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{config::proxy::ProxyConfig, sensitive_string::SensitiveString, tls::TlsConfig};
+use vector_lib::{
+    config::proxy::ProxyConfig, configurable::configurable_component,
+    sensitive_string::SensitiveString, tls::TlsConfig,
+};
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
@@ -424,8 +426,9 @@ async fn default_credentials_provider(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde::{Deserialize, Serialize};
+
+    use super::*;
 
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
     const READ_TIMEOUT: Duration = Duration::from_secs(10);

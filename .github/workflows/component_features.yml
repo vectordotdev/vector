@@ -23,6 +23,7 @@ jobs:
   check-component-features:
     # use free tier on schedule and 8 core to expedite results on demand invocation
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time
     if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: (PR review) Set latest commit status as pending
@@ -36,13 +37,13 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: github.event_name == 'pull_request_review'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: github.event_name != 'pull_request_review'
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup

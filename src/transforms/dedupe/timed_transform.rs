@@ -3,12 +3,11 @@ use std::{future::ready, num::NonZeroUsize, pin::Pin, time::Instant};
 use futures::{Stream, StreamExt};
 use lru::LruCache;
 
-use crate::{event::Event, internal_events::DedupeEventsDropped, transforms::TaskTransform};
-
 use super::{
     common::{FieldMatchConfig, TimedCacheConfig},
-    transform::{build_cache_entry, CacheEntry},
+    transform::{CacheEntry, build_cache_entry},
 };
+use crate::{event::Event, internal_events::DedupeEventsDropped, transforms::TaskTransform};
 
 #[derive(Clone)]
 pub struct TimedDedupe {

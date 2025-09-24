@@ -1,17 +1,16 @@
 use redis::{
-    sentinel::{Sentinel, SentinelNodeConnectionInfo},
     ProtocolVersion, RedisConnectionInfo, TlsMode,
+    sentinel::{Sentinel, SentinelNodeConnectionInfo},
 };
 use snafu::prelude::*;
 
+use super::{
+    RedisCreateFailedSnafu,
+    sink::{RedisConnection, RedisSink},
+};
 use crate::{
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
-};
-
-use super::{
-    sink::{RedisConnection, RedisSink},
-    RedisCreateFailedSnafu,
 };
 
 #[derive(Clone, Copy, Debug)]

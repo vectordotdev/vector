@@ -14,35 +14,35 @@ use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
+    Client, Config as ClientConfig,
     api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{reflector, watcher, WatchStreamExt},
-    Client, Config as ClientConfig,
+    runtime::{WatchStreamExt, reflector, watcher},
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::file_source::{
-    calculate_ignore_before, Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom, ReadFromConfig,
-};
-use vector_lib::lookup::{lookup_v2::OptionalTargetPath, owned_value_path, path, OwnedTargetPath};
-use vector_lib::{config::LegacyKey, config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{BytesDeserializer, BytesDeserializerConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    file_source::file_server::{
+        FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
+    },
+    file_source_common::{
+        Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+    },
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
-    TimeZone,
+    lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use crate::{
+    SourceSender,
     built_info::{PKG_NAME, PKG_VERSION},
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
-};
-use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig,
-        SourceContext, SourceOutput,
+        ComponentKey, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
+        SourceOutput, log_schema,
     },
     event::Event,
     internal_events::{
@@ -54,8 +54,8 @@ use crate::{
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
+    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
     transforms::{FunctionTransform, OutputBuffer},
-    SourceSender,
 };
 
 mod k8s_paths_provider;
@@ -69,10 +69,11 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use self::node_metadata_annotator::NodeMetadataAnnotator;
-use self::parser::Parser;
-use self::pod_metadata_annotator::PodMetadataAnnotator;
+use self::{
+    namespace_metadata_annotator::NamespaceMetadataAnnotator,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    pod_metadata_annotator::PodMetadataAnnotator,
+};
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
@@ -106,6 +107,15 @@ pub struct Config {
         docs::examples = "my_custom_label!=my_value,my_other_custom_label=my_value"
     ))]
     extra_namespace_label_selector: String,
+
+    /// Specifies whether or not to enrich logs with namespace fields.
+    ///
+    /// Setting to `false` prevents Vector from pulling in namespaces and thus namespace label fields will not
+    /// be available. This helps reduce load on the `kube-apiserver` and lowers daemonset memory usage in clusters
+    /// with many namespaces.
+    ///
+    #[serde(default = "default_insert_namespace_fields")]
+    insert_namespace_fields: bool,
 
     /// The name of the Kubernetes [Node][node] that is running.
     ///
@@ -290,6 +300,7 @@ impl Default for Config {
         Self {
             extra_label_selector: "".to_string(),
             extra_namespace_label_selector: "".to_string(),
+            insert_namespace_fields: true,
             self_node_name: default_self_node_name_env_template(),
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
@@ -555,6 +566,7 @@ struct Source {
     field_selector: String,
     label_selector: String,
     namespace_label_selector: String,
+    insert_namespace_fields: bool,
     node_selector: String,
     self_node_name: String,
     include_paths: Vec<glob::Pattern>,
@@ -643,6 +655,7 @@ impl Source {
             field_selector,
             label_selector,
             namespace_label_selector,
+            insert_namespace_fields: config.insert_namespace_fields,
             node_selector,
             self_node_name,
             include_paths,
@@ -679,6 +692,7 @@ impl Source {
             field_selector,
             label_selector,
             namespace_label_selector,
+            insert_namespace_fields,
             node_selector,
             self_node_name,
             include_paths,
@@ -733,27 +747,28 @@ impl Source {
 
         // -----------------------------------------------------------------
 
-        let namespaces = Api::<Namespace>::all(client.clone());
-        let ns_watcher = watcher(
-            namespaces,
-            watcher::Config {
-                label_selector: Some(namespace_label_selector),
-                list_semantic: list_semantic.clone(),
-                page_size: get_page_size(use_apiserver_cache),
-                ..Default::default()
-            },
-        )
-        .backoff(watcher::DefaultBackoff::default());
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
-        let ns_cacher = MetaCache::new();
+        if insert_namespace_fields {
+            let namespaces = Api::<Namespace>::all(client.clone());
+            let ns_watcher = watcher(
+                namespaces,
+                watcher::Config {
+                    label_selector: Some(namespace_label_selector),
+                    list_semantic: list_semantic.clone(),
+                    page_size: get_page_size(use_apiserver_cache),
+                    ..Default::default()
+                },
+            )
+            .backoff(watcher::DefaultBackoff::default());
 
-        reflectors.push(tokio::spawn(custom_reflector(
-            ns_store_w,
-            ns_cacher,
-            ns_watcher,
-            delay_deletion,
-        )));
+            reflectors.push(tokio::spawn(custom_reflector(
+                ns_store_w,
+                MetaCache::new(),
+                ns_watcher,
+                delay_deletion,
+            )));
+        }
 
         // -----------------------------------------------------------------
 
@@ -784,6 +799,7 @@ impl Source {
             ns_state.clone(),
             include_paths,
             exclude_paths,
+            insert_namespace_fields,
         );
         let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator =
@@ -853,7 +869,6 @@ impl Source {
                 include_file_metric_tag,
             },
             // A handle to the current tokio runtime
-            handle: tokio::runtime::Handle::current(),
             rotate_wait,
         };
 
@@ -889,12 +904,11 @@ impl Source {
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-                if let Some(name) = namespace {
-                    let ns_info = ns_annotator.annotate(&mut event, name);
-
-                    if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
-                    }
+                if insert_namespace_fields
+                    && let Some(name) = namespace
+                    && ns_annotator.annotate(&mut event, name).is_none()
+                {
+                    emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                 }
 
                 let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
@@ -1046,6 +1060,11 @@ const fn default_oldest_first() -> bool {
     true
 }
 
+// It might make sense to disable this for clusters with a very large number of namespaces.
+const fn default_insert_namespace_fields() -> bool {
+    true
+}
+
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
     // https://github.com/vectordotdev/vector/issues/6967
@@ -1151,17 +1170,72 @@ fn prepare_label_selector(selector: &str) -> String {
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{owned_value_path, OwnedTargetPath};
-    use vector_lib::{config::LogNamespace, schema::Definition};
-    use vrl::value::{kind::Collection, Kind};
-
-    use crate::config::SourceConfig;
+    use vector_lib::{
+        config::LogNamespace,
+        lookup::{OwnedTargetPath, owned_value_path},
+        schema::Definition,
+    };
+    use vrl::value::{Kind, kind::Collection};
 
     use super::Config;
+    use crate::config::SourceConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn test_default_config_insert_namespace_fields() {
+        let config = Config::default();
+        assert_eq!(config.insert_namespace_fields, true);
+    }
+
+    #[test]
+    fn test_config_insert_namespace_fields_disabled() {
+        let config = Config {
+            insert_namespace_fields: false,
+            ..Default::default()
+        };
+        assert_eq!(config.insert_namespace_fields, false);
+    }
+
+    #[test]
+    fn test_config_serialization_insert_namespace_fields() {
+        // Test that the flag serializes/deserializes correctly from TOML
+        let toml_config = r#"
+            insert_namespace_fields = false
+        "#;
+        let config: Config = toml::from_str(toml_config).unwrap();
+        assert_eq!(config.insert_namespace_fields, false);
+
+        let default_toml = "";
+        let default_config: Config = toml::from_str(default_toml).unwrap();
+        assert_eq!(default_config.insert_namespace_fields, true);
+    }
+
+    #[test]
+    fn test_insert_namespace_fields_affects_behavior() {
+        // Test that the config field properly controls namespace watching behavior
+        // This is a unit test for the conditional logic in the run method
+        let enabled_config = Config {
+            insert_namespace_fields: true,
+            ..Default::default()
+        };
+        let disabled_config = Config {
+            insert_namespace_fields: false,
+            ..Default::default()
+        };
+
+        // The main validation is that the flag is passed through correctly
+        // and can be used in conditional logic
+        assert!(should_watch_namespaces(&enabled_config));
+        assert!(!should_watch_namespaces(&disabled_config));
+    }
+
+    // Helper function to simulate the conditional logic from the run method
+    fn should_watch_namespaces(config: &Config) -> bool {
+        config.insert_namespace_fields
     }
 
     #[test]

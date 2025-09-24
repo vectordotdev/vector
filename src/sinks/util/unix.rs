@@ -8,7 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{stream::BoxStream, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::AsyncWriteExt,
@@ -16,13 +16,14 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::json_size::JsonSize;
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     internal_event::{BytesSent, Protocol},
+    json_size::JsonSize,
 };
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
+use super::datagram::{DatagramSocket, send_datagrams};
 use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
@@ -33,16 +34,14 @@ use crate::{
     },
     sink_ext::VecSinkExt,
     sinks::{
+        Healthcheck, VectorSink,
         util::{
+            EncodedEvent, StreamSink,
             service::net::UnixMode,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
-            EncodedEvent, StreamSink,
         },
-        Healthcheck, VectorSink,
     },
 };
-
-use super::datagram::{send_datagrams, DatagramSocket};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -76,10 +75,10 @@ impl UnixSinkConfig {
         &self,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = vector_lib::codecs::encoding::Error>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
+        + Clone
+        + Send
+        + Sync
+        + 'static,
         unix_mode: UnixMode,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone(), unix_mode);
@@ -279,6 +278,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
+                &None,
                 &bytes_sent,
             )
             .await;
@@ -302,15 +302,16 @@ where
 mod tests {
     use tokio::net::UnixListener;
     use vector_lib::codecs::{
-        encoding::Framer, BytesEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
+        BytesEncoder, NewlineDelimitedEncoder, TextSerializerConfig, encoding::Framer,
     };
 
     use super::*;
     use crate::{
         codecs::Encoder,
         test_util::{
-            components::{assert_sink_compliance, SINK_TAGS},
-            random_lines_with_stream, CountReceiver,
+            CountReceiver,
+            components::{SINK_TAGS, assert_sink_compliance},
+            random_lines_with_stream,
         },
     };
 
@@ -322,16 +323,18 @@ mod tests {
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_stream_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
-        assert!(UnixSinkConfig::new(good_path.clone())
-            .build(
-                Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
-                UnixMode::Stream
-            )
-            .unwrap()
-            .1
-            .await
-            .is_ok());
+        assert!(
+            UnixSinkConfig::new(good_path.clone())
+                .build(
+                    Default::default(),
+                    Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                    UnixMode::Stream
+                )
+                .unwrap()
+                .1
+                .await
+                .is_ok()
+        );
         assert!(
             UnixSinkConfig::new(good_path.clone())
                 .build(
@@ -347,26 +350,30 @@ mod tests {
         );
 
         let bad_path = temp_uds_path("no_one_listening");
-        assert!(UnixSinkConfig::new(bad_path.clone())
-            .build(
-                Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
-                UnixMode::Stream
-            )
-            .unwrap()
-            .1
-            .await
-            .is_err());
-        assert!(UnixSinkConfig::new(bad_path.clone())
-            .build(
-                Default::default(),
-                Encoder::<()>::new(TextSerializerConfig::default().build().into()),
-                UnixMode::Datagram
-            )
-            .unwrap()
-            .1
-            .await
-            .is_err());
+        assert!(
+            UnixSinkConfig::new(bad_path.clone())
+                .build(
+                    Default::default(),
+                    Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                    UnixMode::Stream
+                )
+                .unwrap()
+                .1
+                .await
+                .is_err()
+        );
+        assert!(
+            UnixSinkConfig::new(bad_path.clone())
+                .build(
+                    Default::default(),
+                    Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+                    UnixMode::Datagram
+                )
+                .unwrap()
+                .1
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

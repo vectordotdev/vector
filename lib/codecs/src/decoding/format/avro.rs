@@ -1,18 +1,18 @@
-use super::Deserializer;
-use crate::encoding::AvroSerializerOptions;
-use bytes::Buf;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::{Event, LogEvent},
     schema,
 };
 use vrl::value::KeyString;
+
+use super::Deserializer;
+use crate::encoding::AvroSerializerOptions;
 
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;

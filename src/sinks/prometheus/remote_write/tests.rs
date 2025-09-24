@@ -3,8 +3,7 @@ use futures::StreamExt;
 use http::HeaderMap;
 use indoc::indoc;
 use prost::Message;
-use vector_lib::metric_tags;
-use vector_lib::prometheus::parser::proto;
+use vector_lib::{metric_tags, prometheus::parser::proto};
 
 use super::*;
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     sinks::{prometheus::remote_write::config::RemoteWriteConfig, util::test::build_test_server},
     test_util::{
         self,
-        components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        components::{HTTP_SINK_TAGS, assert_sink_compliance},
     },
 };
 

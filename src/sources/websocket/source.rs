@@ -1,34 +1,37 @@
-use crate::vector_lib::codecs::StreamDecodingError;
-use crate::{
-    codecs::Decoder,
-    common::websocket::{is_closed, PingInterval, WebSocketConnector},
-    config::SourceContext,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketBytesReceived, WebSocketConnectionError,
-        WebSocketConnectionEstablished, WebSocketConnectionFailedError,
-        WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
-        WebSocketReceiveError, WebSocketSendError, PROTOCOL,
-    },
-    sources::websocket::config::WebSocketConfig,
-    SourceSender,
-};
-use chrono::Utc;
-use futures::{pin_mut, sink::SinkExt, Sink, Stream, StreamExt};
-use snafu::Snafu;
 use std::pin::Pin;
+
+use chrono::Utc;
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
+use snafu::Snafu;
 use tokio::time;
-use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, Message};
+use tokio_tungstenite::tungstenite::{
+    Message, error::Error as TungsteniteError, protocol::CloseFrame,
+};
 use tokio_util::codec::FramedRead;
-use vector_lib::internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
     event::{Event, LogEvent},
-    EstimatedJsonEncodedSizeOf,
+    internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+};
+
+use crate::{
+    SourceSender,
+    codecs::Decoder,
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
+    config::SourceContext,
+    internal_events::{
+        ConnectionOpen, OpenGauge, PROTOCOL, WebSocketBytesReceived, WebSocketConnectionError,
+        WebSocketConnectionEstablished, WebSocketConnectionFailedError,
+        WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
+        WebSocketReceiveError, WebSocketSendError,
+    },
+    sources::websocket::config::WebSocketConfig,
+    vector_lib::codecs::StreamDecodingError,
 };
 
 macro_rules! fail_with_event {
-    ($context:expr) => {{
+    ($context:expr_2021) => {{
         emit!(WebSocketConnectionFailedError {
             error: Box::new($context.build())
         });
@@ -454,26 +457,30 @@ impl PingManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::components::run_and_assert_source_error;
+    use std::{borrow::Cow, num::NonZeroU64};
+
+    use futures::{StreamExt, sink::SinkExt};
+    use tokio::{net::TcpListener, time::Duration};
+    use tokio_tungstenite::{
+        accept_async,
+        tungstenite::{
+            Message,
+            protocol::frame::{CloseFrame, coding::CloseCode},
+        },
+    };
+    use url::Url;
+    use vector_lib::codecs::decoding::DeserializerConfig;
+
     use crate::{
         common::websocket::WebSocketCommonConfig,
-        sources::websocket::config::PongMessage,
-        sources::websocket::config::WebSocketConfig,
+        sources::websocket::config::{PongMessage, WebSocketConfig},
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{
+                SOURCE_TAGS, run_and_assert_source_compliance, run_and_assert_source_error,
+            },
             next_addr,
         },
     };
-    use futures::{sink::SinkExt, StreamExt};
-    use std::borrow::Cow;
-    use std::num::NonZeroU64;
-    use tokio::{net::TcpListener, time::Duration};
-    use tokio_tungstenite::tungstenite::{
-        protocol::frame::coding::CloseCode, protocol::frame::CloseFrame,
-    };
-    use tokio_tungstenite::{accept_async, tungstenite::Message};
-    use url::Url;
-    use vector_lib::codecs::decoding::DeserializerConfig;
 
     fn make_config(uri: &str) -> WebSocketConfig {
         WebSocketConfig {
@@ -538,14 +545,14 @@ mod tests {
             let mut websocket = accept_async(stream).await.expect("Failed to accept");
 
             // Wait for the initial message from the client
-            if let Some(Ok(Message::Text(msg))) = websocket.next().await {
-                if msg == initial_message {
-                    // Received correct initial message, send response
-                    websocket
-                        .send(Message::Text(response_message))
-                        .await
-                        .unwrap();
-                }
+            if let Some(Ok(Message::Text(msg))) = websocket.next().await
+                && msg == initial_message
+            {
+                // Received correct initial message, send response
+                websocket
+                    .send(Message::Text(response_message))
+                    .await
+                    .unwrap();
             }
         });
 

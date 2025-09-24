@@ -63,6 +63,7 @@ Automated steps include:
   - [ ] Ensure any breaking changes are highlighted in the release upgrade guide
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide
   - [ ] Review generated changelog entries to ensure they are understandable to end-users
+  - [ ] Ensure the date matches the scheduled release date.
 - [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
     take them (or have someone help you take them)
 - [ ] PR review & approval
@@ -72,13 +73,12 @@ Automated steps include:
 - [ ] Make sure the release branch is in sync with origin/master and has only one squashed commit with all commits from the prepare branch. If you made a PR from the prepare branch into the release branch this should already be the case
   - [ ] `git checkout "${RELEASE_BRANCH}"`
   - [ ] `git show --stat HEAD` - This should show the squashed prepare commit
-  - [ ] `git diff HEAD~1 origin/master --quiet && echo "Same" || echo "Different"` - Should output `Same`
+  - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
+    - If this needs to be updated commit and squash it in the release branch
   - Follow these steps if the release branch needs to be updated
     - [ ] Rebase the release preparation branch on the release branch
       - [ ] Squash the release preparation commits (but not the cherry-picked commits!) to a single
           commit. This makes it easier to cherry-pick to master after the release.
-      - [ ] Ensure release date in `website/cue/reference/releases/0.XX.Y.cue` matches current date.
-        - If this needs to be updated commit and squash it in the release branch
     - [ ] Merge release preparation branch into the release branch
         - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
 

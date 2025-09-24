@@ -2,14 +2,13 @@ use std::sync::Arc;
 
 use snafu::ResultExt;
 
-use crate::sinks::prelude::*;
-
 use super::{
+    EncodingSnafu, NatsError,
     config::{NatsHeaderConfig, NatsPublisher, NatsSinkConfig, NatsTowerRequestConfigDefaults},
     request_builder::{NatsEncoder, NatsRequest, NatsRequestBuilder},
     service::{NatsResponse, NatsService},
-    EncodingSnafu, NatsError,
 };
+use crate::sinks::prelude::*;
 
 pub(super) struct NatsEvent {
     pub(super) event: Event,

@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::FutureExt;
-use tokio::time::{sleep, Sleep};
+use tokio::time::{Sleep, sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 use vector_lib::configurable::configurable_component;
 
@@ -170,7 +170,7 @@ where
                         return None;
                     }
                     *req = modify_request(req.clone());
-                    error!(
+                    warn!(
                         message = "OK/retrying partial after response.",
                         internal_log_rate_limit = true
                     );

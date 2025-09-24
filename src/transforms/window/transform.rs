@@ -97,17 +97,19 @@ impl FunctionTransform for Window {
 #[cfg(test)]
 mod test {
     use std::ops::RangeInclusive;
-    use tokio::sync::mpsc;
-    use tokio::sync::mpsc::{Receiver, Sender};
+
+    use tokio::sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    };
     use tokio_stream::wrappers::ReceiverStream;
     use vrl::core::Value;
 
-    use crate::conditions::{AnyCondition, ConditionConfig, VrlConfig};
-    use crate::transforms::window::config::WindowConfig;
     use crate::{
+        conditions::{AnyCondition, ConditionConfig, VrlConfig},
         event::{Event, LogEvent},
         test_util::components::assert_transform_compliance,
-        transforms::test::create_topology,
+        transforms::{test::create_topology, window::config::WindowConfig},
     };
 
     #[tokio::test]

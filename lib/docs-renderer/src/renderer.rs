@@ -79,7 +79,7 @@ impl RenderData {
             while let Some(segment) = segments.pop_front() {
                 if destination.contains_key(segment) {
                     match destination.get_mut(segment) {
-                        Some(Value::Object(ref mut next)) => {
+                        Some(Value::Object(next)) => {
                             destination = next;
                             continue;
                         }
@@ -91,7 +91,7 @@ impl RenderData {
                 } else {
                     destination.insert(segment.to_string(), Value::Object(Map::new()));
                     match destination.get_mut(segment) {
-                        Some(Value::Object(ref mut next)) => {
+                        Some(Value::Object(next)) => {
                             destination = next;
                         }
                         _ => panic!("New object was just inserted."),
@@ -139,7 +139,7 @@ impl RenderData {
             let mut destination = map;
             while let Some(segment) = segments.pop_front() {
                 match destination.get_mut(segment) {
-                    Some(Value::Object(ref mut next)) => {
+                    Some(Value::Object(next)) => {
                         destination = next;
                         continue;
                     }

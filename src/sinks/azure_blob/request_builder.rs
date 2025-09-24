@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use chrono::Utc;
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::RequestMetadata;
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, request_metadata::RequestMetadata,
+};
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -11,8 +11,8 @@ use crate::{
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };

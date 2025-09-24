@@ -3,9 +3,20 @@ pub mod auth;
 pub mod region;
 pub mod timeout;
 
+use std::{
+    error::Error,
+    pin::Pin,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime},
+};
+
 pub use auth::{AwsAuthentication, ImdsAuthentication};
 use aws_config::{
-    meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig, Region, SdkConfig,
+    Region, SdkConfig, meta::region::ProvideRegion, retry::RetryConfig, timeout::TimeoutConfig,
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
@@ -30,27 +41,19 @@ use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::{HeaderMap, Request};
-use http_body::{combinators::BoxBody, Body};
+use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
 use snafu::Snafu;
-use std::{
-    error::Error,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, OnceLock,
-    },
-    task::{Context, Poll},
-    time::{Duration, SystemTime},
-};
 pub use timeout::AwsTimeout;
 
-use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector, status};
-use crate::internal_events::AwsBytesSent;
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::{
+    config::ProxyConfig,
+    http::{build_proxy_connector, build_tls_connector, status},
+    internal_events::AwsBytesSent,
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 
 static RETRIABLE_CODES: OnceLock<RegexSet> = OnceLock::new();
 
@@ -443,13 +446,13 @@ where
 
         HttpConnectorFuture::new(fut.inspect(move |result| {
             let byte_size = bytes_sent.load(Ordering::Relaxed);
-            if let Ok(result) = result {
-                if result.status().is_success() {
-                    emit!(AwsBytesSent {
-                        byte_size,
-                        region: Some(region),
-                    });
-                }
+            if let Ok(result) = result
+                && result.status().is_success()
+            {
+                emit!(AwsBytesSent {
+                    byte_size,
+                    region: Some(region),
+                });
             }
         }))
     }
