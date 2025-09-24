@@ -148,8 +148,9 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Udp(UdpMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let serializer = encoding.build()?;
+                let chunker = serializer.chunker();
                 let encoder = Encoder::<()>::new(serializer);
-                config.build(transformer, encoder)
+                config.build(transformer, encoder, chunker)
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {

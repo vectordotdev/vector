@@ -97,7 +97,7 @@ impl MemorySource {
                             })
                             .filter_map(|(k, v)| {
                                 let mut event = Event::Log(LogEvent::from_map(
-                                    v.as_object_map(now, self.memory.config.ttl, k).ok()?,
+                                    v.as_object_map(now, k).ok()?,
                                     EventMetadata::default(),
                                 ));
                                 let log = event.as_mut_log();

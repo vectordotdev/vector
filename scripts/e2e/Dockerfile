@@ -11,7 +11,6 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     clang \
     libclang-dev \
     libsasl2-dev \
-    libstdc++-11-dev \
     libssl-dev \
     libxxhash-dev \
     unzip \

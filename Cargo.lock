@@ -4353,9 +4353,9 @@ dependencies = [
 
 [[package]]
 name = "grok"
-version = "2.1.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c52724b609896f661a3f4641dd3a44dc602958ef615857c12d00756b4e9355b"
+checksum = "2e2d7bd791814b06a609b74361ac35b448eb4718548937c6de718554a4348577"
 dependencies = [
  "glob",
  "onig",
@@ -4875,7 +4875,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -5439,6 +5439,15 @@ dependencies = [
  "widestring 1.0.2",
  "windows-sys 0.48.0",
  "winreg",
+]
+
+[[package]]
+name = "ipcrypt-rs"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96e4f67dbfc0f75d7b65953ecf0be3fd84ee0cb1ae72a00a4aa9a2f5518a2c80"
+dependencies = [
+ "aes",
 ]
 
 [[package]]
@@ -8052,7 +8061,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -8098,7 +8107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
@@ -12007,7 +12016,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.50.0"
+version = "0.51.0"
 dependencies = [
  "apache-avro",
  "approx",
@@ -12570,8 +12579,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.26.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#a5706e81ff1dd798540831d4e2680b9ad90eb728"
+version = "0.27.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#77add1371e6587f69f20541140985a5b3a9b343f"
 dependencies = [
  "aes",
  "aes-siv",
@@ -12615,6 +12624,7 @@ dependencies = [
  "indexmap 2.11.0",
  "indoc",
  "influxdb-line-protocol",
+ "ipcrypt-rs",
  "itertools 0.14.0",
  "jsonschema",
  "lalrpop",

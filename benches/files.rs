@@ -60,6 +60,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         acknowledgements: Default::default(),
                         timezone: Default::default(),
                         internal_metrics: Default::default(),
+                        truncate_config: Default::default(),
                     },
                 );
 

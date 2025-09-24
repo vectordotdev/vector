@@ -82,6 +82,7 @@ pub struct SimpleHttpConfig {
     /// The expected encoding of received data.
     ///
     /// For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+    #[configurable(deprecated)]
     #[serde(default)]
     encoding: Option<Encoding>,
 

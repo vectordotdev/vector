@@ -322,6 +322,20 @@ generated: components: sinks: file: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			gelf: {
+				description:   "The GELF Serializer Options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: max_chunk_size: {
+					description: """
+						Maximum size for each GELF chunked datagram (including 12-byte header).
+						Chunking starts when datagrams exceed this size.
+						For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+						"""
+					required: false
+					type: uint: default: 8192
+				}
+			}
 			json: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
@@ -514,5 +528,26 @@ generated: components: sinks: file: configuration: {
 			"""
 		required: false
 		type: string: examples: ["local", "America/New_York", "EST5EDT"]
+	}
+	truncate_config: {
+		description: "Configuration for truncating files."
+		required:    false
+		type: object: options: {
+			after_close_time_secs: {
+				description: "If this is set, files will be truncated after being closed for a set amount of seconds."
+				required:    false
+				type: uint: {}
+			}
+			after_modified_time_secs: {
+				description: "If this is set, files will be truncated after set amount of seconds of no modifications."
+				required:    false
+				type: uint: {}
+			}
+			after_secs: {
+				description: "If this is set, files will be truncated after set amount of seconds regardless of the state."
+				required:    false
+				type: uint: {}
+			}
+		}
 	}
 }

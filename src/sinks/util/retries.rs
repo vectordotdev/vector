@@ -170,7 +170,7 @@ where
                         return None;
                     }
                     *req = modify_request(req.clone());
-                    error!(
+                    warn!(
                         message = "OK/retrying partial after response.",
                         internal_log_rate_limit = true
                     );

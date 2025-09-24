@@ -1656,7 +1656,7 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
         writeln!(&mut file, "the line").unwrap();
-        sleep_500_millis().await;
+        file.flush().unwrap();
 
         // First time server runs it picks up existing lines.
         let received = run_file_source(
@@ -1664,7 +1664,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            sleep_500_millis(),
+            sleep(Duration::from_secs(5)),
         )
         .await;
         let lines = extract_messages_string(received);
@@ -1676,7 +1676,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            sleep_500_millis(),
+            sleep(Duration::from_secs(5)),
         )
         .await;
         let lines = extract_messages_string(received);
