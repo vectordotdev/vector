@@ -15,7 +15,7 @@ pub struct Cli {
     #[arg(long, default_value = "vectordotdev")]
     username: String,
 
-    /// Vector version, defaults to $VECTOR_VERSION if not specified.
+    /// Vector version, defaults to $`VECTOR_VERSION` if not specified.
     #[arg(long, env = "VECTOR_VERSION")]
     vector_version: String,
 }
