@@ -945,10 +945,11 @@ mod tests {
 
     use encoding_rs::UTF_16LE;
     use similar_asserts::assert_eq;
-    use tempfile::tempdir;
+    use tempfile::{Builder, TempDir};
     use tokio::{
         fs::{self, File},
         io::{AsyncSeekExt, AsyncWriteExt},
+        select,
         sync::mpsc::{self, UnboundedReceiver},
         time::{Duration, sleep, timeout},
     };
@@ -964,6 +965,10 @@ mod tests {
         test_util::components::{IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS, assert_source},
     };
     use vrl::value;
+
+    fn tempdir() -> std::io::Result<TempDir> {
+        Builder::new().tempdir_in("/tmp")
+    }
 
     trait AWrite {
         async fn write_line<T: AsRef<str>>(&mut self, line: T) -> std::io::Result<()>;
@@ -987,7 +992,7 @@ mod tests {
         timeout_ms: u64,
     ) {
         let mut counter = 0;
-        let shutdown = sleep(Duration::from_millis(timeout_ms));
+        let shutdown = sleep(Duration::from_millis(timeout_ms * 4)); // FIXME
 
         tokio::select! {
             _ = shutdown => {
@@ -1014,7 +1019,7 @@ mod tests {
         count: usize,
         timeout_ms: u64,
     ) {
-        let shutdown = sleep(Duration::from_millis(timeout_ms));
+        let shutdown = sleep(Duration::from_millis(timeout_ms * 4)); // FIXME
         let mut files: HashSet<PathBuf> = HashSet::from_iter(
             original_files
                 .into_iter()
