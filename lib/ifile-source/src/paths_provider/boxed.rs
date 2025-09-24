@@ -26,8 +26,11 @@ impl BoxedPathsProvider {
 impl PathsProvider for BoxedPathsProvider {
     type IntoIter = Vec<PathBuf>;
 
-    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
+    fn paths(
+        &self,
+        should_glob: bool,
+    ) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
         // Return the inner future directly
-        self.inner.paths()
+        self.inner.paths(should_glob)
     }
 }

@@ -56,7 +56,10 @@ impl<E: FileSourceInternalEvents> Glob<E> {
 impl<E: FileSourceInternalEvents + Clone + Send + 'static> PathsProvider for Glob<E> {
     type IntoIter = Vec<PathBuf>;
 
-    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
+    fn paths(
+        &self,
+        _should_glob: bool,
+    ) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
         Box::pin(async move {
             // Clone the data we need to move into the spawn_blocking task
             let include_patterns = self.include_patterns.clone();

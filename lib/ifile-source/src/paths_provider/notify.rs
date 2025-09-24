@@ -386,7 +386,10 @@ impl<E: FileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider
 {
     type IntoIter = Vec<PathBuf>;
 
-    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
+    fn paths(
+        &self,
+        should_glob: bool,
+    ) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>> {
         // Clone everything we need to avoid capturing self
         let discovered_files = self.discovered_files.clone();
         let event_mutex = self.event_mutex.clone();
@@ -403,7 +406,7 @@ impl<E: FileSourceInternalEvents + Clone + Send + Sync + 'static> PathsProvider
 
             // Only perform a glob scan if we're using glob fallback
             // This prevents unnecessary glob scans when the notify watcher is working
-            if use_glob_fallback {
+            if use_glob_fallback && should_glob {
                 debug!(message = "Using glob fallback for file discovery");
                 clone.glob_scan().await;
             }

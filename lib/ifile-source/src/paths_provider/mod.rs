@@ -33,5 +33,6 @@ pub trait PathsProvider {
     type IntoIter: IntoIterator<Item = PathBuf>;
 
     /// Provides a set of paths asynchronously.
-    fn paths(&self) -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>>;
+    fn paths(&self, should_glob: bool)
+        -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>>;
 }

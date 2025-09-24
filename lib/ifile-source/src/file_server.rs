@@ -126,7 +126,7 @@ where
 
         let mut existing_files = Vec::new();
 
-        let paths = self.paths_provider.paths().await;
+        let paths = self.paths_provider.paths(true).await;
         for path in paths.into_iter() {
             debug!(?path, "fingerprinting on startup");
             if let Some(file_id) = self
@@ -211,6 +211,7 @@ where
             self.emitter.clone(),
         ));
 
+        let mut last_stats_report: Option<Instant> = None;
         // Alright friends, how does this work?
         //
         // We want to avoid burning up users' CPUs. To do this we sleep after
@@ -227,23 +228,22 @@ where
             // Check for new files frequently to minimize the delay between when a file is discovered
             // by the notify watcher and when it's actually processed, but not on every iteration
             // to avoid excessive CPU usage
-            let should_discover = next_glob_time <= now_time
+            let should_discover_glob = next_glob_time <= now_time
                 || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
 
             // Report stats periodically, but only if enough time has passed since the last report
             // This prevents excessive logging when the main loop is running frequently
-            static mut LAST_STATS_REPORT: Option<Instant> = None;
             let now = Instant::now();
-            let should_report_stats = unsafe {
-                if let Some(last_report) = LAST_STATS_REPORT {
+            let should_report_stats = {
+                if let Some(last_report) = last_stats_report {
                     if now.duration_since(last_report) >= Duration::from_secs(10) {
-                        LAST_STATS_REPORT = Some(now);
+                        last_stats_report = Some(now);
                         true
                     } else {
                         false
                     }
                 } else {
-                    LAST_STATS_REPORT = Some(now);
+                    last_stats_report = Some(now);
                     true
                 }
             };
@@ -256,121 +256,121 @@ where
                 stats = TimingStats::default();
             }
 
-            if should_discover {
+            if should_discover_glob {
                 // Schedule the next glob time - use a fixed interval of 1 second
                 next_glob_time = now_time.checked_add(Duration::from_secs(1)).unwrap();
+            }
 
-                // Search (glob) for files to detect major file changes.
-                let start = time::Instant::now();
-                for (_file_id, watcher) in &mut fp_map {
-                    watcher.set_file_findable(false); // assume not findable until found
-                }
+            // Search for files to detect major file changes.
+            let start = time::Instant::now();
+            for (_file_id, watcher) in &mut fp_map {
+                watcher.set_file_findable(false); // assume not findable until found
+            }
 
-                // Use async paths provider
-                let paths = self.paths_provider.paths().await;
-                for path in paths.into_iter() {
-                    if let Some(file_id) = self
-                        .fingerprinter
-                        .get_fingerprint_or_log_error(
-                            &path,
-                            &mut fingerprint_buffer,
-                            &mut known_small_files,
-                            &self.emitter,
-                        )
-                        .await
-                    {
-                        if let Some(watcher) = fp_map.get_mut(&file_id) {
-                            // file fingerprint matches a watched file
-                            let was_found_this_cycle = watcher.file_findable();
-                            watcher.set_file_findable(true);
-                            if watcher.path == path {
-                                trace!(
-                                    message = "Continue watching file.",
-                                    path = ?path,
-                                );
-                            } else if !was_found_this_cycle {
-                                // matches a file with a different path
-                                info!(
-                                    message = "Watched file has been renamed.",
-                                    path = ?path,
-                                    old_path = ?watcher.path
-                                );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
-                            } else {
-                                info!(
-                                    message = "More than one file has the same fingerprint.",
-                                    path = ?path,
-                                    old_path = ?watcher.path
-                                );
-                                let (old_path, new_path) = (&watcher.path, &path);
-                                if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(old_path).await.and_then(|m| m.modified()),
-                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
-                                ) {
-                                    if old_modified_time < new_modified_time {
-                                        info!(
-                                            message = "Switching to watch most recently modified file.",
-                                            new_modified_time = ?new_modified_time,
-                                            old_modified_time = ?old_modified_time,
-                                        );
-                                        watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
-                                    }
-                                }
-                            }
+            // Use async paths provider
+            let paths = self.paths_provider.paths(should_discover_glob).await;
+            for path in paths.into_iter() {
+                if let Some(file_id) = self
+                    .fingerprinter
+                    .get_fingerprint_or_log_error(
+                        &path,
+                        &mut fingerprint_buffer,
+                        &mut known_small_files,
+                        &self.emitter,
+                    )
+                    .await
+                {
+                    if let Some(watcher) = fp_map.get_mut(&file_id) {
+                        // file fingerprint matches a watched file
+                        let was_found_this_cycle = watcher.file_findable();
+                        watcher.set_file_findable(true);
+                        if watcher.path == path {
+                            trace!(
+                                message = "Continue watching file.",
+                                path = ?path,
+                            );
+                        } else if !was_found_this_cycle {
+                            // matches a file with a different path
+                            info!(
+                                message = "Watched file has been renamed.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                         } else {
-                            // untracked file fingerprint
-                            // Immediately watch and read the new file
-                            let path_clone = path.clone();
-                            debug!(message = "Discovered new file during runtime", ?path_clone);
-                            self.watch_new_file(
-                                path.clone(),
-                                file_id,
-                                &mut fp_map,
-                                &checkpoints,
-                                false,
-                                &mut lines,
-                            )
-                            .await;
-
-                            // Immediately read the file to avoid delay in detecting content
-                            if let Some(watcher) = fp_map.get_mut(&file_id) {
-                                debug!(
-                                    message = "Immediately reading newly discovered file",
-                                    ?path_clone
-                                );
-                                let mut bytes_read: usize = 0;
-                                while let Ok(Some(line)) = watcher.read_line().await {
-                                    let sz = line.bytes.len();
-                                    trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
-                                    bytes_read += sz;
-
-                                    lines.push(Line {
-                                        text: line.bytes,
-                                        filename: watcher
-                                            .path
-                                            .to_str()
-                                            .expect("not a valid path")
-                                            .to_owned(),
-                                        file_id,
-                                        start_offset: line.offset,
-                                        end_offset: watcher.get_file_position(),
-                                    });
-                                }
-
-                                if bytes_read > 0 {
-                                    debug!(
-                                        message = "Read initial content from newly discovered file",
-                                        ?path_clone,
-                                        bytes = bytes_read
+                            info!(
+                                message = "More than one file has the same fingerprint.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            let (old_path, new_path) = (&watcher.path, &path);
+                            if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                fs::metadata(new_path).await.and_then(|m| m.modified()),
+                            ) {
+                                if old_modified_time < new_modified_time {
+                                    info!(
+                                        message = "Switching to watch most recently modified file.",
+                                        new_modified_time = ?new_modified_time,
+                                        old_modified_time = ?old_modified_time,
                                     );
+                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                                 }
                             }
-                            self.emitter.emit_files_open(fp_map.len());
                         }
+                    } else {
+                        // untracked file fingerprint
+                        // Immediately watch and read the new file
+                        let path_clone = path.clone();
+                        debug!(message = "Discovered new file during runtime", ?path_clone);
+                        self.watch_new_file(
+                            path.clone(),
+                            file_id,
+                            &mut fp_map,
+                            &checkpoints,
+                            false,
+                            &mut lines,
+                        )
+                        .await;
+
+                        // Immediately read the file to avoid delay in detecting content
+                        if let Some(watcher) = fp_map.get_mut(&file_id) {
+                            debug!(
+                                message = "Immediately reading newly discovered file",
+                                ?path_clone
+                            );
+                            let mut bytes_read: usize = 0;
+                            while let Ok(Some(line)) = watcher.read_line().await {
+                                let sz = line.bytes.len();
+                                trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
+                                bytes_read += sz;
+
+                                lines.push(Line {
+                                    text: line.bytes,
+                                    filename: watcher
+                                        .path
+                                        .to_str()
+                                        .expect("not a valid path")
+                                        .to_owned(),
+                                    file_id,
+                                    start_offset: line.offset,
+                                    end_offset: watcher.get_file_position(),
+                                });
+                            }
+
+                            if bytes_read > 0 {
+                                debug!(
+                                    message = "Read initial content from newly discovered file",
+                                    ?path_clone,
+                                    bytes = bytes_read
+                                );
+                            }
+                        }
+                        self.emitter.emit_files_open(fp_map.len());
                     }
                 }
-                stats.record("discovery", start.elapsed());
             }
+            stats.record("discovery", start.elapsed());
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
