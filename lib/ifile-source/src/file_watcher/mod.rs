@@ -447,16 +447,11 @@ impl FileWatcher {
     pub fn last_seen(&self) -> Instant {
         self.last_seen
     }
+}
 
-    /// Shutdown the file watcher
-    ///
-    /// This method should be called when the watcher is no longer needed,
-    /// such as when Vector is shutting down. It shuts down the notify watcher
-    /// to prevent further events from being sent.
-    pub fn shutdown(&mut self) {
-        // Shut down the notify watcher
-        self.notify_watcher.shutdown(); // FIXME this is sync
-
+impl Drop for FileWatcher {
+    fn drop(&mut self) {
+        self.notify_watcher.shutdown();
         debug!(message = "FileWatcher shut down", ?self.path);
     }
 }

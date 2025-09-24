@@ -51,13 +51,14 @@ impl NotifyWatcher {
         // Create a watcher with a callback that sends events to the channel
         let watcher = RecommendedWatcher::new(
             move |res| {
-                // Check if we're shutting down
-                static SHUTTING_DOWN: std::sync::atomic::AtomicBool =
-                    std::sync::atomic::AtomicBool::new(false);
-                if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
-                    // Skip sending events during shutdown
-                    return;
-                }
+                // FIXME this is totally incorrect
+                // // Check if we're shutting down
+                // static SHUTTING_DOWN: std::sync::atomic::AtomicBool =
+                //     std::sync::atomic::AtomicBool::new(false);
+                // if SHUTTING_DOWN.load(std::sync::atomic::Ordering::SeqCst) {
+                //     // Skip sending events during shutdown
+                //     return;
+                // }
 
                 // Use a synchronous channel send to avoid requiring tokio runtime
                 // This is necessary because the notify-rs callback runs in its own thread
@@ -206,21 +207,7 @@ impl NotifyWatcher {
         events
     }
 
-    // Note: The methods activate, deactivate, get_file_position, and update_file_position
-    // have been removed as they were not used in the codebase.
-
-    /// Shutdown the watcher
-    ///
-    /// This method should be called when the watcher is no longer needed,
-    /// such as when Vector is shutting down. It drops the watcher and
-    /// channel to prevent further events from being sent.
     pub fn shutdown(&mut self) {
-        // First, set a flag to indicate we're shutting down
-        // This is used in the callback to avoid sending events during shutdown
-        static SHUTTING_DOWN: std::sync::atomic::AtomicBool =
-            std::sync::atomic::AtomicBool::new(false);
-        SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::SeqCst);
-
         // Drop the watcher to stop receiving events
         self.watcher = None;
         // Drop the channel to prevent further events from being sent

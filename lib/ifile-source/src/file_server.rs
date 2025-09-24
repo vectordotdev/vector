@@ -524,9 +524,8 @@ where
                     message = "Shutting down all file watchers",
                     count = fp_map.len()
                 );
-                for (_, watcher) in fp_map.iter_mut() {
-                    watcher.shutdown();
-                }
+                // This will drop all watchers. See `FileWatcher::drop`
+                fp_map.retain(|_, _| false);
 
                 chans
                     .close()
