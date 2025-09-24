@@ -327,15 +327,11 @@ impl FileWatcher {
         }
 
         // Open the file for reading
-        let mut file = match fs::File::open(&self.path).await {
-            Ok(f) => f,
-            Err(e) => {
-                if let io::ErrorKind::NotFound = e.kind() {
-                    self.set_dead();
-                }
-                return Err(e);
+        let mut file = fs::File::open(&self.path).await.inspect_err(|e| {
+            if let io::ErrorKind::NotFound = e.kind() {
+                self.set_dead();
             }
-        };
+        })?;
 
         // Seek to the current position
         file.seek(SeekFrom::Start(self.file_position)).await?;
