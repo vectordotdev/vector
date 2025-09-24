@@ -220,10 +220,8 @@ where
     ) -> Result<(), Vec<String>> {
         if let Some(table) = self.load(input, format)? {
             self.merge(table, None)?;
-            Ok(())
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 
     /// Deserializes a file with the provided format, and makes the result available via `take`.
