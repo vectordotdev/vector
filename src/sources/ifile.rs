@@ -1903,19 +1903,16 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
     async fn file_start_position_server_restart_acknowledged() {
         file_start_position_server_restart(Acks).await
     }
 
-    #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
     async fn file_start_position_server_restart_no_acknowledge() {
         file_start_position_server_restart(NoAcks).await
     }
 
-    #[cfg(target_os = "linux")] // see #7988
     async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = ifile::FileConfig {
@@ -1926,30 +1923,44 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).await.unwrap();
         file.write_line("zeroth line").await.unwrap();
-        sleep_500_millis().await;
+        file.flush().await.unwrap();
 
         // First time server runs it picks up existing lines.
         {
-            let received =
-                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let received = run_ifile_source(
+                &config,
+                true,
+                acking,
+                LogNamespace::Legacy,
+                Some(tx),
+                async {
                     file.write_line("first line").await.unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+                    file.flush().await.unwrap();
+                    wait_checkpoint_and_n_reads(&mut rx, vec![&path], 2, 5000).await;
+                },
+            )
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let received =
-                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let received = run_ifile_source(
+                &config,
+                true,
+                acking,
+                LogNamespace::Legacy,
+                Some(tx),
+                async {
                     file.write_line("second line").await.unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+                    file.flush().await.unwrap();
+                    wait_for_n_reads(&mut rx, 1, 5000).await;
+                },
+            )
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1962,13 +1973,20 @@ mod tests {
                 read_from: ifile::ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
-            let received =
-                run_ifile_source(&config, false, acking, LogNamespace::Legacy, None, async {
-                    sleep_500_millis().await;
+            let (tx, mut rx) = mpsc::unbounded_channel();
+            let received = run_ifile_source(
+                &config,
+                false,
+                acking,
+                LogNamespace::Legacy,
+                Some(tx),
+                async {
                     file.write_line("third line").await.unwrap();
-                    sleep_500_millis().await;
-                })
-                .await;
+                    file.flush().await.unwrap();
+                    wait_checkpoint_and_n_reads(&mut rx, vec![&path], 4, 5000).await;
+                },
+            )
+            .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(
