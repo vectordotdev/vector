@@ -1748,22 +1748,28 @@ mod tests {
         file1.write_line(INITIAL_CONTENT).await.unwrap();
         file2.write_line(INITIAL_CONTENT).await.unwrap();
 
-        // Give the filesystem a moment to register the files
-        sleep(Duration::from_millis(100)).await;
+        file1.flush().await.unwrap();
+        file2.flush().await.unwrap();
 
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
-                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path1], 1, 5000).await;
 
                 for i in 0..n {
                     file1.write_line(format!("1 {i}")).await.unwrap();
                     file2.write_line(format!("2 {i}")).await.unwrap();
                 }
 
-                // Give more time for the file source to process the files
-                sleep(Duration::from_secs(1)).await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, n, 5000).await;
+            },
+        )
+        .await;
 
         let mut is = [0; 1];
 
