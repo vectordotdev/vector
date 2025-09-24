@@ -68,6 +68,8 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub compression: Compression,
 
+    /// If not specified, `encoding.codec` will default to `json`.
+    /// If `encoding.framing` is not specified, it will be deduced from `encoding.codec`.
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
@@ -170,78 +172,14 @@ impl HttpSinkConfig {
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         Ok(Encoder::<Framer>::new(framer, serializer))
     }
-}
 
-impl GenerateConfig for HttpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"uri = "https://10.22.212.22:9000/endpoint"
-            encoding.codec = "json""#,
-        )
-        .unwrap()
-    }
-}
-
-async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
-    let auth = auth.choose_one(&uri.auth)?;
-    let uri = uri.with_default_parts();
-    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
-
-    if let Some(auth) = auth {
-        auth.apply(&mut request);
-    }
-
-    let response = client.send(request).await?;
-
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
-}
-
-pub(super) fn validate_headers(
-    headers: &BTreeMap<String, String>,
-    configures_auth: bool,
-) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
-    let headers = crate::sinks::util::http::validate_headers(headers)?;
-
-    for name in headers.keys() {
-        if configures_auth && name.inner() == AUTHORIZATION {
-            return Err("Authorization header can not be used with defined auth options".into());
-        }
-    }
-
-    Ok(headers)
-}
-
-pub(super) fn validate_payload_wrapper(
-    payload_prefix: &str,
-    payload_suffix: &str,
-    encoder: &Encoder<Framer>,
-) -> crate::Result<(String, String)> {
-    let payload = [payload_prefix, "{}", payload_suffix].join("");
-    match (
-        encoder.serializer(),
-        encoder.framer(),
-        serde_json::from_str::<serde_json::Value>(&payload),
-    ) {
-        (
-            Serializer::Json(_),
-            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
-            Err(_),
-        ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
-        _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
-    }
-}
-
-#[async_trait]
-#[typetag::serde(name = "http")]
-impl SinkConfig for HttpSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(crate) async fn build_with_encoder(
+        &self,
+        cx: SinkContext,
+        encoder: Encoder<Framer>,
+        transformer: Transformer,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
-
-        let encoder = self.build_encoder()?;
-        let transformer = self.encoding.transformer();
 
         let mut request = self.request.clone();
         request.add_old_option(self.headers.clone());
@@ -349,6 +287,77 @@ impl SinkConfig for HttpSinkConfig {
         );
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+impl GenerateConfig for HttpSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"uri = "https://10.22.212.22:9000/endpoint"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
+
+async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
+    let auth = auth.choose_one(&uri.auth)?;
+    let uri = uri.with_default_parts();
+    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
+
+    if let Some(auth) = auth {
+        auth.apply(&mut request);
+    }
+
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    }
+}
+
+pub(super) fn validate_headers(
+    headers: &BTreeMap<String, String>,
+    configures_auth: bool,
+) -> crate::Result<BTreeMap<OrderedHeaderName, HeaderValue>> {
+    let headers = crate::sinks::util::http::validate_headers(headers)?;
+
+    for name in headers.keys() {
+        if configures_auth && name.inner() == AUTHORIZATION {
+            return Err("Authorization header can not be used with defined auth options".into());
+        }
+    }
+
+    Ok(headers)
+}
+
+pub(super) fn validate_payload_wrapper(
+    payload_prefix: &str,
+    payload_suffix: &str,
+    encoder: &Encoder<Framer>,
+) -> crate::Result<(String, String)> {
+    let payload = [payload_prefix, "{}", payload_suffix].join("");
+    match (
+        encoder.serializer(),
+        encoder.framer(),
+        serde_json::from_str::<serde_json::Value>(&payload),
+    ) {
+        (
+            Serializer::Json(_),
+            Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+            Err(_),
+        ) => Err("Payload prefix and suffix wrapper must produce a valid JSON object.".into()),
+        _ => Ok((payload_prefix.to_owned(), payload_suffix.to_owned())),
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "http")]
+impl SinkConfig for HttpSinkConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let encoder = self.build_encoder()?;
+        self.build_with_encoder(cx, encoder, self.encoding.transformer()).await
     }
 
     fn input(&self) -> Input {

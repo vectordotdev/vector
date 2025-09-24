@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost_reflect::{MessageDescriptor, prost::Message as _};
 use tokio_util::codec::Encoder;
@@ -9,9 +10,10 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
-use vrl::protobuf::{descriptor::get_message_descriptor, encode::encode_message};
-
-use crate::encoding::BuildError;
+use vrl::protobuf::{
+    descriptor::{get_message_descriptor, get_message_descriptor_from_bytes},
+    encode::encode_message,
+};
 
 /// Config used to build a `ProtobufSerializer`.
 #[configurable_component]
@@ -70,6 +72,12 @@ impl ProtobufSerializer {
     /// Creates a new `ProtobufSerializer`.
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
         Self { message_descriptor }
+    }
+
+    /// Creates a new serializer instance using the descriptor bytes directly.
+    pub fn new_from_bytes(desc_bytes: &[u8], message_type: &str) -> vector_common::Result<Self> {
+        let message_descriptor = get_message_descriptor_from_bytes(desc_bytes, message_type)?;
+        Ok(Self { message_descriptor })
     }
 
     /// Get a description of the message type used in serialization.

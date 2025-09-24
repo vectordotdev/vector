@@ -293,6 +293,12 @@ pub enum SerializerConfig {
     Text(TextSerializerConfig),
 }
 
+impl Default for SerializerConfig {
+    fn default() -> Self {
+        Self::Json(JsonSerializerConfig::default())
+    }
+}
+
 impl From<AvroSerializerConfig> for SerializerConfig {
     fn from(config: AvroSerializerConfig) -> Self {
         Self::Avro { avro: config.avro }

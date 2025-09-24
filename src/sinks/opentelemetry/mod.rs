@@ -1,13 +1,4 @@
-use indoc::indoc;
-use vector_config::component::GenerateConfig;
-use vector_lib::{
-    codecs::{
-        JsonSerializerConfig,
-        encoding::{FramingConfig, SerializerConfig},
-    },
-    configurable::configurable_component,
-};
-
+use crate::codecs::Encoder;
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
@@ -15,6 +6,19 @@ use crate::{
         Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
     },
+};
+use indoc::indoc;
+use vector_config::component::GenerateConfig;
+use vector_lib::codecs::encoding::{Framer, ProtobufSerializer, Serializer};
+use vector_lib::opentelemetry::proto::{
+    LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE, TRACES_REQUEST_MESSAGE_TYPE,
+};
+use vector_lib::{
+    codecs::{
+        JsonSerializerConfig,
+        encoding::{FramingConfig, SerializerConfig},
+    },
+    configurable::configurable_component,
 };
 
 /// Configuration for the `OpenTelemetry` sink.
@@ -24,6 +28,19 @@ pub struct OpenTelemetryConfig {
     /// Protocol configuration
     #[configurable(derived)]
     protocol: Protocol,
+
+    /// Setting this field to `true`, will override all encoding settings and it will encode requests based on the
+    /// [OpenTelemetry protocol](https://opentelemetry.io/docs/specs/otel/protocol/).
+    ///
+    /// The endpoint is used to determine the data type:
+    /// * v1/logs → OTLP Logs
+    /// * v1/traces → OTLP Traces
+    /// * v1/metrics → OTLP Metrics
+    ///
+    /// More information available [here](https://opentelemetry.io/docs/specs/otlp/?utm_source=chatgpt.com#otlphttp-request).
+    #[configurable(derived)]
+    #[serde(default)]
+    pub use_otlp_encoding: bool,
 }
 
 /// The protocol used to send data to OpenTelemetry.
@@ -78,7 +95,21 @@ impl GenerateConfig for OpenTelemetryConfig {
 impl SinkConfig for OpenTelemetryConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         match &self.protocol {
-            Protocol::Http(config) => config.build(cx).await,
+            Protocol::Http(config) => {
+                if self.use_otlp_encoding {
+                    let serializer = ProtobufSerializer::new_from_bytes(
+                        vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES,
+                        to_message_type(&config.uri.to_string())?,
+                    )?;
+                    let encoder = Encoder::<Framer>::new(
+                        FramingConfig::Bytes.build(),
+                        Serializer::Protobuf(serializer),
+                    );
+                    config.build_with_encoder(cx, encoder, config.encoding.transformer()).await
+                } else {
+                    config.build(cx).await
+                }
+            }
         }
     }
 
@@ -92,6 +123,19 @@ impl SinkConfig for OpenTelemetryConfig {
         match self.protocol {
             Protocol::Http(ref config) => config.acknowledgements(),
         }
+    }
+}
+
+/// Checks if an endpoint ends with a known OTEL proto request.
+pub fn to_message_type(endpoint: &str) -> crate::Result<&'static str> {
+    if endpoint.ends_with("v1/logs") {
+        Ok(LOGS_REQUEST_MESSAGE_TYPE)
+    } else if endpoint.ends_with("v1/traces") {
+        Ok(TRACES_REQUEST_MESSAGE_TYPE)
+    } else if endpoint.ends_with("v1/metrics") {
+        Ok(METRICS_REQUEST_MESSAGE_TYPE)
+    } else {
+        Err(format!("Endpoint {endpoint} not supported, should end with 'v1/logs', 'v1/metrics' or 'v1/traces'.").into())
     }
 }
 
