@@ -2815,7 +2815,6 @@ mod tests {
         Acks,        // Full acknowledgements and proper finalization
     }
     use AckingMode::*;
-    use vector_lib::emit;
     use vector_lib::lookup::OwnedTargetPath;
 
     async fn run_ifile_source(
