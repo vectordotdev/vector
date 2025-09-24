@@ -591,13 +591,14 @@ where
                     self.emitter.emit_file_resumed(&path, file_position);
                 } else {
                     self.emitter.emit_file_added(&path);
+
+                    #[cfg(any(test, feature = "test"))]
+                    if let Some(sender) = self.test_sender.as_ref() {
+                        debug!("watching {path:?}");
+                        sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
+                    }
                 }
 
-                #[cfg(any(test, feature = "test"))]
-                if let Some(sender) = self.test_sender.as_ref() {
-                    debug!("watching {path:?}");
-                    sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
-                }
                 // Process any lines read at startup
                 if !startup_lines.is_empty() {
                     // Process all startup lines, including empty ones
