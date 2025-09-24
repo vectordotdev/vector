@@ -321,8 +321,7 @@ where
                     } else {
                         // untracked file fingerprint
                         // Immediately watch and read the new file
-                        let path_clone = path.clone();
-                        debug!(message = "Discovered new file during runtime", ?path_clone);
+                        debug!(message = "Discovered new file during runtime", ?path);
                         self.watch_new_file(
                             path.clone(),
                             file_id,
@@ -335,14 +334,11 @@ where
 
                         // Immediately read the file to avoid delay in detecting content
                         if let Some(watcher) = fp_map.get_mut(&file_id) {
-                            debug!(
-                                message = "Immediately reading newly discovered file",
-                                ?path_clone
-                            );
+                            debug!(message = "Immediately reading newly discovered file", ?path);
                             let mut bytes_read: usize = 0;
                             while let Ok(Some(line)) = watcher.read_line().await {
                                 let sz = line.bytes.len();
-                                trace!(message = "Read bytes from new file", ?path_clone, bytes = ?sz);
+                                trace!(message = "Read bytes from new file", ?path, bytes = ?sz);
                                 bytes_read += sz;
 
                                 lines.push(Line {
@@ -361,7 +357,7 @@ where
                             if bytes_read > 0 {
                                 debug!(
                                     message = "Read initial content from newly discovered file",
-                                    ?path_clone,
+                                    ?path,
                                     bytes = bytes_read
                                 );
                             }
