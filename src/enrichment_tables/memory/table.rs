@@ -263,7 +263,12 @@ impl Memory {
                     })
                 })
                 .collect::<Vec<_>>();
-            let _ = self.expired_items_sender.send(pending_removal);
+            if let Err(error) = self.expired_items_sender.send(pending_removal) {
+                error!(
+                    message = "Error exporting expired items from memory enrichment table.",
+                    %error
+                );
+            }
         }
 
         writer.write_handle.refresh();
