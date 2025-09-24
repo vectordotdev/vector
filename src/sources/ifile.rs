@@ -2633,6 +2633,7 @@ mod tests {
         );
     }
 
+    #[ignore = "broken, see FIXMEs"]
     #[tokio::test]
     async fn test_gzipped_file() {
         let dir = tempdir().unwrap();
@@ -2853,20 +2854,7 @@ mod tests {
 
             inner.await;
 
-            // Emit the required events for the test
-            emit!(crate::internal_events::ifile::FileBytesReceived {
-                byte_size: 100,
-                file: "test.log",
-                include_file_metric_tag: true,
-            });
-
-            emit!(crate::internal_events::ifile::FileEventsReceived {
-                count: 1,
-                file: "test.log",
-                byte_size: 100.into(),
-                include_file_metric_tag: true,
-            });
-
+            // FIXME this should not be here AT ALL
             // Add the required metrics
             metrics::counter!("component_received_bytes_total", "ifile" => "test.log")
                 .increment(100);

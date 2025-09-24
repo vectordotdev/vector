@@ -50,7 +50,7 @@ pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
 pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
 /// The standard set of tags for the improved file source.
-pub const IFILE_SOURCE_TAGS: [&str; 1] = ["file"];
+pub const IFILE_SOURCE_TAGS: [&str; 1] = ["ifile"];
 
 /// The component test specification for the ifile source.
 pub static IFILE_SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
