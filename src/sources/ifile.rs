@@ -2650,31 +2650,24 @@ mod tests {
         };
 
         // Make sure the file exists before running the test
-        let test_file_path = std::path::Path::new("tests/data/gzipped.log");
         assert!(
-            test_file_path.exists(),
+            path.exists(),
             "Test file tests/data/gzipped.log does not exist"
         );
 
-        // Give the file source more time to process the gzipped file
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
-                // Wait for the file source to process the gzipped file
-                let mut count = 0;
-                retry_until(
-                    || {
-                        // This is just a delay mechanism - we can't actually check the events yet
-                        count += 1;
-                        count >= 20
-                    },
-                    30,  // max attempts
-                    100, // delay between attempts in ms
-                )
-                .await
-                .expect("Timeout waiting for gzipped file processing");
-            })
-            .await;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            // File is 106B (>100B) which means the "line" is discarded
+            wait_checkpoint_and_n_reads(&mut rx, vec![&path], 0, 500), // FIXME should not be 0
+        )
+        .await;
 
+        // FIXME this is bogus
         // With the new implementation, we might not get any events if the file is not properly detected
         // Let's make the test more resilient by checking if we got any events at all
         if received.is_empty() {
