@@ -260,7 +260,7 @@ pub fn load_builder_from_paths(config_paths: &[ConfigPath]) -> Result<ConfigBuil
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
-pub fn load_builder_from_input<R: std::io::Read>(
+fn load_builder_from_input<R: std::io::Read>(
     input: R,
     format: Format,
 ) -> Result<ConfigBuilder, Vec<String>> {
@@ -275,7 +275,7 @@ pub fn load_builder_from_paths_with_secrets(
     loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
 }
 
-pub fn load_builder_from_input_with_secrets<R: std::io::Read>(
+fn load_builder_from_input_with_secrets<R: std::io::Read>(
     input: R,
     format: Format,
     secrets: HashMap<String, String>,
@@ -297,7 +297,7 @@ pub fn load_secret_backends_from_paths(
     loader_from_paths(SecretBackendLoader::new(), config_paths)
 }
 
-pub fn load_secret_backends_from_input<R: std::io::Read>(
+fn load_secret_backends_from_input<R: std::io::Read>(
     input: R,
     format: Format,
 ) -> Result<SecretBackendLoader, Vec<String>> {
