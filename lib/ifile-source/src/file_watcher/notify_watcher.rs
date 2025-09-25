@@ -1,22 +1,15 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 use futures::{
     channel::mpsc::{channel, Receiver},
     SinkExt, StreamExt,
 };
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use tokio::sync::Mutex as TokioMutex;
+// use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, trace};
 
 use crate::FilePosition;
-
-/// Represents the state of a file being watched by the notify-based watcher
-#[derive(Debug)]
-struct FileState {
-    /// Path to the file being watched
-    path: PathBuf,
-}
 
 /// A watcher implementation that uses notify-rs/notify for filesystem notifications
 /// instead of polling. This allows for more efficient file watching, especially
@@ -27,9 +20,7 @@ pub struct NotifyWatcher {
     /// Channel for receiving events from the watcher
     event_rx: Option<Receiver<Result<Event, notify::Error>>>,
     /// Paths of all files being watched
-    watched_files: Arc<Mutex<Vec<FileState>>>,
-    /// Async mutex for thread-safe access to the event receiver
-    event_mutex: Arc<TokioMutex<()>>,
+    watched_files: HashSet<PathBuf>,
 }
 
 impl NotifyWatcher {
@@ -38,8 +29,7 @@ impl NotifyWatcher {
         NotifyWatcher {
             watcher: None,
             event_rx: None,
-            watched_files: Arc::new(Mutex::new(Vec::new())),
-            event_mutex: Arc::new(TokioMutex::new(())),
+            watched_files: HashSet::new(),
         }
     }
 
@@ -110,12 +100,8 @@ impl NotifyWatcher {
             self.initialize(&path).await?
         }
 
-        // Check if we're already watching this file to avoid duplicates
-        let mut files = self.watched_files.lock().unwrap();
-        if !files.iter().any(|state| state.path == path) {
-            let state = FileState { path };
-            files.push(state);
-        }
+        // Insert to set, duplciated automatically ignored
+        self.watched_files.insert(path);
 
         Ok(())
     }
@@ -129,78 +115,73 @@ impl NotifyWatcher {
     pub async fn check_events(&mut self) -> Vec<(PathBuf, EventKind)> {
         let mut events = Vec::new();
 
-        // Use a mutex to ensure only one thread is checking events at a time
-        let _lock = self.event_mutex.lock().await;
+        let Some(ref mut rx) = self.event_rx else {
+            return events;
+        };
 
-        if let Some(ref mut rx) = self.event_rx {
-            // Try to receive events with a timeout
-            let timeout =
-                tokio::time::timeout(std::time::Duration::from_millis(10), rx.next()).await;
+        // Try to receive events with a timeout
+        let timeout = tokio::time::timeout(std::time::Duration::from_millis(10), rx.next()).await;
 
-            match timeout {
-                Ok(Some(Ok(event))) => {
-                    // Don't log Access events or Other events at all to eliminate noise
-                    match event.kind {
-                        EventKind::Access(_) => {
-                            // Skip logging for Access events
-                        }
-                        EventKind::Other => {
-                            // Skip logging for all Other events
-                        }
-                        _ => {
-                            debug!(message = "Received file event", ?event);
-                        }
+        match timeout {
+            Ok(Some(Ok(event))) => {
+                // Don't log Access events or Other events at all to eliminate noise
+                match event.kind {
+                    EventKind::Access(_) => {
+                        // Skip logging for Access events
                     }
-
-                    // Filter for relevant events only
-                    let is_relevant = match event.kind {
-                        // File content was modified
-                        EventKind::Modify(notify::event::ModifyKind::Data(_)) => true,
-                        // File was created or moved
-                        EventKind::Create(_) => true,
-                        // File was renamed
-                        EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
-                        // Explicitly filter out Access events (our own file opens)
-                        EventKind::Access(_) => false,
-                        // Explicitly filter out all Other events
-                        EventKind::Other => false,
-                        // Other events are not relevant for our purposes
-                        _ => {
-                            trace!(message = "Ignoring other event type", kind = ?event.kind);
-                            false
-                        }
-                    };
-
-                    if is_relevant {
-                        for path in event.paths {
-                            // Check if this path is one of our watched files
-                            let is_watched = {
-                                let files = self.watched_files.lock().unwrap();
-                                files.iter().any(|state| state.path == path)
-                            };
-
-                            if is_watched {
-                                debug!(message = "Relevant file event detected for watched file", ?path, kind = ?event.kind);
-                                events.push((path, event.kind));
-                            } else {
-                                trace!(message = "Ignoring event for unwatched file", ?path);
-                            }
-                        }
-                    } else {
-                        trace!(message = "Ignoring non-relevant file event", kind = ?event.kind);
+                    EventKind::Other => {
+                        // Skip logging for all Other events
+                    }
+                    _ => {
+                        debug!(message = "Received file event", ?event);
                     }
                 }
-                Ok(Some(Err(e))) => {
-                    error!(message = "Error receiving file event", error = ?e);
+
+                // Filter for relevant events only
+                let is_relevant = match event.kind {
+                    // File content was modified
+                    EventKind::Modify(notify::event::ModifyKind::Data(_)) => true,
+                    // File was created or moved
+                    EventKind::Create(_) => true,
+                    // File was renamed
+                    EventKind::Modify(notify::event::ModifyKind::Name(_)) => true,
+                    // Explicitly filter out Access events (our own file opens)
+                    EventKind::Access(_) => false,
+                    // Explicitly filter out all Other events
+                    EventKind::Other => false,
+                    // Other events are not relevant for our purposes
+                    _ => {
+                        trace!(message = "Ignoring other event type", kind = ?event.kind);
+                        false
+                    }
+                };
+
+                if is_relevant {
+                    for path in event.paths {
+                        // Check if this path is one of our watched files
+                        let is_watched = self.watched_files.contains(&path);
+
+                        if is_watched {
+                            debug!(message = "Relevant file event detected for watched file", ?path, kind = ?event.kind);
+                            events.push((path, event.kind));
+                        } else {
+                            trace!(message = "Ignoring event for unwatched file", ?path);
+                        }
+                    }
+                } else {
+                    trace!(message = "Ignoring non-relevant file event", kind = ?event.kind);
                 }
-                Ok(None) => {
-                    // Channel closed
-                    error!(message = "Notify watcher channel closed");
-                }
-                Err(_) => {
-                    // Timeout occurred, no events available
-                    trace!(message = "No events received within timeout");
-                }
+            }
+            Ok(Some(Err(e))) => {
+                error!(message = "Error receiving file event", error = ?e);
+            }
+            Ok(None) => {
+                // Channel closed
+                error!(message = "Notify watcher channel closed");
+            }
+            Err(_) => {
+                // Timeout occurred, no events available
+                trace!(message = "No events received within timeout");
             }
         }
 
