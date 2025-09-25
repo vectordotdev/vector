@@ -21,7 +21,7 @@ releases: "0.50.0": {
 
 		## Breaking Changes
 
-		- The `azure_blob` sink now requires a `connection_string`. This is the only supported authentication method for now. For more details, see this [pull request](https://github.com/vectordotdev/vector/pull/23351)).
+		- The `azure_blob` sink now requires a `connection_string`. This is the only supported authentication method for now. For more details, see this [pull request](https://github.com/vectordotdev/vector/pull/23351).
 		"""
 
 	changelog: [
