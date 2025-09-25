@@ -14,6 +14,10 @@ pub struct Cli {
     /// GitHub username for the repository.
     #[arg(long, default_value = "vectordotdev")]
     username: String,
+
+    /// Vector version, defaults to $`VECTOR_VERSION` if not specified.
+    #[arg(long, env = "VECTOR_VERSION")]
+    vector_version: String,
 }
 
 impl Cli {
@@ -40,7 +44,8 @@ impl Cli {
 
 /// Clones the repository and sets up Git configuration
 fn clone_and_setup_git(username: &str) -> Result<()> {
-    let github_token = env::var("GITHUB_TOKEN")?;
+    let github_token = env::var("HOMEBREW_PAT")
+        .or_else(|_| env::var("GITHUB_TOKEN"))?;
     let homebrew_repo = format!(
         "https://{username}:{github_token}@github.com/{username}/homebrew-brew.git"
     );
