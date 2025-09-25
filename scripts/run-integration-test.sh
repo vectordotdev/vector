@@ -10,8 +10,6 @@ if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
   set -x
 fi
 
-SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
