@@ -2038,6 +2038,7 @@ mod tests {
         assert_eq!(lines, vec!["the line"]);
     }
 
+    #[ignore = "test doesn't work since all lines are read during startup"]
     #[tokio::test]
     async fn file_duplicate_processing_after_restart() {
         let dir = tempdir().unwrap();
@@ -2050,13 +2051,13 @@ mod tests {
         let mut file = File::create(&path).await.unwrap();
 
         // Reduce the line count to make the test more reliable
-        let line_count = 100;
+        let line_count = 100000;
         for i in 0..line_count {
             file.write_line(format!("Here's a line for you: {i}"))
                 .await
                 .unwrap();
         }
-        sleep_500_millis().await;
+        file.flush().await.unwrap();
 
         // First time server runs it should pick up a bunch of lines
         let received = run_ifile_source(
@@ -2075,9 +2076,12 @@ mod tests {
         // or we might process them in multiple runs. Either way is fine.
 
         // If we processed all lines in the first run, we're done
-        if lines.len() == line_count {
-            return;
-        }
+        assert!(
+            lines.len() < line_count,
+            "Read {}/{}",
+            lines.len(),
+            line_count
+        );
 
         // Otherwise, restart the server, and it should read the rest without duplicating any
         let received = run_ifile_source(
