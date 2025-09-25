@@ -4,8 +4,6 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
-#[cfg(feature = "aws-core")]
-use aws_types::region::Region;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use vector_lib::codecs::{
