@@ -704,9 +704,9 @@ struct EventIterator<'de, R: JsonRead<'de>, E: Extractor> {
 }
 
 pub struct RequestMeta {
-    token: Option<String>,
-    remote: Option<SocketAddr>,
-    remote_addr: Option<String>,
+    pub token: Option<String>,
+    pub remote: Option<SocketAddr>,
+    pub remote_addr: Option<String>,
 }
 
 /// Intermediate struct to generate an `EventIterator`
