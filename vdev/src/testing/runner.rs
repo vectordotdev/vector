@@ -1,5 +1,5 @@
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
 use anyhow::Result;
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -286,7 +286,7 @@ impl IntegrationTestRunner {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes
+            volumes,
         })
     }
 
