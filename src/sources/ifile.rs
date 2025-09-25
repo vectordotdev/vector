@@ -2892,11 +2892,11 @@ mod tests {
             drop(trigger_shutdown);
 
             let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(50)))
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
                     .collect::<Vec<_>>()
                     .await
             } else {
-                timeout(Duration::from_secs(50), rx.collect::<Vec<_>>())
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
                     .await
                     .expect(
                         "Unclosed channel: may indicate file-server could not shutdown gracefully.",
