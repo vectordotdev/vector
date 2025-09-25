@@ -194,6 +194,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
+        self.ensure_volumes()?;
         docker_command(
             [
                 "create",
