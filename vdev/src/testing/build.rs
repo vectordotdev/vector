@@ -53,6 +53,7 @@ pub fn prepare_build_command(
 
     command.envs(extract_present(config_environment_variables));
 
+    // This is a vdev convention for integration tests that output files.
     command.args(["."]);
     command
 }

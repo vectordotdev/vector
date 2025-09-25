@@ -1,51 +1,37 @@
-use std::{collections::BTreeMap, path::PathBuf};
-
+use std::process::Command;
+use std::{collections::BTreeMap};
+use std::{fs, io, path::Path, thread, time::Duration};
 use serde_json::Value;
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
-fn log_output_dir() -> PathBuf {
-    std::env::current_dir()
-        .expect("Failed to get current dir")
-        .join("tests")
-        .join("data")
-        .join("e2e")
-        .join("opentelemetry")
-        .join("logs")
-        .join("output")
-}
+const VOLUME: &str = "vector_target";  // logical name in docker-compose.yml
+const OUTPUT_PATH: &str = "/output";
 
-fn collector_log_path() -> PathBuf {
-    log_output_dir().join("collector-file-exporter.log")
-}
+fn read_from_volume(filename: &str) -> Result<String, io::Error> {
+    let container_path = format!("{OUTPUT_PATH}/{filename}");
 
-fn vector_log_path() -> PathBuf {
-    log_output_dir().join("vector-file-sink.log")
-}
+    let out = Command::new("docker")
+        .args([
+            "run", "--rm",
+            "-v", &format!("{VOLUME}:{OUTPUT_PATH}:ro"),
+            "alpine:3.20",
+            "cat", &container_path,
+        ])
+        .output()?;
 
-use std::{fs, io, path::Path, thread, time::Duration};
-
-pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
-    let max_retries = 5;
-    let retry_delay = Duration::from_secs(2);
-    let mut last_err: Option<io::Error> = None;
-    for attempt in 1..=max_retries {
-        match fs::read_to_string(path) {
-            Ok(contents) => return Ok(contents),
-            Err(e) => {
-                eprintln!(
-                    "Attempt {attempt}/{max_retries}: Failed to read file '{}': {e}",
-                    path.display()
-                );
-                last_err = Some(e);
-                if attempt < max_retries {
-                    thread::sleep(retry_delay);
-                    continue;
-                }
-            }
-        }
+    if !out.status.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "docker run failed: {}\n{}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            ),
+        ));
     }
-    Err(last_err.unwrap())
+
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -94,29 +80,19 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path).unwrap();
-
+fn parse_log_records(content: String) -> BTreeMap<u64, Value> {
     let mut result = BTreeMap::new();
 
     for (idx, line) in content.lines().enumerate() {
         let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
-            panic!(
-                "Malformed JSON on line {} in {}\nLine: {line}",
-                idx + 1,
-                path.display()
-            )
+            panic!("Line {idx} is malformed: {line}")
         });
 
         let resource_logs = root
             .get("resourceLogs")
             .and_then(|v| v.as_array())
             .unwrap_or_else(|| {
-                panic!(
-                    "Missing or invalid 'resourceLogs' in line {} of {}",
-                    idx + 1,
-                    path.display()
-                )
+                panic!("Missing or invalid 'resourceLogs' in line {idx}")
             });
 
         for resource in resource_logs {
@@ -124,11 +100,7 @@ fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
                 .get("scopeLogs")
                 .and_then(|v| v.as_array())
                 .unwrap_or_else(|| {
-                    panic!(
-                        "Missing or invalid 'scopeLogs' in line {} of {}",
-                        idx + 1,
-                        path.display()
-                    )
+                    panic!("Missing or invalid 'scopeLogs' in line {idx}")
                 });
 
             for scope in scope_logs {
@@ -136,18 +108,14 @@ fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
                     .get("logRecords")
                     .and_then(|v| v.as_array())
                     .unwrap_or_else(|| {
-                        panic!(
-                            "Missing or invalid 'logRecords' in line {} of {}",
-                            idx + 1,
-                            path.display()
-                        )
+                        panic!("Missing or invalid 'logRecords' in line {idx}")
                     });
 
                 for record in log_records {
                     let count = extract_count(record);
                     let sanitized = sanitize(record.clone());
                     if result.insert(count, sanitized).is_some() {
-                        panic!("Duplicate count value {count} in {}", path.display());
+                        panic!("Duplicate count value {count}");
                     }
                 }
             }
@@ -159,8 +127,8 @@ fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
 /// # Panics
 /// After the timeout, this function will panic if both logs are not ready.
 fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    let collector_logs = read_log_records(&collector_log_path());
-    let vector_logs = read_log_records(&vector_log_path());
+    let collector_logs = parse_log_records(read_from_volume("collector-file-exporter.log").unwrap());
+    let vector_logs = parse_log_records(read_from_volume("vector-file-sink.log").unwrap());
 
     assert_eq!(
         collector_logs.len(),

@@ -1,5 +1,4 @@
 use std::{collections::HashSet, env, path::PathBuf, process::Command};
-
 use anyhow::Result;
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
@@ -275,15 +274,19 @@ impl IntegrationTestRunner {
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let mut volumes: Vec<String> = config
+            .volumes
+            .iter()
+            .map(|(a, b)| format!("{a}:{b}"))
+            .collect();
+
+        volumes.push(format!("{VOLUME_TARGET}:/output"));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes: config
-                .volumes
-                .iter()
-                .map(|(a, b)| format!("{a}:{b}"))
-                .collect(),
+            volumes
         })
     }
 
