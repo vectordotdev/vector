@@ -706,6 +706,7 @@ struct EventIterator<'de, R: JsonRead<'de>, E: Extractor> {
     store_hec_token: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct RequestMeta {
     pub token: Option<String>,
     pub remote: Option<SocketAddr>,
