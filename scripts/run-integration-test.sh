@@ -110,7 +110,7 @@ fi
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
 
   docker run --rm \
-    -v vector_target:/output/${TEST_NAME} \
+    -v vector_target:/output/"${TEST_NAME}" \
     alpine:3.20 \
     sh -c "rm -rf /output/${TEST_NAME}/*"
 
