@@ -38,6 +38,8 @@ impl NotifyWatcher {
     {
         let (tx, rx) = channel(100); // Use a larger buffer to avoid missing events
 
+        let rt = tokio::runtime::Handle::current();
+
         // Create a watcher with a callback that sends events to the channel
         let watcher = RecommendedWatcher::new(
             move |res| {
@@ -56,7 +58,7 @@ impl NotifyWatcher {
                 let mut tx = tx.clone();
                 // Use a blocking executor to send the event
                 // This avoids the need for a tokio runtime
-                futures::executor::block_on(async {
+                rt.block_on(async {
                     if let Err(e) = tx.send(res).await {
                         // Only log at trace level to avoid spamming the logs during shutdown
                         trace!(message = "Failed to send event to channel", error = ?e);
