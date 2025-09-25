@@ -2556,9 +2556,6 @@ mod tests {
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).await.unwrap();
 
-        let newer_path = dir.path().join("a_newer_file");
-        let mut newer = File::create(&newer_path).await.unwrap();
-
         older.write_line("hello i am the old file").await.unwrap();
         older
             .write_line("i have been around a while")
@@ -2570,6 +2567,9 @@ mod tests {
             .unwrap();
 
         older.sync_all().await.unwrap();
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).await.unwrap();
 
         newer.write_line("i'm new").await.unwrap();
         newer
