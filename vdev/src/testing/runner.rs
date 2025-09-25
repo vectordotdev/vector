@@ -115,7 +115,6 @@ pub trait ContainerTestRunner: TestRunner {
             }
             RunnerState::Missing => {
                 self.build(features, directory, config_environment_variables)?;
-                self.ensure_volumes()?;
                 self.create()?;
                 self.start()?;
             }
@@ -160,6 +159,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn start(&self) -> Result<()> {
+        self.ensure_volumes()?;
         docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
