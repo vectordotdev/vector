@@ -266,7 +266,8 @@ impl Memory {
             if let Err(error) = self.expired_items_sender.send(pending_removal) {
                 error!(
                     message = "Error exporting expired items from memory enrichment table.",
-                    %error
+                    error = %error
+                    internal_log_rate_limit = true,
                 );
             }
         }
