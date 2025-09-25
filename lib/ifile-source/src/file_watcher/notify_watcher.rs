@@ -82,6 +82,7 @@ impl NotifyWatcher {
 
         // Watch the parent directory of the file to catch renames, deletions, etc.
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        trace!(directory = ?parent, target_file = ?path, "Initializing async notify watcher for directory");
         watcher.watch(parent, RecursiveMode::NonRecursive)?;
 
         debug!(message = "Initialized async notify watcher for directory", directory = ?parent, target_file = ?path);

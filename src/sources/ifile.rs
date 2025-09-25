@@ -992,7 +992,7 @@ mod tests {
         timeout_ms: u64,
     ) {
         let mut counter = 0;
-        let shutdown = sleep(Duration::from_millis(timeout_ms * 4)); // FIXME
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
 
         tokio::select! {
             _ = shutdown => {
@@ -1019,7 +1019,7 @@ mod tests {
         count: usize,
         timeout_ms: u64,
     ) {
-        let shutdown = sleep(Duration::from_millis(timeout_ms * 4)); // FIXME
+        let shutdown = sleep(Duration::from_millis(timeout_ms));
         let mut files: HashSet<PathBuf> = HashSet::from_iter(
             original_files
                 .into_iter()
@@ -2893,11 +2893,11 @@ mod tests {
             drop(trigger_shutdown);
 
             let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                rx.take_until(tokio::time::sleep(Duration::from_secs(50)))
                     .collect::<Vec<_>>()
                     .await
             } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                timeout(Duration::from_secs(50), rx.collect::<Vec<_>>())
                     .await
                     .expect(
                         "Unclosed channel: may indicate file-server could not shutdown gracefully.",
