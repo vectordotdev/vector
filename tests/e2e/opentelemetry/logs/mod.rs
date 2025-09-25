@@ -26,14 +26,11 @@ fn read_file_helper(filename: &str) -> Result<String, io::Error> {
             .output()?;
 
         if !out.status.success() {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(
-                    "docker run failed: {}\n{}",
-                    out.status,
-                    String::from_utf8_lossy(&out.stderr)
-                ),
-            ));
+            return Err(io::Error::other(format!(
+                "docker run failed: {}\n{}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            )));
         }
 
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
