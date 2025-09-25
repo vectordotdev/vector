@@ -436,9 +436,7 @@ impl<E: Extractor> SplunkSource<E> {
                             batch,
                             log_namespace,
                             events_received,
-                            token,
-                            store_hec_token,
-                            extractor: E::new(meta, log_namespace),
+                            extractor: E::new(meta, log_namespace, store_hec_token),
                         }
                         .into();
 
@@ -696,14 +694,10 @@ struct EventIterator<'de, R: JsonRead<'de>, E: Extractor> {
     extractor: E,
     /// Event finalization
     batch: Option<BatchNotifier>,
-    /// Splunk HEC Token for passthrough
-    token: Option<Arc<str>>,
     /// Lognamespace to put the events in
     log_namespace: LogNamespace,
     /// handle to EventsReceived registry
     events_received: Registered<EventsReceived>,
-    /// Whether to store the HEC token in the log event metadata
-    store_hec_token: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -720,8 +714,6 @@ struct EventIteratorGenerator<'de, R: JsonRead<'de>, E: Extractor> {
     batch: Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: Registered<EventsReceived>,
-    token: Option<String>,
-    store_hec_token: bool,
     extractor: E,
 }
 
@@ -734,12 +726,10 @@ impl<'de, R: JsonRead<'de>, E: Extractor> From<EventIteratorGenerator<'de, R, E>
             events: 0,
             channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
-            token: f.token.map(Into::into),
             extractor: f.extractor,
             batch: f.batch,
             log_namespace: f.log_namespace,
             events_received: f.events_received,
-            store_hec_token: f.store_hec_token,
         }
     }
 }
@@ -840,13 +830,6 @@ impl<'de, R: JsonRead<'de>, E: Extractor> EventIterator<'de, R, E> {
 
         // Extract default extracted fields
         self.extractor.extract(&mut log, &mut json);
-
-        // Add passthrough token if present
-        if let Some(token) = &self.token
-            && self.store_hec_token
-        {
-            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
-        }
 
         if let Some(batch) = self.batch.clone() {
             log = log.with_batch_notifier(&batch);
@@ -1059,7 +1042,7 @@ impl FieldExtractor {
 /// This DefaultExtractor can be wrapped in a custom implementation to extract additional properties.
 pub trait Extractor {
     /// create a new instance of the extractor
-    fn new(meta: RequestMeta, log_namespace: LogNamespace) -> Self;
+    fn new(meta: RequestMeta, log_namespace: LogNamespace, store_hec_token: bool) -> Self;
 
     /// extract will be called for each value in the request and the associated log.
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue);
@@ -1067,10 +1050,12 @@ pub trait Extractor {
 
 pub struct DefaultExtractor {
     extractors: [FieldExtractor; 4],
+    store_hec_token: bool,
+    token: Option<String>,
 }
 
 impl Extractor for DefaultExtractor {
-    fn new(meta: RequestMeta, log_namespace: LogNamespace) -> Self {
+    fn new(meta: RequestMeta, log_namespace: LogNamespace, store_hec_token: bool) -> Self {
         DefaultExtractor {
             extractors: [
                 // Extract the host field with the given priority:
@@ -1093,12 +1078,22 @@ impl Extractor for DefaultExtractor {
                     log_namespace,
                 ),
             ],
+            store_hec_token,
+            token: meta.token,
         }
     }
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
         for de in self.extractors.iter_mut() {
             de.extract(log, value);
+        }
+
+        // Add passthrough token if present
+        if let Some(token) = &self.token
+            && self.store_hec_token
+        {
+            log.metadata_mut()
+                .set_splunk_hec_token(token.clone().into());
         }
     }
 }
