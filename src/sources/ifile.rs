@@ -2007,40 +2007,35 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).await.unwrap();
         file.write_line("the line").await.unwrap();
-        sleep_500_millis().await;
+        file.flush().await.unwrap();
 
+        let (tx, mut rx) = mpsc::unbounded_channel();
         // First time server runs it picks up existing lines.
         let received = run_ifile_source(
             &config,
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            None,
-            sleep_500_millis(),
+            Some(tx),
+            wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000),
         )
         .await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
 
         // Restart server, it re-reads file since the events were not acknowledged before shutdown
-        // With the new notify-based implementation, we need to make sure the file is still being watched
-        // by adding a small delay before the second run
-        sleep(Duration::from_millis(100)).await;
-
         let received = run_ifile_source(
             &config,
             false,
             Unfinalized,
             LogNamespace::Legacy,
             None,
-            sleep_500_millis(),
+            wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000),
         )
         .await;
 
-        // With our fix to skip empty lines at the beginning of files, we might not get any output
-        // if the file only contains a newline at the end. This is the expected behavior.
-        // Just check that the test runs without errors.
-        let _lines = extract_messages_string(received);
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["the line"]);
     }
 
     #[tokio::test]
