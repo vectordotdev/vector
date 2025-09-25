@@ -1,40 +1,43 @@
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::io;
+use std::path::Path;
 use std::process::Command;
-use std::{fs, io, path::Path, thread, time::Duration};
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
-const VOLUME: &str = "vector_target"; // logical name in docker-compose.yml
-const OUTPUT_PATH: &str = "/output";
+fn read_file_helper(filename: &str) -> Result<String, io::Error> {
+    let local_path = Path::new("/output/opentelemetry-logs").join(filename);
+    if local_path.exists() {
+        // Running inside the runner container, volume is mounted
+        std::fs::read_to_string(local_path)
+    } else {
+        // Running on hostno-eno
+        let out = Command::new("docker")
+            .args([
+                "run",
+                "--rm",
+                "-v",
+                "vector_target:/output",
+                "alpine:3.20",
+                "cat",
+                &format!("/output/{filename}"),
+            ])
+            .output()?;
 
-fn read_from_volume(filename: &str) -> Result<String, io::Error> {
-    let container_path = format!("{OUTPUT_PATH}/{filename}");
+        if !out.status.success() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(
+                    "docker run failed: {}\n{}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            ));
+        }
 
-    let out = Command::new("docker")
-        .args([
-            "run",
-            "--rm",
-            "-v",
-            &format!("{VOLUME}:{OUTPUT_PATH}:ro"),
-            "alpine:3.20",
-            "cat",
-            &container_path,
-        ])
-        .output()?;
-
-    if !out.status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!(
-                "docker run failed: {}\n{}",
-                out.status,
-                String::from_utf8_lossy(&out.stderr)
-            ),
-        ));
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
-
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 fn extract_count(value: &Value) -> u64 {
@@ -124,8 +127,8 @@ fn parse_log_records(content: String) -> BTreeMap<u64, Value> {
 /// After the timeout, this function will panic if both logs are not ready.
 fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
     let collector_logs =
-        parse_log_records(read_from_volume("collector-file-exporter.log").unwrap());
-    let vector_logs = parse_log_records(read_from_volume("vector-file-sink.log").unwrap());
+        parse_log_records(read_file_helper("collector-file-exporter.log").unwrap());
+    let vector_logs = parse_log_records(read_file_helper("vector-file-sink.log").unwrap());
 
     assert_eq!(
         collector_logs.len(),
