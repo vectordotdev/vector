@@ -16,7 +16,7 @@ chrono.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 crc = "3.3.0"
-notify = "8.0.0"
+notify = "8.2.0"
 scan_fmt = "0.2.6"
 bstr = { version = "1.12", default-features = false }
 bytes.workspace = true
