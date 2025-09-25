@@ -949,7 +949,6 @@ mod tests {
     use tokio::{
         fs::{self, File},
         io::{AsyncSeekExt, AsyncWriteExt},
-        select,
         sync::mpsc::{self, UnboundedReceiver},
         time::{Duration, sleep, timeout},
     };
