@@ -24,10 +24,6 @@ sinks:
       type: http
       uri: http://otel-collector-sink:5318/v1/logs
       method: post
-      encoding:
-        codec: json
-      framing:
-        method: newline_delimited
       batch:
         max_events: 1
       request:
