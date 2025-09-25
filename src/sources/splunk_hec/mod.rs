@@ -424,18 +424,21 @@ impl<E: Extractor> SplunkSource<E> {
                         let mut error = None;
                         let mut events = Vec::new();
 
+                        let meta = RequestMeta {
+                            token: token.clone(),
+                            remote,
+                            remote_addr,
+                        };
+
                         let iter: EventIterator<'_, StrRead<'_>, E> = EventIteratorGenerator {
                             deserializer: Deserializer::from_str(&body).into_iter::<JsonValue>(),
                             channel,
                             batch,
                             log_namespace,
                             events_received,
+                            token,
                             store_hec_token,
-                            meta: RequestMeta {
-                                token,
-                                remote,
-                                remote_addr,
-                            },
+                            extractor: E::new(meta, log_namespace),
                         }
                         .into();
 
@@ -710,27 +713,28 @@ pub struct RequestMeta {
 }
 
 /// Intermediate struct to generate an `EventIterator`
-struct EventIteratorGenerator<'de, R: JsonRead<'de>> {
+struct EventIteratorGenerator<'de, R: JsonRead<'de>, E: Extractor> {
     deserializer: serde_json::StreamDeserializer<'de, R, JsonValue>,
     channel: Option<String>,
     batch: Option<BatchNotifier>,
     log_namespace: LogNamespace,
     events_received: Registered<EventsReceived>,
-    meta: RequestMeta,
+    token: Option<String>,
     store_hec_token: bool,
+    extractor: E,
 }
 
-impl<'de, R: JsonRead<'de>, E: Extractor> From<EventIteratorGenerator<'de, R>>
+impl<'de, R: JsonRead<'de>, E: Extractor> From<EventIteratorGenerator<'de, R, E>>
     for EventIterator<'de, R, E>
 {
-    fn from(f: EventIteratorGenerator<'de, R>) -> Self {
+    fn from(f: EventIteratorGenerator<'de, R, E>) -> Self {
         Self {
             deserializer: f.deserializer,
             events: 0,
             channel: f.channel.map(Value::from),
             time: Time::Now(Utc::now()),
-            token: f.meta.token.clone().map(Into::into),
-            extractor: E::new(f.meta, f.log_namespace),
+            token: f.token.map(Into::into),
+            extractor: f.extractor,
             batch: f.batch,
             log_namespace: f.log_namespace,
             events_received: f.events_received,
