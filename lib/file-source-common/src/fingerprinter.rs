@@ -222,13 +222,12 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let mut buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
                 skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
-                let bytes_read =
-                    fingerprinter_read_until(reader, b'\n', lines, &mut buffer).await?;
+                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
@@ -319,7 +318,7 @@ impl Fingerprinter {
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
                 fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
-                let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
+                let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(buffer);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -346,7 +345,7 @@ impl Fingerprinter {
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
                 fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let fingerprint = FINGERPRINT_CRC.checksum(buffer);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
             _ => Ok(None),
