@@ -190,6 +190,7 @@ impl Fingerprinter {
         let mut buffer = Vec::with_capacity(buffer_len);
 
         // Sneaky ;)
+        #[allow(clippy::uninit_vec)]
         unsafe {
             buffer.set_len(buffer_len);
         }
@@ -313,11 +314,11 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let mut buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(buffer);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
@@ -340,11 +341,11 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let mut buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(buffer);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
