@@ -562,11 +562,11 @@ pub fn file_source(
         line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: Fingerprinter {
-            strategy: config.fingerprint.clone().into(),
-            max_line_length: config.max_line_bytes,
-            ignore_not_found: config.ignore_not_found,
-        },
+        fingerprinter: Fingerprinter::new(
+            config.fingerprint.clone().into(),
+            config.max_line_bytes,
+            config.ignore_not_found,
+        ),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,

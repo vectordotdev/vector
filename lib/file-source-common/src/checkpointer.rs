@@ -170,13 +170,9 @@ impl CheckpointsView {
         &self,
         path: &Path,
         fng: FileFingerprint,
-        fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
+        fingerprinter: &mut Fingerprinter,
     ) {
-        if let Ok(Some(old_checksum)) = fingerprinter
-            .get_bytes_checksum(path, fingerprint_buffer)
-            .await
-        {
+        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path).await {
             self.update_key(old_checksum, fng)
         }
 
@@ -188,16 +184,12 @@ impl CheckpointsView {
         }
 
         if self.checkpoints.get(&fng).is_none() {
-            if let Ok(Some(fingerprint)) = fingerprinter
-                .get_legacy_checksum(path, fingerprint_buffer)
-                .await
+            if let Ok(Some(fingerprint)) = fingerprinter.get_legacy_checksum(path).await
                 && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
                 self.update(fng, pos);
             }
-            if let Ok(Some(fingerprint)) = fingerprinter
-                .get_legacy_first_lines_checksum(path, fingerprint_buffer)
-                .await
+            if let Ok(Some(fingerprint)) = fingerprinter.get_legacy_first_lines_checksum(path).await
                 && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
                 self.update(fng, pos);
@@ -294,11 +286,10 @@ impl Checkpointer {
         &mut self,
         path: &Path,
         fresh: FileFingerprint,
-        fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
+        fingerprinter: &mut Fingerprinter,
     ) {
         self.checkpoints
-            .maybe_upgrade(path, fresh, fingerprinter, fingerprint_buffer)
+            .maybe_upgrade(path, fresh, fingerprinter)
             .await
     }
 
@@ -567,13 +558,7 @@ mod test {
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
         let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy().await);
         let position: FilePosition = 1234;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::DevInode,
-            max_line_length: 1000,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false);
 
         let data_dir = tempdir().unwrap();
         {
@@ -588,7 +573,7 @@ mod test {
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
             chkptr
-                .maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf)
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
                 .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
@@ -607,16 +592,14 @@ mod test {
         let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
         let position: FilePosition = 6;
 
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 102400,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+            102400,
+            false,
+        );
 
         let data_dir = tempdir().unwrap();
         {
@@ -631,7 +614,7 @@ mod test {
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
             chkptr
-                .maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf)
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
                 .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
@@ -650,16 +633,14 @@ mod test {
         let new_fingerprint = FileFingerprint::FirstLinesChecksum(11081174131906673079);
         let position: FilePosition = 6;
 
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 102400,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+            102400,
+            false,
+        );
 
         let data_dir = tempdir().unwrap();
         {
@@ -674,7 +655,7 @@ mod test {
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
             chkptr
-                .maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf)
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
                 .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
@@ -766,15 +747,15 @@ mod test {
     async fn test_checkpointer_checksum_updates() {
         let data_dir = tempdir().unwrap();
 
-        let fingerprinter = crate::Fingerprinter {
-            strategy: crate::FingerprintStrategy::Checksum {
+        let mut fingerprinter = crate::Fingerprinter::new(
+            crate::FingerprintStrategy::Checksum {
                 bytes: 16,
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 1024,
-            ignore_not_found: false,
-        };
+            1024,
+            false,
+        );
 
         let log_path = data_dir.path().join("test.log");
         let contents = "hello i am a test log line that is just long enough but not super long\n";
@@ -782,15 +763,14 @@ mod test {
             .await
             .expect("writing test data");
 
-        let mut buf = vec![0; 1024];
         let old = fingerprinter
-            .get_bytes_checksum(&log_path, &mut buf)
+            .get_bytes_checksum(&log_path)
             .await
             .expect("getting old checksum")
             .expect("still getting old checksum");
 
         let new = fingerprinter
-            .get_fingerprint_of_file(&log_path, &mut buf)
+            .get_fingerprint_of_file(&log_path)
             .await
             .expect("getting new checksum");
 
@@ -810,7 +790,7 @@ mod test {
         assert!(chkptr.checkpoints.contains_bytes_checksums());
 
         chkptr
-            .maybe_upgrade(&log_path, new, &fingerprinter, &mut buf)
+            .maybe_upgrade(&log_path, new, &mut fingerprinter)
             .await;
 
         assert!(!chkptr.checkpoints.contains_bytes_checksums());

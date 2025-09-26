@@ -26,9 +26,10 @@ const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
 
 #[derive(Debug, Clone)]
 pub struct Fingerprinter {
-    pub strategy: FingerprintStrategy,
-    pub max_line_length: usize,
-    pub ignore_not_found: bool,
+    strategy: FingerprintStrategy,
+    max_line_length: usize,
+    ignore_not_found: bool,
+    buffer: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -177,11 +178,31 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
 }
 
 impl Fingerprinter {
-    pub async fn get_fingerprint_of_file(
-        &self,
-        path: &Path,
-        buffer: &mut Vec<u8>,
-    ) -> Result<FileFingerprint> {
+    pub fn new(
+        strategy: FingerprintStrategy,
+        max_line_length: usize,
+        ignore_not_found: bool,
+    ) -> Fingerprinter {
+        let buffer_len = match strategy {
+            FingerprintStrategy::Checksum { bytes, .. } => std::cmp::max(bytes, max_line_length),
+            _ => max_line_length,
+        };
+        let mut buffer = Vec::with_capacity(buffer_len);
+
+        // Sneaky ;)
+        unsafe {
+            buffer.set_len(buffer_len);
+        }
+
+        Fingerprinter {
+            strategy,
+            max_line_length,
+            ignore_not_found,
+            buffer,
+        }
+    }
+
+    pub async fn get_fingerprint_of_file(&mut self, path: &Path) -> Result<FileFingerprint> {
         use FileFingerprint::*;
 
         match self.strategy {
@@ -201,12 +222,13 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                buffer.resize(self.max_line_length, 0u8);
+                let mut buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
                 skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
-                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer).await?;
+                let bytes_read =
+                    fingerprinter_read_until(reader, b'\n', lines, &mut buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(FirstLinesChecksum(fingerprint))
             }
@@ -214,16 +236,15 @@ impl Fingerprinter {
     }
 
     pub async fn get_fingerprint_or_log_error(
-        &self,
+        &mut self,
         path: &Path,
-        buffer: &mut Vec<u8>,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
-                    self.get_fingerprint_of_file(path, buffer).await.map(Some)
+                    self.get_fingerprint_of_file(path).await.map(Some)
                 } else {
                     Ok(None)
                 }
@@ -261,22 +282,18 @@ impl Fingerprinter {
             .flatten()
     }
 
-    pub async fn get_bytes_checksum(
-        &self,
-        path: &Path,
-        buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>> {
+    pub async fn get_bytes_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 bytes,
                 ignored_header_bytes,
                 lines: _,
             } => {
-                buffer.resize(bytes, 0u8);
+                let buffer = &mut self.buffer[..bytes];
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fp.read_exact(&mut buffer[..bytes]).await?;
+                fp.read_exact(buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
@@ -286,11 +303,7 @@ impl Fingerprinter {
 
     /// Calculates checksums using strategy pre-0.14.0
     /// <https://github.com/vectordotdev/vector/issues/8182>
-    pub async fn get_legacy_checksum(
-        &self,
-        path: &Path,
-        buffer: &mut Vec<u8>,
-    ) -> Result<Option<FileFingerprint>> {
+    pub async fn get_legacy_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -301,11 +314,11 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                buffer.resize(self.max_line_length, 0u8);
+                let mut buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
                 let fingerprint = LEGACY_FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
@@ -315,9 +328,8 @@ impl Fingerprinter {
     /// For upgrades from legacy strategy version
     /// <https://github.com/vectordotdev/vector/issues/15700>
     pub async fn get_legacy_first_lines_checksum(
-        &self,
+        &mut self,
         path: &Path,
-        buffer: &mut Vec<u8>,
     ) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
@@ -329,11 +341,11 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                buffer.resize(self.max_line_length, 0u8);
+                let mut buffer = &mut self.buffer[..self.max_line_length];
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, buffer).await?;
+                fingerprinter_read_until_and_zerofill_buf(fp, b'\n', lines, &mut buffer).await?;
                 let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
                 Ok(Some(FileFingerprint::FirstLinesChecksum(fingerprint)))
             }
@@ -436,15 +448,15 @@ mod test {
 
     #[tokio::test]
     async fn test_checksum_fingerprint() {
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::Checksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::Checksum {
                 bytes: 256,
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 1024,
-            ignore_not_found: false,
-        };
+            1024,
+            false,
+        );
 
         let target_dir = tempdir().unwrap();
         let mut full_line_data = vec![b'x'; 256];
@@ -459,32 +471,31 @@ mod test {
         fs::write(&duplicate_path, &full_line_data).unwrap();
         fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
-        let mut buf = Vec::new();
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&empty_path, &mut buf)
+                .get_fingerprint_of_file(&empty_path)
                 .await
                 .is_err()
         );
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .get_fingerprint_of_file(&full_line_path)
                 .await
                 .is_ok()
         );
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&not_full_line_path, &mut buf)
+                .get_fingerprint_of_file(&not_full_line_path)
                 .await
                 .is_err()
         );
         assert_eq!(
             fingerprinter
-                .get_fingerprint_of_file(&full_line_path, &mut buf)
+                .get_fingerprint_of_file(&full_line_path)
                 .await
                 .unwrap(),
             fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .get_fingerprint_of_file(&duplicate_path)
                 .await
                 .unwrap(),
         );
@@ -493,14 +504,14 @@ mod test {
     #[tokio::test]
     async fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
             max_line_length,
-            ignore_not_found: false,
-        };
+            false,
+        );
 
         let target_dir = tempdir().unwrap();
         let prepare_test = |file: &str, contents: &[u8]| {
@@ -550,8 +561,7 @@ mod test {
             max_line_length - 1,
         );
 
-        let mut buf = Vec::new();
-        let mut run = async |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
+        let mut run = async |path| fingerprinter.get_fingerprint_of_file(path).await;
 
         assert!(run(&empty).await.is_err());
         assert!(run(&incomplete_line).await.is_err());
@@ -605,14 +615,14 @@ mod test {
     #[tokio::test]
     async fn test_first_two_lines_checksum_fingerprint() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 2,
             },
             max_line_length,
-            ignore_not_found: false,
-        };
+            false,
+        );
 
         let target_dir = tempdir().unwrap();
         let prepare_test = |file: &str, contents: &[u8]| {
@@ -646,8 +656,7 @@ mod test {
             b"line one\nline two\nine three\n",
         );
 
-        let mut buf = Vec::new();
-        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
+        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path).await;
 
         assert!(run(&incomplete_lines).await.is_err());
 
@@ -691,14 +700,14 @@ mod test {
     #[tokio::test]
     async fn test_first_two_lines_checksum_fingerprint_with_headers() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 14,
                 lines: 2,
             },
             max_line_length,
-            ignore_not_found: false,
-        };
+            false,
+        );
 
         let target_dir = tempdir().unwrap();
         let prepare_test = |file: &str, contents: &[u8]| {
@@ -724,8 +733,7 @@ mod test {
             &gzip(b"some-header-22\nhellow world\nfrom vector\n").await,
         );
 
-        let mut buf = Vec::new();
-        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf).await;
+        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path).await;
 
         assert!(run(&two_lines).await.is_ok());
         assert_eq!(
@@ -746,11 +754,7 @@ mod test {
 
     #[tokio::test]
     async fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::DevInode,
-            max_line_length: 42,
-            ignore_not_found: false,
-        };
+        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false);
 
         let target_dir = tempdir().unwrap();
         let small_data = vec![b'x'; 1];
@@ -764,26 +768,25 @@ mod test {
         fs::write(&medium_path, &medium_data).unwrap();
         fs::write(&duplicate_path, &medium_data).unwrap();
 
-        let mut buf = Vec::new();
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&empty_path, &mut buf)
+                .get_fingerprint_of_file(&empty_path)
                 .await
                 .is_ok()
         );
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&small_path, &mut buf)
+                .get_fingerprint_of_file(&small_path)
                 .await
                 .is_ok()
         );
         assert_ne!(
             fingerprinter
-                .get_fingerprint_of_file(&medium_path, &mut buf)
+                .get_fingerprint_of_file(&medium_path)
                 .await
                 .unwrap(),
             fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .get_fingerprint_of_file(&duplicate_path)
                 .await
                 .unwrap()
         );
@@ -792,26 +795,20 @@ mod test {
     #[tokio::test]
     async fn no_error_on_dir() {
         let target_dir = tempdir().unwrap();
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::Checksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::Checksum {
                 bytes: 256,
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 1024,
-            ignore_not_found: false,
-        };
+            1024,
+            false,
+        );
 
-        let mut buf = Vec::new();
         let mut small_files = HashMap::new();
         assert!(
             fingerprinter
-                .get_fingerprint_or_log_error(
-                    target_dir.path(),
-                    &mut buf,
-                    &mut small_files,
-                    &NoErrors
-                )
+                .get_fingerprint_or_log_error(target_dir.path(), &mut small_files, &NoErrors)
                 .await
                 .is_none()
         );
