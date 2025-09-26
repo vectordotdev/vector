@@ -35,7 +35,7 @@ sinks:
 
   otel_file_sink:
     type: file
-    path: "/output/vector-file-sink.log"
+    path: "/output/opentelemetry-logs/vector-file-sink.log"
     inputs:
       - source0.logs
     encoding:
