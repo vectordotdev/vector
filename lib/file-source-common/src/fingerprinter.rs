@@ -187,13 +187,7 @@ impl Fingerprinter {
             FingerprintStrategy::Checksum { bytes, .. } => std::cmp::max(bytes, max_line_length),
             _ => max_line_length,
         };
-        let mut buffer = Vec::with_capacity(buffer_len);
-
-        // Sneaky ;)
-        #[allow(clippy::uninit_vec)]
-        unsafe {
-            buffer.set_len(buffer_len);
-        }
+        let buffer = vec![0u8; buffer_len];
 
         Fingerprinter {
             strategy,
