@@ -23,6 +23,7 @@ fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),
         region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
+        storage_resolution: IndexMap::from([("bytes_out".to_owned(), 1)]),
         ..Default::default()
     }
 }
@@ -33,7 +34,10 @@ async fn svc() -> CloudWatchMetricsSvc {
         .create_client(&ProxyConfig::from_env())
         .await
         .unwrap();
-    CloudWatchMetricsSvc { client }
+    CloudWatchMetricsSvc {
+        client,
+        storage_resolution: config.storage_resolution,
+    }
 }
 
 #[tokio::test]
@@ -80,6 +84,7 @@ async fn encode_events_basic_counter() {
                 .metric_name("bytes_out")
                 .value(2.5)
                 .timestamp(timestamp("2018-11-14T08:09:10.123Z"))
+                .storage_resolution(1)
                 .build(),
             MetricDatum::builder()
                 .metric_name("healthcheck")
