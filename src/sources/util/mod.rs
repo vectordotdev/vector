@@ -40,7 +40,7 @@ mod unix_datagram;
 mod unix_stream;
 mod wrappers;
 
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile"))]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(

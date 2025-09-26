@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom, TaskSet,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -20,7 +20,6 @@ use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio::{
     fs::{self, remove_file},
-    task::{Id, JoinSet},
     time::sleep,
 };
 
@@ -257,39 +256,25 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                let mut set = JoinSet::new();
+                let mut set = TaskSet::new();
 
-                let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
+                known_small_files
                     .iter()
                     .filter(|&(_path, last_time_open)| (last_time_open.elapsed() >= grace_period))
                     .map(|(path, _last_time_open)| path.clone())
-                    .map(|path| {
-                        let path_ = path.clone();
-                        let abort_handle =
-                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
-                        (abort_handle.id(), path)
-                    })
-                    .collect();
+                    .for_each(|path| set.spawn(path.clone(), remove_file(path)));
 
-                while let Some(res) = set.join_next().await {
-                    match res {
-                        Ok((path, Ok(()))) => {
+                while let Some((path, result)) = set.join_next().await {
+                    match result.map_err(std::io::Error::other).flatten() {
+                        Ok(()) => {
                             let removed = known_small_files.remove(&path);
 
                             if removed.is_some() {
                                 self.emitter.emit_file_deleted(&path);
                             }
                         }
-                        Ok((path, Err(err))) => {
+                        Err(err) => {
                             self.emitter.emit_file_delete_error(&path, err);
-                        }
-                        Err(join_err) => {
-                            self.emitter.emit_file_delete_error(
-                                remove_file_tasks
-                                    .get(&join_err.id())
-                                    .expect("panicked/cancelled task id not in task id pool"),
-                                std::io::Error::other(join_err),
-                            );
                         }
                     }
                 }
