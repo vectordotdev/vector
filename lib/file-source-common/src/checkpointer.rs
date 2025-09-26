@@ -770,7 +770,7 @@ mod test {
             .expect("still getting old checksum");
 
         let new = fingerprinter
-            .get_fingerprint_of_file(&log_path)
+            .fingerprint(&log_path)
             .await
             .expect("getting new checksum");
 

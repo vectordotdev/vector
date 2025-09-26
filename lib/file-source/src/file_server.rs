@@ -109,7 +109,7 @@ where
         for path in self.paths_provider.paths().into_iter() {
             if let Some(file_id) = self
                 .fingerprinter
-                .get_fingerprint_or_log_error(&path, &mut known_small_files, &self.emitter)
+                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                 .await
             {
                 existing_files.push((path, file_id));
@@ -192,7 +192,7 @@ where
                 for path in self.paths_provider.paths().into_iter() {
                     if let Some(file_id) = self
                         .fingerprinter
-                        .get_fingerprint_or_log_error(&path, &mut known_small_files, &self.emitter)
+                        .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                         .await
                     {
                         if let Some(watcher) = fp_map.get_mut(&file_id) {

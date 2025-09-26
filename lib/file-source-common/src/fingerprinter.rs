@@ -191,7 +191,8 @@ impl Fingerprinter {
         }
     }
 
-    pub async fn get_fingerprint_of_file(&mut self, path: &Path) -> Result<FileFingerprint> {
+    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
+    pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
         use FileFingerprint::*;
 
         match self.strategy {
@@ -223,7 +224,7 @@ impl Fingerprinter {
         }
     }
 
-    pub async fn get_fingerprint_or_log_error(
+    pub async fn fingerprint_or_emit(
         &mut self,
         path: &Path,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
@@ -232,7 +233,7 @@ impl Fingerprinter {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
-                    self.get_fingerprint_of_file(path).await.map(Some)
+                    self.fingerprint(path).await.map(Some)
                 } else {
                     Ok(None)
                 }
@@ -459,33 +460,17 @@ mod test {
         fs::write(&duplicate_path, &full_line_data).unwrap();
         fs::write(&not_full_line_path, not_full_line_data).unwrap();
 
+        assert!(fingerprinter.fingerprint(&empty_path).await.is_err());
+        assert!(fingerprinter.fingerprint(&full_line_path).await.is_ok());
         assert!(
             fingerprinter
-                .get_fingerprint_of_file(&empty_path)
-                .await
-                .is_err()
-        );
-        assert!(
-            fingerprinter
-                .get_fingerprint_of_file(&full_line_path)
-                .await
-                .is_ok()
-        );
-        assert!(
-            fingerprinter
-                .get_fingerprint_of_file(&not_full_line_path)
+                .fingerprint(&not_full_line_path)
                 .await
                 .is_err()
         );
         assert_eq!(
-            fingerprinter
-                .get_fingerprint_of_file(&full_line_path)
-                .await
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path)
-                .await
-                .unwrap(),
+            fingerprinter.fingerprint(&full_line_path).await.unwrap(),
+            fingerprinter.fingerprint(&duplicate_path).await.unwrap(),
         );
     }
 
@@ -549,7 +534,7 @@ mod test {
             max_line_length - 1,
         );
 
-        let mut run = async |path| fingerprinter.get_fingerprint_of_file(path).await;
+        let mut run = async |path| fingerprinter.fingerprint(path).await;
 
         assert!(run(&empty).await.is_err());
         assert!(run(&incomplete_line).await.is_err());
@@ -644,7 +629,7 @@ mod test {
             b"line one\nline two\nine three\n",
         );
 
-        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path).await;
+        let mut run = async move |path| fingerprinter.fingerprint(path).await;
 
         assert!(run(&incomplete_lines).await.is_err());
 
@@ -721,7 +706,7 @@ mod test {
             &gzip(b"some-header-22\nhellow world\nfrom vector\n").await,
         );
 
-        let mut run = async move |path| fingerprinter.get_fingerprint_of_file(path).await;
+        let mut run = async move |path| fingerprinter.fingerprint(path).await;
 
         assert!(run(&two_lines).await.is_ok());
         assert_eq!(
@@ -756,27 +741,11 @@ mod test {
         fs::write(&medium_path, &medium_data).unwrap();
         fs::write(&duplicate_path, &medium_data).unwrap();
 
-        assert!(
-            fingerprinter
-                .get_fingerprint_of_file(&empty_path)
-                .await
-                .is_ok()
-        );
-        assert!(
-            fingerprinter
-                .get_fingerprint_of_file(&small_path)
-                .await
-                .is_ok()
-        );
+        assert!(fingerprinter.fingerprint(&empty_path).await.is_ok());
+        assert!(fingerprinter.fingerprint(&small_path).await.is_ok());
         assert_ne!(
-            fingerprinter
-                .get_fingerprint_of_file(&medium_path)
-                .await
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path)
-                .await
-                .unwrap()
+            fingerprinter.fingerprint(&medium_path).await.unwrap(),
+            fingerprinter.fingerprint(&duplicate_path).await.unwrap()
         );
     }
 
@@ -796,7 +765,7 @@ mod test {
         let mut small_files = HashMap::new();
         assert!(
             fingerprinter
-                .get_fingerprint_or_log_error(target_dir.path(), &mut small_files, &NoErrors)
+                .fingerprint_or_emit(target_dir.path(), &mut small_files, &NoErrors)
                 .await
                 .is_none()
         );
