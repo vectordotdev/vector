@@ -169,10 +169,18 @@ generated: configuration: configuration: {
 														"""
 						required: false
 					}
+					export_expired_items: {
+						type: bool: default: false
+						description: """
+														Set to true to export expired items via the `expired` output port.
+														Expired items ignore other settings and are exported as they are flushed from the table.
+														"""
+						required: false
+					}
 					export_interval: {
 						type: uint: {}
 						description: "Interval for exporting all data from the table when used as a source."
-						required:    true
+						required:    false
 					}
 					remove_after_export: {
 						type: bool: default: false
