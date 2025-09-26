@@ -851,16 +851,16 @@ impl Source {
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
-            fingerprinter: Fingerprinter {
-                strategy: FingerprintStrategy::FirstLinesChecksum {
+            fingerprinter: Fingerprinter::new(
+                FingerprintStrategy::FirstLinesChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
                     ignored_header_bytes: 0,
                     lines: fingerprint_lines,
                 },
-                max_line_length: resolved_max_line_bytes,
-                ignore_not_found: true,
-            },
+                resolved_max_line_bytes,
+                true,
+            ),
             oldest_first,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
