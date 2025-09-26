@@ -79,12 +79,6 @@ impl FileFingerprint {
     }
 }
 
-impl From<u64> for FileFingerprint {
-    fn from(c: u64) -> Self {
-        FileFingerprint::Unknown(c)
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
 enum SupportedCompressionAlgorithms {
     Gzip,
