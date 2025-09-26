@@ -295,29 +295,14 @@ components: sources: opentelemetry: {
 						inputs:
 							- otel.logs
 						type: opentelemetry
+						use_otlp_encoding: true
 						protocol:
 							type: http
 							uri: http://localhost:5318/v1/logs
 							method: post
-							encoding:
-								codec: protobuf
-								protobuf:
-									desc_file: path/to/opentelemetry-proto.desc
-									message_type: opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest
-							framing:
-								method: "bytes"
 							request:
 								headers:
 									content-type: "application/x-protobuf"
-				```
-
-				The `desc` file was generated with the following command:
-				```bash
-					protoc -I=/path/to/vector/lib/opentelemetry-proto/src/proto/opentelemetry-proto \\
-						--include_imports \\
-						--include_source_info \\
-						--descriptor_set_out=opentelemetry-proto.desc \\
-						$(find /path/to/vector/lib/opentelemetry-proto/src/proto/opentelemetry-proto -name '*.proto')
 				```
 				"""
 		}
