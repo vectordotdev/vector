@@ -244,6 +244,7 @@ jobs:
             redis sink
             sematext_logs sink
             sematext_metrics sink
+            sentry sink
             socket sink
             splunk_hec sink
             statsd sink
