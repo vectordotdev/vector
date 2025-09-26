@@ -231,6 +231,7 @@ jobs:
             kafka sink
             logdna sink
             loki sink
+            mqtt sink
             nats sink
             new sink
             new_relic sink
