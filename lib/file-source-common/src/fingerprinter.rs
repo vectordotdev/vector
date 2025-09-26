@@ -32,6 +32,21 @@ pub struct Fingerprinter {
     buffer: Vec<u8>,
 }
 
+trait ResizeSlice<T> {
+    /// Slice until [..`size`] and resize with default values if needed to avoid panics
+    fn resize_slice_mut(&mut self, size: usize) -> &mut [T];
+}
+
+impl ResizeSlice<u8> for Vec<u8> {
+    fn resize_slice_mut(&mut self, size: usize) -> &mut [u8] {
+        if size > self.len() {
+            self.resize_with(size, Default::default);
+        }
+
+        &mut self[..size]
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FingerprintStrategy {
     Checksum {
@@ -212,7 +227,7 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = self.buffer.resize_slice_mut(self.max_line_length);
                 let mut fp = File::open(path).await?;
                 let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
@@ -278,12 +293,12 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines: _,
             } => {
-                let buffer = &mut self.buffer[..bytes];
+                let buffer = self.buffer.resize_slice_mut(bytes);
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
                 fp.read_exact(buffer).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                let fingerprint = FINGERPRINT_CRC.checksum(buffer);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -303,7 +318,7 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = self.buffer.resize_slice_mut(self.max_line_length);
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
@@ -330,7 +345,7 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 lines,
             } => {
-                let buffer = &mut self.buffer[..self.max_line_length];
+                let buffer = self.buffer.resize_slice_mut(self.max_line_length);
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
