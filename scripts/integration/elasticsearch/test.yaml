@@ -11,7 +11,9 @@ env:
   ELASTICSEARCH_HTTP_ADDRESS: http://elasticsearch:9200
 
 matrix:
-  version: [7.13.1]
+  image:
+    - "docker.io/elasticsearch:7.13.1"
+    - "docker.io/opensearch:2.19.3"
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
