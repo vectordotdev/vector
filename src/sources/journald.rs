@@ -689,7 +689,10 @@ impl StartJournalctl {
         }
 
         if self.current_boot_only {
+            // required for systemd < 250, otherwise implied by --follow
             command.arg("--boot");
+        } else {
+            command.arg("--boot=all");
         }
 
         if let Some(cursor) = checkpoint {
@@ -1494,7 +1497,7 @@ mod tests {
         let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
-        assert!(!cmd_line.contains("--boot"));
+        assert!(cmd_line.contains("--boot=all"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
         let journal_dir = None;
