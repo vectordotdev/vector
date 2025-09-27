@@ -1,9 +1,12 @@
 use std::{future::ready, time::Duration};
 
+use bytes::Bytes;
 use chrono::Utc;
 use futures::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::uri::Scheme;
-use hyper::{Body, Request};
+use http_body_util::Empty;
+use hyper::Request;
+use hyper::body::Body;
 use serde_with::serde_as;
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
@@ -159,7 +162,7 @@ fn apache_metrics(
                 let sanitized_url = url.to_sanitized_string();
 
                 let request = Request::get(&url)
-                    .body(Body::empty())
+                    .body(Empty::<Bytes>::new())
                     .expect("error creating request");
 
                 let tags = metric_tags! {
@@ -278,10 +281,7 @@ fn apache_metrics(
 
 #[cfg(test)]
 mod test {
-    use hyper::{
-        Body, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use hyper::{Body, Response, Server, service::service_fn};
     use similar_asserts::assert_eq;
     use tokio::time::{Duration, sleep};
 
@@ -305,7 +305,7 @@ mod test {
     async fn test_apache_up() {
         let in_addr = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
+        let make_svc = service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
                     r"
@@ -398,7 +398,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     async fn test_apache_error() {
         let in_addr = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
+        let make_svc = service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(
                     Response::builder()

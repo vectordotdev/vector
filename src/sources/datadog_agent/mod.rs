@@ -17,46 +17,46 @@ pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
 }
 
-use std::{convert::Infallible, fmt::Debug, io::Read, net::SocketAddr, sync::Arc, time::Duration};
+use std::convert::Infallible;
+use std::time::Duration;
+use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
+use hyper::Server;
+use hyper::service::service_fn;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
-    config::{LegacyKey, LogNamespace},
-    configurable::configurable_component,
-    event::{BatchNotifier, BatchStatus},
-    internal_event::{EventsReceived, Registered},
-    lookup::owned_value_path,
-    schema::meaning,
-    tls::MaybeTlsIncomingStream,
-};
-use vrl::{
-    path::OwnedTargetPath,
-    value::{Kind, kind::Collection},
-};
+use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_lib::config::{LegacyKey, LogNamespace};
+use vector_lib::configurable::configurable_component;
+use vector_lib::event::{BatchNotifier, BatchStatus};
+use vector_lib::internal_event::{EventsReceived, Registered};
+use vector_lib::lookup::owned_value_path;
+use vector_lib::schema::meaning;
+use vector_lib::tls::MaybeTlsIncomingStream;
+use vrl::path::OwnedTargetPath;
+use vrl::value::Kind;
+use vrl::value::kind::Collection;
 use warp::{Filter, Reply, filters::BoxedFilter, reject::Rejection, reply::Response};
 
+use crate::common::http::ErrorMessage;
+use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer};
 use crate::{
     SourceSender,
     codecs::{Decoder, DecodingConfig},
-    common::http::ErrorMessage,
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput, log_schema,
     },
     event::Event,
-    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -210,7 +210,7 @@ impl SourceConfig for DatadogAgentConfig {
             });
 
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {

@@ -12,8 +12,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
-use serde::{Serialize, de::DeserializeOwned};
+use hyper::{Server, service::service_fn};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::{
     Deserializer, Value as JsonValue,
     de::{Read as JsonRead, StrRead},
@@ -22,29 +23,21 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
+use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
+use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::lookup::{self, event_path, owned_value_path};
+use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
-    configurable::configurable_component,
     event::BatchNotifier,
-    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
-    lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
     schema::meaning,
-    sensitive_string::SensitiveString,
-    tls::MaybeTlsIncomingStream,
 };
-use vrl::{
-    path::OwnedTargetPath,
-    value::{Kind, kind::Collection},
-};
-use warp::{
-    Filter, Reply,
-    filters::BoxedFilter,
-    http::header::{CONTENT_TYPE, HeaderValue},
-    path,
-    reject::Rejection,
-    reply::Response,
-};
+use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
+use vrl::path::OwnedTargetPath;
+use vrl::value::{Kind, kind::Collection};
+use warp::http::header::{CONTENT_TYPE, HeaderValue};
+use warp::{Filter, Reply, filters::BoxedFilter, path, reject::Rejection, reply::Response};
 
 use self::{
     acknowledgements::{
@@ -183,7 +176,7 @@ impl SourceConfig for SplunkConfig {
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
             let span = Span::current();
-            let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
+            let make_svc = service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
                 let svc = ServiceBuilder::new()
                     .layer(build_http_trace_layer(span.clone()))
                     .option_layer(keepalive_settings.max_connection_age_secs.map(|secs| {
@@ -1302,15 +1295,12 @@ mod tests {
     use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_lib::{
-        codecs::{
-            BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
-            decoding::DeserializerConfig,
-        },
-        event::EventStatus,
-        schema::Definition,
-        sensitive_string::SensitiveString,
+    use vector_lib::codecs::{
+        BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
+        decoding::DeserializerConfig,
     };
+    use vector_lib::sensitive_string::SensitiveString;
+    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;

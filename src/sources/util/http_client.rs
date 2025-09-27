@@ -11,21 +11,20 @@
 // Okta source only imports defaults but doesn't use the rest of the client
 #![cfg_attr(feature = "sources-okta", allow(dead_code))]
 
-use std::{collections::HashMap, future::ready, time::Duration};
-
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{Uri, response::Parts};
-use hyper::{Body, Request};
+use http_body_util::Empty;
+use hyper::{Request, body::Body};
+use std::time::Duration;
+use std::{collections::HashMap, future::ready};
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
-    shutdown::ShutdownSignal,
-};
+use vector_lib::json_size::JsonSize;
 
+use crate::http::{QueryParameterValue, QueryParameters};
 use crate::{
     SourceSender,
-    http::{Auth, HttpClient, QueryParameterValue, QueryParameters},
+    http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, HttpClientEventsReceived, HttpClientHttpError,
         HttpClientHttpResponseError, StreamClosedError,
@@ -33,6 +32,8 @@ use crate::{
     sources::util::http::HttpMethod,
     tls::TlsSettings,
 };
+use vector_lib::shutdown::ShutdownSignal;
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event};
 
 /// Contains the inputs generic to any http client.
 pub(crate) struct GenericHttpClientInputs {
@@ -191,7 +192,9 @@ pub(crate) async fn call<
             }
 
             // building an empty request should be infallible
-            let mut request = builder.body(Body::empty()).expect("error creating request");
+            let mut request = builder
+                .body(Empty::<Bytes>::new())
+                .expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
                 auth.apply(&mut request);

@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use http::{Request, Response};
-use hyper::Body;
+use hyper::body::Body;
 use tokio::{pin, select, sync::mpsc};
 use tonic::{
     Status,

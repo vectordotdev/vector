@@ -1,7 +1,10 @@
 use std::{env, time::Duration};
 
+use bytes::Bytes;
 use futures::StreamExt;
-use hyper::{Body, Request};
+use http_body_util::Empty;
+use hyper::Request;
+use hyper::body::Body;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -187,7 +190,7 @@ async fn aws_ecs_metrics(
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     while interval.next().await.is_some() {
         let request = Request::get(&url)
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .expect("error creating request");
         let uri = request.uri().clone();
 
@@ -248,10 +251,7 @@ async fn aws_ecs_metrics(
 
 #[cfg(test)]
 mod test {
-    use hyper::{
-        Body, Response, Server,
-        service::{make_service_fn, service_fn},
-    };
+    use hyper::{Body, Response, Server, service::service_fn};
     use tokio::time::Duration;
 
     use super::*;
@@ -268,7 +268,7 @@ mod test {
     async fn test_aws_ecs_metrics_source() {
         let in_addr = next_addr();
 
-        let make_svc = make_service_fn(|_| async {
+        let make_svc = service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
                 Ok::<_, Error>(Response::new(Body::from(
                     r#"

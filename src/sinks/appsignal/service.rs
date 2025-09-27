@@ -6,7 +6,7 @@ use futures::{
     future::{BoxFuture, Ready},
 };
 use http::{Request, StatusCode, Uri, header::AUTHORIZATION};
-use hyper::Body;
+use hyper::body::Body;
 use tower::{Service, ServiceExt};
 use vector_lib::{
     finalization::EventStatus,

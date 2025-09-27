@@ -1,11 +1,5 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::fmt;
-
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
-
 use super::{
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
@@ -18,6 +12,12 @@ use crate::{
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
     },
 };
+use bytes::Bytes;
+use http::{Request, StatusCode, Uri};
+use http_body_util::Empty;
+use hyper::body::Body;
+use std::fmt;
+use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
 
 /// Data format.
 ///
@@ -260,7 +260,7 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(Empty::<Bytes>::new()).unwrap();
 
     if let Some(auth) = auth {
         auth.apply(&mut request);

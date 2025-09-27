@@ -1,10 +1,7 @@
 use std::{convert::Infallible, future::Future};
 
 use http::{Request, Response, Uri, uri::Scheme};
-use hyper::{
-    Body, Server,
-    service::{make_service_fn, service_fn},
-};
+use hyper::{Body, Server, service::service_fn};
 
 use super::{next_addr, wait_for_tcp};
 
@@ -26,7 +23,7 @@ where
         .build()
         .expect("URI should always be valid when starting from `SocketAddr`");
 
-    let make_service = make_service_fn(move |_| {
+    let make_service = service_fn(move |_| {
         let handler = handler.clone();
         let service = service_fn(handler);
 

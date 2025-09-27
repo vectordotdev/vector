@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
+use bytes::Bytes;
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use hyper::Body;
+use http_body_util::Empty;
+use hyper::body::Body;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
@@ -115,7 +117,7 @@ pub fn build_healthcheck(
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let uri = base_url.parse::<Uri>()?;
-        let mut request = http::Request::head(uri).body(Body::empty())?;
+        let mut request = http::Request::head(uri).body(Empty::<Bytes>::new())?;
 
         auth.apply(&mut request);
 

@@ -9,12 +9,13 @@ use std::{
 
 use async_trait::async_trait;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
+use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future, stream::BoxStream};
+use http_body_util::Empty;
+use hyper::body::Body;
 use hyper::{
-    Body, Method, Request, Response, Server, StatusCode,
-    body::HttpBody,
-    header::HeaderValue,
-    service::{make_service_fn, service_fn},
+    Method, Request, Response, Server, StatusCode, body::HttpBody, header::HeaderValue,
+    service::service_fn,
 };
 use indexmap::{IndexMap, map::Entry};
 use serde_with::serde_as;
@@ -438,7 +439,7 @@ impl PrometheusExporter {
         let span = Span::current();
         let metrics = Arc::clone(&self.metrics);
 
-        let new_service = make_service_fn(move |_| {
+        let new_service = service_fn(move |_| {
             let span = Span::current();
             let metrics = Arc::clone(&metrics);
             let handler = handler.clone();
@@ -932,7 +933,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let mut request = Request::get(format!("{proto}://{address}/metrics"))
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .expect("Error creating request.");
 
         if let Some(ref encoding) = encoding {
@@ -1020,7 +1021,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let mut request = Request::get(format!("{proto}://{address}/metrics"))
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .expect("Error creating request.");
 
         if let Some(client_auth_config) = client_auth_config {
@@ -1481,7 +1482,7 @@ mod integration_tests {
     async fn fetch_exporter_body() -> String {
         let url = format!("http://{}/metrics", sink_exporter_address());
         let request = Request::get(url)
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
         let result = HttpClient::new(None, &proxy)
@@ -1502,7 +1503,7 @@ mod integration_tests {
             query
         );
         let request = Request::post(url)
-            .body(Body::empty())
+            .body(Empty::<Bytes>::new())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
         let result = HttpClient::new(None, &proxy)

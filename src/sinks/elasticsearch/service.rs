@@ -6,7 +6,8 @@ use std::{
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
-use hyper::{Body, Request, service::Service};
+use hyper::body::Body;
+use hyper::{Request, service::Service};
 use tower::ServiceExt;
 use vector_lib::{
     ByteSizeOf,
@@ -183,11 +184,6 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
     type Response = ElasticsearchResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    // Emission of an internal event in case of errors is handled upstream by the caller.
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut req: ElasticsearchRequest) -> Self::Future {

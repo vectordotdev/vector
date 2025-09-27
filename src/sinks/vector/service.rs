@@ -2,9 +2,9 @@ use std::task::{Context, Poll};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
-use hyper::client::HttpConnector;
-use hyper_openssl::HttpsConnector;
-use hyper_proxy::ProxyConnector;
+use hyper_http_proxy::ProxyConnector;
+use hyper_openssl::client::legacy::HttpsConnector;
+use hyper_util::client::legacy::connect::HttpConnector;
 use prost::Message;
 use tonic::{IntoRequest, body::BoxBody};
 use tower::Service;

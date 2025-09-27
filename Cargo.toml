@@ -154,6 +154,12 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
+headers = { version = "0.4.1", default-features = false }
+http = { package = "http", version = "1.0", default-features = false, features = ["std"] }
+hyper = { version = "1.7.0", default-features = false, features = ["client", "http1", "http2", "server"] }
+hyper-http-proxy = { version = "1.1.0", default-features = false, features = ["default-tls"] }
+hyper-util = { version = "0.1.16", default-features = false, features = ["client-legacy"] }
+http-body-util = { version = "0.1.3", default-features = false }
 humantime = { version = "2.2.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
@@ -366,16 +372,17 @@ governor = { version = "0.10.0", default-features = false, features = ["dashmap"
 h2 = { version = "0.4.11", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
-headers = { version = "0.3.9", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
-http = { version = "0.2.9", default-features = false }
-http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
-http-serde = "1.1.3"
-http-body = { version = "0.4.5", default-features = false }
+headers.workspace = true
+http.workspace = true
+http-serde = "2.1.1"
+http-body = { version = "1.0.1", default-features = false }
 humantime.workspace = true
-hyper = { version = "0.14.28", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
-hyper-openssl = { version = "0.9.2", default-features = false }
-hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
+hyper.workspace = true
+hyper-openssl = { version = "0.10.2", default-features = false }
+hyper-http-proxy.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
 indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }

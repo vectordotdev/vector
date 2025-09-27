@@ -10,7 +10,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
-use http_1::{HeaderName, HeaderValue};
+use http::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{

@@ -258,10 +258,6 @@ impl Service<Vec<Event>> for TestSink {
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();
         let mut control = self.control.lock().expect("Poisoned control lock");
