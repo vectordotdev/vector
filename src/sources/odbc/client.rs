@@ -32,10 +32,10 @@ use vrl::prelude::*;
 
 /// Configuration for the `odbc` source.
 #[serde_as]
-#[configurable_component(
-    source("odbc", "Periodically pulls observability data from an ODBC interface by running a scheduled query."
-    )
-)]
+#[configurable_component(source(
+    "odbc",
+    "Periodically pulls observability data from an ODBC interface by running a scheduled query."
+))]
 #[derive(Clone, Debug)]
 pub struct OdbcConfig {
     /// The connection string to use for odbc.
@@ -451,7 +451,7 @@ async fn extract_and_save_tracking(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_query(
+pub fn execute_query(
     env: &Environment,
     conn_str: &str,
     stmt_str: &str,
