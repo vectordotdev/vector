@@ -11,13 +11,7 @@ echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Ap
 $N_JOBS = (((Get-CimInstance -ClassName Win32_ComputerSystem).NumberOfLogicalProcessors / 2), 1 | Measure-Object -Max).Maximum
 echo "CARGO_BUILD_JOBS=$N_JOBS" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-rustup toolchain install stable
-
-if ($env:RELEASE_BUILDER -ne "true")
-{
-    # Ensure we have cargo-next test installed.
-    rustup run stable cargo install cargo-nextest --version 0.9.95 --locked
-}
+bash scripts/environment/prepare.sh --modules=cargo-nextest
 
 # Enable retries to avoid transient network issues.
 $env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"

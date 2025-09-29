@@ -9,6 +9,7 @@ BINSTALL_SHA256SUM_AARCH64_LINUX="17d69bcc07a0e38c912e7f596ed71b1f5f59dc8980da59
 BINSTALL_SHA256SUM_ARMV7_LINUX="e4ba720023e02b071aa805ae62412e94741c1bb0e0a2bb2b35896fec3d140128"
 BINSTALL_SHA256SUM_AARCH64_DARWIN="07d46d31fb68ac10b906c5d39d611ded7787966f4ed15c598cb6175b45a2b069"
 BINSTALL_SHA256SUM_X86_64_DARWIN="3de381bdcca08c418dc790d2a283711894a0577c6e55bba0d4e6cb8b0378b36"
+BINSTALL_SHA256SUM_X86_64_WINDOWS="a43fb6403e7286c08387c5d0f2780306da7a61c5f0a893761b160d3e2d1cee5a"
 
 pushd "$(mktemp -d)"
 
@@ -54,10 +55,18 @@ elif [ "$os" = "Linux" ]; then
   url="${base_url}-${target}.tgz"
 
   download -o output.tgz "$url"
-# elif [ "${OS-}" = "Windows_NT" ]; then
-#   target="${machine}-pc-windows-msvc"
-#   url="${base_url}-${target}.zip"
-#   download -o output.zip "$url"
+elif [ "$os" = "Windows_NT" ]; then
+  if [ "$machine" = "x86_64" ]; then
+    target="${machine}-pc-windows-msvc"
+    download_sha256sum="${BINSTALL_SHA256SUM_X86_64_WINDOWS}"
+  else
+    echo "Unsupported OS ${os} machine ${machine}"
+    popd
+    exit 1
+  fi
+
+  url="${base_url}-${target}.zip"
+  download -o output.zip "$url"
 else
     echo "Unsupported OS ${os}"
     popd
