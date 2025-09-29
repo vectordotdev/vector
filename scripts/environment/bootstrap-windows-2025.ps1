@@ -1,3 +1,7 @@
+# Fail immediately on any error
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
 # Set up our Cargo path so we can do Rust-y things.
 echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -6,6 +10,8 @@ echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Ap
 # and making things go veryyyyyyy slow.
 $N_JOBS = (((Get-CimInstance -ClassName Win32_ComputerSystem).NumberOfLogicalProcessors / 2), 1 | Measure-Object -Max).Maximum
 echo "CARGO_BUILD_JOBS=$N_JOBS" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+rustup toolchain install stable
 
 if ($env:RELEASE_BUILDER -ne "true")
 {
