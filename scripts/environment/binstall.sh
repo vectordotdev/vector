@@ -55,7 +55,7 @@ elif [ "$os" = "Linux" ]; then
   url="${base_url}-${target}.tgz"
 
   download -o output.tgz "$url"
-elif [ "$os" = "Windows_NT" ]; then
+elif [[ "$os" == MINGW64_NT-* ]]; then
   if [ "$machine" = "x86_64" ]; then
     target="${machine}-pc-windows-msvc"
     download_sha256sum="${BINSTALL_SHA256SUM_X86_64_WINDOWS}"
