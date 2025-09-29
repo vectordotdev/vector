@@ -1,18 +1,11 @@
 #![allow(missing_docs)]
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
-
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
 };
+use hyper::client::connect::dns::{GaiResolver, Name};
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -23,6 +16,18 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
+use std::{
+    collections::HashMap,
+    fmt,
+    future::Future,
+    io,
+    net::SocketAddr,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+    time::Duration,
+};
+use tokio::net::lookup_host;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -73,12 +78,51 @@ impl HttpError {
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
-type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
+type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector<AnyResolver>>>;
 
 pub struct HttpClient<B = Body> {
-    client: Client<HttpProxyConnector, B>,
+    client: Client<ProxyConnector<HttpsConnector<HttpConnector<AnyResolver>>>, B>,
     user_agent: HeaderValue,
     proxy_connector: HttpProxyConnector,
+}
+
+#[derive(Clone)]
+pub enum AnyResolver {
+    System(GaiResolver),
+    Round(RoundRobinResolver),
+}
+
+impl Service<Name> for AnyResolver {
+    type Response = std::vec::IntoIter<SocketAddr>;
+    type Error = io::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self {
+            AnyResolver::System(r) => r.poll_ready(cx),
+            AnyResolver::Round(r) => r.poll_ready(cx),
+        }
+    }
+
+    fn call(&mut self, name: Name) -> Self::Future {
+        match self {
+            AnyResolver::System(r) => {
+                let fut = r.call(name);
+                Box::pin(async move {
+                    let addrs = fut.await?;
+                    let vec: Vec<SocketAddr> = addrs.collect();
+                    Ok(vec.into_iter())
+                })
+            }
+            AnyResolver::Round(r) => {
+                let fut = r.call(name);
+                Box::pin(async move {
+                    let iter = fut.await?;
+                    Ok(iter)
+                })
+            }
+        }
+    }
 }
 
 impl<B> HttpClient<B>
@@ -91,15 +135,35 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+        HttpClient::new_with_custom_client(
+            tls_settings,
+            proxy_config,
+            &mut Client::builder(),
+            false,
+        )
+    }
+
+    pub fn new_with_dns(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        use_custom_dns: bool,
+    ) -> Result<Self, HttpError> {
+        Self::new_with_custom_client(
+            tls_settings,
+            proxy_config,
+            &mut Client::builder(),
+            use_custom_dns,
+        )
     }
 
     pub fn new_with_custom_client(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
         client_builder: &mut client::Builder,
+        use_custom_dns: bool,
     ) -> Result<HttpClient<B>, HttpError> {
-        let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+        let proxy_connector =
+            build_proxy_connector(tls_settings.into(), proxy_config, use_custom_dns)?;
         let client = client_builder.build(proxy_connector.clone());
 
         let app_name = crate::get_app_name();
@@ -175,12 +239,13 @@ where
 pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
-) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    use_custom_dns: bool,
+) -> Result<ProxyConnector<HttpsConnector<HttpConnector<AnyResolver>>>, HttpError> {
     // Create dedicated TLS connector for the proxied connection with user TLS settings.
     let tls = tls_connector_builder(&tls_settings)
         .context(BuildTlsConnectorSnafu)?
         .build();
-    let https = build_tls_connector(tls_settings)?;
+    let https = build_tls_connector(tls_settings, use_custom_dns)?;
     let mut proxy = ProxyConnector::new(https).unwrap();
     // Make proxy connector aware of user TLS settings by setting the TLS connector:
     // https://github.com/vectordotdev/vector/issues/13683
@@ -193,8 +258,15 @@ pub fn build_proxy_connector(
 
 pub fn build_tls_connector(
     tls_settings: MaybeTlsSettings,
-) -> Result<HttpsConnector<HttpConnector>, HttpError> {
-    let mut http = HttpConnector::new();
+    use_custom_dns: bool,
+) -> Result<HttpsConnector<HttpConnector<AnyResolver>>, HttpError> {
+    // Round-robin resolver
+    let resolver = if use_custom_dns {
+        AnyResolver::Round(RoundRobinResolver::default())
+    } else {
+        AnyResolver::System(GaiResolver::new())
+    };
+    let mut http = HttpConnector::new_with_resolver(resolver);
     http.enforce_http(false);
 
     let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
@@ -584,6 +656,54 @@ where
                 _ => (),
             }
             Ok(response)
+        })
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct RoundRobinResolver {
+    next: Arc<Mutex<HashMap<String, usize>>>,
+}
+
+impl Service<Name> for RoundRobinResolver {
+    type Response = std::vec::IntoIter<SocketAddr>;
+    type Error = io::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, name: Name) -> Self::Future {
+        let host = name.as_str().to_owned();
+        let next = Arc::clone(&self.next);
+
+        Box::pin(async move {
+            let mut addrs: Vec<SocketAddr> = lookup_host((host.as_str(), 0)).await?.collect();
+            if addrs.is_empty() {
+                return Err(io::Error::new(io::ErrorKind::NotFound, "no addresses"));
+            }
+            let before_rotate = addrs.clone();
+
+            let start = {
+                let mut map = next.lock().expect("failed to lock resolver index mutex");
+                let idx = map.entry(host.clone()).or_insert(0);
+                let s = *idx % addrs.len();
+                *idx = (*idx + 1) % addrs.len();
+                s
+            };
+            addrs.rotate_left(start);
+            debug!(
+                target: "net.dns",
+                %host,
+                start_index = start,
+                ?before_rotate,
+                ?addrs,
+                selected = %addrs[0],
+                "DNS round-robin resolved and rotated"
+            );
+
+            Ok(addrs.into_iter())
         })
     }
 }

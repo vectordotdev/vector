@@ -211,6 +211,19 @@ generated: components: sinks: clickhouse: configuration: {
 			}
 		}
 	}
+	auto_resolve_dns: {
+		description: """
+			Automatically resolve hostnames to all available IP addresses.
+
+			When enabled, the hostname in the endpoint will be resolved to all its IP addresses,
+			and Vector will load balance across all resolved IPs using round-robin rotation.
+			IP rotation occurs when establishing new connections, which happens when connection
+			pools are exhausted or connections expire (either due to Hyper's pool_idle_timeout
+			or when the server closes connections based on its keep_alive_timeout).
+			"""
+		required: false
+		type: bool: default: false
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false

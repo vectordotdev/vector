@@ -56,6 +56,16 @@ impl fmt::Display for Format {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
+    /// Automatically resolve hostnames to all available IP addresses.
+    ///
+    /// When enabled, the hostname in the endpoint will be resolved to all its IP addresses,
+    /// and Vector will load balance across all resolved IPs using round-robin rotation.
+    /// IP rotation occurs when establishing new connections, which happens when connection
+    /// pools are exhausted or connections expire (either due to Hyper's pool_idle_timeout
+    /// or when the server closes connections based on its keep_alive_timeout).
+    #[serde(default)]
+    pub auto_resolve_dns: bool,
+
     /// The endpoint of the ClickHouse server.
     #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
@@ -186,7 +196,7 @@ impl SinkConfig for ClickhouseConfig {
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
 
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new_with_dns(tls_settings, &cx.proxy, self.auto_resolve_dns)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
