@@ -11,7 +11,11 @@ echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Ap
 $N_JOBS = (((Get-CimInstance -ClassName Win32_ComputerSystem).NumberOfLogicalProcessors / 2), 1 | Measure-Object -Max).Maximum
 echo "CARGO_BUILD_JOBS=$N_JOBS" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-bash scripts/environment/prepare.sh --modules=cargo-nextest
+if ($env:RELEASE_BUILDER -ne "true") {
+    bash scripts/environment/prepare.sh --modules=cargo-nextest
+} else {
+    bash scripts/environment/prepare.sh --modules=rustup
+}
 
 # Enable retries to avoid transient network issues.
 $env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"
