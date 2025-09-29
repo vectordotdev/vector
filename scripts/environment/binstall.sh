@@ -25,9 +25,6 @@ if [ "$os" = "Darwin" ]; then
   if [ "$machine" = "arm64" ]; then
     url="${base_url}-aarch64-apple-darwin.zip"
     download_sha256sum="${BINSTALL_SHA256SUM_AARCH64_DARWIN}"
-  elif [ "$machine" = "x86_64" ]; then
-    url="${base_url}-x86_64-apple-darwin.zip"
-    download_sha256sum="${BINSTALL_SHA256SUM_X86_64_DARWIN}"
   else
     echo "Unsupported OS ${os} machine ${machine}"
     popd
