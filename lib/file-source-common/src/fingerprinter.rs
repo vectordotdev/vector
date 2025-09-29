@@ -286,7 +286,7 @@ impl Fingerprinter {
             .flatten()
     }
 
-    pub async fn get_bytes_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
+    pub async fn bytes_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 bytes,
@@ -307,7 +307,7 @@ impl Fingerprinter {
 
     /// Calculates checksums using strategy pre-0.14.0
     /// <https://github.com/vectordotdev/vector/issues/8182>
-    pub async fn get_legacy_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
+    pub async fn legacy_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
         match self.strategy {
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
@@ -331,7 +331,7 @@ impl Fingerprinter {
     }
     /// For upgrades from legacy strategy version
     /// <https://github.com/vectordotdev/vector/issues/15700>
-    pub async fn get_legacy_first_lines_checksum(
+    pub async fn legacy_first_lines_checksum(
         &mut self,
         path: &Path,
     ) -> Result<Option<FileFingerprint>> {

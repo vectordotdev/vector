@@ -172,7 +172,7 @@ impl CheckpointsView {
         fng: FileFingerprint,
         fingerprinter: &mut Fingerprinter,
     ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path).await {
+        if let Ok(Some(old_checksum)) = fingerprinter.bytes_checksum(path).await {
             self.update_key(old_checksum, fng)
         }
 
@@ -184,12 +184,12 @@ impl CheckpointsView {
         }
 
         if self.checkpoints.get(&fng).is_none() {
-            if let Ok(Some(fingerprint)) = fingerprinter.get_legacy_checksum(path).await
+            if let Ok(Some(fingerprint)) = fingerprinter.legacy_checksum(path).await
                 && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
                 self.update(fng, pos);
             }
-            if let Ok(Some(fingerprint)) = fingerprinter.get_legacy_first_lines_checksum(path).await
+            if let Ok(Some(fingerprint)) = fingerprinter.legacy_first_lines_checksum(path).await
                 && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
                 self.update(fng, pos);
@@ -764,7 +764,7 @@ mod test {
             .expect("writing test data");
 
         let old = fingerprinter
-            .get_bytes_checksum(&log_path)
+            .bytes_checksum(&log_path)
             .await
             .expect("getting old checksum")
             .expect("still getting old checksum");
