@@ -364,7 +364,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 return Value::Null;
             };
 
-            Value::Boolean(value[0] != 0 && value[0] != b'0')
+            Value::Boolean(value[0] == 1 || value[0] == b'1')
         }
     }
 }

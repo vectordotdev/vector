@@ -1,0 +1,17 @@
+features:
+  - odbc-integration-tests
+
+test_filter: '::odbc::'
+
+env:
+  ODBC_DB_TYPE: "mariadb"
+  ODBC_CONN_STRING: "driver={MariaDB ODBC 3.0 Driver};server=mariadb;port=3306;database=vector_db;uid=vector;pwd=vector;"
+
+matrix:
+  version: [ '11-jammy' ]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sources/odbc/**"
+  - "scripts/integration/odbc/**"

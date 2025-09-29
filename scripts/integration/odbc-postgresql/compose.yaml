@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+  postgresql:
+    image: docker.io/postgres:${CONFIG_VERSION}
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=vector
+      - POSTGRES_PASSWORD=vector
+      - POSTGRES_DB=vector_db
