@@ -191,12 +191,9 @@ impl Fingerprinter {
         strategy: FingerprintStrategy,
         max_line_length: usize,
         ignore_not_found: bool,
+        internal_buffer_size: usize,
     ) -> Fingerprinter {
-        let buffer_len = match strategy {
-            FingerprintStrategy::Checksum { bytes, .. } => std::cmp::max(bytes, max_line_length),
-            _ => max_line_length,
-        };
-        let buffer = vec![0u8; buffer_len];
+        let buffer = vec![0u8; internal_buffer_size];
 
         Fingerprinter {
             strategy,
@@ -460,6 +457,7 @@ mod test {
             },
             1024,
             false,
+            1024, // 1024 > 256
         );
 
         let target_dir = tempdir().unwrap();
@@ -499,6 +497,7 @@ mod test {
             },
             max_line_length,
             false,
+            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -610,6 +609,7 @@ mod test {
             },
             max_line_length,
             false,
+            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -695,6 +695,7 @@ mod test {
             },
             max_line_length,
             false,
+            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -742,7 +743,7 @@ mod test {
 
     #[tokio::test]
     async fn test_inode_fingerprint() {
-        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false);
+        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false, 42);
 
         let target_dir = tempdir().unwrap();
         let small_data = vec![b'x'; 1];
@@ -775,6 +776,7 @@ mod test {
             },
             1024,
             false,
+            1024, // 1024 > 256
         );
 
         let mut small_files = HashMap::new();

@@ -552,6 +552,7 @@ pub fn file_source(
     };
 
     let checkpointer = Checkpointer::new(&data_dir);
+    let strategy = config.fingerprint.clone().into();
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -563,9 +564,14 @@ pub fn file_source(
         data_dir,
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter::new(
-            config.fingerprint.clone().into(),
+            strategy,
             config.max_line_bytes,
             config.ignore_not_found,
+            if let FingerprintStrategy::Checksum { bytes, .. } = strategy {
+                std::cmp::max(bytes, config.max_line_bytes)
+            } else {
+                config.max_line_bytes
+            },
         ),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),

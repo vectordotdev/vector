@@ -558,7 +558,8 @@ mod test {
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
         let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy().await);
         let position: FilePosition = 1234;
-        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false);
+        let mut fingerprinter =
+            Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false, 1000);
 
         let data_dir = tempdir().unwrap();
         {
@@ -599,6 +600,7 @@ mod test {
             },
             102400,
             false,
+            102400,
         );
 
         let data_dir = tempdir().unwrap();
@@ -640,6 +642,7 @@ mod test {
             },
             102400,
             false,
+            102400,
         );
 
         let data_dir = tempdir().unwrap();
@@ -755,6 +758,7 @@ mod test {
             },
             1024,
             false,
+            1024, // 1024 > 16
         );
 
         let log_path = data_dir.path().join("test.log");
