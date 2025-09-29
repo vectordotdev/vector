@@ -1,4 +1,3 @@
-Fixed `azure_blob` sink to use the correct compilation feature. This prevents panics that sometimes
-happens when the old `azure_core` (v0.21) is used to make requests instead of the newest (v0.25).
+Fixed a panic in the `azure_blob` sink by enabling a missing required crate feature.
 
 authors: thomasqueirozb
