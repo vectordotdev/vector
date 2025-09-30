@@ -294,14 +294,12 @@ impl Checkpointer {
             Ok(state) => {
                 info!(message = "Loaded checkpoint data.");
                 self.checkpoints.set_state(state, ignore_before);
-                return;
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 // This is expected, so no warning needed
             }
             Err(error) => {
                 warn!(message = "Unable to load checkpoint data.", %error);
-                return;
             }
         }
     }
