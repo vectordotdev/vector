@@ -555,7 +555,7 @@ pub fn file_source(
     let strategy = config.fingerprint.clone().into();
 
     let internal_buffer_size = if let FingerprintStrategy::Checksum { bytes, .. } = &strategy {
-        std::cmp::max(bytes, &config.max_line_bytes)
+        std::cmp::max(*bytes, config.max_line_bytes)
     } else {
         config.max_line_bytes
     };
