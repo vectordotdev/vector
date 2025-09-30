@@ -84,6 +84,7 @@ under entities and also used to define global Vector behavior.
   following abbreviations for time units: `_secs`, `_ms`, `_ns`.
 - SHOULD consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
 - MUST NOT repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
+- MUST NOT end with `_config` suffix. Historically, we have avoided appending this suffix, so please follow the same pattern for consistency. Note that this also applies to config fields that contain nested fields.
 
 ### Types
 
