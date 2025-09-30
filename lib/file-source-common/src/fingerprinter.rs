@@ -21,7 +21,7 @@ use crate::{
     AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
 };
 
-const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
+pub const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 const LEGACY_FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_XZ);
 
 #[derive(Debug, Clone)]
@@ -177,6 +177,13 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
 }
 
 impl Fingerprinter {
+    pub fn new(strategy: FingerprintStrategy) -> Self {
+        Self {
+            strategy,
+            max_line_length: 1024,
+            ignore_not_found: false,
+        }
+    }
     pub async fn get_fingerprint_of_file(
         &self,
         path: &Path,
@@ -276,8 +283,16 @@ impl Fingerprinter {
                 let mut fp = File::open(path).await?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
                     .await?;
-                fp.read_exact(&mut buffer[..bytes]).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..]);
+                // Make sure we don't exceed the buffer size
+                let bytes_to_read = std::cmp::min(bytes, buffer.len());
+                if bytes_to_read == 0 {
+                    // Buffer is empty, return a default fingerprint
+                    return Ok(Some(FileFingerprint::BytesChecksum(0)));
+                }
+
+                // Read as much as we can
+                let bytes_read = fp.read(&mut buffer[..bytes_to_read]).await?;
+                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
                 Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
             }
             _ => Ok(None),
@@ -413,7 +428,7 @@ mod test {
     use bytes::BytesMut;
     use tempfile::{TempDir, tempdir};
 
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use crate::{FingerprintStrategy, Fingerprinter, internal_events::FileSourceInternalEvents};
 
     use tokio::io::AsyncReadExt;
 
