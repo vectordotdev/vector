@@ -120,6 +120,12 @@ jobs:
         with:
           submodules: "recursive"
 
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+
       - name: Run E2E Tests for ${{ matrix.service }}
         run: |
           if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
@@ -131,6 +137,9 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" || \
                 "${{ github.event_name }}" == "workflow_dispatch" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+            # 
+            docker image prune -af
+            docker container prune -f
             bash scripts/environment/prepare.sh --modules=datadog-ci
             echo "Running test for ${{ matrix.service }}"
             bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
