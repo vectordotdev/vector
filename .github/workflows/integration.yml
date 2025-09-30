@@ -40,6 +40,7 @@ jobs:
     with:
       source: true
       int_tests: true
+      e2e_tests: true
     secrets: inherit
 
   integration-tests:
@@ -104,12 +105,49 @@ jobs:
             fi
 
 
-  integration-test-suite:
-    name: Integration Test Suite
+  e2e-tests:
+    runs-on: ubuntu-24.04
+    needs:
+      - changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    strategy:
+      matrix:
+        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ]
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: "recursive"
+
+      - name: Run E2E Tests for ${{ matrix.service }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 45
+          command: |
+            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
+              exit 0
+            fi
+
+            # Check if any of the three conditions is true
+            if [[ "${{ github.event_name }}" == "merge_group" || \
+                  "${{ github.event_name }}" == "workflow_dispatch" || \
+                  "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+              bash scripts/environment/prepare.sh --modules=datadog-ci
+              echo "Running test for ${{ matrix.service }}"
+              bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+            else
+              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
+            fi
+
+  integration-test-suite-result:
+    name: Integration Test Suite Result
     runs-on: ubuntu-24.04
     if: always()
     needs:
       - integration-tests
+      - e2e-tests
     steps:
       - run: |
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
