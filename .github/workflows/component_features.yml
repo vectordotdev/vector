@@ -13,8 +13,7 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    # At midnight UTC Tue-Sat
-    - cron: '0 0 * * 2-6'
+    - cron: '0 2 * * 2-6' # 02:00 UTC Tue-Sat
 
 permissions:
   statuses: write

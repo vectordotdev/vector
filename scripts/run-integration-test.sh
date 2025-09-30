@@ -10,8 +10,6 @@ if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
   set -x
 fi
 
-SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
@@ -110,13 +108,11 @@ else
 fi
 
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
-  # Pre-run cleanup
-  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-    # TODO use Docker compose volumes
-    find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
-    # Like 777, but users can only delete their own files. This allows the docker instances to write output files.
-    chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
-  fi
+
+  docker run --rm \
+    -v vector_target:/output/"${TEST_NAME}" \
+    alpine:3.20 \
+    sh -c "rm -rf /output/${TEST_NAME}/*"
 
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENV}" || true
   START_RET=$?
@@ -132,11 +128,6 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   fi
 
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
-
-  # Post-run cleanup
-  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-    chmod 0755 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
-  fi
 
   # Only upload test results if CI is defined
   if [[ -n "${CI:-}" ]]; then

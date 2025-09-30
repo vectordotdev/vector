@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.50.0"
+version = "0.51.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -285,7 +285,7 @@ azure_storage = { version = "0.21", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
 
 # Needed to bridge with outdated version of azure_core used in azure_storage*
-azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["reqwest", "hmac_openssl"] }
+azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
 
 
 # OpenDAL
