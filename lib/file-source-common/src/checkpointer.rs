@@ -7,7 +7,6 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use glob::glob;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
@@ -45,6 +44,7 @@ struct Checkpoint {
     modified: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 pub struct Checkpointer {
     directory: PathBuf,
     tmp_file_path: PathBuf,
@@ -175,26 +175,6 @@ impl CheckpointsView {
         if let Ok(Some(old_checksum)) = fingerprinter.bytes_checksum(path).await {
             self.update_key(old_checksum, fng)
         }
-
-        if let Some((_, pos)) = self
-            .checkpoints
-            .remove(&FileFingerprint::Unknown(fng.as_legacy().await))
-        {
-            self.update(fng, pos);
-        }
-
-        if self.checkpoints.get(&fng).is_none() {
-            if let Ok(Some(fingerprint)) = fingerprinter.legacy_checksum(path).await
-                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
-            {
-                self.update(fng, pos);
-            }
-            if let Ok(Some(fingerprint)) = fingerprinter.legacy_first_lines_checksum(path).await
-                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
-            {
-                self.update(fng, pos);
-            }
-        }
     }
 }
 
@@ -217,57 +197,6 @@ impl Checkpointer {
 
     pub fn view(&self) -> Arc<CheckpointsView> {
         Arc::clone(&self.checkpoints)
-    }
-
-    /// Encode a fingerprint to a file name, including legacy Unknown values
-    ///
-    /// For each of the non-legacy variants, prepend an identifier byte that
-    /// falls outside of the hex range used by the legacy implementation. This
-    /// allows them to be differentiated by simply peeking at the first byte.
-    #[cfg(test)]
-    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
-        use FileFingerprint::*;
-
-        let path = match fng {
-            BytesChecksum(c) => format!("g{c:x}.{pos}"),
-            FirstLinesChecksum(c) => format!("h{c:x}.{pos}"),
-            DevInode(dev, ino) => format!("i{dev:x}.{ino:x}.{pos}"),
-            Unknown(x) => format!("{x:x}.{pos}"),
-        };
-        self.directory.join(path)
-    }
-
-    /// Decode a fingerprint from a file name, accounting for unknowns due to the legacy
-    /// implementation.
-    ///
-    /// The trick here is to rely on the hex encoding of the legacy
-    /// format. Because hex encoding only allows [0-9a-f], we can use any
-    /// character outside of that range as a magic byte identifier for the newer
-    /// formats.
-    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
-        use FileFingerprint::*;
-
-        let file_name = &path.file_name().unwrap().to_string_lossy();
-        match file_name.chars().next().expect("empty file name") {
-            'g' => {
-                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], FilePosition).unwrap();
-                (BytesChecksum(c), pos)
-            }
-            'h' => {
-                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
-                (FirstLinesChecksum(c), pos)
-            }
-            'i' => {
-                let (dev, ino, pos) =
-                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], FilePosition)
-                        .unwrap();
-                (DevInode(dev, ino), pos)
-            }
-            _ => {
-                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
-                (Unknown(c), pos)
-            }
-        }
     }
 
     #[cfg(test)]
@@ -337,20 +266,6 @@ impl Checkpointer {
         Ok(self.checkpoints.checkpoints.len())
     }
 
-    /// Write checkpoints to disk in the legacy format. Used for compatibility
-    /// testing only.
-    #[cfg(test)]
-    pub async fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
-        use tokio::fs::File;
-
-        fs::remove_dir_all(&self.directory).await.ok();
-        fs::create_dir_all(&self.directory).await?;
-        for c in self.checkpoints.checkpoints.iter() {
-            File::create(self.encode(*c.key(), *c.value())).await?;
-        }
-        Ok(self.checkpoints.checkpoints.len())
-    }
-
     /// Read persisted checkpoints from disk, preferring the new JSON file
     /// format but falling back to the legacy system when those files are found
     /// instead.
@@ -397,10 +312,10 @@ impl Checkpointer {
             }
         }
 
-        // If we haven't returned yet, go ahead and look for the legacy files
-        // and try to read them.
-        info!("Attempting to read legacy checkpoint files.");
-        self.read_legacy_checkpoints(ignore_before).await;
+        // // If we haven't returned yet, go ahead and look for the legacy files
+        // // and try to read them.
+        // info!("Attempting to read legacy checkpoint files.");
+        // self.read_legacy_checkpoints(ignore_before).await;
 
         if self.write_checkpoints().await.is_ok() {
             fs::remove_dir_all(&self.directory).await.ok();
@@ -417,29 +332,6 @@ impl Checkpointer {
 
         serde_json::from_slice(&output[..])
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-    }
-
-    async fn read_legacy_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
-        for path in glob(&self.glob_string).unwrap().flatten() {
-            let mut mtime = None;
-            if let Some(ignore_before) = ignore_before
-                && let Ok(Ok(modified)) = fs::metadata(&path)
-                    .await
-                    .map(|metadata| metadata.modified())
-            {
-                let modified = DateTime::<Utc>::from(modified);
-                if modified < ignore_before {
-                    fs::remove_file(path).await.ok();
-                    continue;
-                }
-                mtime = Some(modified);
-            }
-            let (fng, pos) = self.decode(&path);
-            self.checkpoints.checkpoints.insert(fng, pos);
-            if let Some(mtime) = mtime {
-                self.checkpoints.modified_times.insert(fng, mtime);
-            }
-        }
     }
 }
 
@@ -462,16 +354,11 @@ mod test {
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(78910),
-            FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
             let position: FilePosition = 1234;
             let data_dir = tempdir().unwrap();
             let mut chkptr = Checkpointer::new(data_dir.path());
-            assert_eq!(
-                chkptr.decode(&chkptr.encode(fingerprint, position)),
-                (fingerprint, position)
-            );
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
@@ -489,7 +376,7 @@ mod test {
             FileFingerprint::FirstLinesChecksum(78910),
             now - Duration::seconds(15),
         );
-        let older = (FileFingerprint::Unknown(1337), now - Duration::seconds(20));
+        let older = (FileFingerprint::DevInode(3, 4), now - Duration::seconds(20));
         let ignore_before = Some(now - Duration::seconds(12));
 
         let position: FilePosition = 1234;
@@ -528,7 +415,6 @@ mod test {
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(78910),
-            FileFingerprint::Unknown(1337),
         ];
         for fingerprint in fingerprints {
             let position: FilePosition = 1234;
@@ -556,7 +442,7 @@ mod test {
         fs::write(&path, data).await.unwrap();
 
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
-        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy().await);
+        let old_fingerprint = FileFingerprint::BytesChecksum(321);
         let position: FilePosition = 1234;
         let mut fingerprinter =
             Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false, 1000);
@@ -678,7 +564,6 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-            chkptr.write_legacy_checkpoints().await.unwrap();
         }
 
         // Ensure that the new files were not written but the old style of files were
@@ -818,10 +703,6 @@ mod test {
                 FileFingerprint::FirstLinesChecksum(78910),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"first_lines_checksum":78910},"position":1234}]}"#,
             ),
-            (
-                FileFingerprint::Unknown(1337),
-                r#"{"version":"1","checkpoints":[{"fingerprint":{"unknown":1337},"position":1234}]}"#,
-            ),
         ];
         for (fingerprint, expected) in fingerprints {
             let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
@@ -889,7 +770,6 @@ mod test {
             FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(1234),
             FileFingerprint::FirstLinesChecksum(78910),
-            FileFingerprint::Unknown(1337),
         ];
 
         let data_dir = tempdir().unwrap();
