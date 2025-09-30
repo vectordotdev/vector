@@ -137,6 +137,9 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" || \
                 "${{ github.event_name }}" == "workflow_dispatch" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+            # E2E might run out of space.
+            docker image prune -af
+            docker container prune -f
             bash scripts/environment/prepare.sh --modules=datadog-ci
             echo "Running test for ${{ matrix.service }}"
             bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
