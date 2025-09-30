@@ -144,8 +144,8 @@ jobs:
           echo "Skipping ${{ matrix.service }} test because run conditions were not met."
           fi
 
-  integration-test-suite-result:
-    name: Integration Test Suite Result
+  integration-test-suite:
+    name: Integration Test Suite
     runs-on: ubuntu-24.04
     if: always()
     needs:
