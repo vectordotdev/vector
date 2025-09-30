@@ -44,12 +44,9 @@ struct Checkpoint {
     modified: DateTime<Utc>,
 }
 
-#[allow(dead_code)]
 pub struct Checkpointer {
-    directory: PathBuf,
     tmp_file_path: PathBuf,
     stable_file_path: PathBuf,
-    glob_string: String,
     checkpoints: Arc<CheckpointsView>,
     last: Mutex<Option<State>>,
 }
@@ -180,14 +177,10 @@ impl CheckpointsView {
 
 impl Checkpointer {
     pub fn new(data_dir: &Path) -> Checkpointer {
-        let directory = data_dir.join("checkpoints");
-        let glob_string = directory.join("*").to_string_lossy().into_owned();
         let tmp_file_path = data_dir.join(TMP_FILE_NAME);
         let stable_file_path = data_dir.join(CHECKPOINT_FILE_NAME);
 
         Checkpointer {
-            directory,
-            glob_string,
             tmp_file_path,
             stable_file_path,
             checkpoints: Arc::new(CheckpointsView::default()),
@@ -310,15 +303,6 @@ impl Checkpointer {
                 warn!(message = "Unable to load checkpoint data.", %error);
                 return;
             }
-        }
-
-        // // If we haven't returned yet, go ahead and look for the legacy files
-        // // and try to read them.
-        // info!("Attempting to read legacy checkpoint files.");
-        // self.read_legacy_checkpoints(ignore_before).await;
-
-        if self.write_checkpoints().await.is_ok() {
-            fs::remove_dir_all(&self.directory).await.ok();
         }
     }
 
