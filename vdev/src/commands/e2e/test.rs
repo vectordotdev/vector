@@ -40,7 +40,7 @@ impl Cli {
             self.environment.as_ref(),
             self.build_all,
             self.retries.unwrap_or_default(),
-            &self.args,
+            self.args,
         )
     }
 }

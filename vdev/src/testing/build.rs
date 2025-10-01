@@ -57,7 +57,6 @@ pub fn prepare_build_command(
     command
 }
 
-#[allow(dead_code)]
 /// Build the integration test‐runner image from `scripts/integration/Dockerfile`
 pub fn build_integration_image() -> Result<()> {
     let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
