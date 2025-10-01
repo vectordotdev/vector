@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 use tokio::sync::mpsc;
 use tokio::{
     fs::{self, remove_file},
-    time::sleep,
+    time::timeout,
 };
 use tracing::{debug, error, info, trace};
 
@@ -526,13 +526,10 @@ where
                 chans
                     .close()
                     .await
-                    .expect("error closing file_server data channel.");
-                let checkpointer = checkpoint_task_handle
+                    .expect("error closing file_server data channel");
+                checkpoint_task_handle
                     .await
-                    .expect("checkpoint task has panicked");
-                if let Err(error) = checkpointer.write_checkpoints().await {
-                    error!(?error, "Error writing checkpoints before shutdown");
-                }
+                    .expect("checkpoint task has was cancelled or panicked");
                 return Ok(Shutdown);
             }
         }
@@ -635,20 +632,26 @@ async fn checkpoint_writer(
     mut shutdown: impl Future + Unpin,
     emitter: impl FileSourceInternalEvents,
 ) -> Checkpointer {
-    loop {
-        let sleep = sleep(sleep_duration);
-        tokio::select! {
-            _ = &mut shutdown => break,
-            _ = sleep => {},
+    let mut should_shutdown = false;
+    while !should_shutdown {
+        should_shutdown = timeout(sleep_duration, &mut shutdown).await.is_ok();
+        if should_shutdown {
+            debug!("Writing checkpoints before shutdown");
         }
 
         let emitter = emitter.clone();
         let start = time::Instant::now();
         match checkpointer.write_checkpoints().await {
             Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-            Err(error) => emitter.emit_file_checkpoint_write_error(error),
+            Err(error) => {
+                if should_shutdown {
+                    error!(?error, "Error writing checkpoints before shutdown");
+                }
+                emitter.emit_file_checkpoint_write_error(error);
+            }
         }
     }
+
     checkpointer
 }
 
