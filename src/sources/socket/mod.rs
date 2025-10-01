@@ -1055,6 +1055,7 @@ mod test {
                 schema: Default::default(),
                 schema_definitions: HashMap::default(),
                 extra_context: Default::default(),
+                topology_metadata: None,
             })
             .await
             .unwrap();

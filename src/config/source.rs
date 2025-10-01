@@ -16,7 +16,9 @@ use vector_lib::{
     source::Source,
 };
 
-use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use super::{
+    ComponentKey, ProxyConfig, Resource, SharedTopologyMetadata, dot_graph::GraphConfig, schema,
+};
 use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
@@ -143,6 +145,9 @@ pub struct SourceContext {
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
+
+    /// Optional topology metadata for internal sources to expose topology as metrics
+    pub topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl SourceContext {
@@ -165,6 +170,7 @@ impl SourceContext {
                 schema_definitions: HashMap::default(),
                 schema: Default::default(),
                 extra_context: Default::default(),
+                topology_metadata: None,
             },
             shutdown,
         )
@@ -186,6 +192,7 @@ impl SourceContext {
             schema_definitions: schema_definitions.unwrap_or_default(),
             schema: Default::default(),
             extra_context: Default::default(),
+            topology_metadata: None,
         }
     }
 
