@@ -1814,15 +1814,14 @@ mod tests {
             };
 
             let path = dir.path().join("file");
+            let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
-
-                    sleep_500_millis().await;
-
                     file.write_line("hello there").await.unwrap();
+                    file.flush().await.unwrap();
 
-                    sleep(Duration::from_secs(2)).await;
+                    wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
                 })
                 .await;
 
@@ -1843,15 +1842,14 @@ mod tests {
             };
 
             let path = dir.path().join("file");
+            let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
-
-                    sleep_500_millis().await;
-
                     file.write_line("hello there").await.unwrap();
+                    file.flush().await.unwrap();
 
-                    sleep(Duration::from_secs(2)).await;
+                    wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
                 })
                 .await;
 
@@ -1871,15 +1869,14 @@ mod tests {
             };
 
             let path = dir.path().join("file");
+            let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
-
-                    sleep_500_millis().await;
-
                     file.write_line("hello there").await.unwrap();
+                    file.flush().await.unwrap();
 
-                    sleep(Duration::from_secs(2)).await;
+                    wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
                 })
                 .await;
 
@@ -1913,6 +1910,7 @@ mod tests {
         file_start_position_server_restart(NoAcks).await
     }
 
+    // FIXME: sleeps should not be needed in here
     async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = ifile::FileConfig {
@@ -1938,6 +1936,7 @@ mod tests {
                     file.write_line("first line").await.unwrap();
                     file.flush().await.unwrap();
                     wait_checkpoint_and_n_reads(&mut rx, vec![&path], 2, 5000).await;
+                    sleep_500_millis().await;
                 },
             )
             .await;
@@ -1958,6 +1957,7 @@ mod tests {
                     file.write_line("second line").await.unwrap();
                     file.flush().await.unwrap();
                     wait_for_n_reads(&mut rx, 1, 5000).await;
+                    sleep_500_millis().await;
                 },
             )
             .await;
@@ -1984,6 +1984,7 @@ mod tests {
                     file.write_line("third line").await.unwrap();
                     file.flush().await.unwrap();
                     wait_checkpoint_and_n_reads(&mut rx, vec![&path], 4, 5000).await;
+                    sleep_500_millis().await;
                 },
             )
             .await;
@@ -2295,13 +2296,22 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let received = run_ifile_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(tx),
+            async {
                 let mut file = File::create(&path).await.unwrap();
-
-                sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
                 file.write_line("leftover foo").await.unwrap();
+                file.flush().await.unwrap();
+                // Wait for the source to be initialized before writing lines and testing time
+                // based aggregation
+                wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
+
                 file.write_line("INFO hello").await.unwrap();
                 file.write_line("INFO goodbye").await.unwrap();
                 file.write_line("part of goodbye").await.unwrap();
@@ -2322,9 +2332,10 @@ mod tests {
                 file.write_line("the middle").await.unwrap();
                 file.flush().await.unwrap();
 
-                sleep_500_millis().await;
-            })
-            .await;
+                wait_for_n_reads(&mut rx, 10, 5000).await;
+            },
+        )
+        .await;
 
         let received = extract_messages_value(received);
 
