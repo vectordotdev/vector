@@ -3023,10 +3023,11 @@ checksum = "5c297a1c74b71ae29df00c3e22dd9534821d60eb9af5a0192823fa2acea70c2a"
 
 [[package]]
 name = "databend-client"
-version = "0.28.2"
+version = "0.29.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d689ffeaa08b1e4be3f035fcdadd4ea69db3dbf529ec5668c6911b8a301fc06"
+checksum = "fcc1ffc1ada405c3df38536769a678320edb2223835f89041b815d34377821b0"
 dependencies = [
+ "base64 0.22.1",
  "cookie",
  "log",
  "once_cell",
@@ -4875,7 +4876,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -8061,7 +8062,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -8107,7 +8108,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
