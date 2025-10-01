@@ -383,6 +383,40 @@ async fn handle_signal(
 
             reload_config_from_result(topology_controller, new_config).await
         }
+        Ok(SignalTo::ReloadWithExternalVRL) => {
+            let mut topology_controller = topology_controller.lock().await;
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+                allow_empty_config,
+            )
+            .await;
+
+            if let Ok(ref config) = new_config {
+                // Find all transforms that have external files to watch
+                let transform_keys_to_reload = config.transform_keys_with_external_files();
+
+                // Add these transforms to reload set
+                if !transform_keys_to_reload.is_empty() {
+                    info!(
+                        message = "Reloading transforms with external files.",
+                        count = transform_keys_to_reload.len()
+                    );
+                    topology_controller
+                        .topology
+                        .extend_reload_set(transform_keys_to_reload);
+                }
+            }
+
+            reload_config_from_result(topology_controller, new_config).await
+        }
         Ok(SignalTo::ReloadEnrichmentTables) => {
             let topology_controller = topology_controller.lock().await;
 
