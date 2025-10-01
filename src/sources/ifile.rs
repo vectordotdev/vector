@@ -19,7 +19,7 @@ use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::ifile_source::TestEvent;
 use vector_lib::ifile_source::{
     BoxedPathsProvider, Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom,
-    ReadFromConfig, calculate_ignore_before, paths_provider::glob::MatchOptions,
+    ReadFromConfig, calculate_ignore_before, paths_provider::GlobMatchOptions,
 };
 use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
@@ -626,7 +626,7 @@ pub fn ifile_source(
     let paths_provider = BoxedPathsProvider::new(NotifyPathsProvider::new(
         &include,
         &exclude_patterns,
-        MatchOptions::default(),
+        GlobMatchOptions::default(),
         emitter.clone(),
     ));
 

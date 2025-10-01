@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-pub mod glob;
+pub use glob::MatchOptions as GlobMatchOptions;
 
 /// Provides a notify-based implementation of the `PathsProvider` trait.
 ///
