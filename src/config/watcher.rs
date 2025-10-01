@@ -5,7 +5,6 @@ use std::{
     thread,
     time::Duration,
 };
-
 use notify::{EventKind, RecursiveMode, recommended_watcher};
 
 use crate::{
@@ -119,13 +118,10 @@ pub fn spawn_thread<'a>(
                             delay = ?delay
                         );
 
-                        let changed_paths_vec: Vec<PathBuf> =
-                            changed_paths.into_iter().collect();
-
                         let changed_components: HashMap<_, _> = component_configs
                             .clone()
                             .into_iter()
-                            .flat_map(|p| p.contains(&changed_paths_vec))
+                            .flat_map(|p| p.contains(&changed_paths))
                             .collect();
 
                         // We need to read paths to resolve any inode changes that may have happened.
