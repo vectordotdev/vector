@@ -14,11 +14,11 @@ impl Cli {
         let artifacts = glob("target/artifacts/*")
             .expect("failed to read glob pattern")
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to read path: {}", e))?
+            .map_err(|e| anyhow!("failed to read path: {e}"))?
             .into_iter()
             .map(|p| p.into_os_string().into_string())
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
+            .map_err(|e| anyhow!("failed to turn path into string: {e:?}"))?;
 
         let version = util::get_version()?;
         let mut command = Command::new("gh");

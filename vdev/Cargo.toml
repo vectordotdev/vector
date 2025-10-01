@@ -31,9 +31,9 @@ hex = "0.4.3"
 indexmap.workspace = true
 indicatif = { version = "0.18.0", features = ["improved_unicode"] }
 itertools.workspace = true
-log = "0.4.27"
+log = "0.4.28"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.2.2", features = ["supports-colors"] }
+owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 paste.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["blocking"] }
