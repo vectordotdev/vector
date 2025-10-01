@@ -196,7 +196,7 @@ impl ComposeTestConfig {
             .collect();
 
         if !test_dir.is_dir() {
-            bail!("unknown integration: {}", integration);
+            bail!("unknown integration: {integration}");
         }
 
         let config = Self::parse_file(&test_dir.join(FILE_NAME))?;

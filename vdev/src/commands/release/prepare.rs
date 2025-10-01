@@ -306,7 +306,7 @@ impl Prepare {
             if line.trim().starts_with("weight: ") && !weight_updated {
                 // Extract the current weight value
                 let weight_str = line.trim().strip_prefix("weight: ").ok_or_else(|| anyhow!("Invalid weight format"))?;
-                let weight: i32 = weight_str.parse().map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
+                let weight: i32 = weight_str.parse().map_err(|e| anyhow!("Failed to parse weight: {e}"))?;
                 // Increase by 1
                 let new_weight = weight + 1;
                 updated_lines.push(format!("weight: {new_weight}"));
