@@ -42,13 +42,15 @@ pub(crate) struct SecretBackendOuter {
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
     pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    interpolate_env: bool,
 }
 
 impl SecretBackendLoader {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new_with_opts(interpolate_env: bool) -> Self {
         Self {
             backends: IndexMap::new(),
             secret_keys: HashMap::new(),
+            interpolate_env,
         }
     }
 
@@ -88,8 +90,16 @@ impl SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input)?;
+    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
+        let config_string = if self.interpolate_env {
+            prepare_input(input)?
+        } else {
+            let mut s = String::new();
+            input
+                .read_to_string(&mut s)
+                .map_err(|e| vec![e.to_string()])?;
+            s
+        };
         // Collect secret placeholders just after env var processing
         collect_secret_keys(&config_string, &mut self.secret_keys);
         Ok(config_string)

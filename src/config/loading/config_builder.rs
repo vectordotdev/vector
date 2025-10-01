@@ -12,28 +12,39 @@ use crate::config::{
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
     secrets: Option<HashMap<String, String>>,
+    interpolate_env: bool,
 }
 
 impl ConfigBuilderLoader {
-    pub fn new() -> Self {
+    pub fn new_with_opts(interpolate_env: bool) -> Self {
         Self {
             builder: ConfigBuilder::default(),
             secrets: None,
+            interpolate_env,
         }
     }
 
-    pub fn with_secrets(secrets: HashMap<String, String>) -> Self {
+    pub fn with_secrets_and_opts(secrets: HashMap<String, String>, interpolate_env: bool) -> Self {
         Self {
             builder: ConfigBuilder::default(),
             secrets: Some(secrets),
+            interpolate_env,
         }
     }
 }
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let prepared_input = prepare_input(input)?;
+    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
+        let prepared_input = if self.interpolate_env {
+            prepare_input(input)?
+        } else {
+            let mut s = String::new();
+            input
+                .read_to_string(&mut s)
+                .map_err(|e| vec![e.to_string()])?;
+            s
+        };
         let prepared_input = self
             .secrets
             .as_ref()
