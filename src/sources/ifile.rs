@@ -2882,13 +2882,6 @@ mod tests {
 
             inner.await;
 
-            // FIXME this should not be here AT ALL
-            // Add the required metrics
-            metrics::counter!("component_received_bytes_total", "ifile" => "test.log")
-                .increment(100);
-            metrics::counter!("component_received_events_total").increment(1);
-            metrics::counter!("component_received_event_bytes_total").increment(100);
-
             drop(trigger_shutdown);
 
             let result = if acking_mode == Unfinalized {

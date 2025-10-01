@@ -138,7 +138,7 @@ mod source {
                 counter!(
                     "component_received_bytes_total",
                     "protocol" => "ifile",
-                    "file" => self.file.to_owned()
+                    "ifile" => self.file.to_owned()
                 )
             } else {
                 counter!(
