@@ -81,6 +81,7 @@ axum,https://github.com/tokio-rs/axum,MIT,The axum Authors
 axum-core,https://github.com/tokio-rs/axum,MIT,The axum-core Authors
 azure_core,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_core,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
+azure_core_macros,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_identity,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft
 azure_storage,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
 azure_storage_blobs,https://github.com/azure/azure-sdk-for-rust,MIT,Microsoft Corp.
