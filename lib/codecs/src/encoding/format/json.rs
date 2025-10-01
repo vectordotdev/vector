@@ -12,7 +12,7 @@ pub struct JsonSerializerConfig {
     /// Controls how metric tag values are encoded.
     ///
     /// When set to `single`, only the last non-bare value of tags are displayed with the
-    /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
+    /// metric. When set to `full`, all metric tags are exposed as separate assignments.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub metric_tag_values: MetricTagValues,
 

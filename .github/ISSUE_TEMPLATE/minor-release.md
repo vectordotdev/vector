@@ -64,8 +64,7 @@ Automated steps include:
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide
   - [ ] Review generated changelog entries to ensure they are understandable to end-users
   - [ ] Ensure the date matches the scheduled release date.
-- [ ] Check for any outstanding deprecation actions in [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md) and
-    take them (or have someone help you take them)
+  - [ ] Add a link to pending deprecation items from [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md).
 - [ ] PR review & approval
 
 # On the day of release

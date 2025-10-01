@@ -281,8 +281,6 @@ jobs:
         include:
           # Refer to https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#about-macos-larger-runners.
           # and to https://github.com/actions/runner-images
-          - architecture: x86_64
-            runner: macos-14-large
           - architecture: arm64
             runner: macos-14-xlarge
     steps:
@@ -475,8 +473,6 @@ jobs:
       matrix:
         include:
           # Refer to https://github.com/actions/runner-images
-          - target: x86_64-apple-darwin
-            runner: macos-14-large
           - target: arm64-apple-darwin
             runner: macos-14
     steps:
@@ -637,11 +633,6 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts
       - name: Download staged package artifacts (arm64-apple-darwin)
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
@@ -727,11 +718,6 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
           path: target/artifacts
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts
       - name: Download staged package artifacts (arm64-apple-darwin)
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
@@ -814,11 +800,6 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
           path: target/artifacts
       - name: Download staged package artifacts (arm64-apple-darwin)
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
