@@ -13,7 +13,7 @@ set -u
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
 # If VECTOR_VERSION is unset or empty, default it.
-VECTOR_VERSION="${VECTOR_VERSION:-"0.49.0"}"
+VECTOR_VERSION="${VECTOR_VERSION:-"0.50.0"}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -144,9 +144,6 @@ install_from_archive() {
     local _archive_arch=""
 
     case "$_arch" in
-        x86_64-apple-darwin)
-            _archive_arch=$_arch
-            ;;
         aarch64-apple-darwin)
             _archive_arch="arm64-apple-darwin"
             ;;

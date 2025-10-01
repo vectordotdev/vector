@@ -24,8 +24,7 @@ on:
   merge_group:
     types: [checks_requested]
   schedule:
-    # At midnight UTC Tue-Sat
-    - cron: '0 0 * * 2-6'
+    - cron: '0 1 * * 2-6' # 01:00 UTC Tue-Sat
 
 concurrency:
   # In flight runs will be canceled through re-trigger in the merge queue, scheduled run, or if
@@ -42,7 +41,7 @@ concurrency:
 env:
   CONTAINER_TOOL: "docker"
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   DISABLE_MOLD: true
   CI: true
