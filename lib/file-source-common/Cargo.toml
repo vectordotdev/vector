@@ -17,11 +17,11 @@ tracing.workspace = true
 crc = "3.3.0"
 scan_fmt = "0.2.6"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.143", default-features = false }
+serde_json = { version = "1.0.145", default-features = false }
 bstr = { version = "1.12", default-features = false }
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 dashmap = { version = "6.1", default-features = false }
-async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.32", features = ["tokio", "gzip"] }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 tokio = { workspace = true, features = ["full"] }

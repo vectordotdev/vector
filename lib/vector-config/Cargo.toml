@@ -20,7 +20,7 @@ no-proxy = { version = "0.3.6", default-features = false, features = ["serialize
 num-traits = { version = "0.2.19", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-serde_with = { version = "3.14.0", default-features = false, features = ["std"] }
+serde_with = { version = "3.14.1", default-features = false, features = ["std"] }
 snafu.workspace = true
 toml.workspace = true
 tracing.workspace = true
@@ -32,4 +32,4 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
-serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros"] }
+serde_with = { version = "3.14.1", default-features = false, features = ["std", "macros"] }
