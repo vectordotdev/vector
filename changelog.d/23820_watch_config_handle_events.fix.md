@@ -1,3 +1,3 @@
-Config watcher no longer ignores subsequent events during the delay period, but collects the changed paths and reloads the corresponding components.
+The configuration watcher now collects event paths even during the delay period. These were previously ignored and prevented components from reloading.
 
 authors: nekorro
