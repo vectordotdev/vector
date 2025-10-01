@@ -164,11 +164,12 @@ pub struct FileConfig {
     /// A lower value results in less data being reprocessed if Vector is terminated abruptly,
     /// but increases the performance impact of checkpointing during normal operation.
     #[serde(default = "default_checkpoint_interval")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::examples = 5))]
-    #[configurable(metadata(docs::examples = 10))]
-    #[configurable(metadata(docs::examples = 60))]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[configurable(metadata(docs::examples = 500))]
+    #[configurable(metadata(docs::examples = 1000))]
+    #[configurable(metadata(docs::examples = 2000))]
+    #[configurable(metadata(docs::examples = 5000))]
     #[configurable(metadata(docs::human_name = "Checkpoint Write Interval"))]
     pub checkpoint_interval: Duration,
 
@@ -269,7 +270,7 @@ const fn default_read_from() -> ReadFromConfig {
 }
 
 const fn default_checkpoint_interval() -> Duration {
-    Duration::from_secs(30)
+    Duration::from_millis(500)
 }
 
 const fn default_multi_line_timeout() -> u64 {
