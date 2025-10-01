@@ -183,7 +183,7 @@ serde_json = { version = "1.0.143", default-features = false, features = ["raw_v
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
-tempfile = "3.21.0"
+tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
 toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
