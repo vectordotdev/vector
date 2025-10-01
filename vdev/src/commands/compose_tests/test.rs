@@ -14,7 +14,7 @@ pub fn exec(
     environment: Option<&String>,
     build_all: bool,
     retries: u8,
-    args: &[String],
+    args: Vec<String>,
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
@@ -33,7 +33,7 @@ pub fn exec(
 
     for environment in environments {
         ComposeTest::generate(local_config, integration, environment, build_all, retries)?
-            .test(args.into())?;
+            .test(args.clone())?;
     }
     Ok(())
 }
