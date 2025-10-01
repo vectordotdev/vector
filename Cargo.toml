@@ -154,7 +154,7 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
-humantime = { version = "2.2.0", default-features = false }
+humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
