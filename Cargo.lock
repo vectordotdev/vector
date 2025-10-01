@@ -2309,7 +2309,7 @@ dependencies = [
  "influxdb-line-protocol",
  "memchr",
  "ordered-float 4.6.0",
- "prost 0.12.6",
+ "prost 0.13.5",
  "prost-reflect",
  "rand 0.9.2",
  "regex",
@@ -2357,7 +2357,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -3265,8 +3265,8 @@ dependencies = [
  "dnsmsg-parser",
  "hickory-proto",
  "paste",
- "prost 0.12.6",
- "prost-build 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
  "snafu 0.8.9",
  "tracing 0.1.41",
  "vector-lib",
@@ -3605,7 +3605,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6073,9 +6073,9 @@ name = "loki-logproto"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
+ "prost-types 0.13.5",
 ]
 
 [[package]]
@@ -7242,8 +7242,8 @@ dependencies = [
  "glob",
  "hex",
  "ordered-float 4.6.0",
- "prost 0.12.6",
- "prost-build 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
  "vector-core",
@@ -7943,9 +7943,9 @@ version = "0.1.0"
 dependencies = [
  "indexmap 2.11.0",
  "nom 8.0.0",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
+ "prost-types 0.13.5",
  "snafu 0.8.9",
  "vector-common",
 ]
@@ -8040,8 +8040,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22505a5c94da8e3b7c2996394d1c933236c4d743e81a410bcca4e6989fc066a4"
 dependencies = [
  "bytes 1.10.1",
- "heck 0.5.0",
- "itertools 0.12.1",
+ "heck 0.4.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8060,8 +8060,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.11.0",
+ "heck 0.4.1",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8094,7 +8094,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.10.5",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
@@ -8107,7 +8107,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
@@ -8369,7 +8369,7 @@ dependencies = [
  "once_cell",
  "socket2 0.5.10",
  "tracing 0.1.41",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9236,7 +9236,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -10072,7 +10072,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
@@ -10652,7 +10652,7 @@ dependencies = [
  "getrandom 0.3.1",
  "once_cell",
  "rustix 1.0.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -12147,10 +12147,10 @@ dependencies = [
  "postgres-openssl",
  "proptest",
  "proptest-derive",
- "prost 0.12.6",
- "prost-build 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
  "prost-reflect",
- "prost-types 0.12.6",
+ "prost-types 0.13.5",
  "pulsar",
  "quick-junit",
  "quickcheck",
@@ -12403,9 +12403,9 @@ dependencies = [
  "parking_lot 0.12.4",
  "pin-project",
  "proptest",
- "prost 0.12.6",
- "prost-build 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.5",
+ "prost-build 0.13.5",
+ "prost-types 0.13.5",
  "quanta",
  "quickcheck",
  "quickcheck_macros",
