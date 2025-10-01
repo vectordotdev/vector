@@ -122,7 +122,7 @@ impl ComposeTest {
         Ok(compose_test)
     }
 
-    pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
+    pub(crate) fn test(&self, extra_args: Box<[String]>) -> Result<()> {
         let active = self.envs_dir.check_active(&self.environment)?;
         self.config.check_required()?;
 
