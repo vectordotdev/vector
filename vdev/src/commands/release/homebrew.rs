@@ -64,13 +64,6 @@ where
     P: AsRef<Path>,
 {
     // URLs and SHA256s for both architectures
-    let x86_package_url = format!(
-        "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-x86_64-apple-darwin.tar.gz"
-    );
-    let x86_package_sha256 = hex::encode(sha2::Sha256::digest(
-        reqwest::blocking::get(&x86_package_url)?.bytes()?,
-    ));
-
     let arm_package_url = format!(
         "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-arm64-apple-darwin.tar.gz"
     );
@@ -86,10 +79,6 @@ where
         .map(|line| {
             if line.trim_start().starts_with("version \"") {
                 format!("  version \"{vector_version}\"")
-            } else if line.contains("# x86_64 url") {
-                format!("      url \"{x86_package_url}\" # x86_64 url")
-            } else if line.contains("# x86_64 sha256") {
-                format!("      sha256 \"{x86_package_sha256}\" # x86_64 sha256")
             } else if line.contains("# arm64 url") {
                 format!("      url \"{arm_package_url}\" # arm64 url")
             } else if line.contains("# arm64 sha256") {

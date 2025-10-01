@@ -144,9 +144,6 @@ install_from_archive() {
     local _archive_arch=""
 
     case "$_arch" in
-        x86_64-apple-darwin)
-            _archive_arch=$_arch
-            ;;
         aarch64-apple-darwin)
             _archive_arch="arm64-apple-darwin"
             ;;
