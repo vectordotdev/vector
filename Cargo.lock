@@ -1537,26 +1537,6 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82c33c072c9d87777262f35abfe2a64b609437076551d4dac8373e60f0e3fde9"
-dependencies = [
- "async-lock 3.4.0",
- "async-trait",
- "bytes 1.10.1",
- "futures 0.3.31",
- "openssl",
- "pin-project",
- "rustc_version 0.4.1",
- "serde",
- "serde_json",
- "tracing 0.1.41",
- "typespec 0.5.0",
- "typespec_client_core 0.4.0",
-]
-
-[[package]]
-name = "azure_core"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd9e026f749ac67e6d736ebcfa1ba36ab60ce3d6c446c67624a538f4e0667fa"
@@ -1566,13 +1546,14 @@ dependencies = [
  "azure_core_macros",
  "bytes 1.10.1",
  "futures 0.3.31",
+ "openssl",
  "pin-project",
  "rustc_version 0.4.1",
  "serde",
  "serde_json",
  "tracing 0.1.41",
- "typespec 0.7.0",
- "typespec_client_core 0.6.0",
+ "typespec",
+ "typespec_client_core",
 ]
 
 [[package]]
@@ -1585,7 +1566,7 @@ dependencies = [
  "quote 1.0.40",
  "syn 2.0.106",
  "tracing 0.1.41",
- "typespec_client_core 0.6.0",
+ "typespec_client_core",
 ]
 
 [[package]]
@@ -1602,7 +1583,7 @@ dependencies = [
  "serde",
  "time",
  "tracing 0.1.41",
- "typespec_client_core 0.6.0",
+ "typespec_client_core",
  "url",
 ]
 
@@ -11756,18 +11737,6 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typespec"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04c7a952f1f34257f945fc727b20defe7a3c01c05ddd42925977626cfa6e62ab"
-dependencies = [
- "base64 0.22.1",
- "serde",
- "serde_json",
- "url",
-]
-
-[[package]]
-name = "typespec"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2fffbed46125e0931e8f45618c3f6f0ffa2e0dc6d8b10a8de9f100b03138f33"
@@ -11776,32 +11745,6 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
-]
-
-[[package]]
-name = "typespec_client_core"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5879ce67ba9e525fe088c882ede1337c32c3f80e83e72d9fd3cc6c8e05bcb3d7"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bytes 1.10.1",
- "dyn-clone",
- "futures 0.3.31",
- "getrandom 0.2.15",
- "pin-project",
- "rand 0.8.5",
- "reqwest 0.12.23",
- "serde",
- "serde_json",
- "time",
- "tokio",
- "tracing 0.1.41",
- "typespec 0.5.0",
- "typespec_macros 0.4.0",
- "url",
- "uuid",
 ]
 
 [[package]]
@@ -11824,22 +11767,10 @@ dependencies = [
  "time",
  "tokio",
  "tracing 0.1.41",
- "typespec 0.7.0",
- "typespec_macros 0.6.0",
+ "typespec",
+ "typespec_macros",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "typespec_macros"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cbccdbe531c8d553812a609bdb70c0d1002ad91333498e18df42c98744b15cc"
-dependencies = [
- "proc-macro2 1.0.101",
- "quote 1.0.40",
- "rustc_version 0.4.1",
- "syn 2.0.106",
 ]
 
 [[package]]
@@ -12175,7 +12106,7 @@ dependencies = [
  "aws-types",
  "axum 0.6.20",
  "azure_core 0.21.0",
- "azure_core 0.25.0",
+ "azure_core 0.27.0",
  "azure_identity",
  "azure_storage",
  "azure_storage_blobs",
