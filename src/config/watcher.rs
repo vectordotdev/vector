@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::mpsc::{Receiver, channel},
     thread,
@@ -99,15 +99,33 @@ pub fn spawn_thread<'a>(
                     ) {
                         debug!(message = "Configuration file change detected.", event = ?event);
 
-                        // Consume events until delay amount of time has passed since the latest event.
-                        while receiver.recv_timeout(delay).is_ok() {}
+                        // Collect paths from initial event
+                        let mut changed_paths: HashSet<PathBuf> =
+                            event.paths.into_iter().collect();
 
-                        debug!(message = "Consumed file change events for delay.", delay = ?delay);
+                        // Collect paths from subsequent events until delay amount of time has passed
+                        while let Ok(Ok(subseq_event)) = receiver.recv_timeout(delay) {
+                            if matches!(
+                                subseq_event.kind,
+                                EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
+                            ) {
+                                changed_paths.extend(subseq_event.paths);
+                            }
+                        }
+
+                        debug!(
+                            message = "Collected file change events during delay period.",
+                            paths = changed_paths.len(),
+                            delay = ?delay
+                        );
+
+                        let changed_paths_vec: Vec<PathBuf> =
+                            changed_paths.into_iter().collect();
 
                         let changed_components: HashMap<_, _> = component_configs
                             .clone()
                             .into_iter()
-                            .flat_map(|p| p.contains(&event.paths))
+                            .flat_map(|p| p.contains(&changed_paths_vec))
                             .collect();
 
                         // We need to read paths to resolve any inode changes that may have happened.
