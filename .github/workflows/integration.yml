@@ -44,7 +44,7 @@ jobs:
     secrets: inherit
 
   integration-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-8core
     needs:
       - changes
 
