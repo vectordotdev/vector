@@ -264,7 +264,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                     // The directory pattern is a literal path
                     let dir = PathBuf::from(dir_pattern);
                     if dir.is_dir() {
-                        if let Err(e) = watcher.watch(&dir, RecursiveMode::Recursive) {
+                        if let Err(e) = watcher.watch(&dir, RecursiveMode::NonRecursive) {
                             warn!(
                                 message = "Failed to watch directory",
                                 directory = ?dir,
