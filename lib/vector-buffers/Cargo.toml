@@ -20,7 +20,7 @@ crossbeam-utils.workspace = true
 derivative.workspace = true
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures.workspace = true
-memmap2 = { version = "0.9.7", default-features = false }
+memmap2 = { version = "0.9.8", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
 paste.workspace = true
@@ -42,7 +42,7 @@ crossbeam-queue = "0.3.12"
 hdrhistogram = "7.5.4"
 metrics-tracing-context.workspace = true
 metrics-util = { workspace = true, features = ["debugging"] }
-proptest = "1.7"
+proptest = "1.8"
 quickcheck = "1.0"
 rand.workspace = true
 serde_yaml.workspace = true

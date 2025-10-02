@@ -2,7 +2,7 @@ name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
     container_name: otel-collector-source
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
     init: true
     volumes:
       - type: bind
@@ -33,15 +33,21 @@ services:
 
   otel-collector-sink:
     container_name: otel-collector-sink
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
+    build:
+      context: ../../../
+      dockerfile: ./scripts/e2e/opentelemetry-logs/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
+    user: "0:0" # test only, override special user with root
+    command: [ "--config", "/etc/otelcol-contrib/config.yaml" ]
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
+      - type: volume
+        source: vector_target
         target: /output
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
@@ -57,14 +63,17 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/vector.yaml
+        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG}
         target: /etc/vector/vector.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
+      - type: volume
+        source: vector_target
         target: /output
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
-      - OTEL_E2E_OUTPUT_PATH
     command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
+
+volumes:
+  vector_target:
+    external: true

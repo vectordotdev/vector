@@ -249,6 +249,78 @@ components: sources: opentelemetry: {
 	}
 
 	how_it_works: {
+		otlp_decoding: {
+			title: "OTLP Decoding Usage"
+			body: """
+				This section is a usage example for the `use_otlp_decoding` option.
+				This setup allows shipping OTLP formatted logs to an OTEL collector without the use of a `remap` transform.
+				The same can be done for metrics and traces.
+
+				However, OTLP formatted metrics cannot be converted to Vector's metrics format. As a workaround, the OTLP
+				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
+				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
+
+				```yaml
+						sources:
+							source0:
+								type: opentelemetry
+								grpc:
+									address: 0.0.0.0:4317
+								http:
+									address: 0.0.0.0:4318
+								use_otlp_decoding: true
+						sinks:
+							otel_sink:
+								inputs:
+									- source0.logs
+								type: opentelemetry
+								protocol:
+									type: http
+									uri: http://otel-collector-sink:5318/v1/logs
+									method: post
+									encoding:
+										codec: json
+									framing:
+										method: newline_delimited
+									batch:
+										max_events: 1
+									request:
+										headers:
+											content-type: application/json
+				```
+
+				Here is another sink configuration that can achieve the same:
+				```yaml
+					otel_sink:
+						inputs:
+							- otel.logs
+						type: opentelemetry
+						protocol:
+							type: http
+							uri: http://localhost:5318/v1/logs
+							method: post
+							encoding:
+								codec: protobuf
+								protobuf:
+									desc_file: path/to/opentelemetry-proto.desc
+									message_type: opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest
+							framing:
+								method: "bytes"
+							request:
+								headers:
+									content-type: "application/x-protobuf"
+				```
+
+				The `desc` file was generated with the following command:
+				```bash
+					protoc -I=/path/to/vector/lib/opentelemetry-proto/src/proto/opentelemetry-proto \\
+						--include_imports \\
+						--include_source_info \\
+						--descriptor_set_out=opentelemetry-proto.desc \\
+						$(find /path/to/vector/lib/opentelemetry-proto/src/proto/opentelemetry-proto -name '*.proto')
+				```
+				"""
+		}
 		tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """

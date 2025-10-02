@@ -58,7 +58,7 @@ impl Arbitrary for Event {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             Event::Log(LogEvent::arbitrary(g))
         } else {
             Event::Metric(Metric::arbitrary(g))
@@ -154,7 +154,7 @@ impl Arbitrary for MetricKind {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             MetricKind::Incremental
         } else {
             MetricKind::Absolute
@@ -455,7 +455,7 @@ impl Arbitrary for StatisticKind {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             StatisticKind::Histogram
         } else {
             StatisticKind::Summary

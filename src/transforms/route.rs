@@ -1,7 +1,9 @@
 use indexmap::IndexMap;
-use vector_lib::config::{LogNamespace, clone_input_definitions};
-use vector_lib::configurable::configurable_component;
-use vector_lib::transform::SyncTransform;
+use vector_lib::{
+    config::{LogNamespace, clone_input_definitions},
+    configurable::configurable_component,
+    transform::SyncTransform,
+};
 
 use crate::{
     conditions::{AnyCondition, Condition, ConditionConfig, VrlConfig},

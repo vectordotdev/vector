@@ -1,6 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{internal_event::InternalEvent, json_size::JsonSize};
 
 #[derive(Debug)]
 pub struct InternalLogsBytesReceived {

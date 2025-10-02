@@ -8,8 +8,7 @@ use std::{
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::EventStatus;
+use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
@@ -19,6 +18,7 @@ use crate::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
     },
+    sinks::util::Compression,
 };
 
 /// Splunk HEC acknowledgement configuration.
@@ -96,6 +96,12 @@ impl HecAckClient {
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
     ) -> Self {
+        // Reimplement with compression support, see https://github.com/vectordotdev/vector/issues/23748
+        let http_request_builder = Arc::new(HttpRequestBuilder {
+            compression: Compression::None,
+            ..(*http_request_builder).clone()
+        });
+
         Self {
             acks: HashMap::new(),
             retry_limit,

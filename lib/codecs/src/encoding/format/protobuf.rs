@@ -1,7 +1,8 @@
+use std::path::PathBuf;
+
 use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost_reflect::{MessageDescriptor, prost::Message as _};
-use std::path::PathBuf;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -9,8 +10,8 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
-use vrl::protobuf::descriptor::get_message_descriptor;
-use vrl::protobuf::encode::encode_message;
+use vrl::protobuf::encode::Options;
+use vrl::protobuf::{descriptor::get_message_descriptor, encode::encode_message};
 
 /// Config used to build a `ProtobufSerializer`.
 #[configurable_component]
@@ -82,11 +83,16 @@ impl Encoder<Event> for ProtobufSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message = match event {
-            Event::Log(log) => encode_message(&self.message_descriptor, log.into_parts().0),
+            Event::Log(log) => encode_message(
+                &self.message_descriptor,
+                log.into_parts().0,
+                &Options::default(),
+            ),
             Event::Metric(_) => unimplemented!(),
             Event::Trace(trace) => encode_message(
                 &self.message_descriptor,
                 Value::Object(trace.into_parts().0),
+                &Options::default(),
             ),
         }?;
         message.encode(buffer).map_err(Into::into)

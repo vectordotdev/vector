@@ -1,14 +1,19 @@
 use std::{
     collections::BTreeSet,
-    fs, io,
+    io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use glob::glob;
 use serde::{Deserialize, Serialize};
+use tokio::{
+    fs::{self, File},
+    io::{AsyncReadExt, BufReader},
+    sync::Mutex,
+};
 use tracing::{error, info, warn};
 
 use super::{
@@ -23,7 +28,7 @@ pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
 /// now there is only one variant, but any incompatible changes will require and
 /// additional variant to be added here and handled anywhere that we transit
 /// this format.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "version", rename_all = "snake_case")]
 enum State {
     #[serde(rename = "1")]
@@ -32,7 +37,7 @@ enum State {
 
 /// A simple JSON-friendly struct of the fingerprint/position pair, since
 /// fingerprints as objects cannot be keys in a plain JSON map.
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 struct Checkpoint {
     fingerprint: FileFingerprint,
@@ -161,33 +166,30 @@ impl CheckpointsView {
         }
     }
 
-    fn maybe_upgrade(
+    async fn maybe_upgrade(
         &self,
         path: &Path,
         fng: FileFingerprint,
-        fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
+        fingerprinter: &mut Fingerprinter,
     ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.get_bytes_checksum(path, fingerprint_buffer) {
+        if let Ok(Some(old_checksum)) = fingerprinter.bytes_checksum(path).await {
             self.update_key(old_checksum, fng)
         }
 
         if let Some((_, pos)) = self
             .checkpoints
-            .remove(&FileFingerprint::Unknown(fng.as_legacy()))
+            .remove(&FileFingerprint::Unknown(fng.as_legacy().await))
         {
             self.update(fng, pos);
         }
 
-        if self.checkpoints.get(&fng).is_none()
-            && let Ok(Some(fingerprint)) =
-                fingerprinter.get_legacy_checksum(path, fingerprint_buffer)
-        {
-            if let Some((_, pos)) = self.checkpoints.remove(&fingerprint) {
+        if self.checkpoints.get(&fng).is_none() {
+            if let Ok(Some(fingerprint)) = fingerprinter.legacy_checksum(path).await
+                && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
+            {
                 self.update(fng, pos);
             }
-            if let Ok(Some(fingerprint)) =
-                fingerprinter.get_legacy_first_lines_checksum(path, fingerprint_buffer)
+            if let Ok(Some(fingerprint)) = fingerprinter.legacy_first_lines_checksum(path).await
                 && let Some((_, pos)) = self.checkpoints.remove(&fingerprint)
             {
                 self.update(fng, pos);
@@ -280,21 +282,21 @@ impl Checkpointer {
 
     /// Scan through a given list of fresh fingerprints to see if any match an existing legacy
     /// fingerprint. If so, upgrade the existing fingerprint.
-    pub fn maybe_upgrade(
+    pub async fn maybe_upgrade(
         &mut self,
         path: &Path,
         fresh: FileFingerprint,
-        fingerprinter: &Fingerprinter,
-        fingerprint_buffer: &mut Vec<u8>,
+        fingerprinter: &mut Fingerprinter,
     ) {
         self.checkpoints
-            .maybe_upgrade(path, fresh, fingerprinter, fingerprint_buffer)
+            .maybe_upgrade(path, fresh, fingerprinter)
+            .await
     }
 
     /// Persist the current checkpoints state to disk, making our best effort to
     /// do so in an atomic way that allow for recovering the previous state in
     /// the event of a crash.
-    pub fn write_checkpoints(&self) -> Result<usize, io::Error> {
+    pub async fn write_checkpoints(&self) -> Result<usize, io::Error> {
         // First drop any checkpoints for files that were removed more than 60
         // seconds ago. This keeps our working set as small as possible and
         // makes sure we don't spend time and IO writing checkpoints that don't
@@ -304,22 +306,30 @@ impl Checkpointer {
         let current = self.checkpoints.get_state();
 
         // Fetch last written state.
-        let mut last = self.last.lock().expect("Data poisoned.");
+        let mut last = self.last.lock().await;
         if last.as_ref() != Some(&current) {
             // Write the new checkpoints to a tmp file and flush it fully to
             // disk. If vector dies anywhere during this section, the existing
             // stable file will still be in its current valid state and we'll be
             // able to recover.
-            let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
-            serde_json::to_writer(&mut f, &current)?;
-            f.into_inner()?.sync_all()?;
+            let tmp_file_path = self.tmp_file_path.clone();
+
+            // spawn_blocking shouldn't be needed: https://github.com/vectordotdev/vector/issues/23743
+            let current = tokio::task::spawn_blocking(move || -> Result<State, io::Error> {
+                let mut f = std::io::BufWriter::new(std::fs::File::create(tmp_file_path)?);
+                serde_json::to_writer(&mut f, &current)?;
+                f.into_inner()?.sync_all()?;
+                Ok(current)
+            })
+            .await
+            .map_err(io::Error::other)??;
 
             // Once the temp file is fully flushed, rename the tmp file to replace
             // the previous stable file. This is an atomic operation on POSIX
             // systems (and the stdlib claims to provide equivalent behavior on
             // Windows), which should prevent scenarios where we don't have at least
             // one full valid file to recover from.
-            fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
+            fs::rename(&self.tmp_file_path, &self.stable_file_path).await?;
 
             *last = Some(current);
         }
@@ -330,11 +340,13 @@ impl Checkpointer {
     /// Write checkpoints to disk in the legacy format. Used for compatibility
     /// testing only.
     #[cfg(test)]
-    pub fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
-        fs::remove_dir_all(&self.directory).ok();
-        fs::create_dir_all(&self.directory)?;
+    pub async fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
+        use tokio::fs::File;
+
+        fs::remove_dir_all(&self.directory).await.ok();
+        fs::create_dir_all(&self.directory).await?;
         for c in self.checkpoints.checkpoints.iter() {
-            fs::File::create(self.encode(*c.key(), *c.value()))?;
+            File::create(self.encode(*c.key(), *c.value())).await?;
         }
         Ok(self.checkpoints.checkpoints.len())
     }
@@ -342,19 +354,19 @@ impl Checkpointer {
     /// Read persisted checkpoints from disk, preferring the new JSON file
     /// format but falling back to the legacy system when those files are found
     /// instead.
-    pub fn read_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
+    pub async fn read_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
         // First try reading from the tmp file location. If this works, it means
         // that the previous process was interrupted in the process of
         // checkpointing and the tmp file should contain more recent data that
         // should be preferred.
-        match self.read_checkpoints_file(&self.tmp_file_path) {
+        match self.read_checkpoints_file(&self.tmp_file_path).await {
             Ok(state) => {
                 warn!(message = "Recovered checkpoint data from interrupted process.");
                 self.checkpoints.set_state(state, ignore_before);
 
                 // Try to move this tmp file to the stable location so we don't
                 // immediately overwrite it when we next persist checkpoints.
-                if let Err(error) = fs::rename(&self.tmp_file_path, &self.stable_file_path) {
+                if let Err(error) = fs::rename(&self.tmp_file_path, &self.stable_file_path).await {
                     warn!(message = "Error persisting recovered checkpoint file.", %error);
                 }
                 return;
@@ -370,7 +382,7 @@ impl Checkpointer {
         // Next, attempt to read checkpoints from the stable file location. This
         // is the expected location, so warn more aggressively if something goes
         // wrong.
-        match self.read_checkpoints_file(&self.stable_file_path) {
+        match self.read_checkpoints_file(&self.stable_file_path).await {
             Ok(state) => {
                 info!(message = "Loaded checkpoint data.");
                 self.checkpoints.set_state(state, ignore_before);
@@ -388,27 +400,36 @@ impl Checkpointer {
         // If we haven't returned yet, go ahead and look for the legacy files
         // and try to read them.
         info!("Attempting to read legacy checkpoint files.");
-        self.read_legacy_checkpoints(ignore_before);
+        self.read_legacy_checkpoints(ignore_before).await;
 
-        if self.write_checkpoints().is_ok() {
-            fs::remove_dir_all(&self.directory).ok();
+        if self.write_checkpoints().await.is_ok() {
+            fs::remove_dir_all(&self.directory).await.ok();
         }
     }
 
-    fn read_checkpoints_file(&self, path: &Path) -> Result<State, io::Error> {
-        let reader = io::BufReader::new(fs::File::open(path)?);
-        serde_json::from_reader(reader).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    async fn read_checkpoints_file(&self, path: &Path) -> Result<State, io::Error> {
+        // Possible optimization: mmap the file into a slice and pass it into serde_json instead of
+        // calling read_to_end. Need to investigate if this would work with tokio::fs::File
+
+        let mut reader = BufReader::new(File::open(path).await?);
+        let mut output = Vec::new();
+        reader.read_to_end(&mut output).await?;
+
+        serde_json::from_slice(&output[..])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    fn read_legacy_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
+    async fn read_legacy_checkpoints(&mut self, ignore_before: Option<DateTime<Utc>>) {
         for path in glob(&self.glob_string).unwrap().flatten() {
             let mut mtime = None;
             if let Some(ignore_before) = ignore_before
-                && let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified())
+                && let Ok(Ok(modified)) = fs::metadata(&path)
+                    .await
+                    .map(|metadata| metadata.modified())
             {
                 let modified = DateTime::<Utc>::from(modified);
                 if modified < ignore_before {
-                    fs::remove_file(path).ok();
+                    fs::remove_file(path).await.ok();
                     continue;
                 }
                 mtime = Some(modified);
@@ -427,6 +448,7 @@ mod test {
     use chrono::{Duration, Utc};
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
+    use tokio::fs;
 
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
@@ -455,25 +477,20 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_checkpointer_ignore_before() {
-        let newer = (
-            FileFingerprint::DevInode(1, 2),
-            Utc::now() - Duration::seconds(5),
-        );
+    #[tokio::test]
+    async fn test_checkpointer_ignore_before() {
+        let now = Utc::now();
+        let newer = (FileFingerprint::DevInode(1, 2), now - Duration::seconds(5));
         let newish = (
             FileFingerprint::BytesChecksum(3456),
-            Utc::now() - Duration::seconds(10),
+            now - Duration::seconds(10),
         );
         let oldish = (
             FileFingerprint::FirstLinesChecksum(78910),
-            Utc::now() - Duration::seconds(15),
+            now - Duration::seconds(15),
         );
-        let older = (
-            FileFingerprint::Unknown(1337),
-            Utc::now() - Duration::seconds(20),
-        );
-        let ignore_before = Some(Utc::now() - Duration::seconds(12));
+        let older = (FileFingerprint::Unknown(1337), now - Duration::seconds(20));
+        let ignore_before = Some(now - Duration::seconds(12));
 
         let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
@@ -489,14 +506,14 @@ mod test {
                     modified: *modified,
                 });
                 assert_eq!(chkptr.get_checkpoint(*fingerprint), Some(position));
-                chkptr.write_checkpoints().unwrap();
+                chkptr.write_checkpoints().await.unwrap();
             }
         }
 
         // read them back and assert old are removed
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(ignore_before);
+            chkptr.read_checkpoints(ignore_before).await;
 
             assert_eq!(chkptr.get_checkpoint(newish.0), Some(position));
             assert_eq!(chkptr.get_checkpoint(newer.0), Some(position));
@@ -505,8 +522,8 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_checkpointer_restart() {
+    #[tokio::test]
+    async fn test_checkpointer_restart() {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
             FileFingerprint::BytesChecksum(3456),
@@ -520,138 +537,137 @@ mod test {
                 let mut chkptr = Checkpointer::new(data_dir.path());
                 chkptr.update_checkpoint(fingerprint, position);
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-                chkptr.write_checkpoints().ok();
+                chkptr.write_checkpoints().await.unwrap();
             }
             {
                 let mut chkptr = Checkpointer::new(data_dir.path());
                 assert_eq!(chkptr.get_checkpoint(fingerprint), None);
-                chkptr.read_checkpoints(None);
+                chkptr.read_checkpoints(None).await;
                 assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
             }
         }
     }
 
-    #[test]
-    fn test_checkpointer_fingerprint_upgrades_unknown() {
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_unknown() {
         let log_dir = tempdir().unwrap();
         let path = log_dir.path().join("test.log");
         let data = "hello\n";
-        std::fs::write(&path, data).unwrap();
+        fs::write(&path, data).await.unwrap();
 
         let new_fingerprint = FileFingerprint::DevInode(1, 2);
-        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy());
+        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.as_legacy().await);
         let position: FilePosition = 1234;
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::DevInode,
-            max_line_length: 1000,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+        let mut fingerprinter =
+            Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false, 1000);
 
         let data_dir = tempdir().unwrap();
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+            chkptr
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
+                .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
         }
     }
 
-    #[test]
-    fn test_checkpointer_fingerprint_upgrades_legacy_checksum() {
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_legacy_checksum() {
         let log_dir = tempdir().unwrap();
         let path = log_dir.path().join("test.log");
         let data = "hello\n";
-        std::fs::write(&path, data).unwrap();
+        fs::write(&path, data).await.unwrap();
 
         let old_fingerprint = FileFingerprint::FirstLinesChecksum(18057733963141331840);
         let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
         let position: FilePosition = 6;
 
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 102400,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+            102400,
+            false,
+            102400,
+        );
 
         let data_dir = tempdir().unwrap();
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+            chkptr
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
+                .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
         }
     }
 
-    #[test]
-    fn test_checkpointer_fingerprint_upgrades_legacy_first_lines_checksum() {
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_legacy_first_lines_checksum() {
         let log_dir = tempdir().unwrap();
         let path = log_dir.path().join("test.log");
         let data = "hello\n";
-        std::fs::write(&path, data).unwrap();
+        fs::write(&path, data).await.unwrap();
 
         let old_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
         let new_fingerprint = FileFingerprint::FirstLinesChecksum(11081174131906673079);
         let position: FilePosition = 6;
 
-        let fingerprinter = Fingerprinter {
-            strategy: FingerprintStrategy::FirstLinesChecksum {
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 102400,
-            ignore_not_found: false,
-        };
-
-        let mut buf = Vec::new();
+            102400,
+            false,
+            102400,
+        );
 
         let data_dir = tempdir().unwrap();
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(old_fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().ok();
+            chkptr.write_checkpoints().await.unwrap();
         }
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
 
-            chkptr.maybe_upgrade(&path, new_fingerprint, &fingerprinter, &mut buf);
+            chkptr
+                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
+                .await;
 
             assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
             assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
         }
     }
 
-    #[test]
-    fn test_checkpointer_file_upgrades() {
+    #[tokio::test]
+    async fn test_checkpointer_file_upgrades() {
         let fingerprint = FileFingerprint::DevInode(1, 2);
         let position: FilePosition = 1234;
 
@@ -662,7 +678,7 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-            chkptr.write_legacy_checkpoints().unwrap();
+            chkptr.write_legacy_checkpoints().await.unwrap();
         }
 
         // Ensure that the new files were not written but the old style of files were
@@ -674,9 +690,9 @@ mod test {
         // them normally (i.e. in the new format)
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-            chkptr.write_checkpoints().unwrap();
+            chkptr.write_checkpoints().await.unwrap();
         }
 
         // Ensure that the stable file is present, the tmp file is not, and the legacy files have
@@ -688,13 +704,13 @@ mod test {
         // Ensure one last time that we can reread from the new files and get the same result
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None);
+            chkptr.read_checkpoints(None).await;
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
     }
 
-    #[test]
-    fn test_checkpointer_expiration() {
+    #[tokio::test]
+    async fn test_checkpointer_expiration() {
         let cases = vec![
             // (checkpoint, position, seconds since removed)
             (FileFingerprint::BytesChecksum(123), 0, 30),
@@ -722,7 +738,7 @@ mod test {
         chkptr.update_checkpoint(cases[2].0, 42);
 
         // Expiration is piggybacked on the persistence interval, so do a write to trigger it
-        chkptr.write_checkpoints().unwrap();
+        chkptr.write_checkpoints().await.unwrap();
 
         assert_eq!(chkptr.get_checkpoint(cases[0].0), Some(0));
         assert_eq!(chkptr.get_checkpoint(cases[1].0), None);
@@ -730,32 +746,36 @@ mod test {
         assert_eq!(chkptr.get_checkpoint(cases[3].0), None);
     }
 
-    #[test]
-    fn test_checkpointer_checksum_updates() {
+    #[tokio::test]
+    async fn test_checkpointer_checksum_updates() {
         let data_dir = tempdir().unwrap();
 
-        let fingerprinter = crate::Fingerprinter {
-            strategy: crate::FingerprintStrategy::Checksum {
+        let mut fingerprinter = crate::Fingerprinter::new(
+            crate::FingerprintStrategy::Checksum {
                 bytes: 16,
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            max_line_length: 1024,
-            ignore_not_found: false,
-        };
+            1024,
+            false,
+            1024, // 1024 > 16
+        );
 
         let log_path = data_dir.path().join("test.log");
         let contents = "hello i am a test log line that is just long enough but not super long\n";
-        std::fs::write(&log_path, contents).expect("writing test data");
+        fs::write(&log_path, contents)
+            .await
+            .expect("writing test data");
 
-        let mut buf = vec![0; 1024];
         let old = fingerprinter
-            .get_bytes_checksum(&log_path, &mut buf)
+            .bytes_checksum(&log_path)
+            .await
             .expect("getting old checksum")
             .expect("still getting old checksum");
 
         let new = fingerprinter
-            .get_fingerprint_of_file(&log_path, &mut buf)
+            .fingerprint(&log_path)
+            .await
             .expect("getting new checksum");
 
         // make sure each is of the expected type and that the inner values are not the same
@@ -773,7 +793,9 @@ mod test {
 
         assert!(chkptr.checkpoints.contains_bytes_checksums());
 
-        chkptr.maybe_upgrade(&log_path, new, &fingerprinter, &mut buf);
+        chkptr
+            .maybe_upgrade(&log_path, new, &mut fingerprinter)
+            .await;
 
         assert!(!chkptr.checkpoints.contains_bytes_checksums());
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
@@ -781,8 +803,8 @@ mod test {
     }
 
     // guards against accidental changes to the checkpoint serialization
-    #[test]
-    fn test_checkpointer_serialization() {
+    #[tokio::test]
+    async fn test_checkpointer_serialization() {
         let fingerprints = vec![
             (
                 FileFingerprint::DevInode(1, 2),
@@ -809,11 +831,12 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
 
             chkptr.update_checkpoint(fingerprint, position);
-            chkptr.write_checkpoints().unwrap();
+            chkptr.write_checkpoints().await.unwrap();
 
             let got: serde_json::Value = {
-                let s =
-                    std::fs::read_to_string(data_dir.path().join(CHECKPOINT_FILE_NAME)).unwrap();
+                let s = fs::read_to_string(data_dir.path().join(CHECKPOINT_FILE_NAME))
+                    .await
+                    .unwrap();
                 let mut checkpoints: serde_json::Value = serde_json::from_str(&s).unwrap();
                 for checkpoint in checkpoints["checkpoints"].as_array_mut().unwrap() {
                     checkpoint.as_object_mut().unwrap().remove("modified");
@@ -827,8 +850,8 @@ mod test {
 
     // guards against accidental changes to the checkpoint deserialization and tests deserializing
     // old checkpoint versions
-    #[test]
-    fn test_checkpointer_deserialization() {
+    #[tokio::test]
+    async fn test_checkpointer_deserialization() {
         let serialized_checkpoints = r#"
 {
   "version": "1",
@@ -873,13 +896,14 @@ mod test {
 
         let mut chkptr = Checkpointer::new(data_dir.path());
 
-        std::fs::write(
+        fs::write(
             data_dir.path().join(CHECKPOINT_FILE_NAME),
             serialized_checkpoints,
         )
+        .await
         .unwrap();
 
-        chkptr.read_checkpoints(None);
+        chkptr.read_checkpoints(None).await;
 
         for fingerprint in fingerprints {
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234))

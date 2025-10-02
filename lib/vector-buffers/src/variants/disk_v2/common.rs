@@ -421,11 +421,10 @@ where
 mod tests {
     use proptest::{prop_assert, proptest, test_runner::Config};
 
-    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
-
     use super::{
         BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT, align16,
     };
+    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
 
     #[test]
     #[should_panic(expected = "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`")]
@@ -448,7 +447,7 @@ mod tests {
 
             // Make sure we're actually aligned.
             let aligned = align16(input);
-            prop_assert!(aligned % SERIALIZER_ALIGNMENT == 0);
+            prop_assert!(aligned.is_multiple_of(SERIALIZER_ALIGNMENT));
 
             // Make sure we're not overaligned, too.
             let delta = if aligned >= input {

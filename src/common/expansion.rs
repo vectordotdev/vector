@@ -1,5 +1,6 @@
-use regex::Regex;
 use std::{collections::HashMap, sync::LazyLock};
+
+use regex::Regex;
 
 use crate::event::Value;
 

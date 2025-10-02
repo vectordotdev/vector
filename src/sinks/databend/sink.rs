@@ -1,7 +1,8 @@
+use super::{
+    request_builder::DatabendRequestBuilder,
+    service::{DatabendRetryLogic, DatabendService},
+};
 use crate::sinks::prelude::*;
-
-use super::request_builder::DatabendRequestBuilder;
-use super::service::{DatabendRetryLogic, DatabendService};
 
 pub struct DatabendSink {
     batch_settings: BatcherSettings,

@@ -43,7 +43,7 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -94,7 +94,7 @@ jobs:
           "redis", "splunk", "webhdfs"
         ]
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -159,7 +159,7 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
-    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:

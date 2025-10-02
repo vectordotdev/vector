@@ -169,10 +169,18 @@ generated: configuration: configuration: {
 														"""
 						required: false
 					}
+					export_expired_items: {
+						type: bool: default: false
+						description: """
+														Set to true to export expired items via the `expired` output port.
+														Expired items ignore other settings and are exported as they are flushed from the table.
+														"""
+						required: false
+					}
 					export_interval: {
 						type: uint: {}
 						description: "Interval for exporting all data from the table when used as a source."
-						required:    true
+						required:    false
 					}
 					remove_after_export: {
 						type: bool: default: false
@@ -204,6 +212,12 @@ generated: configuration: configuration: {
 					When TTL expires, data behind a specific key in the cache is removed.
 					TTL is reset when the key is replaced.
 					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
+			ttl_field: {
+				type: string: default: ""
+				description:   "Field in the incoming value used as the TTL override."
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
@@ -302,6 +316,40 @@ generated: configuration: configuration: {
 					The path to the script or binary must be the first argument.
 					"""
 				required:      true
+				relevant_when: "type = \"exec\""
+			}
+			protocol: {
+				type: object: options: {
+					backend_config: {
+						type: "*": {}
+						description: """
+														The configuration to pass to the secrets executable. This is the `config` field in the
+														backend request. Refer to the documentation of your `backend_type `to see which options
+														are required to be set.
+														"""
+						required:      false
+						relevant_when: "version = \"v1_1\""
+					}
+					backend_type: {
+						type: string: {}
+						description:   "The name of the backend. This is `type` field in the backend request."
+						required:      true
+						relevant_when: "version = \"v1_1\""
+					}
+					version: {
+						required: false
+						type: string: {
+							enum: {
+								v1:   "Expect the command to fetch the configuration options itself."
+								v1_1: "Configuration options to the command are to be curried upon each request."
+							}
+							default: "v1"
+						}
+						description: "The protocol version."
+					}
+				}
+				description:   "Settings for the protocol between Vector and the secrets executable."
+				required:      false
 				relevant_when: "type = \"exec\""
 			}
 			timeout: {
@@ -613,7 +661,7 @@ generated: configuration: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
