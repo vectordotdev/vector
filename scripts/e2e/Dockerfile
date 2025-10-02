@@ -18,10 +18,14 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     zlib1g \
     mold
 
-RUN cargo install cargo-nextest --version 0.9.95 --locked
+COPY tests/data/ca/certs /certs
 
 COPY scripts/environment/install-protoc.sh /
-COPY tests/data/ca/certs /certs
+COPY scripts/environment/prepare.sh /
+COPY scripts/environment/binstall.sh /
+COPY scripts/environment/release-flags.sh /
+
+RUN bash /prepare.sh --modules=cargo-nextest
 RUN bash /install-protoc.sh
 
 WORKDIR /vector
