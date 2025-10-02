@@ -65,7 +65,7 @@ enum TcpError {
     NetlinkSend { source: io::Error },
     #[snafu(display("Could not parse netlink response: {}", source))]
     NetlinkParse {
-        source: netlink_packet_utils::DecodeError,
+        source: netlink_packet_core::DecodeError,
     },
     #[snafu(display("Could not recognize TCP state {state}"))]
     InvalidTcpState { state: u8 },
