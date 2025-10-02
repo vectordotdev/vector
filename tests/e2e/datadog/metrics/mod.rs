@@ -6,8 +6,9 @@ use bytes::Bytes;
 use flate2::read::ZlibDecoder;
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, BufReader};
-use tracing::warn;
+use tracing::{debug, warn};
 use vector::test_util::{compression::is_zstd, trace_init};
+use vector_common::Result;
 
 mod series;
 mod sketches;
@@ -19,16 +20,20 @@ async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
         let mut decompressor = ZstdDecoder::new(payload);
         let mut decompressed = Vec::new();
         decompressor.read_to_end(&mut decompressed).await?;
+        debug!("Zstd decompression successful: {} -> {} bytes", payload.len(), decompressed.len());
         return Ok(decompressed);
     }
 
     let mut decompressor = ZlibDecoder::new(payload);
     let mut decompressed = Vec::new();
     let result = decompressor.read_to_end(&mut decompressed);
+    if let Ok(size) = &result {
+        debug!("Zlib decompression successful: {} -> {} bytes", payload.len(), size);
+    }
     result.map(|_| decompressed)
 }
 
-async fn unpack_proto_payloads<T>(in_payloads: &FakeIntakeResponseRaw) -> Vec<T>
+async fn unpack_proto_payloads<T>(in_payloads: &FakeIntakeResponseRaw) -> Result<Vec<T>>
 where
     T: prost::Message + Default,
 {
@@ -38,7 +43,7 @@ where
         // decode base64
         let payload = BASE64_STANDARD
             .decode(&payload.data)
-            .expect("Invalid base64 data");
+            .map_err(|e| format!("Invalid base64 data: {}", e))?;
 
         // Skip empty or near-empty payloads (e.g., health checks like '{}' sent with
         // X-Requested-With: datadog-agent-diagnose header)
@@ -60,32 +65,47 @@ where
             continue;
         }
 
-        // Fakeintake appears to decompress payloads when returning them via its API.
-        // Try to decode directly as protobuf first.
-        if let Ok(decoded) = T::decode(Bytes::from(payload.clone())) {
-            out_payloads.push(decoded);
-            continue;
-        }
+        // Try to decode directly first (handles decompressed data from fakeintake)
+        let decoded = match T::decode(Bytes::from(payload.clone())) {
+            Ok(decoded) => {
+                // Successfully decoded directly - fakeintake returned decompressed data
+                debug!(
+                    "Decoded protobuf directly (fakeintake returned decompressed): type {}, size {} bytes",
+                    std::any::type_name::<T>(),
+                    payload.len()
+                );
+                decoded
+            }
+            Err(_) => {
+                // Direct decode failed - payload is still compressed, decompress first
+                debug!(
+                    "Direct decode failed, attempting decompression: type {}, size {} bytes",
+                    std::any::type_name::<T>(),
+                    payload.len()
+                );
+                let decompressed = decompress_payload(payload.as_slice())
+                    .await
+                    .map_err(|e| format!(
+                        "Failed to decompress payload: {}. Type {}, length {}, first 4 bytes: {:02x?}",
+                        e,
+                        std::any::type_name::<T>(),
+                        payload.len(),
+                        &payload[..payload.len().min(4)]
+                    ))?;
+                T::decode(Bytes::from(decompressed)).map_err(|e| {
+                    format!(
+                        "Failed to decode protobuf after decompression: {} (type {})",
+                        e,
+                        std::any::type_name::<T>()
+                    )
+                })?
+            }
+        };
 
-        // If direct decode fails, the payload might still be compressed (fallback path).
-        // This handles cases where fakeintake behavior changes or returns compressed data.
-        let decompressed = decompress_payload(payload.as_slice()).await.unwrap_or_else(|e| {
-            panic!(
-                "Failed to decompress payload: {}. Length: {}, First 4 bytes: {:02x?}, is_zstd: {}",
-                e,
-                payload.len(),
-                &payload[..payload.len().min(4)],
-                is_zstd(&payload)
-            )
-        });
-        let bytes = Bytes::from(decompressed);
-
-        let payload = T::decode(bytes).expect("Failed to decode protobuf after decompression");
-
-        out_payloads.push(payload);
+        out_payloads.push(decoded);
     }
 
-    out_payloads
+    Ok(out_payloads)
 }
 
 #[tokio::test]
