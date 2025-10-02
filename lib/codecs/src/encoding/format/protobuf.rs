@@ -10,12 +10,9 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
-use vrl::protobuf::encode::Options;
-use vrl::protobuf::{descriptor::get_message_descriptor, encode::encode_message};
-
 use vrl::protobuf::{
     descriptor::{get_message_descriptor, get_message_descriptor_from_bytes},
-    encode::encode_message,
+    encode::{Options, encode_message},
 };
 
 /// Config used to build a `ProtobufSerializer`.
