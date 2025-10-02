@@ -113,7 +113,7 @@ jobs:
     strategy:
       matrix:
         # service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ] # https://github.com/vectordotdev/vector/issues/23915
-        service: [ "datadog-metrics", "opentelemetry-logs" ]
+        service: [ "datadog-logs", "opentelemetry-logs" ]
     timeout-minutes: 90
 
     steps:
