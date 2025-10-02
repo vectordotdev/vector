@@ -20,7 +20,11 @@ async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
         let mut decompressor = ZstdDecoder::new(payload);
         let mut decompressed = Vec::new();
         decompressor.read_to_end(&mut decompressed).await?;
-        debug!("Zstd decompression successful: {} -> {} bytes", payload.len(), decompressed.len());
+        debug!(
+            "Zstd decompression successful: {} -> {} bytes",
+            payload.len(),
+            decompressed.len()
+        );
         return Ok(decompressed);
     }
 
@@ -28,7 +32,11 @@ async fn decompress_payload(payload: &[u8]) -> std::io::Result<Vec<u8>> {
     let mut decompressed = Vec::new();
     let result = decompressor.read_to_end(&mut decompressed);
     if let Ok(size) = &result {
-        debug!("Zlib decompression successful: {} -> {} bytes", payload.len(), size);
+        debug!(
+            "Zlib decompression successful: {} -> {} bytes",
+            payload.len(),
+            size
+        );
     }
     result.map(|_| decompressed)
 }
