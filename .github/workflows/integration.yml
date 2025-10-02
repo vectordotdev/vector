@@ -112,7 +112,8 @@ jobs:
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
-        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ]
+        # service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ] # https://github.com/vectordotdev/vector/issues/23915
+        service: [ "datadog-logs", "opentelemetry-logs" ]
     timeout-minutes: 90
 
     steps:
