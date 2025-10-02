@@ -27,7 +27,7 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 // Extract the shell from the environment variable `$SHELL` and substitute the above default value
 // if it isn't set.
 pub static SHELL: LazyLock<OsString> =
-    LazyLock::new(|| (env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into())));
+    LazyLock::new(|| env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into()));
 
 static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
 static CONFIG: OnceLock<Config> = OnceLock::new();

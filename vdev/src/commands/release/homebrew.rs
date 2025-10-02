@@ -14,6 +14,10 @@ pub struct Cli {
     /// GitHub username for the repository.
     #[arg(long, default_value = "vectordotdev")]
     username: String,
+
+    /// Vector version, defaults to $`VECTOR_VERSION` if not specified.
+    #[arg(long, env = "VECTOR_VERSION")]
+    vector_version: String,
 }
 
 impl Cli {
@@ -40,7 +44,8 @@ impl Cli {
 
 /// Clones the repository and sets up Git configuration
 fn clone_and_setup_git(username: &str) -> Result<()> {
-    let github_token = env::var("HOMEBREW_TOKEN")?;
+    let github_token = env::var("HOMEBREW_PAT")
+        .or_else(|_| env::var("GITHUB_TOKEN"))?;
     let homebrew_repo = format!(
         "https://{username}:{github_token}@github.com/{username}/homebrew-brew.git"
     );
@@ -59,13 +64,6 @@ where
     P: AsRef<Path>,
 {
     // URLs and SHA256s for both architectures
-    let x86_package_url = format!(
-        "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-x86_64-apple-darwin.tar.gz"
-    );
-    let x86_package_sha256 = hex::encode(sha2::Sha256::digest(
-        reqwest::blocking::get(&x86_package_url)?.bytes()?,
-    ));
-
     let arm_package_url = format!(
         "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-arm64-apple-darwin.tar.gz"
     );
@@ -81,10 +79,6 @@ where
         .map(|line| {
             if line.trim_start().starts_with("version \"") {
                 format!("  version \"{vector_version}\"")
-            } else if line.contains("# x86_64 url") {
-                format!("      url \"{x86_package_url}\" # x86_64 url")
-            } else if line.contains("# x86_64 sha256") {
-                format!("      sha256 \"{x86_package_sha256}\" # x86_64 sha256")
             } else if line.contains("# arm64 url") {
                 format!("      url \"{arm_package_url}\" # arm64 url")
             } else if line.contains("# arm64 sha256") {

@@ -1,6 +1,5 @@
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
-
 use anyhow::Result;
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -27,8 +26,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-default-features",
 ];
 // The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str =
-    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,
@@ -117,7 +115,6 @@ pub trait ContainerTestRunner: TestRunner {
             }
             RunnerState::Missing => {
                 self.build(features, directory, config_environment_variables)?;
-                self.ensure_volumes()?;
                 self.create()?;
                 self.start()?;
             }
@@ -162,6 +159,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn start(&self) -> Result<()> {
+        self.ensure_volumes()?;
         docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
@@ -196,6 +194,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
+        self.ensure_volumes()?;
         docker_command(
             [
                 "create",
@@ -276,15 +275,19 @@ impl IntegrationTestRunner {
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let mut volumes: Vec<String> = config
+            .volumes
+            .iter()
+            .map(|(a, b)| format!("{a}:{b}"))
+            .collect();
+
+        volumes.push(format!("{VOLUME_TARGET}:/output"));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes: config
-                .volumes
-                .iter()
-                .map(|(a, b)| format!("{a}:{b}"))
-                .collect(),
+            volumes,
         })
     }
 

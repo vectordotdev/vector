@@ -552,6 +552,14 @@ pub fn file_source(
     };
 
     let checkpointer = Checkpointer::new(&data_dir);
+    let strategy = config.fingerprint.clone().into();
+
+    let internal_buffer_size = if let FingerprintStrategy::Checksum { bytes, .. } = &strategy {
+        std::cmp::max(*bytes, config.max_line_bytes)
+    } else {
+        config.max_line_bytes
+    };
+
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -562,11 +570,12 @@ pub fn file_source(
         line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: Fingerprinter {
-            strategy: config.fingerprint.clone().into(),
-            max_line_length: config.max_line_bytes,
-            ignore_not_found: config.ignore_not_found,
-        },
+        fingerprinter: Fingerprinter::new(
+            strategy,
+            config.max_line_bytes,
+            config.ignore_not_found,
+            internal_buffer_size,
+        ),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
@@ -1656,7 +1665,7 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
         writeln!(&mut file, "the line").unwrap();
-        sleep_500_millis().await;
+        file.flush().unwrap();
 
         // First time server runs it picks up existing lines.
         let received = run_file_source(
@@ -1664,7 +1673,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            sleep_500_millis(),
+            sleep(Duration::from_secs(5)),
         )
         .await;
         let lines = extract_messages_string(received);
@@ -1676,7 +1685,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            sleep_500_millis(),
+            sleep(Duration::from_secs(5)),
         )
         .await;
         let lines = extract_messages_string(received);

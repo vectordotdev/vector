@@ -48,7 +48,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
+export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:latest
 # Override to disable building the container, having it pull from the GitHub packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -637,7 +637,7 @@ release-github: ## Release to GitHub
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to vectordotdev Homebrew tap
-	@cargo vdev release homebrew
+	@cargo vdev release homebrew --vector-version $(VECTOR_VERSION)
 
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights

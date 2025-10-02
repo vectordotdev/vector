@@ -1,16 +1,39 @@
+use crate::{VALID_FIELD_REGEX, encoding::GelfChunker, gelf::GELF_TARGET_PATHS, gelf_fields::*};
 use bytes::{BufMut, BytesMut};
 use lookup::event_path;
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
 use vector_core::{
     config::{DataType, log_schema},
     event::{Event, KeyString, LogEvent, Value},
     schema,
 };
 
-use crate::{VALID_FIELD_REGEX, gelf::GELF_TARGET_PATHS, gelf_fields::*};
+/// Config used to build a `GelfSerializer`.
+#[configurable_component]
+#[derive(Debug, Clone)]
+pub struct GelfSerializerOptions {
+    /// Maximum size for each GELF chunked datagram (including 12-byte header).
+    /// Chunking starts when datagrams exceed this size.
+    /// For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+    #[configurable(validation(range(min = 13)))]
+    #[serde(default = "default_max_chunk_size")]
+    pub max_chunk_size: usize,
+}
+
+const fn default_max_chunk_size() -> usize {
+    8192
+}
+
+impl Default for GelfSerializerOptions {
+    fn default() -> Self {
+        Self {
+            max_chunk_size: default_max_chunk_size(),
+        }
+    }
+}
 
 /// On GELF encoding behavior:
 ///   Graylog has a relaxed parsing. They are much more lenient than the spec would
@@ -45,27 +68,32 @@ pub enum GelfSerializerError {
 }
 
 /// Config used to build a `GelfSerializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GelfSerializerConfig;
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct GelfSerializerConfig {
+    /// The GELF Serializer Options.
+    #[serde(default, rename = "gelf")]
+    pub options: GelfSerializerOptions,
+}
 
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
-    pub const fn new() -> Self {
-        Self
+    pub const fn new(options: GelfSerializerOptions) -> Self {
+        Self { options }
     }
 
     /// Build the `GelfSerializer` from this configuration.
     pub fn build(&self) -> GelfSerializer {
-        GelfSerializer::new()
+        GelfSerializer::new(self.options.clone())
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
-    pub fn input_type() -> DataType {
+    pub fn input_type(&self) -> DataType {
         DataType::Log
     }
 
     /// The schema required by the serializer.
-    pub fn schema_requirement() -> schema::Requirement {
+    pub fn schema_requirement(&self) -> schema::Requirement {
         // While technically we support `Value` variants that can't be losslessly serialized to
         // JSON, we don't want to enforce that limitation to users yet.
         schema::Requirement::empty()
@@ -75,12 +103,14 @@ impl GelfSerializerConfig {
 /// Serializer that converts an `Event` to bytes using the GELF format.
 /// Spec: <https://docs.graylog.org/docs/gelf>
 #[derive(Debug, Clone)]
-pub struct GelfSerializer;
+pub struct GelfSerializer {
+    options: GelfSerializerOptions,
+}
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
-    pub fn new() -> Self {
-        GelfSerializer
+    pub fn new(options: GelfSerializerOptions) -> Self {
+        GelfSerializer { options }
     }
 
     /// Encode event and represent it as JSON value.
@@ -89,11 +119,12 @@ impl GelfSerializer {
         let log = to_gelf_event(event.into_log())?;
         serde_json::to_value(&log).map_err(|e| e.to_string().into())
     }
-}
 
-impl Default for GelfSerializer {
-    fn default() -> Self {
-        Self::new()
+    /// Instantiates the GELF chunking configuration.
+    pub fn chunker(&self) -> GelfChunker {
+        GelfChunker {
+            max_chunk_size: self.options.max_chunk_size,
+        }
     }
 }
 
@@ -254,7 +285,7 @@ mod tests {
     use crate::encoding::SerializerConfig;
 
     fn do_serialize(expect_success: bool, event_fields: ObjectMap) -> Option<serde_json::Value> {
-        let config = GelfSerializerConfig::new();
+        let config = GelfSerializerConfig::new(GelfSerializerOptions::default());
         let mut serializer = config.build();
         let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         let mut buffer = BytesMut::new();
@@ -273,7 +304,7 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_success() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
+        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
 
         let event_fields = btreemap! {
             VERSION => "1.1",
@@ -288,7 +319,7 @@ mod tests {
 
     #[test]
     fn gelf_serde_json_to_value_supported_failure_to_encode() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
+        let serializer = SerializerConfig::Gelf(Default::default()).build().unwrap();
         let event_fields = btreemap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
         assert!(serializer.supports_json());

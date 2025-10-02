@@ -6,6 +6,7 @@ test: "e2e"
 test_filter: "opentelemetry::logs::"
 
 runner:
+  needs_docker_socket: true
   env:
     OTEL_COLLECTOR_SOURCE_GRPC_PORT: '4317'
     OTEL_COLLECTOR_SOURCE_HTTP_PORT: '4318'

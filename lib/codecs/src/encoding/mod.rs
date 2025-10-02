@@ -1,12 +1,14 @@
 //! A collection of support structures that are used in the process of encoding
 //! events into bytes.
 
+pub mod chunking;
 pub mod format;
 pub mod framing;
 
 use std::fmt::Debug;
 
 use bytes::BytesMut;
+pub use chunking::{Chunker, Chunking, GelfChunker};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -238,7 +240,7 @@ pub enum SerializerConfig {
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
-    Gelf,
+    Gelf(GelfSerializerConfig),
 
     /// Encodes an event as [JSON][json].
     ///
@@ -314,8 +316,8 @@ impl From<CsvSerializerConfig> for SerializerConfig {
 }
 
 impl From<GelfSerializerConfig> for SerializerConfig {
-    fn from(_: GelfSerializerConfig) -> Self {
-        Self::Gelf
+    fn from(config: GelfSerializerConfig) -> Self {
+        Self::Gelf(config)
     }
 }
 
@@ -376,7 +378,7 @@ impl SerializerConfig {
             )),
             SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
-            SerializerConfig::Gelf => Ok(Serializer::Gelf(GelfSerializerConfig::new().build())),
+            SerializerConfig::Gelf(config) => Ok(Serializer::Gelf(config.build())),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
@@ -420,7 +422,7 @@ impl SerializerConfig {
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
             SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
-            SerializerConfig::Gelf => {
+            SerializerConfig::Gelf(_) => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }
         }
@@ -434,7 +436,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
-            SerializerConfig::Gelf => GelfSerializerConfig::input_type(),
+            SerializerConfig::Gelf(config) => config.input_type(),
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -454,7 +456,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),
-            SerializerConfig::Gelf => GelfSerializerConfig::schema_requirement(),
+            SerializerConfig::Gelf(config) => config.schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
@@ -535,6 +537,14 @@ impl Serializer {
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
             }
+        }
+    }
+
+    /// Returns the chunking implementation for the serializer, if any is supported.
+    pub fn chunker(&self) -> Option<Chunker> {
+        match self {
+            Serializer::Gelf(gelf) => Some(Chunker::Gelf(gelf.chunker())),
+            _ => None,
         }
     }
 }
