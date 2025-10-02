@@ -4,6 +4,7 @@ pub mod metrics;
 use reqwest::{Client, Method};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::Value;
+use tracing::debug;
 
 fn fake_intake_vector_address() -> String {
     std::env::var("FAKE_INTAKE_VECTOR_ENDPOINT")
@@ -59,11 +60,18 @@ where
     R: FakeIntakeResponseT + DeserializeOwned,
 {
     let url = &R::build_url(base, endpoint);
-    Client::new()
+    let response = Client::new()
         .request(Method::GET, url)
         .send()
         .await
-        .unwrap_or_else(|_| panic!("Sending GET request to {url} failed"))
+        .unwrap_or_else(|_| panic!("Sending GET request to {url} failed"));
+
+    trace!(
+        "Fakeintake response headers for {endpoint}: {:?}",
+        response.headers()
+    );
+
+    response
         .json::<R>()
         .await
         .expect("Parsing fakeintake payloads failed")
