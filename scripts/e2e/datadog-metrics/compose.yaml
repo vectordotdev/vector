@@ -68,13 +68,13 @@ services:
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
     # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    image: docker.io/datadog/fakeintake:v3c2ea716
 
   # Receives metric data from the `datadog-agent-vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
     # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    image: docker.io/datadog/fakeintake:v3c2ea716
 
 networks:
   default:
