@@ -266,7 +266,7 @@ impl SyslogMessage {
             if !sd.elements.is_empty() {
                 if *rfc == SyslogRFC::Rfc3164 {
                     if !self.message.is_empty() {
-                        message_part = format!("{} {}", sd_string, message_part);
+                        message_part = format!("{sd_string} {message_part}");
                     } else {
                         message_part = sd_string;
                     }

@@ -25,7 +25,7 @@ ordered-float.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true
-regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
