@@ -4,7 +4,7 @@ pub mod metrics;
 use reqwest::{Client, Method};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::Value;
-use tracing::debug;
+use tracing::trace;
 
 fn fake_intake_vector_address() -> String {
     std::env::var("FAKE_INTAKE_VECTOR_ENDPOINT")
