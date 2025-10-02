@@ -443,7 +443,7 @@ nix = { version = "0.26.2", default-features = false, features = ["socket", "sig
 
 [target.'cfg(target_os = "linux")'.dependencies]
 netlink-packet-sock-diag = { version = "0.4.2" }
-netlink-packet-core = { version = "0.8.1" }
+netlink-packet-core = { version = "0.7.0" }
 netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
 
 [build-dependencies]

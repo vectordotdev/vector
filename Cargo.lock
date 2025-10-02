@@ -6575,15 +6575,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "netlink-packet-core"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3463cbb78394cb0141e2c926b93fc2197e473394b761986eca3b9da2c63ae0f4"
-dependencies = [
- "paste",
-]
-
-[[package]]
 name = "netlink-packet-sock-diag"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6593,7 +6584,7 @@ dependencies = [
  "bitflags 1.3.2",
  "byteorder",
  "libc",
- "netlink-packet-core 0.7.0",
+ "netlink-packet-core",
  "netlink-packet-utils",
  "smallvec",
 ]
@@ -12134,7 +12125,7 @@ dependencies = [
  "metrics-tracing-context",
  "mlua",
  "mongodb",
- "netlink-packet-core 0.8.1",
+ "netlink-packet-core",
  "netlink-packet-sock-diag",
  "netlink-sys",
  "nix 0.26.2",
