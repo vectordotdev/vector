@@ -141,7 +141,7 @@ impl Timer {
         {
             // Note that changing the reporting interval would also affect the actual metric reporting frequency.
             // This check reduces debug log spamming.
-            if self.report_count % 5 == 0 {
+            if self.report_count.is_multiple_of(5) {
                 debug!(component_id = %self.component_id, utilization = %avg_rounded);
             }
             self.report_count = self.report_count.wrapping_add(1);
