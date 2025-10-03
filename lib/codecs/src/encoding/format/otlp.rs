@@ -7,7 +7,7 @@ use opentelemetry_proto::proto::{
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
-use vrl::protobuf::{descriptor::get_message_descriptor_from_bytes, parse::Options};
+use vrl::protobuf::{encode::Options};
 
 /// Config used to build an `OtlpSerializer`.
 #[configurable_component]
@@ -64,20 +64,23 @@ impl OtlpSerializer {
             use_json_names: true,
         };
 
-        let logs_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+        let logs_descriptor = ProtobufSerializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             LOGS_REQUEST_MESSAGE_TYPE,
-        )?);
+            &options,
+        )?;
 
-        let metrics_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+        let metrics_descriptor = ProtobufSerializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             METRICS_REQUEST_MESSAGE_TYPE,
-        )?);
+            &options,
+        )?;
 
-        let traces_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+        let traces_descriptor = ProtobufSerializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             TRACES_REQUEST_MESSAGE_TYPE,
-        )?);
+            &options,
+        )?;
 
         Ok(Self {
             logs_descriptor,
