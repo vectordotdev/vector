@@ -92,8 +92,7 @@ jobs:
             fi
 
             # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "merge_group" || \
-                  "${{ github.event_name }}" == "workflow_dispatch" || \
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
@@ -128,8 +127,7 @@ jobs:
           fi
 
           # Check if any of the three conditions is true
-          if [[ "${{ github.event_name }}" == "merge_group" || \
-                "${{ github.event_name }}" == "workflow_dispatch" || \
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                 "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
             bash scripts/environment/prepare.sh --modules=datadog-ci
             echo "Running test for ${{ matrix.service }}"
