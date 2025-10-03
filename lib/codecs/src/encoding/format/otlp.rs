@@ -7,7 +7,7 @@ use opentelemetry_proto::proto::{
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
-use vrl::protobuf::{encode::Options};
+use vrl::protobuf::encode::Options;
 
 /// Config used to build an `OtlpSerializer`.
 #[configurable_component]

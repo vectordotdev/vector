@@ -28,7 +28,10 @@ impl ProtobufSerializerConfig {
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
         let message_descriptor =
             get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
-        Ok(ProtobufSerializer { message_descriptor, options: Options::default() })
+        Ok(ProtobufSerializer {
+            message_descriptor,
+            options: Options::default(),
+        })
     }
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
@@ -72,13 +75,23 @@ pub struct ProtobufSerializer {
 impl ProtobufSerializer {
     /// Creates a new `ProtobufSerializer`.
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
-        Self { message_descriptor, options: Options::default() }
+        Self {
+            message_descriptor,
+            options: Options::default(),
+        }
     }
 
     /// Creates a new serializer instance using the descriptor bytes directly.
-    pub fn new_from_bytes(desc_bytes: &[u8], message_type: &str, options: &Options) -> vector_common::Result<Self> {
+    pub fn new_from_bytes(
+        desc_bytes: &[u8],
+        message_type: &str,
+        options: &Options,
+    ) -> vector_common::Result<Self> {
         let message_descriptor = get_message_descriptor_from_bytes(desc_bytes, message_type)?;
-        Ok(Self { message_descriptor, options: options.clone() })
+        Ok(Self {
+            message_descriptor,
+            options: options.clone(),
+        })
     }
 
     /// Get a description of the message type used in serialization.
@@ -92,11 +105,9 @@ impl Encoder<Event> for ProtobufSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message = match event {
-            Event::Log(log) => encode_message(
-                &self.message_descriptor,
-                log.into_parts().0,
-                &self.options,
-            ),
+            Event::Log(log) => {
+                encode_message(&self.message_descriptor, log.into_parts().0, &self.options)
+            }
             Event::Metric(_) => unimplemented!(),
             Event::Trace(trace) => encode_message(
                 &self.message_descriptor,
