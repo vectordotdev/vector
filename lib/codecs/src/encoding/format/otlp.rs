@@ -1,0 +1,101 @@
+use crate::encoding::ProtobufSerializer;
+use bytes::BytesMut;
+use opentelemetry_proto::proto::{
+    DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
+    TRACES_REQUEST_MESSAGE_TYPE,
+};
+use tokio_util::codec::Encoder;
+use vector_config_macros::configurable_component;
+use vector_core::{config::DataType, event::Event, schema};
+use vrl::protobuf::{descriptor::get_message_descriptor_from_bytes, parse::Options};
+
+/// Config used to build an `OtlpSerializer`.
+#[configurable_component]
+#[derive(Debug, Clone, Default)]
+pub struct OtlpSerializerConfig {
+    // No configuration options needed - OTLP serialization is opinionated
+}
+
+impl OtlpSerializerConfig {
+    /// Build the `OtlpSerializer` from this configuration.
+    pub fn build(&self) -> Result<OtlpSerializer, crate::encoding::BuildError> {
+        OtlpSerializer::new()
+    }
+
+    /// The data type of events that are accepted by `OtlpSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::Log | DataType::Metric | DataType::Trace
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        schema::Requirement::empty()
+    }
+}
+
+/// Serializer that converts an `Event` to bytes using the OTLP (OpenTelemetry Protocol) protobuf format.
+///
+/// This serializer encodes events using the OTLP protobuf specification, which is the recommended
+/// encoding format for OpenTelemetry data. The output is suitable for sending to OTLP-compatible
+/// endpoints with `content-type: application/x-protobuf`.
+///
+/// # Implementation approach
+///
+/// This serializer converts Vector's internal event representation to the appropriate OTLP message type:
+/// - `Event::Log` → `ExportLogsServiceRequest`
+/// - `Event::Metric` → `ExportMetricsServiceRequest`
+/// - `Event::Trace` → `ExportTraceServiceRequest`
+///
+/// The implementation should be the inverse of what the `opentelemetry` source does when
+/// `use_otlp_decoding` is enabled, ensuring round-trip compatibility.
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields will be used once encoding is implemented
+pub struct OtlpSerializer {
+    logs_descriptor: ProtobufSerializer,
+    metrics_descriptor: ProtobufSerializer,
+    traces_descriptor: ProtobufSerializer,
+    options: Options,
+}
+
+impl OtlpSerializer {
+    /// Creates a new OTLP serializer with the appropriate message descriptors.
+    pub fn new() -> vector_common::Result<Self> {
+        let options = Options {
+            use_json_names: true,
+        };
+
+        let logs_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+            DESCRIPTOR_BYTES,
+            LOGS_REQUEST_MESSAGE_TYPE,
+        )?);
+
+        let metrics_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+            DESCRIPTOR_BYTES,
+            METRICS_REQUEST_MESSAGE_TYPE,
+        )?);
+
+        let traces_descriptor = ProtobufSerializer::new(get_message_descriptor_from_bytes(
+            DESCRIPTOR_BYTES,
+            TRACES_REQUEST_MESSAGE_TYPE,
+        )?);
+
+        Ok(Self {
+            logs_descriptor,
+            metrics_descriptor,
+            traces_descriptor,
+            options,
+        })
+    }
+}
+
+impl Encoder<Event> for OtlpSerializer {
+    type Error = vector_common::Error;
+
+    fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        match &event {
+            Event::Log(_) => self.logs_descriptor.encode(event, buffer),
+            Event::Metric(_) => self.metrics_descriptor.encode(event, buffer),
+            Event::Trace(_) => self.traces_descriptor.encode(event, buffer),
+        }
+    }
+}

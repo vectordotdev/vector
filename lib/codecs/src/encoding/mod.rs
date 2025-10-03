@@ -14,9 +14,9 @@ pub use format::{
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
-    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
-    TextSerializerConfig,
+    NativeSerializerConfig, OtlpSerializer, OtlpSerializerConfig, ProtobufSerializer,
+    ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
+    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -268,6 +268,15 @@ pub enum SerializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
 
+    /// Encodes an event in the [OTLP (OpenTelemetry Protocol)][otlp] format.
+    ///
+    /// This codec uses protobuf encoding, which is the recommended format for OTLP.
+    /// The output is suitable for sending to OTLP-compatible endpoints with
+    /// `content-type: application/x-protobuf`.
+    ///
+    /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
+    Otlp,
+
     /// Encodes an event as a [Protobuf][protobuf] message.
     ///
     /// [protobuf]: https://protobuf.dev/
@@ -347,6 +356,12 @@ impl From<NativeJsonSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<OtlpSerializerConfig> for SerializerConfig {
+    fn from(_: OtlpSerializerConfig) -> Self {
+        Self::Otlp
+    }
+}
+
 impl From<ProtobufSerializerConfig> for SerializerConfig {
     fn from(config: ProtobufSerializerConfig) -> Self {
         Self::Protobuf(config)
@@ -381,6 +396,9 @@ impl SerializerConfig {
             SerializerConfig::NativeJson => {
                 Ok(Serializer::NativeJson(NativeJsonSerializerConfig.build()))
             }
+            SerializerConfig::Otlp => {
+                Ok(Serializer::Otlp(OtlpSerializerConfig::default().build()?))
+            }
             SerializerConfig::Protobuf(config) => Ok(Serializer::Protobuf(config.build()?)),
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
@@ -406,7 +424,7 @@ impl SerializerConfig {
             SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
-            SerializerConfig::Protobuf(_) => {
+            SerializerConfig::Otlp | SerializerConfig::Protobuf(_) => {
                 FramingConfig::VarintLengthDelimited(VarintLengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Cef(_)
@@ -435,6 +453,7 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
+            SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
             SerializerConfig::Protobuf(config) => config.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
@@ -454,6 +473,7 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
             SerializerConfig::Protobuf(config) => config.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
@@ -480,6 +500,8 @@ pub enum Serializer {
     Native(NativeSerializer),
     /// Uses a `NativeJsonSerializer` for serialization.
     NativeJson(NativeJsonSerializer),
+    /// Uses an `OtlpSerializer` for serialization.
+    Otlp(OtlpSerializer),
     /// Uses a `ProtobufSerializer` for serialization.
     Protobuf(ProtobufSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
@@ -499,6 +521,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Otlp(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
         }
@@ -521,6 +544,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Otlp(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
@@ -585,6 +609,12 @@ impl From<NativeJsonSerializer> for Serializer {
     }
 }
 
+impl From<OtlpSerializer> for Serializer {
+    fn from(serializer: OtlpSerializer) -> Self {
+        Self::Otlp(serializer)
+    }
+}
+
 impl From<ProtobufSerializer> for Serializer {
     fn from(serializer: ProtobufSerializer) -> Self {
         Self::Protobuf(serializer)
@@ -616,6 +646,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
+            Serializer::Otlp(serializer) => serializer.encode(event, buffer),
             Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),

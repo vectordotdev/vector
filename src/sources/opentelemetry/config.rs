@@ -20,9 +20,6 @@ use crate::{
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
-use vector_lib::opentelemetry::proto::{
-    LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE, TRACES_REQUEST_MESSAGE_TYPE,
-};
 use vector_lib::{
     codecs::decoding::ProtobufDeserializer,
     config::{LegacyKey, LogNamespace, log_schema},
@@ -34,10 +31,13 @@ use vector_lib::{
             ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
             RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
         },
-        proto::collector::{
-            logs::v1::logs_service_server::LogsServiceServer,
-            metrics::v1::metrics_service_server::MetricsServiceServer,
-            trace::v1::trace_service_server::TraceServiceServer,
+        proto::{
+            LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE, TRACES_REQUEST_MESSAGE_TYPE,
+            collector::{
+                logs::v1::logs_service_server::LogsServiceServer,
+                metrics::v1::metrics_service_server::MetricsServiceServer,
+                trace::v1::trace_service_server::TraceServiceServer,
+            },
         },
     },
     schema::Definition,

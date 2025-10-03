@@ -4,18 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use async_trait::async_trait;
-use bytes::BytesMut;
-use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
-use tokio_util::codec::Encoder as _;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, emit,
-    internal_event::{
-        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
-    },
-};
-
 use crate::{
     codecs::{Encoder, Transformer},
     common::websocket::{PingInterval, WebSocketConnector, is_closed},
@@ -24,6 +12,19 @@ use crate::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
     },
     sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
+};
+use async_trait::async_trait;
+use bytes::BytesMut;
+use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
+use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
+use tokio_util::codec::Encoder as _;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::encoding::Serializer::Otlp,
+    emit,
+    internal_event::{
+        ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+    },
 };
 
 pub struct WebSocketSink {
@@ -81,7 +82,7 @@ impl WebSocketSink {
         };
 
         match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) | Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }

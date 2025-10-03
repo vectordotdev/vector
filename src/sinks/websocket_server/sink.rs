@@ -4,6 +4,24 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use super::{
+    WebSocketListenerSinkConfig,
+    buffering::MessageBufferingConfig,
+    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+};
+use crate::{
+    codecs::{Encoder, Transformer},
+    common::http::server_auth::HttpServerAuthMatcher,
+    internal_events::{
+        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
+        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
+        WebSocketListenerMessageSent, WebSocketListenerSendError,
+    },
+    sinks::{
+        prelude::*,
+        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
+    },
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -24,6 +42,7 @@ use url::Url;
 use uuid::Uuid;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::encoding::Serializer::Otlp,
     event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
@@ -31,25 +50,6 @@ use vector_lib::{
     },
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-};
-
-use super::{
-    WebSocketListenerSinkConfig,
-    buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
-};
-use crate::{
-    codecs::{Encoder, Transformer},
-    common::http::server_auth::HttpServerAuthMatcher,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
-        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
-        WebSocketListenerMessageSent, WebSocketListenerSendError,
-    },
-    sinks::{
-        prelude::*,
-        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
-    },
 };
 
 pub struct WebSocketListenerSink {
@@ -92,7 +92,7 @@ impl WebSocketListenerSink {
         };
 
         match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) | Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }

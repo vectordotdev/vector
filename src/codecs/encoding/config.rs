@@ -1,12 +1,11 @@
+use crate::codecs::Transformer;
 use vector_lib::{
     codecs::{
-        CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+        BytesEncoder, CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
         encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     },
     configurable::configurable_component,
 };
-
-use crate::codecs::Transformer;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -130,6 +129,7 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 
         Ok((framer, serializer))
