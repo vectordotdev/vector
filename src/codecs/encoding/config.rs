@@ -10,7 +10,7 @@ use crate::codecs::Transformer;
 
 /// Encoding configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 /// Configures how events are encoded into raw bytes.
 /// The selected encoding also determines which input types (logs, metrics, traces) are supported.
 pub struct EncodingConfig {
@@ -60,7 +60,7 @@ where
 
 /// Encoding configuration.
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFraming {
     #[configurable(derived)]
