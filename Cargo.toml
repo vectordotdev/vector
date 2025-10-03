@@ -143,7 +143,7 @@ base64 = { version = "0.22.1", default-features = false }
 cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.47", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.48", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "3.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -154,7 +154,7 @@ futures = { version = "0.3.31", default-features = false, features = ["compat", 
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
-humantime = { version = "2.2.0", default-features = false }
+humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
@@ -167,7 +167,7 @@ nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.7" }
+proptest = { version = "1.8" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -183,7 +183,7 @@ serde_json = { version = "1.0.143", default-features = false, features = ["raw_v
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
-tempfile = "3.21.0"
+tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
 toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
@@ -285,7 +285,7 @@ azure_storage = { version = "0.21", default-features = false, optional = true }
 azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
 
 # Needed to bridge with outdated version of azure_core used in azure_storage*
-azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["reqwest", "hmac_openssl"] }
+azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
 
 
 # OpenDAL
@@ -432,7 +432,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
-sysinfo = "0.36.1"
+sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
