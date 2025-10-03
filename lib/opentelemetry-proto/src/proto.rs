@@ -1,3 +1,10 @@
+pub const LOGS_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
+pub const TRACES_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
+pub const METRICS_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
+
 /// Service stub and clients.
 pub mod collector {
     pub mod trace {

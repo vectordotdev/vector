@@ -2308,6 +2308,7 @@ dependencies = [
  "indoc",
  "influxdb-line-protocol",
  "memchr",
+ "opentelemetry-proto",
  "ordered-float 4.6.0",
  "prost 0.12.6",
  "prost-reflect",

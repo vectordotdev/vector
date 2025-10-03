@@ -128,6 +128,7 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
 }

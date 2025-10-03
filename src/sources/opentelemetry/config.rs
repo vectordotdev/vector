@@ -1,33 +1,5 @@
 use std::net::SocketAddr;
 
-use futures::FutureExt;
-use futures_util::{TryFutureExt, future::join};
-use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
-use vector_lib::{
-    codecs::decoding::ProtobufDeserializer,
-    config::{LegacyKey, LogNamespace, log_schema},
-    configurable::configurable_component,
-    internal_event::{BytesReceived, EventsReceived, Protocol},
-    lookup::{OwnedTargetPath, owned_value_path},
-    opentelemetry::{
-        logs::{
-            ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
-            RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
-        },
-        proto::collector::{
-            logs::v1::logs_service_server::LogsServiceServer,
-            metrics::v1::metrics_service_server::MetricsServiceServer,
-            trace::v1::trace_service_server::TraceServiceServer,
-        },
-    },
-    schema::Definition,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
-};
-use vrl::{
-    protobuf::parse::Options,
-    value::{Kind, kind::Collection},
-};
-
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -45,17 +17,40 @@ use crate::{
         util::grpc::run_grpc_server_with_routes,
     },
 };
+use futures::FutureExt;
+use futures_util::{TryFutureExt, future::join};
+use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+use vector_lib::{
+    codecs::decoding::ProtobufDeserializer,
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    internal_event::{BytesReceived, EventsReceived, Protocol},
+    lookup::{OwnedTargetPath, owned_value_path},
+    opentelemetry::{
+        logs::{
+            ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
+            RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
+        },
+        proto::{
+            LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE, TRACES_REQUEST_MESSAGE_TYPE,
+            collector::{
+                logs::v1::logs_service_server::LogsServiceServer,
+                metrics::v1::metrics_service_server::MetricsServiceServer,
+                trace::v1::trace_service_server::TraceServiceServer,
+            },
+        },
+    },
+    schema::Definition,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+};
+use vrl::{
+    protobuf::parse::Options,
+    value::{Kind, kind::Collection},
+};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
-
-pub const OTEL_PROTO_LOGS_REQUEST: &str =
-    "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
-pub const OTEL_PROTO_TRACES_REQUEST: &str =
-    "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
-pub const OTEL_PROTO_METRICS_REQUEST: &str =
-    "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
 
 /// Configuration for the `opentelemetry` source.
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
@@ -198,7 +193,7 @@ impl SourceConfig for OpentelemetryConfig {
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
-        let log_deserializer = self.get_deserializer(OTEL_PROTO_LOGS_REQUEST)?;
+        let log_deserializer = self.get_deserializer(LOGS_REQUEST_MESSAGE_TYPE)?;
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
@@ -209,7 +204,7 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let metric_deserializer = self.get_deserializer(OTEL_PROTO_METRICS_REQUEST)?;
+        let metric_deserializer = self.get_deserializer(METRICS_REQUEST_MESSAGE_TYPE)?;
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
@@ -220,7 +215,7 @@ impl SourceConfig for OpentelemetryConfig {
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let trace_deserializer = self.get_deserializer(OTEL_PROTO_TRACES_REQUEST)?;
+        let trace_deserializer = self.get_deserializer(TRACES_REQUEST_MESSAGE_TYPE)?;
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,

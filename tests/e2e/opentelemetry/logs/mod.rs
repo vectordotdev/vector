@@ -1,8 +1,5 @@
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::io;
-use std::path::Path;
-use std::process::Command;
+use std::{collections::BTreeMap, io, path::Path, process::Command};
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
