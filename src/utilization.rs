@@ -17,6 +17,8 @@ use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal};
 
 use crate::stats;
 
+const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
+
 #[pin_project]
 pub(crate) struct Utilization<S> {
     intervals: IntervalStream,
@@ -66,6 +68,8 @@ pub(crate) struct Timer {
     total_wait: Duration,
     ewma: stats::Ewma,
     gauge: Gauge,
+    #[cfg(debug_assertions)]
+    report_count: u32,
 }
 
 /// A simple, specialized timer for tracking spans of waiting vs not-waiting
@@ -85,6 +89,8 @@ impl Timer {
             total_wait: Duration::new(0, 0),
             ewma: stats::Ewma::new(0.9),
             gauge,
+            #[cfg(debug_assertions)]
+            report_count: 0,
         }
     }
 
@@ -122,8 +128,17 @@ impl Timer {
 
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
-        debug!(utilization = %avg);
-        self.gauge.set(avg);
+        let avg_rounded = (avg * 10000.0).round() / 10000.0; // 4 digit precision
+
+        #[cfg(debug_assertions)]
+        {
+            if self.report_count % 6 == 0 {
+                debug!(utilization = %avg_rounded);
+            }
+            self.report_count = self.report_count.wrapping_add(1);
+        }
+
+        self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
         self.overall_start = self.span_start;
@@ -182,7 +197,7 @@ impl UtilizationEmitter {
         let (timer_tx, timer_rx) = channel(4096);
         Self {
             timers: HashMap::default(),
-            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
+            intervals: IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION)),
             timer_tx,
             timer_rx,
         }
