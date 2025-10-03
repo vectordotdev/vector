@@ -270,6 +270,7 @@ impl SinkConfig for HttpSinkConfig {
                 (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
+                (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
         };
