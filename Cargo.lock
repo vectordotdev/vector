@@ -7002,16 +7002,16 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "oauth2"
-version = "4.4.2"
+version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c38841cdd844847e3e7c8d29cef9dcfed8877f8f56f9071f77843ecf3baf937f"
+checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.22.1",
  "chrono",
  "getrandom 0.2.15",
- "http 0.2.9",
+ "http 1.3.1",
  "rand 0.8.5",
- "reqwest 0.11.26",
+ "reqwest 0.12.9",
  "serde",
  "serde_json",
  "serde_path_to_error",
@@ -7149,16 +7149,16 @@ dependencies = [
 
 [[package]]
 name = "openidconnect"
-version = "3.5.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47e80a9cfae4462dd29c41e987edd228971d6565553fbc14b8a11e666d91590"
+checksum = "0d8c6709ba2ea764bbed26bce1adf3c10517113ddea6f2d4196e4851757ef2b2"
 dependencies = [
- "base64 0.13.1",
+ "base64 0.21.7",
  "chrono",
  "dyn-clone",
  "ed25519-dalek",
  "hmac",
- "http 0.2.9",
+ "http 1.3.1",
  "itertools 0.10.5",
  "log",
  "oauth2",
@@ -7168,7 +7168,6 @@ dependencies = [
  "rsa",
  "serde",
  "serde-value",
- "serde_derive",
  "serde_json",
  "serde_path_to_error",
  "serde_plain",
@@ -8201,9 +8200,9 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "6.3.1"
+version = "6.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cee616af00383c461f9ceb0067d15dee68e7d313ae47dbd7f8543236aed7ee9"
+checksum = "27872258cabef39eeeff1086f3a59ada760278e423be9ecf19b281a5fcd8f26f"
 dependencies = [
  "async-channel 2.3.1",
  "async-trait",
@@ -8835,7 +8834,6 @@ dependencies = [
  "http 0.2.9",
  "http-body 0.4.5",
  "hyper 0.14.28",
- "hyper-rustls 0.24.2",
  "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
@@ -8845,7 +8843,6 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
- "rustls 0.21.12",
  "rustls-pemfile 1.0.4",
  "serde",
  "serde_json",
@@ -8854,13 +8851,11 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-native-tls",
- "tokio-rustls 0.24.1",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "webpki-roots 0.25.2",
  "winreg",
 ]
 
@@ -11045,8 +11040,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.13"
-source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.13-framed-read-continue-on-error#b4bdfda8fe8aa24eba36de0d60063b14f30c7fe7"
+version = "0.7.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14307c986784f72ef81c89db7d9e28d6ac26d16213b109ea501696195e6e3ce5"
 dependencies = [
  "bytes 1.10.1",
  "futures-core",
@@ -13737,3 +13733,8 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "tokio-util"
+version = "0.7.13"
+source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.13-framed-read-continue-on-error#b4bdfda8fe8aa24eba36de0d60063b14f30c7fe7"
