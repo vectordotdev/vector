@@ -110,8 +110,15 @@ pub struct GcpCloudStorageConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[serde(flatten)]
-    pub encoding: EncodingConfigWithFraming,
+    #[configurable(derived)]
+    #[serde(default = "default_framing")]
+    #[derivative(Default(value = "default_framing()"))]
+    pub framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    pub decoding: DeserializerConfig,
 }
 
 const fn default_framing() -> FramingConfig {
