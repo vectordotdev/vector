@@ -176,26 +176,17 @@ pub enum ProcessingError {
 }
 
 pub struct State {
-    #[allow(dead_code)]
     project: String,
-    bucket_filter: Option<String>,
     auth: GcpAuthenticator,
-    #[allow(dead_code)]
     http_client: HttpClient,
     subscription: String,
     poll_secs: u32,
-    #[allow(dead_code)]
     max_messages: u32,
     concurrency: usize,
-    #[allow(dead_code)]
     delete_message: bool,
-    #[allow(dead_code)]
     delete_failed_message: bool,
-    #[allow(dead_code)]
     compression: super::Compression,
-    #[allow(dead_code)]
     multiline: Option<line_agg::Config>,
-    #[allow(dead_code)]
     decoder: Decoder,
 }
 
@@ -206,7 +197,6 @@ pub struct Ingestor {
 impl Ingestor {
     pub async fn new(
         project: String,
-        bucket_filter: Option<String>,
         auth: GcpAuthenticator,
         http_client: HttpClient,
         config: Config,
@@ -216,7 +206,6 @@ impl Ingestor {
     ) -> Result<Ingestor, IngestorNewError> {
         let state = Arc::new(State {
             project,
-            bucket_filter,
             auth,
             http_client,
             subscription: config.subscription,
@@ -531,13 +520,6 @@ impl IngestorProcess {
         notification: GcsNotification,
         batch: &Option<BatchNotifier>,
     ) -> Result<Vec<crate::event::Event>, ProcessingError> {
-        // Filter by bucket if specified
-        if let Some(ref bucket_filter) = self.state.bucket_filter {
-            if &notification.bucket != bucket_filter {
-                return Ok(Vec::new());
-            }
-        }
-
         debug!(
             message = "Processing GCS notification",
             bucket = notification.bucket,
@@ -643,7 +625,7 @@ impl IngestorProcess {
             .get("content-encoding")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
-        
+
         let content_type = response.headers()
             .get("content-type")
             .and_then(|v| v.to_str().ok())
