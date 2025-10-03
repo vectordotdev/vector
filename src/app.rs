@@ -82,6 +82,7 @@ impl ApplicationConfig {
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
+            opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
@@ -268,6 +269,7 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
+            interpolate_env: !root_opts.disable_env_var_interpolation,
         })
     }
 }
@@ -279,6 +281,7 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
+    pub interpolate_env: bool,
 }
 
 impl StartedApplication {
@@ -294,6 +297,7 @@ impl StartedApplication {
             topology_controller,
             internal_topologies,
             allow_empty_config,
+            interpolate_env,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -310,6 +314,7 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     allow_empty_config,
+                    interpolate_env,
                 ).await {
                     break signal;
                 },
@@ -338,6 +343,7 @@ async fn handle_signal(
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     allow_empty_config: bool,
+    interpolate_env: bool,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadComponents(components_to_reload)) => {
@@ -356,6 +362,7 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
+                interpolate_env,
             )
             .await;
 
@@ -378,6 +385,7 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
+                interpolate_env,
             )
             .await;
 
@@ -520,6 +528,7 @@ pub async fn load_configs(
     watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
+    interpolate_env: bool,
     graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
@@ -539,6 +548,7 @@ pub async fn load_configs(
         &config_paths,
         signal_handler,
         allow_empty_config,
+        interpolate_env,
     )
     .await
     .map_err(handle_config_errors)?;
