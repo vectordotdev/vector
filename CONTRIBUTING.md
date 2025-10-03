@@ -146,7 +146,6 @@ make check-component-docs
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
 make check-docs
-make check-version
 make check-examples
 make check-scripts
 
