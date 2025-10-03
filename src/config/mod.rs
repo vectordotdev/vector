@@ -109,7 +109,7 @@ impl ComponentConfig {
         }
     }
 
-    pub fn contains(&self, config_paths: &[PathBuf]) -> Option<(ComponentKey, ComponentType)> {
+    pub fn contains(&self, config_paths: &HashSet<PathBuf>) -> Option<(ComponentKey, ComponentType)> {
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
             return Some((self.component_key.clone(), self.component_type.clone()));
         }
