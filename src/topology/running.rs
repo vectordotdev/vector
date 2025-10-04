@@ -703,8 +703,33 @@ impl RunningTopology {
                 self.inputs_tap_metadata.remove(key);
             }
 
+            let removed_sources = diff.enrichment_tables.to_remove.iter().filter_map(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_source(key).map(|(key, _)| key))
+            });
+            for key in removed_sources {
+                // Sources only have outputs
+                self.outputs_tap_metadata.remove(&key);
+            }
+
             for key in diff.sources.changed_and_added() {
                 if let Some(task) = new_pieces.tasks.get(key) {
+                    self.outputs_tap_metadata
+                        .insert(key.clone(), ("source", task.typetag().to_string()));
+                }
+            }
+
+            for key in diff
+                .enrichment_tables
+                .changed_and_added()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key).map(|(key, _)| key))
+                })
+            {
+                if let Some(task) = new_pieces.tasks.get(&key) {
                     self.outputs_tap_metadata
                         .insert(key.clone(), ("source", task.typetag().to_string()));
                 }
@@ -735,7 +760,7 @@ impl RunningTopology {
             .changed_and_added()
             .filter(|k| new_pieces.source_tasks.contains_key(k))
             .collect();
-        for key in added_changed_table_sources {
+        for key in added_changed_table_sources.iter() {
             debug!(component = %key, "Connecting outputs for enrichment table source.");
             self.setup_outputs(key, new_pieces).await;
         }
@@ -764,7 +789,7 @@ impl RunningTopology {
             .changed_and_added()
             .filter(|k| new_pieces.inputs.contains_key(k))
             .collect();
-        for key in added_changed_tables {
+        for key in added_changed_tables.iter() {
             debug!(component = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
@@ -814,11 +839,17 @@ impl RunningTopology {
                         .sources
                         .changed_and_added()
                         .map(|key| key.to_string())
+                        .chain(
+                            added_changed_table_sources
+                                .iter()
+                                .map(|key| key.to_string()),
+                        )
                         .collect(),
                     sink_keys: diff
                         .sinks
                         .changed_and_added()
                         .map(|key| key.to_string())
+                        .chain(added_changed_tables.iter().map(|key| key.to_string()))
                         .collect(),
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
