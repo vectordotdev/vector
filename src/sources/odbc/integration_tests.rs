@@ -2,7 +2,7 @@ use crate::sources::odbc::client::{execute_query, OdbcConfig};
 use crate::test_util::components::run_and_assert_source_compliance;
 use crate::test_util::components::SOURCE_TAGS;
 use bytes::Bytes;
-//use chrono::TimeZone;
+use chrono::TimeZone;
 use chrono_tz::Tz;
 use odbc_api::ConnectionOptions;
 use ordered_float::NotNan;
@@ -637,199 +637,115 @@ INSERT INTO string_columns (
         Value::Bytes(Bytes::from_static(b"longtext"))
     );
 }
-//
-// #[tokio::test]
-// async fn query_other_columns() {
-//     let conn_str = get_conn_str();
-//     let env = odbc_api::Environment::new().unwrap();
-//     let conn = env
-//         .connect_with_connection_string(&conn_str, ConnectionOptions::default())
-//         .unwrap();
-//     let _ = conn
-//         .execute("DROP TABLE IF EXISTS other_columns;", (), Some(3))
-//         .unwrap();
-//     let _ = conn
-//         .execute(
-//             r#"
-// CREATE TABLE other_columns (
-//     binary_col             BINARY(1)                         NULL,
-//     blob_col               BLOB                              NULL,
-//     longblob_col           LONGBLOB                          NULL,
-//     mediumblob_col         MEDIUMBLOB                        NULL,
-//     tinyblob_col           TINYBLOB                          NULL,
-//     varbinary_col          VARBINARY(10)                     NULL,
-//     enum_col               ENUM ('small', 'medium', 'large') NULL,
-//     set_col                SET ('a', 'b', 'c')               NULL,
-//
-//     date_col               DATE                              NULL,
-//     datetime_col           DATETIME                          NULL,
-//     time_col               TIME                              NULL,
-//     timestamp_col          TIMESTAMP                         NULL,
-//     year_col               YEAR                              NULL,
-//     uuid_col               UUID                              NULL,
-//     json_col               LONGTEXT COLLATE utf8mb4_bin      NULL
-//                            CHECK (JSON_VALID(`json_col`)),
-//     geometry_col           GEOMETRY                          NULL,
-//     geometrycollection_col GEOMETRYCOLLECTION                NULL,
-//     liststring_col         LINESTRING                        NULL,
-//     multilinestring_col    MULTILINESTRING                   NULL,
-//     multipoint_col         MULTIPOINT                        NULL,
-//     multipolygon_col       MULTIPOLYGON                      NULL
-// ) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
-//             "#,
-//             (),
-//             Some(3),
-//         )
-//         .unwrap();
-//
-//     let _ = conn
-//         .execute(
-//             r#"
-// INSERT INTO other_columns (
-//     binary_col,
-//     blob_col,
-//     longblob_col,
-//     mediumblob_col,
-//     tinyblob_col,
-//     varbinary_col,
-//     enum_col,
-//     set_col,
-//     date_col,
-//     datetime_col,
-//     time_col,
-//     timestamp_col,
-//     year_col,
-//     uuid_col,
-//     json_col,
-//     geometry_col,
-//     geometrycollection_col,
-//     liststring_col,
-//     multilinestring_col,
-//     multipoint_col,
-//     multipolygon_col
-// ) VALUES (
-//     0x41,                                    -- binary(1) = 'A'
-//     'Blob',                                  -- blob
-//     'Long Blob',                             -- longblob
-//     'Midium Blob',                           -- mediumblob
-//     'Tiny Blob',                             -- tinyblob
-//     0x53616D706C65,                          -- varbinary(10) = 'Sample'
-//     'medium',                                -- enum('small','medium','large')
-//     'a,b',                                   -- set('a','b','c')
-//     '2025-09-28',                            -- date
-//     '2025-09-28 12:34:56',                   -- datetime
-//     '12:34:56',                              -- time
-//     '2025-09-28 12:34:56',                   -- timestamp (fixed quote and format)
-//     2025,                                    -- year
-//     '550e8400-e29b-41d4-a716-446655440000',  -- uuid (use single quotes)
-//     '{ "key": "value" }',                    -- json
-//     ST_GeomFromText('POINT(1 1)'),           -- geometry (quote WKT)
-//     ST_GeomFromText('GEOMETRYCOLLECTION(POINT(1 1),LINESTRING(0 0,1 1))'), -- geometrycollection
-//     ST_GeomFromText('LINESTRING(0 0,1 1)'),  -- linestring (fix stray quote and quote WKT)
-//     ST_GeomFromText('MULTILINESTRING((0 0,1 1),(2 2,3 3))'), -- multilinestring (quote WKT)
-//     ST_GeomFromText('MULTIPOINT(1 1,2 2)'),  -- multipoint (quote WKT)
-//     ST_GeomFromText('MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))') -- multipolygon (quote WKT)
-// );
-//             "#,
-//             (),
-//             Some(3),
-//         )
-//         .unwrap();
-//
-//     let rows = execute_query(
-//         &env,
-//         &conn_str,
-//         "SELECT * FROM other_columns;",
-//         vec![],
-//         Duration::from_secs(3),
-//         Tz::UTC,
-//         10,
-//         1000,
-//     )
-//     .unwrap();
-//
-//     let Value::Object(row) = &rows[0] else {
-//         panic!("No rows returned")
-//     };
-//
-//     assert_eq!(
-//         *row.get("binary_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"A"))
-//     );
-//     assert_eq!(
-//         *row.get("blob_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"Blob"))
-//     );
-//     assert_eq!(
-//         *row.get("longblob_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"Long Blob"))
-//     );
-//     assert_eq!(
-//         *row.get("mediumblob_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"Midium Blob"))
-//     );
-//     assert_eq!(
-//         *row.get("tinyblob_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"Tiny Blob"))
-//     );
-//     assert_eq!(
-//         *row.get("varbinary_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"Sample"))
-//     );
-//     assert_eq!(
-//         *row.get("enum_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"medium"))
-//     );
-//     assert_eq!(
-//         *row.get("set_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"a,b"))
-//     );
-//     assert_eq!(
-//         *row.get("date_col").unwrap(),
-//         Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 9, 28, 0, 0, 0).unwrap())
-//     );
-//     assert_eq!(
-//         *row.get("datetime_col").unwrap(),
-//         Value::Timestamp(
-//             chrono::Utc
-//                 .with_ymd_and_hms(2025, 9, 28, 12, 34, 56)
-//                 .unwrap()
-//         )
-//     );
-//     assert_eq!(
-//         *row.get("time_col").unwrap(),
-//         Value::Timestamp(
-//             chrono::Utc
-//                 .with_ymd_and_hms(1970, 1, 1, 12, 34, 56)
-//                 .unwrap()
-//         )
-//     );
-//     assert_eq!(
-//         *row.get("timestamp_col").unwrap(),
-//         Value::Timestamp(
-//             chrono::Utc
-//                 .with_ymd_and_hms(2025, 9, 28, 12, 34, 56)
-//                 .unwrap()
-//         )
-//     );
-//     assert_eq!(*row.get("year_col").unwrap(), Value::Integer(2025));
-//     assert_eq!(
-//         *row.get("uuid_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"550e8400-e29b-41d4-a716-446655440000"))
-//     );
-//     assert_eq!(
-//         *row.get("json_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(b"{ \"key\": \"value\" }"))
-//     );
-//     assert_eq!(
-//         *row.get("geometry_col").unwrap(),
-//         Value::Bytes(Bytes::from_static(
-//             b"\0\0\0\0\x01\x01\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?"
-//         ))
-//     );
-//     assert_eq!(*row.get("geometrycollection_col").unwrap(), Value::Bytes(Bytes::from_static(b"\0\0\0\0\x01\x07\0\0\0\x02\0\0\0\x01\x01\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\x01\x02\0\0\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?")));
-//     assert_eq!(*row.get("liststring_col").unwrap(), Value::Bytes(Bytes::from_static(b"\0\0\0\0\x01\x02\0\0\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?")));
-//     assert_eq!(*row.get("multilinestring_col").unwrap(), Value::Bytes(Bytes::from_static(b"\0\0\0\0\x01\x05\0\0\0\x02\0\0\0\x01\x02\0\0\0\x02\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\x01\x02\0\0\0\x02\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\x08@\0\0\0\0\0\0\x08@")));
-//     assert_eq!(*row.get("multipoint_col").unwrap(), Value::Bytes(Bytes::from_static(b"\0\0\0\0\x01\x04\0\0\0\x02\0\0\0\x01\x01\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\x01\x01\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@")));
-//     assert_eq!(*row.get("multipolygon_col").unwrap(), Value::Bytes(Bytes::from_static(b"\0\0\0\0\x01\x06\0\0\0\x01\0\0\0\x01\x03\0\0\0\x01\0\0\0\x05\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\xf0?\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0")));
-// }
+
+#[tokio::test]
+async fn query_timestamp_columns() {
+    let conn_str = get_conn_str();
+    let env = odbc_api::Environment::new().unwrap();
+    let conn = env
+        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
+        .unwrap();
+    let _ = conn
+        .execute("DROP TABLE IF EXISTS timestamp_columns;", (), Some(3))
+        .unwrap();
+    let _ = conn
+        .execute(
+            match get_db_type() {
+                DbType::MariaDb => r#"
+CREATE TABLE timestamp_columns (
+    date_col               DATE                              NULL,
+    datetime_col           DATETIME                          NULL,
+    time_col               TIME                              NULL,
+    timestamp_col          TIMESTAMP                         NULL,
+    year_col               YEAR                              NULL
+) DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+                "#,
+                DbType::Postgres => r#"
+CREATE TABLE timestamp_columns (
+    date_col       DATE,                          -- MySQL DATE → PostgreSQL DATE
+    datetime_col   TIMESTAMP,                     -- MySQL DATETIME → PostgreSQL TIMESTAMP
+    time_col       TIME,                          -- Same in both
+    timestamp_col  TIMESTAMP,                     -- Same type (use TIMESTAMPTZ if timezone is needed)
+    year_col       SMALLINT                       -- MySQL YEAR → PostgreSQL SMALLINT
+);
+                "#,
+            },
+            (),
+            Some(3),
+        )
+        .unwrap();
+
+    let _ = conn
+        .execute(
+            r#"
+INSERT INTO timestamp_columns (
+    date_col,
+    datetime_col,
+    time_col,
+    timestamp_col,
+    year_col
+)
+VALUES (
+    '2025-10-04',
+    '2025-10-04 12:34:56',
+    '15:30:00',
+    '2025-10-04 12:34:56',
+    2025
+);
+                "#,
+            (),
+            Some(3),
+        )
+        .unwrap();
+
+    let rows = execute_query(
+        &env,
+        &conn_str,
+        "SELECT * FROM timestamp_columns;",
+        vec![],
+        Duration::from_secs(3),
+        Tz::UTC,
+        10,
+        1000,
+    )
+    .unwrap();
+
+    println!("Rows Count: {}", rows.len());
+    for row in &rows {
+        if let Value::Object(map) = row {
+            for (key, value) in map {
+                println!("{}: {:?}", key, value);
+            }
+        }
+    }
+
+    let Value::Object(row) = &rows[0] else {
+        panic!("No rows returned")
+    };
+
+    assert_eq!(
+        *row.get("date_col").unwrap(),
+        Value::Timestamp(chrono::Utc.with_ymd_and_hms(2025, 10, 4, 0, 0, 0).unwrap())
+    );
+    assert_eq!(
+        *row.get("datetime_col").unwrap(),
+        Value::Timestamp(
+            chrono::Utc
+                .with_ymd_and_hms(2025, 10, 4, 12, 34, 56)
+                .unwrap()
+        )
+    );
+    assert_eq!(
+        *row.get("time_col").unwrap(),
+        Value::Timestamp(chrono::Utc.with_ymd_and_hms(1970, 1, 1, 15, 30, 0).unwrap())
+    );
+    assert_eq!(
+        *row.get("timestamp_col").unwrap(),
+        Value::Timestamp(
+            chrono::Utc
+                .with_ymd_and_hms(2025, 10, 4, 12, 34, 56)
+                .unwrap()
+        )
+    );
+    assert_eq!(*row.get("year_col").unwrap(), Value::Integer(2025));
+}
