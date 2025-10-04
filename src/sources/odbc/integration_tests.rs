@@ -15,19 +15,26 @@ use vrl::value::Value;
 
 enum DbType {
     MariaDb,
-    Postgres
+    Postgres,
 }
 
 fn get_db_type() -> DbType {
     match std::env::var("ODBC_DB_TYPE").as_deref() {
         Ok("mariadb") => DbType::MariaDb,
         Ok("postgresql") => DbType::Postgres,
-        _ => panic!("Required environment variable 'ODBC_DB_TYPE'")
+        _ => panic!("Required environment variable 'ODBC_DB_TYPE'"),
     }
 }
 
 fn get_conn_str() -> String {
     std::env::var("ODBC_CONN_STRING").expect("Required environment variable 'ODBC_CONN_STRING'")
+}
+
+fn get_conn_opt() -> ConnectionOptions {
+    ConnectionOptions {
+        login_timeout_sec: Some(3),
+        packet_size: None,
+    }
 }
 
 fn get_value_from_event<'a>(event: &'a Event, key: &str) -> Option<Cow<'a, str>> {
@@ -85,7 +92,7 @@ async fn query_executed_with_init_params() {
     let conn_str = get_conn_str();
     let env = odbc_api::Environment::new().unwrap();
     let conn = env
-        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
+        .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
@@ -93,22 +100,26 @@ async fn query_executed_with_init_params() {
     let _ = conn
         .execute(
             match get_db_type() {
-                DbType::MariaDb => r#"
+                DbType::MariaDb => {
+                    r#"
 CREATE TABLE odbc_table
 (
     id int auto_increment primary key,
     name varchar(255) null,
     datetime datetime null
 );
-    "#,
-                DbType::Postgres => r#"
+    "#
+                }
+                DbType::Postgres => {
+                    r#"
 CREATE TABLE odbc_table
 (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255),
     "datetime" TIMESTAMP NULL
 );
-"#,
+"#
+                }
             },
             (),
             Some(3),
@@ -180,7 +191,7 @@ async fn query_executed_with_filepath() {
     let conn_str = get_conn_str();
     let env = odbc_api::Environment::new().unwrap();
     let conn = env
-        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
+        .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
     let _ = conn
         .execute("DROP TABLE IF EXISTS odbc_table;", (), Some(3))
@@ -188,20 +199,24 @@ async fn query_executed_with_filepath() {
     let _ = conn
         .execute(
             match get_db_type() {
-                DbType::MariaDb => r#"
+                DbType::MariaDb => {
+                    r#"
 CREATE TABLE odbc_table
 (
     id int auto_increment primary key,
     name varchar(255) null,
     datetime datetime null
-);"#,
-                DbType::Postgres => r#"
+);"#
+                }
+                DbType::Postgres => {
+                    r#"
 CREATE TABLE odbc_table
 (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255),
     "datetime" TIMESTAMP NULL
 );"#
+                }
             },
             (),
             Some(3),
@@ -275,7 +290,7 @@ async fn query_number_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::Environment::new().unwrap();
     let conn = env
-        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
+        .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
     let _ = conn
         .execute("DROP TABLE IF EXISTS number_columns;", (), Some(3))
@@ -283,7 +298,8 @@ async fn query_number_types() {
     let _ = conn
         .execute(
             match get_db_type() {
-                DbType::MariaDb => r#"
+                DbType::MariaDb => {
+                    r#"
 create table number_columns
 (
     int_col                int(10)                           null,
@@ -298,8 +314,10 @@ create table number_columns
     float_col              float                             null,
     decimal_col            decimal(10, 2)                    null
 );
-                "#,
-                DbType::Postgres => r#"
+                "#
+                }
+                DbType::Postgres => {
+                    r#"
 CREATE TABLE number_columns
 (
     int_col        INTEGER,            -- integer
@@ -315,6 +333,7 @@ CREATE TABLE number_columns
     decimal_col    NUMERIC(10,2)       -- MySQL DECIMAL mapped to PostgreSQL NUMERIC(p,s)
 );
                 "#
+                }
             },
             (),
             Some(3),
@@ -415,7 +434,10 @@ INSERT INTO number_columns (
     assert_eq!(*row.get("int_col").unwrap(), Value::Integer(-2147483648));
     match get_db_type() {
         DbType::MariaDb => assert_eq!(*row.get("bit_col").unwrap(), Value::Boolean(false)),
-        DbType::Postgres => assert_eq!(*row.get("bit_col").unwrap(), Value::Bytes(Bytes::from_static(b"0")))
+        DbType::Postgres => assert_eq!(
+            *row.get("bit_col").unwrap(),
+            Value::Bytes(Bytes::from_static(b"0"))
+        ),
     }
     assert_eq!(*row.get("mediumint_col").unwrap(), Value::Integer(-8388608));
     assert_eq!(*row.get("middleint_col").unwrap(), Value::Integer(-8388608));
@@ -427,15 +449,24 @@ INSERT INTO number_columns (
     );
     match get_db_type() {
         DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Boolean(false)),
-        DbType::Postgres => assert_eq!(*row.get("boolean_col").unwrap(), Value::Bytes(Bytes::from_static(b"0")))
+        DbType::Postgres => assert_eq!(
+            *row.get("boolean_col").unwrap(),
+            Value::Bytes(Bytes::from_static(b"0"))
+        ),
     }
     assert_eq!(
         *row.get("double_col").unwrap(),
         Value::Float(NotNan::new(-1.7976931348623157e308).unwrap())
     );
     match get_db_type() {
-        DbType::MariaDb => assert_eq!(*row.get("float_col").unwrap(), Value::Float(NotNan::new(-3.40282e38).unwrap())),
-        DbType::Postgres => assert_eq!(*row.get("float_col").unwrap(), Value::Float(NotNan::new(-3.4028235e38).unwrap()))
+        DbType::MariaDb => assert_eq!(
+            *row.get("float_col").unwrap(),
+            Value::Float(NotNan::new(-3.40282e38).unwrap())
+        ),
+        DbType::Postgres => assert_eq!(
+            *row.get("float_col").unwrap(),
+            Value::Float(NotNan::new(-3.4028235e38).unwrap())
+        ),
     }
     assert_eq!(
         *row.get("decimal_col").unwrap(),
@@ -448,7 +479,10 @@ INSERT INTO number_columns (
     assert_eq!(*row.get("int_col").unwrap(), Value::Integer(2147483647));
     match get_db_type() {
         DbType::MariaDb => assert_eq!(*row.get("bit_col").unwrap(), Value::Boolean(true)),
-        DbType::Postgres => assert_eq!(*row.get("bit_col").unwrap(), Value::Bytes(Bytes::from_static(b"1")))
+        DbType::Postgres => assert_eq!(
+            *row.get("bit_col").unwrap(),
+            Value::Bytes(Bytes::from_static(b"1"))
+        ),
     }
     assert_eq!(*row.get("mediumint_col").unwrap(), Value::Integer(8388607));
     assert_eq!(*row.get("middleint_col").unwrap(), Value::Integer(8388607));
@@ -460,15 +494,24 @@ INSERT INTO number_columns (
     );
     match get_db_type() {
         DbType::MariaDb => assert_eq!(*row.get("boolean_col").unwrap(), Value::Boolean(true)),
-        DbType::Postgres => assert_eq!(*row.get("boolean_col").unwrap(), Value::Bytes(Bytes::from_static(b"1")))
+        DbType::Postgres => assert_eq!(
+            *row.get("boolean_col").unwrap(),
+            Value::Bytes(Bytes::from_static(b"1"))
+        ),
     }
     assert_eq!(
         *row.get("double_col").unwrap(),
         Value::Float(NotNan::new(1.7976931348623157e308).unwrap())
     );
     match get_db_type() {
-        DbType::MariaDb => assert_eq!(*row.get("float_col").unwrap(), Value::Float(NotNan::new(3.40282e38).unwrap())),
-        DbType::Postgres => assert_eq!(*row.get("float_col").unwrap(), Value::Float(NotNan::new(3.4028235e38).unwrap()))
+        DbType::MariaDb => assert_eq!(
+            *row.get("float_col").unwrap(),
+            Value::Float(NotNan::new(3.40282e38).unwrap())
+        ),
+        DbType::Postgres => assert_eq!(
+            *row.get("float_col").unwrap(),
+            Value::Float(NotNan::new(3.4028235e38).unwrap())
+        ),
     }
     assert_eq!(
         *row.get("decimal_col").unwrap(),
@@ -483,7 +526,7 @@ async fn query_string_types() {
     let conn_str = get_conn_str();
     let env = odbc_api::Environment::new().unwrap();
     let conn = env
-        .connect_with_connection_string(&conn_str, ConnectionOptions::default())
+        .connect_with_connection_string(&conn_str, get_conn_opt())
         .unwrap();
     let _ = conn
         .execute("DROP TABLE IF EXISTS string_columns;", (), Some(3))
@@ -491,7 +534,8 @@ async fn query_string_types() {
     let _ = conn
         .execute(
             match get_db_type() {
-                DbType::MariaDb => r#"
+                DbType::MariaDb => {
+                    r#"
 CREATE TABLE string_columns (
     char10_col        CHAR(10)       NULL,
     nchar10_col       NCHAR(10)      NULL,
@@ -501,8 +545,10 @@ CREATE TABLE string_columns (
     mediumtext_col    MEDIUMTEXT     NULL,
     longtext_col      LONGTEXT       NULL
 ) DEFAULT CHARSET = utf8mb3 COLLATE = utf8mb3_general_ci;
-            "#,
-                DbType::Postgres => r#"
+            "#
+                }
+                DbType::Postgres => {
+                    r#"
 CREATE TABLE string_columns (
     char10_col       CHAR(10),       -- fixed-length character column (10)
     nchar10_col      CHAR(10),       -- PostgreSQL has no NCHAR; use CHAR with UTF-8 encoding
@@ -513,6 +559,7 @@ CREATE TABLE string_columns (
     longtext_col     TEXT            -- PostgreSQL has no LONGTEXT; use TEXT
 );
                 "#
+                }
             },
             (),
             Some(3),

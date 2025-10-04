@@ -5,7 +5,7 @@ test_filter: '::odbc::'
 
 env:
   ODBC_DB_TYPE: "postgresql"
-  ODBC_CONN_STRING: "driver={PostgreSQL ODBC Driver};server=postgresql;port=5432;database=vector_db;uid=vector;pwd=vector;"
+  ODBC_CONN_STRING: "driver={PostgreSQL Unicode};server=postgresql;port=5432;database=vector_db;uid=vector;pwd=vector;"
 
 matrix:
   version: [ '16' ]

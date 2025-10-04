@@ -5,7 +5,7 @@ test_filter: '::odbc::'
 
 env:
   ODBC_DB_TYPE: "mariadb"
-  ODBC_CONN_STRING: "driver={MariaDB ODBC 3.0 Driver};server=mariadb;port=3306;database=vector_db;uid=vector;pwd=vector;"
+  ODBC_CONN_STRING: "driver={MariaDB Unicode};server=mariadb;port=3306;database=vector_db;uid=vector;pwd=vector;"
 
 matrix:
   version: [ '11-jammy' ]
